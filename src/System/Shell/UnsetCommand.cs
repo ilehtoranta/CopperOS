@@ -26,15 +26,24 @@ public static class UnsetCommand
             return (int)ShellCommandResult.Fail;
 
         if (!ReadArgsCommandSupport.Prepare(ref platform, nameBuffer,
-                nameCapacity, ReadArgsCommandTemplate.UnsetOptional, 4,
+                nameCapacity, ReadArgsCommandTemplate.UnsetOptional,
+                ReadArgsPointerResultRecord.Size,
                 out var resultArray, out var templateLength))
             return (int)ShellCommandResult.Error;
 
         if (!platform.TryReadArgs(invocation.ArgumentText,
                 invocation.ArgumentLength, nameBuffer, templateLength,
-                resultArray, 4, out var rdArgs) || rdArgs.IsNull)
+                resultArray, ReadArgsPointerResultRecord.Size,
+                out var rdArgs) || rdArgs.IsNull)
             return (int)ShellCommandResult.Error;
-        var name = APTR.FromPointer(platform.ReadUInt32(resultArray));
+
+        if (!ReadArgsPointerResultRecordCodec.TryRead(ref platform,
+                resultArray, out var parsed))
+        {
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
+        }
+        var name = parsed.Value;
         if (name.IsNull)
         {
             platform.FreeArgs(rdArgs);

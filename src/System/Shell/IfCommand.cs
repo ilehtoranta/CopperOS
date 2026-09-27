@@ -34,44 +34,42 @@ public static class IfCommand
             return (int)ShellCommandResult.Fail;
 
         if (!ReadArgsCommandSupport.Prepare(ref platform, tokenBuffer,
-                tokenCapacity, ReadArgsCommandTemplate.If, 44,
+                tokenCapacity, ReadArgsCommandTemplate.If,
+                IfReadArgsResultRecord.Size,
                 out var resultArray, out var templateLength))
             return (int)ShellCommandResult.Error;
 
         if (!platform.TryReadArgs(invocation.ArgumentText,
                 invocation.ArgumentLength, tokenBuffer, templateLength,
-                resultArray, 44, out var rdArgs) || rdArgs.IsNull)
+                resultArray, IfReadArgsResultRecord.Size,
+                out var rdArgs) || rdArgs.IsNull)
             return (int)ShellCommandResult.Error;
 
-        var not = platform.ReadUInt32(resultArray);
-        var warn = platform.ReadUInt32(resultArray, 4);
-        var error = platform.ReadUInt32(resultArray, 8);
-        var fail = platform.ReadUInt32(resultArray, 12);
-        var left = APTR.FromPointer(platform.ReadUInt32(resultArray, 16));
-        var equal = APTR.FromPointer(platform.ReadUInt32(resultArray, 20));
-        var greater = APTR.FromPointer(platform.ReadUInt32(resultArray, 24));
-        var greaterEqual = APTR.FromPointer(platform.ReadUInt32(resultArray, 28));
-        var value = platform.ReadUInt32(resultArray, 32);
-        var exists = APTR.FromPointer(platform.ReadUInt32(resultArray, 36));
-        var noRequester = platform.ReadUInt32(resultArray, 40);
+        if (!IfReadArgsResultRecordCodec.TryRead(ref platform,
+                resultArray, out var parsed))
+        {
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
+        }
 
         uint condition = 0;
         uint threshold = 0;
-        var thresholdCount = (warn != 0 ? 1u : 0u) +
-            (error != 0 ? 1u : 0u) + (fail != 0 ? 1u : 0u);
+        var thresholdCount = (parsed.Warn != 0 ? 1u : 0u) +
+            (parsed.Error != 0 ? 1u : 0u) +
+            (parsed.Fail != 0 ? 1u : 0u);
         if (thresholdCount != 0)
         {
             condition = (uint)ShellIfCondition.PreviousResult;
             // MorphOS selects the lowest supplied threshold.
-            threshold = warn != 0 ? (uint)ShellCommandResult.Warn :
-                error != 0 ? (uint)ShellCommandResult.Error :
+            threshold = parsed.Warn != 0 ? (uint)ShellCommandResult.Warn :
+                parsed.Error != 0 ? (uint)ShellCommandResult.Error :
                 (uint)ShellCommandResult.Fail;
         }
 
-        var comparisonCount = (equal.IsNotNull ? 1u : 0u) +
-            (greater.IsNotNull ? 1u : 0u) +
-            (greaterEqual.IsNotNull ? 1u : 0u) +
-            (exists.IsNotNull ? 1u : 0u);
+        var comparisonCount = (parsed.Equal.IsNotNull ? 1u : 0u) +
+            (parsed.Greater.IsNotNull ? 1u : 0u) +
+            (parsed.GreaterEqual.IsNotNull ? 1u : 0u) +
+            (parsed.Exists.IsNotNull ? 1u : 0u);
         if (comparisonCount != 0)
         {
             if (thresholdCount != 0 || comparisonCount != 1)
@@ -79,11 +77,11 @@ public static class IfCommand
                 platform.FreeArgs(rdArgs);
                 return (int)ShellCommandResult.Error;
             }
-            condition = equal.IsNotNull
+            condition = parsed.Equal.IsNotNull
                 ? (uint)ShellIfCondition.Equal
-                : greater.IsNotNull
+                : parsed.Greater.IsNotNull
                     ? (uint)ShellIfCondition.Greater
-                    : greaterEqual.IsNotNull
+                    : parsed.GreaterEqual.IsNotNull
                         ? (uint)ShellIfCondition.GreaterEqual
                         : (uint)ShellIfCondition.Exists;
         }
@@ -95,12 +93,13 @@ public static class IfCommand
             (uint)ShellIfCondition.GreaterEqual;
         if (condition == 0 ||
             (condition == (uint)ShellIfCondition.PreviousResult &&
-             left.IsNotNull) ||
+             parsed.Left.IsNotNull) ||
             (condition == (uint)ShellIfCondition.Exists &&
-             left.IsNotNull) ||
-            (needsLeft && left.IsNull && exists.IsNull) ||
-            (needsRight && (left.IsNull ||
-                (equal.IsNull && greater.IsNull && greaterEqual.IsNull))))
+             parsed.Left.IsNotNull) ||
+            (needsLeft && parsed.Left.IsNull && parsed.Exists.IsNull) ||
+            (needsRight && (parsed.Left.IsNull ||
+                (parsed.Equal.IsNull && parsed.Greater.IsNull &&
+                 parsed.GreaterEqual.IsNull))))
         {
             platform.FreeArgs(rdArgs);
             return (int)ShellCommandResult.Error;
@@ -110,7 +109,8 @@ public static class IfCommand
         uint rightLength = 0;
         if (condition == (uint)ShellIfCondition.Exists)
         {
-            if (!ReadArgsCommandSupport.CopyCString(ref platform, exists,
+            if (!ReadArgsCommandSupport.CopyCString(ref platform,
+                    parsed.Exists,
                     leftBuffer, leftCapacity, out leftLength))
             {
                 platform.FreeArgs(rdArgs);
@@ -119,16 +119,17 @@ public static class IfCommand
         }
         else if (needsRight)
         {
-            if (!ReadArgsCommandSupport.CopyCString(ref platform, left,
+            if (!ReadArgsCommandSupport.CopyCString(ref platform,
+                    parsed.Left,
                     leftBuffer, leftCapacity, out leftLength))
             {
                 platform.FreeArgs(rdArgs);
                 return (int)ShellCommandResult.Error;
             }
-            var right = APTR.FromPointer(0);
-            if (equal.IsNotNull) right = equal;
-            else if (greater.IsNotNull) right = greater;
-            else right = greaterEqual;
+            var right = APTR.Null;
+            if (parsed.Equal.IsNotNull) right = parsed.Equal;
+            else if (parsed.Greater.IsNotNull) right = parsed.Greater;
+            else right = parsed.GreaterEqual;
             if (!ReadArgsCommandSupport.CopyCString(ref platform, right,
                     rightBuffer, rightCapacity, out rightLength))
             {
@@ -150,9 +151,9 @@ public static class IfCommand
                 invocation.Cli,
                 condition,
                 threshold,
-                not != 0 ? 1u : 0u,
-                noRequester != 0 ? 1u : 0u,
-                value != 0 ? 1u : 0u,
+                parsed.Not != 0 ? 1u : 0u,
+                parsed.NoRequester != 0 ? 1u : 0u,
+                parsed.Value != 0 ? 1u : 0u,
                 leftArgument,
                 leftArgumentLength,
                 rightArgument,

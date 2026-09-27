@@ -23,20 +23,36 @@ public static class StackCommand
             return (int)ShellCommandResult.Fail;
 
         if (!ReadArgsCommandSupport.Prepare(ref platform, tokenBuffer,
-                tokenCapacity, ReadArgsCommandTemplate.Stack, 4,
+                tokenCapacity, ReadArgsCommandTemplate.Stack,
+                StackReadArgsResultRecord.Size,
                 out var resultArray, out var templateLength))
             return (int)ShellCommandResult.Error;
 
         if (!platform.TryReadArgs(invocation.ArgumentText,
                 invocation.ArgumentLength, tokenBuffer, templateLength,
-                resultArray, 4, out var rdArgs) || rdArgs.IsNull)
+                resultArray, StackReadArgsResultRecord.Size,
+                out var rdArgs) || rdArgs.IsNull)
             return (int)ShellCommandResult.Error;
 
-        var requestedAddress = APTR.FromPointer(platform.ReadUInt32(resultArray));
-        var hasRequestedStack = requestedAddress.IsNotNull;
-        var requestedStack = hasRequestedStack
-            ? platform.ReadUInt32(requestedAddress)
-            : 0;
+        if (!StackReadArgsResultRecordCodec.TryRead(ref platform,
+                resultArray, out var parsed))
+        {
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
+        }
+
+        var hasRequestedStack = parsed.StackNumber.IsNotNull;
+        var requestedStack = 0u;
+        if (hasRequestedStack)
+        {
+            if (!ReadArgsLongValueRecordCodec.TryRead(ref platform,
+                    parsed.StackNumber, out var stackSize))
+            {
+                platform.FreeArgs(rdArgs);
+                return (int)ShellCommandResult.Error;
+            }
+            requestedStack = unchecked((uint)stackSize.Value);
+        }
         platform.FreeArgs(rdArgs);
 
         if (!hasRequestedStack)
@@ -47,7 +63,8 @@ public static class StackCommand
                     invocation.Cli,
                     out var currentStack) || currentStack < 0)
                 return (int)ShellCommandResult.Fail;
-            return WriteStackSize(ref platform, invocation.Output, currentStack);
+            return ShellUnsignedOutput.WriteLine(ref platform,
+                invocation.Output, (uint)currentStack);
         }
 
         if (requestedStack == 0 || requestedStack > int.MaxValue)
@@ -60,29 +77,4 @@ public static class StackCommand
             : (int)ShellCommandResult.Fail;
     }
 
-    private static int WriteStackSize<TPlatform>(
-        ref TPlatform platform,
-        BPTR output,
-        int stackBytes)
-        where TPlatform : struct, IShellPlatform
-    {
-        uint value = (uint)stackBytes;
-        uint divisor = 1;
-        while (value / divisor >= 10 && divisor <= uint.MaxValue / 10)
-            divisor *= 10;
-
-        do
-        {
-            byte digit = (byte)('0' + value / divisor);
-            if (platform.WriteByte(output, digit) < 0)
-                return (int)ShellCommandResult.Error;
-            value %= divisor;
-            divisor /= 10;
-        }
-        while (divisor != 0);
-
-        return platform.WriteByte(output, (byte)'\n') < 0
-            ? (int)ShellCommandResult.Error
-            : (int)ShellCommandResult.Ok;
-    }
 }

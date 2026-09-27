@@ -18,19 +18,36 @@ public static class QuitCommand
             return (int)ShellCommandResult.Fail;
 
         if (!ReadArgsCommandSupport.Prepare(ref platform, tokenBuffer,
-                tokenCapacity, ReadArgsCommandTemplate.Quit, 4,
+                tokenCapacity, ReadArgsCommandTemplate.Quit,
+                ReadArgsPointerResultRecord.Size,
                 out var resultArray, out var templateLength))
             return (int)ShellCommandResult.Error;
 
         if (!platform.TryReadArgs(invocation.ArgumentText,
                 invocation.ArgumentLength, tokenBuffer, templateLength,
-                resultArray, 4, out var rdArgs) || rdArgs.IsNull)
+                resultArray, ReadArgsPointerResultRecord.Size,
+                out var rdArgs) || rdArgs.IsNull)
             return (int)ShellCommandResult.Error;
 
-        var returnAddress = APTR.FromPointer(platform.ReadUInt32(resultArray));
-        var returnCode = returnAddress.IsNotNull
-            ? platform.ReadUInt32(returnAddress)
-            : 0;
+        if (!ReadArgsPointerResultRecordCodec.TryRead(ref platform,
+                resultArray, out var parsed))
+        {
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
+        }
+
+        var returnAddress = parsed.Value;
+        var returnCode = 0u;
+        if (returnAddress.IsNotNull)
+        {
+            if (!ReadArgsLongValueRecordCodec.TryRead(ref platform,
+                    returnAddress, out var returnCodeValue))
+            {
+                platform.FreeArgs(rdArgs);
+                return (int)ShellCommandResult.Error;
+            }
+            returnCode = unchecked((uint)returnCodeValue.Value);
+        }
         platform.FreeArgs(rdArgs);
         if (returnCode > int.MaxValue)
             return (int)ShellCommandResult.Error;

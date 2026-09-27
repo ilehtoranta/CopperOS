@@ -29,16 +29,25 @@ public static class CdCommand
             return (int)ShellCommandResult.Fail;
 
         if (!ReadArgsCommandSupport.Prepare(ref platform, tokenBuffer,
-                tokenCapacity, ReadArgsCommandTemplate.Dir, 4,
+                tokenCapacity, ReadArgsCommandTemplate.Dir,
+                ReadArgsPointerResultRecord.Size,
                 out var resultArray, out var templateLength))
             return (int)ShellCommandResult.Error;
 
         if (!platform.TryReadArgs(invocation.ArgumentText,
                 invocation.ArgumentLength, tokenBuffer, templateLength,
-                resultArray, 4, out var rdArgs) || rdArgs.IsNull)
+                resultArray, ReadArgsPointerResultRecord.Size,
+                out var rdArgs) || rdArgs.IsNull)
             return (int)ShellCommandResult.Error;
 
-        var directory = APTR.FromPointer(platform.ReadUInt32(resultArray));
+        if (!ReadArgsPointerResultRecordCodec.TryRead(ref platform,
+                resultArray, out var parsed))
+        {
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
+        }
+
+        var directory = parsed.Value;
         if (directory.IsNotNull)
         {
             if (!ReadArgsCommandSupport.CopyCString(ref platform, directory,

@@ -36,6 +36,72 @@ internal enum ReadArgsCommandTemplate : byte
     Run,
     Resident,
     NewShell,
+    Echo,
+}
+
+// ReadArgs stores one ULONG result per template item.  Keep sequential ABI
+// traversal in this bounded cursor so command code works with named records
+// rather than positional byte offsets.
+[System.Runtime.InteropServices.StructLayout(
+    System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 2)]
+internal struct ShellReadArgsResultCursor
+{
+    internal APTR Base;
+    internal uint ByteLength;
+    internal uint Position;
+}
+
+internal static class ShellReadArgsResultCursorCodec
+{
+    internal static bool TryCreate<TPlatform>(ref TPlatform platform,
+        APTR address, uint byteLength, out ShellReadArgsResultCursor cursor)
+        where TPlatform : struct, IShellPlatform
+    {
+        cursor = default;
+        if (address.IsNull || byteLength == 0 ||
+            address.Raw > uint.MaxValue - byteLength ||
+            !platform.IsMapped(address, byteLength)) return false;
+        cursor.Base = address;
+        cursor.ByteLength = byteLength;
+        return true;
+    }
+
+    internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+        ref ShellReadArgsResultCursor cursor, out uint value)
+        where TPlatform : struct, IShellPlatform
+    {
+        value = 0;
+        if (cursor.Position > cursor.ByteLength ||
+            cursor.ByteLength - cursor.Position < sizeof(uint) ||
+            cursor.Position > int.MaxValue) return false;
+        value = platform.ReadUInt32(cursor.Base, (int)cursor.Position);
+        cursor.Position += sizeof(uint);
+        return true;
+    }
+
+    internal static bool TryReadPointer<TPlatform>(ref TPlatform platform,
+        ref ShellReadArgsResultCursor cursor, out APTR value)
+        where TPlatform : struct, IShellPlatform
+    {
+        value = APTR.Null;
+        if (!TryReadUInt32(ref platform, ref cursor, out var raw))
+            return false;
+        value = APTR.FromPointer(raw);
+        return true;
+    }
+
+    internal static bool IsComplete(ShellReadArgsResultCursor cursor) =>
+        cursor.Position == cursor.ByteLength;
+}
+
+// These templates are NUL-terminated guest byte strings. Keep their only
+// positional state in this named sequential writer record.
+[System.Runtime.InteropServices.StructLayout(
+    System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 2)]
+internal struct ShellReadArgsTemplateWriter
+{
+    internal APTR Buffer;
+    internal uint Position;
 }
 
 internal static class ReadArgsCommandSupport
@@ -73,12 +139,30 @@ internal static class ReadArgsCommandSupport
         return true;
     }
 
+    public static bool TryWriteTemplate<TPlatform>(
+        ref TPlatform platform,
+        APTR buffer,
+        uint capacity,
+        ReadArgsCommandTemplate template,
+        out uint templateLength)
+        where TPlatform : struct, IShellPlatform
+    {
+        templateLength = Length(template);
+        var templateBytes = templateLength + 1;
+        if (buffer.IsNull || capacity < templateBytes ||
+            buffer.Raw > uint.MaxValue - capacity ||
+            !platform.IsMapped(buffer, capacity))
+            return false;
+        Write(ref platform, buffer, template);
+        return true;
+    }
+
     private static uint Length(ReadArgsCommandTemplate template)
     {
         switch (template)
         {
             case ReadArgsCommandTemplate.Empty: return 0;
-            case ReadArgsCommandTemplate.Stack: return 7;
+            case ReadArgsCommandTemplate.Stack: return 6;
             case ReadArgsCommandTemplate.Failat: return 9;
             case ReadArgsCommandTemplate.Fault: return 9;
             case ReadArgsCommandTemplate.Quit: return 4;
@@ -103,6 +187,7 @@ internal static class ReadArgsCommandSupport
             case ReadArgsCommandTemplate.Run: return 44;
             case ReadArgsCommandTemplate.Resident: return 72;
             case ReadArgsCommandTemplate.NewShell: return 11;
+            case ReadArgsCommandTemplate.Echo: return 41;
             default: return 0;
         }
     }
@@ -113,530 +198,577 @@ internal static class ReadArgsCommandSupport
         ReadArgsCommandTemplate template)
         where TPlatform : struct, IShellPlatform
     {
+        var writer = new ShellReadArgsTemplateWriter { Buffer = buffer };
         switch (template)
         {
             case ReadArgsCommandTemplate.Empty:
-                WriteByte(ref platform, buffer, 0, 0);
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.Stack:
-                WriteByte(ref platform, buffer, 0, (byte)'S');
-                WriteByte(ref platform, buffer, 1, (byte)'T');
-                WriteByte(ref platform, buffer, 2, (byte)'A');
-                WriteByte(ref platform, buffer, 3, (byte)'C');
-                WriteByte(ref platform, buffer, 4, (byte)'K');
-                WriteByte(ref platform, buffer, 5, (byte)'/');
-                WriteByte(ref platform, buffer, 6, (byte)'N');
-                WriteByte(ref platform, buffer, 7, 0);
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'I');
+                AppendByte(ref platform, ref writer, (byte)'Z');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.Failat:
-                WriteByte(ref platform, buffer, 0, (byte)'R');
-                WriteByte(ref platform, buffer, 1, (byte)'C');
-                WriteByte(ref platform, buffer, 2, (byte)'L');
-                WriteByte(ref platform, buffer, 3, (byte)'I');
-                WriteByte(ref platform, buffer, 4, (byte)'M');
-                WriteByte(ref platform, buffer, 5, (byte)'/');
-                WriteByte(ref platform, buffer, 6, (byte)'A');
-                WriteByte(ref platform, buffer, 7, (byte)'/');
-                WriteByte(ref platform, buffer, 8, (byte)'N');
-                WriteByte(ref platform, buffer, 9, 0);
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'C');
+                AppendByte(ref platform, ref writer, (byte)'L');
+                AppendByte(ref platform, ref writer, (byte)'I');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.Fault:
-                WriteByte(ref platform, buffer, 0, (byte)'E');
-                WriteByte(ref platform, buffer, 1, (byte)'R');
-                WriteByte(ref platform, buffer, 2, (byte)'R');
-                WriteByte(ref platform, buffer, 3, (byte)'O');
-                WriteByte(ref platform, buffer, 4, (byte)'R');
-                WriteByte(ref platform, buffer, 5, (byte)'/');
-                WriteByte(ref platform, buffer, 6, (byte)'N');
-                WriteByte(ref platform, buffer, 7, (byte)'/');
-                WriteByte(ref platform, buffer, 8, (byte)'M');
-                WriteByte(ref platform, buffer, 9, 0);
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'O');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.Quit:
-                WriteByte(ref platform, buffer, 0, (byte)'R');
-                WriteByte(ref platform, buffer, 1, (byte)'C');
-                WriteByte(ref platform, buffer, 2, (byte)'/');
-                WriteByte(ref platform, buffer, 3, (byte)'N');
-                WriteByte(ref platform, buffer, 4, 0);
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'C');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.Name:
-                WriteByte(ref platform, buffer, 0, (byte)'N');
-                WriteByte(ref platform, buffer, 1, (byte)'A');
-                WriteByte(ref platform, buffer, 2, (byte)'M');
-                WriteByte(ref platform, buffer, 3, (byte)'E');
-                WriteByte(ref platform, buffer, 4, (byte)'/');
-                WriteByte(ref platform, buffer, 5, (byte)'A');
-                WriteByte(ref platform, buffer, 6, 0);
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.Cls:
-                WriteByte(ref platform, buffer, 0, (byte)'R');
-                WriteByte(ref platform, buffer, 1, (byte)'E');
-                WriteByte(ref platform, buffer, 2, (byte)'S');
-                WriteByte(ref platform, buffer, 3, (byte)'E');
-                WriteByte(ref platform, buffer, 4, (byte)'T');
-                WriteByte(ref platform, buffer, 5, (byte)'/');
-                WriteByte(ref platform, buffer, 6, (byte)'S');
-                WriteByte(ref platform, buffer, 7, 0);
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'T');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.Unsetenv:
-                WriteByte(ref platform, buffer, 0, (byte)'N');
-                WriteByte(ref platform, buffer, 1, (byte)'A');
-                WriteByte(ref platform, buffer, 2, (byte)'M');
-                WriteByte(ref platform, buffer, 3, (byte)'E');
-                WriteByte(ref platform, buffer, 4, (byte)'/');
-                WriteByte(ref platform, buffer, 5, (byte)'A');
-                WriteByte(ref platform, buffer, 6, (byte)',');
-                WriteByte(ref platform, buffer, 7, (byte)'S');
-                WriteByte(ref platform, buffer, 8, (byte)'A');
-                WriteByte(ref platform, buffer, 9, (byte)'V');
-                WriteByte(ref platform, buffer, 10, (byte)'E');
-                WriteByte(ref platform, buffer, 11, (byte)'/');
-                WriteByte(ref platform, buffer, 12, (byte)'S');
-                WriteByte(ref platform, buffer, 13, 0);
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'V');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.UnsetenvOptional:
-                WriteByte(ref platform, buffer, 0, (byte)'N');
-                WriteByte(ref platform, buffer, 1, (byte)'A');
-                WriteByte(ref platform, buffer, 2, (byte)'M');
-                WriteByte(ref platform, buffer, 3, (byte)'E');
-                WriteByte(ref platform, buffer, 4, (byte)',');
-                WriteByte(ref platform, buffer, 5, (byte)'S');
-                WriteByte(ref platform, buffer, 6, (byte)'A');
-                WriteByte(ref platform, buffer, 7, (byte)'V');
-                WriteByte(ref platform, buffer, 8, (byte)'E');
-                WriteByte(ref platform, buffer, 9, (byte)'/');
-                WriteByte(ref platform, buffer, 10, (byte)'S');
-                WriteByte(ref platform, buffer, 11, 0);
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'V');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.UnsetOptional:
-                WriteByte(ref platform, buffer, 0, (byte)'N');
-                WriteByte(ref platform, buffer, 1, (byte)'A');
-                WriteByte(ref platform, buffer, 2, (byte)'M');
-                WriteByte(ref platform, buffer, 3, (byte)'E');
-                WriteByte(ref platform, buffer, 4, 0);
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.Set:
-                WriteByte(ref platform, buffer, 0, (byte)'N');
-                WriteByte(ref platform, buffer, 1, (byte)'A');
-                WriteByte(ref platform, buffer, 2, (byte)'M');
-                WriteByte(ref platform, buffer, 3, (byte)'E');
-                WriteByte(ref platform, buffer, 4, (byte)'/');
-                WriteByte(ref platform, buffer, 5, (byte)'A');
-                WriteByte(ref platform, buffer, 6, (byte)',');
-                WriteByte(ref platform, buffer, 7, (byte)'S');
-                WriteByte(ref platform, buffer, 8, (byte)'T');
-                WriteByte(ref platform, buffer, 9, (byte)'R');
-                WriteByte(ref platform, buffer, 10, (byte)'I');
-                WriteByte(ref platform, buffer, 11, (byte)'N');
-                WriteByte(ref platform, buffer, 12, (byte)'G');
-                WriteByte(ref platform, buffer, 13, (byte)'/');
-                WriteByte(ref platform, buffer, 14, (byte)'F');
-                WriteByte(ref platform, buffer, 15, 0);
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'T');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'I');
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'G');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'F');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.SetOptional:
-                WriteByte(ref platform, buffer, 0, (byte)'N');
-                WriteByte(ref platform, buffer, 1, (byte)'A');
-                WriteByte(ref platform, buffer, 2, (byte)'M');
-                WriteByte(ref platform, buffer, 3, (byte)'E');
-                WriteByte(ref platform, buffer, 4, (byte)',');
-                WriteByte(ref platform, buffer, 5, (byte)'S');
-                WriteByte(ref platform, buffer, 6, (byte)'T');
-                WriteByte(ref platform, buffer, 7, (byte)'R');
-                WriteByte(ref platform, buffer, 8, (byte)'I');
-                WriteByte(ref platform, buffer, 9, (byte)'N');
-                WriteByte(ref platform, buffer, 10, (byte)'G');
-                WriteByte(ref platform, buffer, 11, (byte)'/');
-                WriteByte(ref platform, buffer, 12, (byte)'F');
-                WriteByte(ref platform, buffer, 13, 0);
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'T');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'I');
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'G');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'F');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.Setenv:
-                WriteByte(ref platform, buffer, 0, (byte)'N');
-                WriteByte(ref platform, buffer, 1, (byte)'A');
-                WriteByte(ref platform, buffer, 2, (byte)'M');
-                WriteByte(ref platform, buffer, 3, (byte)'E');
-                WriteByte(ref platform, buffer, 4, (byte)'/');
-                WriteByte(ref platform, buffer, 5, (byte)'A');
-                WriteByte(ref platform, buffer, 6, (byte)',');
-                WriteByte(ref platform, buffer, 7, (byte)'S');
-                WriteByte(ref platform, buffer, 8, (byte)'A');
-                WriteByte(ref platform, buffer, 9, (byte)'V');
-                WriteByte(ref platform, buffer, 10, (byte)'E');
-                WriteByte(ref platform, buffer, 11, (byte)'/');
-                WriteByte(ref platform, buffer, 12, (byte)'S');
-                WriteByte(ref platform, buffer, 13, (byte)',');
-                WriteByte(ref platform, buffer, 14, (byte)'S');
-                WriteByte(ref platform, buffer, 15, (byte)'T');
-                WriteByte(ref platform, buffer, 16, (byte)'R');
-                WriteByte(ref platform, buffer, 17, (byte)'I');
-                WriteByte(ref platform, buffer, 18, (byte)'N');
-                WriteByte(ref platform, buffer, 19, (byte)'G');
-                WriteByte(ref platform, buffer, 20, (byte)'/');
-                WriteByte(ref platform, buffer, 21, (byte)'F');
-                WriteByte(ref platform, buffer, 22, 0);
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'V');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'T');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'I');
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'G');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'F');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.SetenvOptional:
-                WriteByte(ref platform, buffer, 0, (byte)'N');
-                WriteByte(ref platform, buffer, 1, (byte)'A');
-                WriteByte(ref platform, buffer, 2, (byte)'M');
-                WriteByte(ref platform, buffer, 3, (byte)'E');
-                WriteByte(ref platform, buffer, 4, (byte)',');
-                WriteByte(ref platform, buffer, 5, (byte)'S');
-                WriteByte(ref platform, buffer, 6, (byte)'A');
-                WriteByte(ref platform, buffer, 7, (byte)'V');
-                WriteByte(ref platform, buffer, 8, (byte)'E');
-                WriteByte(ref platform, buffer, 9, (byte)'/');
-                WriteByte(ref platform, buffer, 10, (byte)'S');
-                WriteByte(ref platform, buffer, 11, (byte)',');
-                WriteByte(ref platform, buffer, 12, (byte)'S');
-                WriteByte(ref platform, buffer, 13, (byte)'T');
-                WriteByte(ref platform, buffer, 14, (byte)'R');
-                WriteByte(ref platform, buffer, 15, (byte)'I');
-                WriteByte(ref platform, buffer, 16, (byte)'N');
-                WriteByte(ref platform, buffer, 17, (byte)'G');
-                WriteByte(ref platform, buffer, 18, (byte)'/');
-                WriteByte(ref platform, buffer, 19, (byte)'F');
-                WriteByte(ref platform, buffer, 20, 0);
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'V');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'T');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'I');
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'G');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'F');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.Alias:
-                WriteByte(ref platform, buffer, 0, (byte)'N');
-                WriteByte(ref platform, buffer, 1, (byte)'A');
-                WriteByte(ref platform, buffer, 2, (byte)'M');
-                WriteByte(ref platform, buffer, 3, (byte)'E');
-                WriteByte(ref platform, buffer, 4, (byte)',');
-                WriteByte(ref platform, buffer, 5, (byte)'S');
-                WriteByte(ref platform, buffer, 6, (byte)'T');
-                WriteByte(ref platform, buffer, 7, (byte)'R');
-                WriteByte(ref platform, buffer, 8, (byte)'I');
-                WriteByte(ref platform, buffer, 9, (byte)'N');
-                WriteByte(ref platform, buffer, 10, (byte)'G');
-                WriteByte(ref platform, buffer, 11, (byte)'/');
-                WriteByte(ref platform, buffer, 12, (byte)'F');
-                WriteByte(ref platform, buffer, 13, 0);
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'T');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'I');
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'G');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'F');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.Ask:
-                WriteByte(ref platform, buffer, 0, (byte)'P');
-                WriteByte(ref platform, buffer, 1, (byte)'R');
-                WriteByte(ref platform, buffer, 2, (byte)'O');
-                WriteByte(ref platform, buffer, 3, (byte)'M');
-                WriteByte(ref platform, buffer, 4, (byte)'P');
-                WriteByte(ref platform, buffer, 5, (byte)'T');
-                WriteByte(ref platform, buffer, 6, (byte)'/');
-                WriteByte(ref platform, buffer, 7, (byte)'A');
-                WriteByte(ref platform, buffer, 8, (byte)'/');
-                WriteByte(ref platform, buffer, 9, (byte)'F');
-                WriteByte(ref platform, buffer, 10, 0);
+                AppendByte(ref platform, ref writer, (byte)'P');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'O');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)'P');
+                AppendByte(ref platform, ref writer, (byte)'T');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'F');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.Prompt:
-                WriteByte(ref platform, buffer, 0, (byte)'P');
-                WriteByte(ref platform, buffer, 1, (byte)'R');
-                WriteByte(ref platform, buffer, 2, (byte)'O');
-                WriteByte(ref platform, buffer, 3, (byte)'M');
-                WriteByte(ref platform, buffer, 4, (byte)'P');
-                WriteByte(ref platform, buffer, 5, (byte)'T');
-                WriteByte(ref platform, buffer, 6, (byte)'/');
-                WriteByte(ref platform, buffer, 7, (byte)'F');
-                WriteByte(ref platform, buffer, 8, 0);
+                AppendByte(ref platform, ref writer, (byte)'P');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'O');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)'P');
+                AppendByte(ref platform, ref writer, (byte)'T');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'F');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.Lab:
-                WriteByte(ref platform, buffer, 0, (byte)'L');
-                WriteByte(ref platform, buffer, 1, (byte)'A');
-                WriteByte(ref platform, buffer, 2, (byte)'B');
-                WriteByte(ref platform, buffer, 3, (byte)'E');
-                WriteByte(ref platform, buffer, 4, (byte)'L');
-                WriteByte(ref platform, buffer, 5, (byte)'/');
-                WriteByte(ref platform, buffer, 6, (byte)'A');
-                WriteByte(ref platform, buffer, 7, 0);
+                AppendByte(ref platform, ref writer, (byte)'L');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'B');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'L');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.Dir:
-                WriteByte(ref platform, buffer, 0, (byte)'D');
-                WriteByte(ref platform, buffer, 1, (byte)'I');
-                WriteByte(ref platform, buffer, 2, (byte)'R');
-                WriteByte(ref platform, buffer, 3, 0);
+                AppendByte(ref platform, ref writer, (byte)'D');
+                AppendByte(ref platform, ref writer, (byte)'I');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.Unalias:
-                WriteByte(ref platform, buffer, 0, (byte)'N');
-                WriteByte(ref platform, buffer, 1, (byte)'A');
-                WriteByte(ref platform, buffer, 2, (byte)'M');
-                WriteByte(ref platform, buffer, 3, (byte)'E');
-                WriteByte(ref platform, buffer, 4, 0);
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.Skip:
-                WriteByte(ref platform, buffer, 0, (byte)'L');
-                WriteByte(ref platform, buffer, 1, (byte)'A');
-                WriteByte(ref platform, buffer, 2, (byte)'B');
-                WriteByte(ref platform, buffer, 3, (byte)'E');
-                WriteByte(ref platform, buffer, 4, (byte)'L');
-                WriteByte(ref platform, buffer, 5, (byte)',');
-                WriteByte(ref platform, buffer, 6, (byte)'B');
-                WriteByte(ref platform, buffer, 7, (byte)'A');
-                WriteByte(ref platform, buffer, 8, (byte)'C');
-                WriteByte(ref platform, buffer, 9, (byte)'K');
-                WriteByte(ref platform, buffer, 10, (byte)'/');
-                WriteByte(ref platform, buffer, 11, (byte)'S');
-                WriteByte(ref platform, buffer, 12, 0);
+                AppendByte(ref platform, ref writer, (byte)'L');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'B');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'L');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'B');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'C');
+                AppendByte(ref platform, ref writer, (byte)'K');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.Path:
-                WriteByte(ref platform, buffer, 0, (byte)'P');
-                WriteByte(ref platform, buffer, 1, (byte)'A');
-                WriteByte(ref platform, buffer, 2, (byte)'T');
-                WriteByte(ref platform, buffer, 3, (byte)'H');
-                WriteByte(ref platform, buffer, 4, (byte)'/');
-                WriteByte(ref platform, buffer, 5, (byte)'M');
-                WriteByte(ref platform, buffer, 6, (byte)',');
-                WriteByte(ref platform, buffer, 7, (byte)'A');
-                WriteByte(ref platform, buffer, 8, (byte)'D');
-                WriteByte(ref platform, buffer, 9, (byte)'D');
-                WriteByte(ref platform, buffer, 10, (byte)'/');
-                WriteByte(ref platform, buffer, 11, (byte)'S');
-                WriteByte(ref platform, buffer, 12, (byte)',');
-                WriteByte(ref platform, buffer, 13, (byte)'S');
-                WriteByte(ref platform, buffer, 14, (byte)'H');
-                WriteByte(ref platform, buffer, 15, (byte)'O');
-                WriteByte(ref platform, buffer, 16, (byte)'W');
-                WriteByte(ref platform, buffer, 17, (byte)'/');
-                WriteByte(ref platform, buffer, 18, (byte)'S');
-                WriteByte(ref platform, buffer, 19, (byte)',');
-                WriteByte(ref platform, buffer, 20, (byte)'R');
-                WriteByte(ref platform, buffer, 21, (byte)'E');
-                WriteByte(ref platform, buffer, 22, (byte)'S');
-                WriteByte(ref platform, buffer, 23, (byte)'E');
-                WriteByte(ref platform, buffer, 24, (byte)'T');
-                WriteByte(ref platform, buffer, 25, (byte)'/');
-                WriteByte(ref platform, buffer, 26, (byte)'S');
-                WriteByte(ref platform, buffer, 27, (byte)',');
-                WriteByte(ref platform, buffer, 28, (byte)'R');
-                WriteByte(ref platform, buffer, 29, (byte)'E');
-                WriteByte(ref platform, buffer, 30, (byte)'M');
-                WriteByte(ref platform, buffer, 31, (byte)'O');
-                WriteByte(ref platform, buffer, 32, (byte)'V');
-                WriteByte(ref platform, buffer, 33, (byte)'E');
-                WriteByte(ref platform, buffer, 34, (byte)'/');
-                WriteByte(ref platform, buffer, 35, (byte)'S');
-                WriteByte(ref platform, buffer, 36, (byte)',');
-                WriteByte(ref platform, buffer, 37, (byte)'Q');
-                WriteByte(ref platform, buffer, 38, (byte)'U');
-                WriteByte(ref platform, buffer, 39, (byte)'I');
-                WriteByte(ref platform, buffer, 40, (byte)'E');
-                WriteByte(ref platform, buffer, 41, (byte)'T');
-                WriteByte(ref platform, buffer, 42, (byte)'/');
-                WriteByte(ref platform, buffer, 43, (byte)'S');
-                WriteByte(ref platform, buffer, 44, 0);
+                AppendByte(ref platform, ref writer, (byte)'P');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'T');
+                AppendByte(ref platform, ref writer, (byte)'H');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'D');
+                AppendByte(ref platform, ref writer, (byte)'D');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'H');
+                AppendByte(ref platform, ref writer, (byte)'O');
+                AppendByte(ref platform, ref writer, (byte)'W');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'T');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)'O');
+                AppendByte(ref platform, ref writer, (byte)'V');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'Q');
+                AppendByte(ref platform, ref writer, (byte)'U');
+                AppendByte(ref platform, ref writer, (byte)'I');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'T');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.If:
-                WriteByte(ref platform, buffer, 0, (byte)'N');
-                WriteByte(ref platform, buffer, 1, (byte)'O');
-                WriteByte(ref platform, buffer, 2, (byte)'T');
-                WriteByte(ref platform, buffer, 3, (byte)'/');
-                WriteByte(ref platform, buffer, 4, (byte)'S');
-                WriteByte(ref platform, buffer, 5, (byte)',');
-                WriteByte(ref platform, buffer, 6, (byte)'W');
-                WriteByte(ref platform, buffer, 7, (byte)'A');
-                WriteByte(ref platform, buffer, 8, (byte)'R');
-                WriteByte(ref platform, buffer, 9, (byte)'N');
-                WriteByte(ref platform, buffer, 10, (byte)'/');
-                WriteByte(ref platform, buffer, 11, (byte)'S');
-                WriteByte(ref platform, buffer, 12, (byte)',');
-                WriteByte(ref platform, buffer, 13, (byte)'E');
-                WriteByte(ref platform, buffer, 14, (byte)'R');
-                WriteByte(ref platform, buffer, 15, (byte)'R');
-                WriteByte(ref platform, buffer, 16, (byte)'O');
-                WriteByte(ref platform, buffer, 17, (byte)'R');
-                WriteByte(ref platform, buffer, 18, (byte)'/');
-                WriteByte(ref platform, buffer, 19, (byte)'S');
-                WriteByte(ref platform, buffer, 20, (byte)',');
-                WriteByte(ref platform, buffer, 21, (byte)'F');
-                WriteByte(ref platform, buffer, 22, (byte)'A');
-                WriteByte(ref platform, buffer, 23, (byte)'I');
-                WriteByte(ref platform, buffer, 24, (byte)'L');
-                WriteByte(ref platform, buffer, 25, (byte)'/');
-                WriteByte(ref platform, buffer, 26, (byte)'S');
-                WriteByte(ref platform, buffer, 27, (byte)',');
-                WriteByte(ref platform, buffer, 28, (byte)',');
-                WriteByte(ref platform, buffer, 29, (byte)'E');
-                WriteByte(ref platform, buffer, 30, (byte)'Q');
-                WriteByte(ref platform, buffer, 31, (byte)'/');
-                WriteByte(ref platform, buffer, 32, (byte)'K');
-                WriteByte(ref platform, buffer, 33, (byte)',');
-                WriteByte(ref platform, buffer, 34, (byte)'G');
-                WriteByte(ref platform, buffer, 35, (byte)'T');
-                WriteByte(ref platform, buffer, 36, (byte)'/');
-                WriteByte(ref platform, buffer, 37, (byte)'K');
-                WriteByte(ref platform, buffer, 38, (byte)',');
-                WriteByte(ref platform, buffer, 39, (byte)'G');
-                WriteByte(ref platform, buffer, 40, (byte)'E');
-                WriteByte(ref platform, buffer, 41, (byte)'/');
-                WriteByte(ref platform, buffer, 42, (byte)'K');
-                WriteByte(ref platform, buffer, 43, (byte)',');
-                WriteByte(ref platform, buffer, 44, (byte)'V');
-                WriteByte(ref platform, buffer, 45, (byte)'A');
-                WriteByte(ref platform, buffer, 46, (byte)'L');
-                WriteByte(ref platform, buffer, 47, (byte)'/');
-                WriteByte(ref platform, buffer, 48, (byte)'S');
-                WriteByte(ref platform, buffer, 49, (byte)',');
-                WriteByte(ref platform, buffer, 50, (byte)'E');
-                WriteByte(ref platform, buffer, 51, (byte)'X');
-                WriteByte(ref platform, buffer, 52, (byte)'I');
-                WriteByte(ref platform, buffer, 53, (byte)'S');
-                WriteByte(ref platform, buffer, 54, (byte)'T');
-                WriteByte(ref platform, buffer, 55, (byte)'S');
-                WriteByte(ref platform, buffer, 56, (byte)'/');
-                WriteByte(ref platform, buffer, 57, (byte)'K');
-                WriteByte(ref platform, buffer, 58, (byte)',');
-                WriteByte(ref platform, buffer, 59, (byte)'N');
-                WriteByte(ref platform, buffer, 60, (byte)'O');
-                WriteByte(ref platform, buffer, 61, (byte)'R');
-                WriteByte(ref platform, buffer, 62, (byte)'E');
-                WriteByte(ref platform, buffer, 63, (byte)'Q');
-                WriteByte(ref platform, buffer, 64, (byte)'/');
-                WriteByte(ref platform, buffer, 65, (byte)'S');
-                WriteByte(ref platform, buffer, 66, 0);
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'O');
+                AppendByte(ref platform, ref writer, (byte)'T');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'W');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'O');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'F');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'I');
+                AppendByte(ref platform, ref writer, (byte)'L');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'Q');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'K');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'G');
+                AppendByte(ref platform, ref writer, (byte)'T');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'K');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'G');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'K');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'V');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'L');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'X');
+                AppendByte(ref platform, ref writer, (byte)'I');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'T');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'K');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'O');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'Q');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.Run:
-                WriteByte(ref platform, buffer, 0, (byte)'D');
-                WriteByte(ref platform, buffer, 1, (byte)'E');
-                WriteByte(ref platform, buffer, 2, (byte)'T');
-                WriteByte(ref platform, buffer, 3, (byte)'A');
-                WriteByte(ref platform, buffer, 4, (byte)'C');
-                WriteByte(ref platform, buffer, 5, (byte)'H');
-                WriteByte(ref platform, buffer, 6, (byte)'/');
-                WriteByte(ref platform, buffer, 7, (byte)'S');
-                WriteByte(ref platform, buffer, 8, (byte)',');
-                WriteByte(ref platform, buffer, 9, (byte)'Q');
-                WriteByte(ref platform, buffer, 10, (byte)'U');
-                WriteByte(ref platform, buffer, 11, (byte)'I');
-                WriteByte(ref platform, buffer, 12, (byte)'E');
-                WriteByte(ref platform, buffer, 13, (byte)'T');
-                WriteByte(ref platform, buffer, 14, (byte)'/');
-                WriteByte(ref platform, buffer, 15, (byte)'S');
-                WriteByte(ref platform, buffer, 16, (byte)',');
-                WriteByte(ref platform, buffer, 17, (byte)'S');
-                WriteByte(ref platform, buffer, 18, (byte)'T');
-                WriteByte(ref platform, buffer, 19, (byte)'A');
-                WriteByte(ref platform, buffer, 20, (byte)'C');
-                WriteByte(ref platform, buffer, 21, (byte)'K');
-                WriteByte(ref platform, buffer, 22, (byte)'/');
-                WriteByte(ref platform, buffer, 23, (byte)'K');
-                WriteByte(ref platform, buffer, 24, (byte)'/');
-                WriteByte(ref platform, buffer, 25, (byte)'N');
-                WriteByte(ref platform, buffer, 26, (byte)',');
-                WriteByte(ref platform, buffer, 27, (byte)'P');
-                WriteByte(ref platform, buffer, 28, (byte)'R');
-                WriteByte(ref platform, buffer, 29, (byte)'I');
-                WriteByte(ref platform, buffer, 30, (byte)'/');
-                WriteByte(ref platform, buffer, 31, (byte)'K');
-                WriteByte(ref platform, buffer, 32, (byte)'/');
-                WriteByte(ref platform, buffer, 33, (byte)'N');
-                WriteByte(ref platform, buffer, 34, (byte)',');
-                WriteByte(ref platform, buffer, 35, (byte)'C');
-                WriteByte(ref platform, buffer, 36, (byte)'O');
-                WriteByte(ref platform, buffer, 37, (byte)'M');
-                WriteByte(ref platform, buffer, 38, (byte)'M');
-                WriteByte(ref platform, buffer, 39, (byte)'A');
-                WriteByte(ref platform, buffer, 40, (byte)'N');
-                WriteByte(ref platform, buffer, 41, (byte)'D');
-                WriteByte(ref platform, buffer, 42, (byte)'/');
-                WriteByte(ref platform, buffer, 43, (byte)'F');
-                WriteByte(ref platform, buffer, 44, 0);
+                AppendByte(ref platform, ref writer, (byte)'D');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'T');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'C');
+                AppendByte(ref platform, ref writer, (byte)'H');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'Q');
+                AppendByte(ref platform, ref writer, (byte)'U');
+                AppendByte(ref platform, ref writer, (byte)'I');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'T');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'T');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'C');
+                AppendByte(ref platform, ref writer, (byte)'K');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'K');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'P');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'I');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'K');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'C');
+                AppendByte(ref platform, ref writer, (byte)'O');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'D');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'F');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.Resident:
-                WriteByte(ref platform, buffer, 0, (byte)'N');
-                WriteByte(ref platform, buffer, 1, (byte)'A');
-                WriteByte(ref platform, buffer, 2, (byte)'M');
-                WriteByte(ref platform, buffer, 3, (byte)'E');
-                WriteByte(ref platform, buffer, 4, (byte)',');
-                WriteByte(ref platform, buffer, 5, (byte)'F');
-                WriteByte(ref platform, buffer, 6, (byte)'I');
-                WriteByte(ref platform, buffer, 7, (byte)'L');
-                WriteByte(ref platform, buffer, 8, (byte)'E');
-                WriteByte(ref platform, buffer, 9, (byte)',');
-                WriteByte(ref platform, buffer, 10, (byte)'A');
-                WriteByte(ref platform, buffer, 11, (byte)'L');
-                WriteByte(ref platform, buffer, 12, (byte)'I');
-                WriteByte(ref platform, buffer, 13, (byte)'A');
-                WriteByte(ref platform, buffer, 14, (byte)'S');
-                WriteByte(ref platform, buffer, 15, (byte)'/');
-                WriteByte(ref platform, buffer, 16, (byte)'K');
-                WriteByte(ref platform, buffer, 17, (byte)',');
-                WriteByte(ref platform, buffer, 18, (byte)'R');
-                WriteByte(ref platform, buffer, 19, (byte)'E');
-                WriteByte(ref platform, buffer, 20, (byte)'M');
-                WriteByte(ref platform, buffer, 21, (byte)'O');
-                WriteByte(ref platform, buffer, 22, (byte)'V');
-                WriteByte(ref platform, buffer, 23, (byte)'E');
-                WriteByte(ref platform, buffer, 24, (byte)'/');
-                WriteByte(ref platform, buffer, 25, (byte)'S');
-                WriteByte(ref platform, buffer, 26, (byte)',');
-                WriteByte(ref platform, buffer, 27, (byte)'A');
-                WriteByte(ref platform, buffer, 28, (byte)'D');
-                WriteByte(ref platform, buffer, 29, (byte)'D');
-                WriteByte(ref platform, buffer, 30, (byte)'/');
-                WriteByte(ref platform, buffer, 31, (byte)'S');
-                WriteByte(ref platform, buffer, 32, (byte)',');
-                WriteByte(ref platform, buffer, 33, (byte)'R');
-                WriteByte(ref platform, buffer, 34, (byte)'E');
-                WriteByte(ref platform, buffer, 35, (byte)'P');
-                WriteByte(ref platform, buffer, 36, (byte)'L');
-                WriteByte(ref platform, buffer, 37, (byte)'A');
-                WriteByte(ref platform, buffer, 38, (byte)'C');
-                WriteByte(ref platform, buffer, 39, (byte)'E');
-                WriteByte(ref platform, buffer, 40, (byte)'/');
-                WriteByte(ref platform, buffer, 41, (byte)'S');
-                WriteByte(ref platform, buffer, 42, (byte)',');
-                WriteByte(ref platform, buffer, 43, (byte)'P');
-                WriteByte(ref platform, buffer, 44, (byte)'U');
-                WriteByte(ref platform, buffer, 45, (byte)'R');
-                WriteByte(ref platform, buffer, 46, (byte)'E');
-                WriteByte(ref platform, buffer, 47, (byte)'=');
-                WriteByte(ref platform, buffer, 48, (byte)'F');
-                WriteByte(ref platform, buffer, 49, (byte)'O');
-                WriteByte(ref platform, buffer, 50, (byte)'R');
-                WriteByte(ref platform, buffer, 51, (byte)'C');
-                WriteByte(ref platform, buffer, 52, (byte)'E');
-                WriteByte(ref platform, buffer, 53, (byte)'/');
-                WriteByte(ref platform, buffer, 54, (byte)'S');
-                WriteByte(ref platform, buffer, 55, (byte)',');
-                WriteByte(ref platform, buffer, 56, (byte)'S');
-                WriteByte(ref platform, buffer, 57, (byte)'Y');
-                WriteByte(ref platform, buffer, 58, (byte)'S');
-                WriteByte(ref platform, buffer, 59, (byte)'T');
-                WriteByte(ref platform, buffer, 60, (byte)'E');
-                WriteByte(ref platform, buffer, 61, (byte)'M');
-                WriteByte(ref platform, buffer, 62, (byte)'/');
-                WriteByte(ref platform, buffer, 63, (byte)'S');
-                WriteByte(ref platform, buffer, 64, (byte)',');
-                WriteByte(ref platform, buffer, 65, (byte)'D');
-                WriteByte(ref platform, buffer, 66, (byte)'E');
-                WriteByte(ref platform, buffer, 67, (byte)'F');
-                WriteByte(ref platform, buffer, 68, (byte)'E');
-                WriteByte(ref platform, buffer, 69, (byte)'R');
-                WriteByte(ref platform, buffer, 70, (byte)'/');
-                WriteByte(ref platform, buffer, 71, (byte)'S');
-                WriteByte(ref platform, buffer, 72, 0);
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'F');
+                AppendByte(ref platform, ref writer, (byte)'I');
+                AppendByte(ref platform, ref writer, (byte)'L');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'L');
+                AppendByte(ref platform, ref writer, (byte)'I');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'K');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)'O');
+                AppendByte(ref platform, ref writer, (byte)'V');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'D');
+                AppendByte(ref platform, ref writer, (byte)'D');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'P');
+                AppendByte(ref platform, ref writer, (byte)'L');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'C');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'P');
+                AppendByte(ref platform, ref writer, (byte)'U');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'=');
+                AppendByte(ref platform, ref writer, (byte)'F');
+                AppendByte(ref platform, ref writer, (byte)'O');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'C');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'Y');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'T');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'D');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'F');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.NewShell:
-                WriteByte(ref platform, buffer, 0, (byte)'W');
-                WriteByte(ref platform, buffer, 1, (byte)'I');
-                WriteByte(ref platform, buffer, 2, (byte)'N');
-                WriteByte(ref platform, buffer, 3, (byte)'D');
-                WriteByte(ref platform, buffer, 4, (byte)'O');
-                WriteByte(ref platform, buffer, 5, (byte)'W');
-                WriteByte(ref platform, buffer, 6, (byte)',');
-                WriteByte(ref platform, buffer, 7, (byte)'F');
-                WriteByte(ref platform, buffer, 8, (byte)'R');
-                WriteByte(ref platform, buffer, 9, (byte)'O');
-                WriteByte(ref platform, buffer, 10, (byte)'M');
-                WriteByte(ref platform, buffer, 11, 0);
+                AppendByte(ref platform, ref writer, (byte)'W');
+                AppendByte(ref platform, ref writer, (byte)'I');
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'D');
+                AppendByte(ref platform, ref writer, (byte)'O');
+                AppendByte(ref platform, ref writer, (byte)'W');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'F');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'O');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, 0);
+                return;
+            case ReadArgsCommandTemplate.Echo:
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'A');
+                AppendByte(ref platform, ref writer, (byte)'G');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'M');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'O');
+                AppendByte(ref platform, ref writer, (byte)'L');
+                AppendByte(ref platform, ref writer, (byte)'I');
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'F');
+                AppendByte(ref platform, ref writer, (byte)'I');
+                AppendByte(ref platform, ref writer, (byte)'R');
+                AppendByte(ref platform, ref writer, (byte)'S');
+                AppendByte(ref platform, ref writer, (byte)'T');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'K');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'L');
+                AppendByte(ref platform, ref writer, (byte)'E');
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'K');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'N');
+                AppendByte(ref platform, ref writer, (byte)',');
+                AppendByte(ref platform, ref writer, (byte)'T');
+                AppendByte(ref platform, ref writer, (byte)'O');
+                AppendByte(ref platform, ref writer, (byte)'/');
+                AppendByte(ref platform, ref writer, (byte)'K');
+                AppendByte(ref platform, ref writer, 0);
                 return;
         }
     }
 
-    private static void WriteByte<TPlatform>(
+    private static void AppendByte<TPlatform>(
         ref TPlatform platform,
-        APTR buffer,
-        int offset,
+        ref ShellReadArgsTemplateWriter writer,
         byte value)
-        where TPlatform : struct, IShellPlatform =>
-        platform.WriteUInt8(buffer, offset, value);
+        where TPlatform : struct, IShellPlatform
+    {
+        // The caller has validated the complete template and backing span.
+        platform.WriteUInt8(writer.Buffer, (int)writer.Position, value);
+        writer.Position++;
+    }
 
     public static int CStringLength<TPlatform>(
         ref TPlatform platform,

@@ -19,13 +19,15 @@ public static class ShellControlCommand
             return (int)ShellCommandResult.Fail;
 
         if (!ReadArgsCommandSupport.Prepare(ref platform, tokenBuffer,
-                tokenCapacity, ReadArgsCommandTemplate.Empty, 4,
+                tokenCapacity, ReadArgsCommandTemplate.Empty,
+                EmptyReadArgsResultRecord.Size,
                 out var resultArray, out var templateLength))
             return (int)ShellCommandResult.Error;
 
         if (!platform.TryReadArgs(invocation.ArgumentText,
                 invocation.ArgumentLength, tokenBuffer, templateLength,
-                resultArray, 4, out var rdArgs) || rdArgs.IsNull)
+                resultArray, EmptyReadArgsResultRecord.Size,
+                out var rdArgs) || rdArgs.IsNull)
             return (int)ShellCommandResult.Error;
         platform.FreeArgs(rdArgs);
 

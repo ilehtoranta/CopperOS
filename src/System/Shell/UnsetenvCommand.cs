@@ -24,16 +24,25 @@ public static class UnsetenvCommand
             return (int)ShellCommandResult.Fail;
 
         if (!ReadArgsCommandSupport.Prepare(ref platform, nameBuffer,
-                nameCapacity, ReadArgsCommandTemplate.UnsetenvOptional, 8,
+                nameCapacity, ReadArgsCommandTemplate.UnsetenvOptional,
+                UnsetenvReadArgsResultRecord.Size,
                 out var resultArray, out var templateLength))
             return (int)ShellCommandResult.Error;
 
         if (!platform.TryReadArgs(invocation.ArgumentText,
                 invocation.ArgumentLength, nameBuffer, templateLength,
-                resultArray, 8, out var rdArgs) || rdArgs.IsNull)
+                resultArray, UnsetenvReadArgsResultRecord.Size,
+                out var rdArgs) || rdArgs.IsNull)
             return (int)ShellCommandResult.Error;
-        var name = APTR.FromPointer(platform.ReadUInt32(resultArray));
-        var save = platform.ReadUInt32(resultArray, 4);
+
+        if (!UnsetenvReadArgsResultRecordCodec.TryRead(ref platform,
+                resultArray, out var parsed))
+        {
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
+        }
+        var name = parsed.Name;
+        var save = parsed.Save;
         if (name.IsNull)
         {
             if (save != 0)

@@ -235,9 +235,23 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 		}
 		else if (condition == (uint)ShellIfCondition.Exists)
 		{
-			var handle = DosCore.Open(ref Dos, State, left, DOS.FileMode.OldFile);
-			matched = handle.IsNotNull;
-			if (handle.IsNotNull) DosCore.Close(ref Dos, State, handle);
+			// Lock resolves either a file or directory. Open(OldFile) is only a
+			// file-handle probe and incorrectly makes directory EXISTS false.
+			var requesterScope = default(DosRequesterScope);
+			if (!DosRequesterPolicy.TryEnter(ref Dos, noRequester,
+				out requesterScope))
+			{
+				DosCore.SetIoErr(ref Dos, State, DOS.Error.ObjectWrongType);
+				return false;
+			}
+			var objectLock = DosCore.Lock(ref Dos, State, left,
+				DOS.LockMode.Shared);
+			matched = objectLock.IsNotNull;
+			if (objectLock.IsNotNull)
+				DosCore.UnLock(ref Dos, State, objectLock);
+			else
+				DosCore.SetIoErr(ref Dos, State, DOS.Error.None);
+			DosRequesterPolicy.Exit(ref Dos, ref requesterScope);
 		}
 		else
 		{

@@ -26,16 +26,25 @@ public static class UnaliasCommand
             return (int)ShellCommandResult.Fail;
 
         if (!ReadArgsCommandSupport.Prepare(ref platform, tokenBuffer,
-                tokenCapacity, ReadArgsCommandTemplate.Unalias, 4,
+                tokenCapacity, ReadArgsCommandTemplate.Unalias,
+                ReadArgsPointerResultRecord.Size,
                 out var resultArray, out var templateLength))
             return (int)ShellCommandResult.Error;
 
         if (!platform.TryReadArgs(invocation.ArgumentText,
                 invocation.ArgumentLength, tokenBuffer, templateLength,
-                resultArray, 4, out var rdArgs) || rdArgs.IsNull)
+                resultArray, ReadArgsPointerResultRecord.Size,
+                out var rdArgs) || rdArgs.IsNull)
             return (int)ShellCommandResult.Error;
 
-        var name = APTR.FromPointer(platform.ReadUInt32(resultArray));
+        if (!ReadArgsPointerResultRecordCodec.TryRead(ref platform,
+                resultArray, out var parsed))
+        {
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
+        }
+
+        var name = parsed.Value;
         if (name.IsNull)
         {
             platform.FreeArgs(rdArgs);

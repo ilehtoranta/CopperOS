@@ -27,17 +27,26 @@ public static class AliasCommand
             return (int)ShellCommandResult.Fail;
 
         if (!ReadArgsCommandSupport.Prepare(ref platform, nameBuffer,
-                nameCapacity, ReadArgsCommandTemplate.Alias, 8,
+                nameCapacity, ReadArgsCommandTemplate.Alias,
+                NameAndValueReadArgsResultRecord.Size,
                 out var resultArray, out var templateLength))
             return (int)ShellCommandResult.Error;
 
         if (!platform.TryReadArgs(invocation.ArgumentText,
                 invocation.ArgumentLength, nameBuffer, templateLength,
-                resultArray, 8, out var rdArgs) || rdArgs.IsNull)
+                resultArray, NameAndValueReadArgsResultRecord.Size,
+                out var rdArgs) || rdArgs.IsNull)
             return (int)ShellCommandResult.Error;
 
-        var name = APTR.FromPointer(platform.ReadUInt32(resultArray));
-        var value = APTR.FromPointer(platform.ReadUInt32(resultArray, 4));
+        if (!NameAndValueReadArgsResultRecordCodec.TryRead(ref platform,
+                resultArray, out var parsed))
+        {
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
+        }
+
+        var name = parsed.Name;
+        var value = parsed.Value;
         if (name.IsNull)
         {
             platform.FreeArgs(rdArgs);

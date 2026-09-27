@@ -30,18 +30,27 @@ public static class SetenvCommand
             return (int)ShellCommandResult.Fail;
 
         if (!ReadArgsCommandSupport.Prepare(ref platform, nameBuffer,
-                nameCapacity, ReadArgsCommandTemplate.SetenvOptional, 12,
+                nameCapacity, ReadArgsCommandTemplate.SetenvOptional,
+                SetenvReadArgsResultRecord.Size,
                 out var resultArray, out var templateLength))
             return (int)ShellCommandResult.Error;
 
         if (!platform.TryReadArgs(invocation.ArgumentText,
                 invocation.ArgumentLength, nameBuffer, templateLength,
-                resultArray, 12, out var rdArgs) || rdArgs.IsNull)
+                resultArray, SetenvReadArgsResultRecord.Size,
+                out var rdArgs) || rdArgs.IsNull)
             return (int)ShellCommandResult.Error;
 
-        var name = APTR.FromPointer(platform.ReadUInt32(resultArray));
-        var value = APTR.FromPointer(platform.ReadUInt32(resultArray, 8));
-        var save = platform.ReadUInt32(resultArray, 4);
+        if (!SetenvReadArgsResultRecordCodec.TryRead(ref platform,
+                resultArray, out var parsed))
+        {
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
+        }
+
+        var name = parsed.Name;
+        var value = parsed.Value;
+        var save = parsed.Save;
         if (name.IsNull)
         {
             if (value.IsNotNull || save != 0)

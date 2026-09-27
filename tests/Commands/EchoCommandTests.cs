@@ -121,6 +121,8 @@ public sealed class EchoCommandTests
 
         Assert.Equal((int)ShellCommandResult.Ok, result);
         Assert.Equal("one two three \n\n", platform.Store.OutputText);
+        Assert.Equal("MESSAGE/M,NOLINE/S,FIRST/K/N,LEN/K/N,TO/K",
+            platform.Store.LastReadArgsTemplate);
         Assert.Equal(1, platform.Store.ReadArgsCount);
         Assert.Equal(1, platform.Store.FreeArgsCount);
     }
@@ -173,6 +175,38 @@ public sealed class EchoCommandTests
 
         Assert.Equal((int)ShellCommandResult.Ok, result);
         Assert.Equal("ef\n", platform.Store.OutputText);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void Rejects_an_invalid_ReadArgs_number_value(bool unmapped,
+        bool misaligned)
+    {
+        TestShellPlatform platform = new();
+        platform.Store.InvalidReadArgsNumberValueAddress = unmapped;
+        platform.Store.MisalignedReadArgsNumberValueAddress = misaligned;
+        string commandLine = "hello FIRST 1";
+        APTR source = platform.Store.PutAt(16, commandLine);
+        CommandInvocation invocation = CommandInvocation.ForOutput(
+            source,
+            (uint)commandLine.Length,
+            new BPTR(1));
+
+        int result = EchoCommand.ParseAndExecute(
+            ref platform,
+            in invocation,
+            new APTR(80),
+            96,
+            new APTR(176),
+            48,
+            new APTR(224),
+            32);
+
+        Assert.Equal((int)ShellCommandResult.Error, result);
+        Assert.Equal(1, platform.Store.ReadArgsCount);
+        Assert.Equal(1, platform.Store.FreeArgsCount);
+        Assert.Equal(string.Empty, platform.Store.OutputText);
     }
 
     [Fact]
@@ -1094,11 +1128,11 @@ public sealed class EchoCommandTests
             string templateText = Store.ReadText(template, templateLength);
             Store.LastReadArgsTemplate = templateText;
             if (string.Equals(templateText,
-                    "MESSAGE/M,NOLINE/S,FIRST/N,LEN/N,TO/K",
+                    "MESSAGE/M,NOLINE/S,FIRST/K/N,LEN/K/N,TO/K",
                     StringComparison.OrdinalIgnoreCase))
                 return TryReadEchoArgs(argumentText, argumentLength,
                     resultArray, resultBytes, out rdArgs);
-            if (string.Equals(templateText, "STACK/N",
+            if (string.Equals(templateText, "SIZE/N",
                     StringComparison.OrdinalIgnoreCase))
                 return TryReadSingleNumberArgs(argumentText, argumentLength,
                     resultArray, required: false, out rdArgs);
@@ -2113,7 +2147,16 @@ public sealed class EchoCommandTests
 
             if (pathCount != 0)
             {
-                WriteUInt32(listAddress, pathCount * 4, 0);
+                if (Store.PathArgsMissingTerminator)
+                {
+                    var firstPath = ReadUInt32(listAddress, 0);
+                    for (var index = pathCount; index <= 64; index++)
+                        WriteUInt32(listAddress, index * 4, firstPath);
+                }
+                else
+                {
+                    WriteUInt32(listAddress, pathCount * 4, 0);
+                }
                 WriteUInt32(resultArray, 0, listAddress.Raw);
             }
             rdArgs = new APTR(240);
@@ -2247,8 +2290,13 @@ public sealed class EchoCommandTests
             if (tokenResult != (int)ShellTextTokenResult.End)
                 return false;
 
-            var numberAddress = new APTR(184);
-            WriteUInt32(numberAddress, 0, number);
+            var numberAddress = Store.InvalidReadArgsNumberValueAddress
+                ? new APTR(9000)
+                : Store.MisalignedReadArgsNumberValueAddress
+                    ? new APTR(185)
+                    : new APTR(184);
+            if (!Store.InvalidReadArgsNumberValueAddress)
+                WriteUInt32(numberAddress, 0, number);
             WriteUInt32(resultArray, 0, numberAddress.Raw);
             rdArgs = new APTR(240);
             Store.ReadArgsCount++;
@@ -2413,9 +2461,13 @@ public sealed class EchoCommandTests
                     var destination = string.Equals(value, "FIRST",
                         StringComparison.OrdinalIgnoreCase) ? 8 : 12;
                     if (ReadUInt32(resultArray, destination) != 0) return false;
-                    var numberAddress = destination == 8 ? new APTR(184) :
-                        new APTR(188);
-                    WriteUInt32(numberAddress, 0, number);
+                    var numberAddress = Store.InvalidReadArgsNumberValueAddress
+                        ? new APTR(9000)
+                        : Store.MisalignedReadArgsNumberValueAddress
+                            ? new APTR(185)
+                            : destination == 8 ? new APTR(184) : new APTR(188);
+                    if (!Store.InvalidReadArgsNumberValueAddress)
+                        WriteUInt32(numberAddress, 0, number);
                     WriteUInt32(resultArray, destination, numberAddress.Raw);
                     optionsStarted = true;
                     continue;
@@ -2663,6 +2715,9 @@ public sealed class EchoCommandTests
         public readonly byte[] Memory = new byte[8192];
         public readonly List<byte> Output = new();
         public bool ShortWrite;
+        public bool InvalidReadArgsNumberValueAddress;
+        public bool MisalignedReadArgsNumberValueAddress;
+        public bool PathArgsMissingTerminator;
         public string OpenedPath = string.Empty;
         public BPTR ClosedHandle;
         public int DefaultStack = 8192;

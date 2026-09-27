@@ -47,19 +47,26 @@ public static class NewShellCommand
             return (int)ShellCommandResult.Fail;
 
         if (!ReadArgsCommandSupport.Prepare(ref platform, tokenBuffer,
-                tokenCapacity, ReadArgsCommandTemplate.NewShell, 8,
+                tokenCapacity, ReadArgsCommandTemplate.NewShell,
+                WindowFromReadArgsResultRecord.Size,
                 out var resultArray, out var templateLength))
             return (int)ShellCommandResult.Error;
         if (!platform.TryReadArgs(invocation.ArgumentText,
                 invocation.ArgumentLength, tokenBuffer, templateLength,
-                resultArray, 8, out var rdArgs) || rdArgs.IsNull)
+                resultArray, WindowFromReadArgsResultRecord.Size,
+                out var rdArgs) || rdArgs.IsNull)
             return (int)ShellCommandResult.Error;
 
-        var window = APTR.FromPointer(platform.ReadUInt32(resultArray));
-        var from = APTR.FromPointer(platform.ReadUInt32(resultArray, 4));
-        if (!CopyOptional(ref platform, window, windowBuffer, windowCapacity,
+        if (!WindowFromReadArgsResultRecordCodec.TryRead(ref platform,
+                resultArray, out var parsed))
+        {
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
+        }
+
+        if (!CopyOptional(ref platform, parsed.Window, windowBuffer, windowCapacity,
                 out var windowLength) ||
-            !CopyOptional(ref platform, from, fromBuffer, fromCapacity,
+            !CopyOptional(ref platform, parsed.From, fromBuffer, fromCapacity,
                 out var fromLength))
         {
             platform.FreeArgs(rdArgs);
@@ -73,9 +80,9 @@ public static class NewShellCommand
             return (int)ShellCommandResult.Error;
 
         var windowArgument = windowBuffer;
-        if (window.IsNull) windowArgument = APTR.FromPointer(0);
+        if (parsed.Window.IsNull) windowArgument = APTR.FromPointer(0);
         var fromArgument = fromBuffer;
-        if (from.IsNull) fromArgument = APTR.FromPointer(0);
+        if (parsed.From.IsNull) fromArgument = APTR.FromPointer(0);
         var launched = platform.TryCreateShell(invocation.Cli, kind,
                 invocation.Input, invocation.Output, invocation.Error,
                 invocation.CurrentDirectory, invocation.Continuation,

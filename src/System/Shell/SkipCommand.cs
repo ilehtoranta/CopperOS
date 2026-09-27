@@ -26,17 +26,26 @@ public static class SkipCommand
             return (int)ShellCommandResult.Fail;
 
         if (!ReadArgsCommandSupport.Prepare(ref platform, tokenBuffer,
-                tokenCapacity, ReadArgsCommandTemplate.Skip, 8,
+                tokenCapacity, ReadArgsCommandTemplate.Skip,
+                SkipReadArgsResultRecord.Size,
                 out var resultArray, out var templateLength))
             return (int)ShellCommandResult.Error;
 
         if (!platform.TryReadArgs(invocation.ArgumentText,
                 invocation.ArgumentLength, tokenBuffer, templateLength,
-                resultArray, 8, out var rdArgs) || rdArgs.IsNull)
+                resultArray, SkipReadArgsResultRecord.Size,
+                out var rdArgs) || rdArgs.IsNull)
             return (int)ShellCommandResult.Error;
 
-        var label = APTR.FromPointer(platform.ReadUInt32(resultArray));
-        var back = platform.ReadUInt32(resultArray, 4);
+        if (!SkipReadArgsResultRecordCodec.TryRead(ref platform,
+                resultArray, out var parsed))
+        {
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
+        }
+
+        var label = parsed.Label;
+        var back = parsed.Back;
         if (label.IsNull)
         {
             platform.FreeArgs(rdArgs);

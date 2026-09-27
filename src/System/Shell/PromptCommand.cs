@@ -18,16 +18,25 @@ public static class PromptCommand
             return (int)ShellCommandResult.Fail;
 
         if (!ReadArgsCommandSupport.Prepare(ref platform, valueBuffer,
-                valueCapacity, ReadArgsCommandTemplate.Prompt, 4,
+                valueCapacity, ReadArgsCommandTemplate.Prompt,
+                ReadArgsPointerResultRecord.Size,
                 out var resultArray, out var templateLength))
             return (int)ShellCommandResult.Error;
 
         if (!platform.TryReadArgs(invocation.ArgumentText,
                 invocation.ArgumentLength, valueBuffer, templateLength,
-                resultArray, 4, out var rdArgs) || rdArgs.IsNull)
+                resultArray, ReadArgsPointerResultRecord.Size,
+                out var rdArgs) || rdArgs.IsNull)
             return (int)ShellCommandResult.Error;
 
-        var value = APTR.FromPointer(platform.ReadUInt32(resultArray));
+        if (!ReadArgsPointerResultRecordCodec.TryRead(ref platform,
+                resultArray, out var parsed))
+        {
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
+        }
+
+        var value = parsed.Value;
         var reset = value.IsNull ? 1u : 0u;
         uint valueLength = 0;
         if (value.IsNotNull && !ReadArgsCommandSupport.CopyCString(

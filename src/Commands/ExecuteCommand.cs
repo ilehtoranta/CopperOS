@@ -36,7 +36,7 @@ public static class ExecuteCommand
         const uint templateLength = 6;
         if (fileTokenCapacity <= templateLength ||
             !platform.IsMapped(fileTokenBuffer, templateLength + 1) ||
-            stableFileCapacity < 4)
+            stableFileCapacity < ExecuteReadArgsResultRecord.Size)
             return (int)ShellCommandResult.Fail;
         WriteFileTemplate(ref platform, fileTokenBuffer);
 
@@ -51,10 +51,18 @@ public static class ExecuteCommand
 
         if (!platform.TryReadArgs(invocation.ArgumentText,
             filePrefixLength, fileTokenBuffer, templateLength,
-            stableFileBuffer, 4, out var rdArgs))
+            stableFileBuffer, ExecuteReadArgsResultRecord.Size,
+            out var rdArgs) || rdArgs.IsNull)
             return (int)ShellCommandResult.Error;
 
-        var file = APTR.FromPointer(platform.ReadUInt32(stableFileBuffer));
+        if (!ExecuteReadArgsResultRecordCodec.TryRead(ref platform,
+                stableFileBuffer, out var parsed))
+        {
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
+        }
+
+        var file = parsed.File;
         if (!CStringCodec.TryReadLength(ref platform, file,
             EchoCommand.MaximumArgumentLength, out var fileLength))
         {
@@ -78,16 +86,36 @@ public static class ExecuteCommand
         };
     }
 
+    // This template is a NUL-terminated guest byte string. Keep its only
+    // positional state in a named sequential writer record.
+    [System.Runtime.InteropServices.StructLayout(
+        System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 2)]
+    private struct ExecuteTemplateWriter
+    {
+        internal APTR Buffer;
+        internal uint Position;
+    }
+
     private static void WriteFileTemplate<TPlatform>(ref TPlatform platform,
         APTR template) where TPlatform : struct, IShellPlatform
     {
-        platform.WriteUInt8(template, 0, (byte)'F');
-        platform.WriteUInt8(template, 1, (byte)'I');
-        platform.WriteUInt8(template, 2, (byte)'L');
-        platform.WriteUInt8(template, 3, (byte)'E');
-        platform.WriteUInt8(template, 4, (byte)'/');
-        platform.WriteUInt8(template, 5, (byte)'A');
-        platform.WriteUInt8(template, 6, 0);
+        var writer = new ExecuteTemplateWriter { Buffer = template };
+        AppendTemplateByte(ref platform, ref writer, (byte)'F');
+        AppendTemplateByte(ref platform, ref writer, (byte)'I');
+        AppendTemplateByte(ref platform, ref writer, (byte)'L');
+        AppendTemplateByte(ref platform, ref writer, (byte)'E');
+        AppendTemplateByte(ref platform, ref writer, (byte)'/');
+        AppendTemplateByte(ref platform, ref writer, (byte)'A');
+        AppendTemplateByte(ref platform, ref writer, 0);
+    }
+
+    private static void AppendTemplateByte<TPlatform>(ref TPlatform platform,
+        ref ExecuteTemplateWriter writer, byte value)
+        where TPlatform : struct, IShellPlatform
+    {
+        // The caller has validated the complete template and backing span.
+        platform.WriteUInt8(writer.Buffer, (int)writer.Position, value);
+        writer.Position++;
     }
 
 }

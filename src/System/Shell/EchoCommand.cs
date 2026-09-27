@@ -81,8 +81,9 @@ public static class EchoCommand
         ref EchoArguments arguments)
         where TPlatform : struct, IShellPlatform
     {
-        if (sourceLength > MaximumArgumentLength || messageCapacity < 20 ||
-            tokenCapacity < 38 || toCapacity == 0 || messageBuffer.IsNull ||
+        if (sourceLength > MaximumArgumentLength ||
+            messageCapacity < EchoReadArgsResultRecord.Size ||
+            tokenCapacity < 42 || toCapacity == 0 || messageBuffer.IsNull ||
             tokenBuffer.IsNull || toBuffer.IsNull ||
             messageBuffer.Raw > uint.MaxValue - messageCapacity ||
             tokenBuffer.Raw > uint.MaxValue - tokenCapacity ||
@@ -95,18 +96,22 @@ public static class EchoCommand
                 !platform.IsMapped(source, sourceLength))))
             return (int)ShellCommandResult.Fail;
 
-        WriteReadArgsTemplate(ref platform, tokenBuffer);
-        if (!platform.TryReadArgs(source, sourceLength, tokenBuffer, 37,
-            messageBuffer, 20, out var rdArgs))
+        if (!ReadArgsCommandSupport.TryWriteTemplate(ref platform, tokenBuffer,
+                tokenCapacity, ReadArgsCommandTemplate.Echo,
+                out var templateLength) ||
+            !platform.TryReadArgs(source, sourceLength, tokenBuffer,
+                templateLength, messageBuffer, EchoReadArgsResultRecord.Size,
+                out var rdArgs))
             return (int)ShellCommandResult.Error;
 
-        var messageList = APTR.FromPointer(platform.ReadUInt32(messageBuffer));
-        var noLine = platform.ReadUInt32(messageBuffer, 4);
-        var firstValue = APTR.FromPointer(platform.ReadUInt32(messageBuffer, 8));
-        var lengthValue = APTR.FromPointer(platform.ReadUInt32(messageBuffer, 12));
-        var toValue = APTR.FromPointer(platform.ReadUInt32(messageBuffer, 16));
-        var messageLength = CopyReadArgsMultiple(ref platform, messageList,
-            messageBuffer, messageCapacity);
+        if (!EchoReadArgsResultRecordCodec.TryRead(ref platform, messageBuffer,
+            out var readArgsResult))
+        {
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
+        }
+        var messageLength = CopyReadArgsMultiple(ref platform,
+            readArgsResult.MessageList, messageBuffer, messageCapacity);
         if (messageLength == uint.MaxValue)
         {
             platform.FreeArgs(rdArgs);
@@ -114,82 +119,49 @@ public static class EchoCommand
         }
 
         uint toLength = 0;
-        if (toValue.IsNotNull)
+        if (readArgsResult.To.IsNotNull)
         {
-            if (!CStringCodec.TryReadLength(ref platform, toValue,
+            if (!CStringCodec.TryReadLength(ref platform, readArgsResult.To,
                     MaximumArgumentLength, out toLength) ||
                 toLength >= toCapacity)
             {
                 platform.FreeArgs(rdArgs);
                 return (int)ShellCommandResult.Error;
             }
-            platform.Copy(toValue, toBuffer, toLength);
+            platform.Copy(readArgsResult.To, toBuffer, toLength);
             platform.WriteUInt8(toBuffer, (int)toLength, 0);
+        }
+
+        ReadArgsLongValueRecord first = default;
+        ReadArgsLongValueRecord length = default;
+        if ((readArgsResult.First.IsNotNull &&
+             !ReadArgsLongValueRecordCodec.TryRead(ref platform,
+                 readArgsResult.First, out first)) ||
+            (readArgsResult.Length.IsNotNull &&
+             !ReadArgsLongValueRecordCodec.TryRead(ref platform,
+                 readArgsResult.Length, out length)))
+        {
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
         }
 
         arguments = new EchoArguments
         {
             Message = messageBuffer,
             MessageLength = messageLength,
-            NoLine = noLine,
+            NoLine = readArgsResult.NoLine,
+            HasFirst = readArgsResult.First.IsNotNull ? 1u : 0u,
+            // Echo's bounded substring core retains the existing raw 32-bit
+            // arithmetic; signed edge-case behavior remains a MorphOS trace
+            // question, not an assumption made by this memory-safety check.
+            First = unchecked((uint)first.Value),
+            HasLength = readArgsResult.Length.IsNotNull ? 1u : 0u,
+            Length = unchecked((uint)length.Value),
             ToPath = toBuffer,
             ToPathLength = toLength,
         };
-        if (firstValue.IsNotNull)
-        {
-            arguments.HasFirst = 1;
-            arguments.First = platform.ReadUInt32(firstValue);
-        }
-        if (lengthValue.IsNotNull)
-        {
-            arguments.HasLength = 1;
-            arguments.Length = platform.ReadUInt32(lengthValue);
-        }
         platform.FreeArgs(rdArgs);
         return (int)ShellCommandResult.Ok;
-    }
-
-    private static void WriteReadArgsTemplate<TPlatform>(ref TPlatform platform,
-        APTR template) where TPlatform : struct, IShellPlatform
-    {
-        platform.WriteUInt8(template, 0, (byte)'M');
-        platform.WriteUInt8(template, 1, (byte)'E');
-        platform.WriteUInt8(template, 2, (byte)'S');
-        platform.WriteUInt8(template, 3, (byte)'S');
-        platform.WriteUInt8(template, 4, (byte)'A');
-        platform.WriteUInt8(template, 5, (byte)'G');
-        platform.WriteUInt8(template, 6, (byte)'E');
-        platform.WriteUInt8(template, 7, (byte)'/');
-        platform.WriteUInt8(template, 8, (byte)'M');
-        platform.WriteUInt8(template, 9, (byte)',');
-        platform.WriteUInt8(template, 10, (byte)'N');
-        platform.WriteUInt8(template, 11, (byte)'O');
-        platform.WriteUInt8(template, 12, (byte)'L');
-        platform.WriteUInt8(template, 13, (byte)'I');
-        platform.WriteUInt8(template, 14, (byte)'N');
-        platform.WriteUInt8(template, 15, (byte)'E');
-        platform.WriteUInt8(template, 16, (byte)'/');
-        platform.WriteUInt8(template, 17, (byte)'S');
-        platform.WriteUInt8(template, 18, (byte)',');
-        platform.WriteUInt8(template, 19, (byte)'F');
-        platform.WriteUInt8(template, 20, (byte)'I');
-        platform.WriteUInt8(template, 21, (byte)'R');
-        platform.WriteUInt8(template, 22, (byte)'S');
-        platform.WriteUInt8(template, 23, (byte)'T');
-        platform.WriteUInt8(template, 24, (byte)'/');
-        platform.WriteUInt8(template, 25, (byte)'N');
-        platform.WriteUInt8(template, 26, (byte)',');
-        platform.WriteUInt8(template, 27, (byte)'L');
-        platform.WriteUInt8(template, 28, (byte)'E');
-        platform.WriteUInt8(template, 29, (byte)'N');
-        platform.WriteUInt8(template, 30, (byte)'/');
-        platform.WriteUInt8(template, 31, (byte)'N');
-        platform.WriteUInt8(template, 32, (byte)',');
-        platform.WriteUInt8(template, 33, (byte)'T');
-        platform.WriteUInt8(template, 34, (byte)'O');
-        platform.WriteUInt8(template, 35, (byte)'/');
-        platform.WriteUInt8(template, 36, (byte)'K');
-        platform.WriteUInt8(template, 37, 0);
     }
 
     private static uint CopyReadArgsMultiple<TPlatform>(ref TPlatform platform,
@@ -204,13 +176,15 @@ public static class EchoCommand
             return 0;
         }
         uint output = 0;
-        for (var index = 0; index < 256; index++)
+        var cursor = default(EchoReadArgsStringVectorCursor);
+        cursor.Base = list;
+        for (var index = 0u; index <
+            EchoReadArgsStringVectorCursor.MaximumEntries; index++)
         {
-            if (list.Raw > uint.MaxValue - (uint)(index * 4) ||
-                !platform.IsMapped(list, (uint)((index + 1) * 4)))
+            if (!EchoReadArgsStringVectorCursorCodec.TryReadCurrent(
+                ref platform, cursor, out var item, out var hasItem))
                 return uint.MaxValue;
-            var item = APTR.FromPointer(platform.ReadUInt32(list, index * 4));
-            if (item.IsNull) break;
+            if (!hasItem) break;
             if (!CStringCodec.TryReadLength(ref platform, item,
                     MaximumArgumentLength, out var length) ||
                 output > capacity - 1 ||
@@ -220,6 +194,9 @@ public static class EchoCommand
                 platform.WriteUInt8(destination, (int)output++, (byte)' ');
             platform.Copy(item, APTR.FromPointer(destination.Raw + output), length);
             output += length;
+            if (index + 1 == EchoReadArgsStringVectorCursor.MaximumEntries ||
+                !EchoReadArgsStringVectorCursorCodec.TryAdvance(ref cursor))
+                return uint.MaxValue;
         }
         if (output >= capacity) return uint.MaxValue;
         platform.WriteUInt8(destination, (int)output, 0);

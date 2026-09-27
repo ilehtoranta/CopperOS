@@ -47,31 +47,45 @@ public static class PathCommand
         uint pathBytes = 0;
         uint pathCount = 0;
         if (!ReadArgsCommandSupport.Prepare(ref platform, tokenBuffer,
-                tokenCapacity, ReadArgsCommandTemplate.Path, 24,
+                tokenCapacity, ReadArgsCommandTemplate.Path,
+                PathReadArgsResultRecord.Size,
                 out var resultArray, out var templateLength))
             return (int)ShellCommandResult.Error;
 
         if (!platform.TryReadArgs(invocation.ArgumentText,
                 invocation.ArgumentLength, tokenBuffer, templateLength,
-                resultArray, 24, out var rdArgs) || rdArgs.IsNull)
+                resultArray, PathReadArgsResultRecord.Size,
+                out var rdArgs) || rdArgs.IsNull)
             return (int)ShellCommandResult.Error;
 
-        var pathList = APTR.FromPointer(platform.ReadUInt32(resultArray));
-        if (pathList.IsNotNull)
+        if (!PathReadArgsResultRecordCodec.TryRead(ref platform,
+                resultArray, out var parsed))
         {
-            for (var index = 0u; index < MaximumPathEntries; index++)
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
+        }
+
+        if (parsed.Paths.IsNotNull)
+        {
+            PathReadArgsVectorCursor cursor = new()
             {
-                if (pathList.Raw > uint.MaxValue - (index + 1) * 4u ||
-                    !platform.IsMapped(pathList, (index + 1) * 4u))
+                Base = parsed.Paths,
+            };
+            var terminated = false;
+            while (true)
+            {
+                if (!PathReadArgsVectorCursorCodec.TryReadCurrent(
+                        ref platform, ref cursor, out var item,
+                        out var hasItem))
                 {
                     platform.FreeArgs(rdArgs);
                     return (int)ShellCommandResult.Error;
                 }
-
-                var item = APTR.FromPointer(platform.ReadUInt32(
-                    pathList, (int)(index * 4u)));
-                if (item.IsNull)
+                if (!hasItem)
+                {
+                    terminated = true;
                     break;
+                }
                 if (pathCount >= MaximumPathEntries ||
                     pathBytes >= pathCapacity)
                 {
@@ -90,18 +104,28 @@ public static class PathCommand
                 }
                 pathBytes += itemLength + 1;
                 pathCount++;
+                if (!PathReadArgsVectorCursorCodec.TryAdvance(ref cursor))
+                {
+                    platform.FreeArgs(rdArgs);
+                    return (int)ShellCommandResult.Error;
+                }
+            }
+            if (!terminated)
+            {
+                platform.FreeArgs(rdArgs);
+                return (int)ShellCommandResult.Error;
             }
         }
 
-        if (platform.ReadUInt32(resultArray, 4) != 0)
+        if (parsed.Add != 0)
             optionMask |= OptionAdd;
-        if (platform.ReadUInt32(resultArray, 8) != 0)
+        if (parsed.Show != 0)
             optionMask |= OptionShow;
-        if (platform.ReadUInt32(resultArray, 12) != 0)
+        if (parsed.Reset != 0)
             optionMask |= OptionReset;
-        if (platform.ReadUInt32(resultArray, 16) != 0)
+        if (parsed.Remove != 0)
             optionMask |= OptionRemove;
-        if (platform.ReadUInt32(resultArray, 20) != 0)
+        if (parsed.Quiet != 0)
             optionMask |= OptionQuiet;
         platform.FreeArgs(rdArgs);
 

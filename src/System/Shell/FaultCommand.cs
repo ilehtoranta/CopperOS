@@ -31,63 +31,75 @@ public static class FaultCommand
             return (int)ShellCommandResult.Fail;
 
         uint codeCapacity = errorCodeCapacity / 4;
+        if (!FaultErrorCodeBufferCodec.TryCreate(ref platform,
+                errorCodeBuffer, errorCodeCapacity, out var codes))
+            return (int)ShellCommandResult.Fail;
         if (!ReadArgsCommandSupport.Prepare(ref platform, tokenBuffer,
-                tokenCapacity, ReadArgsCommandTemplate.Fault, 4,
+                tokenCapacity, ReadArgsCommandTemplate.Fault,
+                ReadArgsPointerResultRecord.Size,
                 out var resultArray, out var templateLength))
             return (int)ShellCommandResult.Error;
         if (!platform.TryReadArgs(invocation.ArgumentText,
                 invocation.ArgumentLength, tokenBuffer, templateLength,
-                resultArray, 4, out var rdArgs) || rdArgs.IsNull)
+                resultArray, ReadArgsPointerResultRecord.Size,
+                out var rdArgs) || rdArgs.IsNull)
             return (int)ShellCommandResult.Error;
 
-        var listAddress = APTR.FromPointer(platform.ReadUInt32(resultArray));
+        if (!ReadArgsPointerResultRecordCodec.TryRead(ref platform,
+                resultArray, out var parsed))
+        {
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
+        }
+        var listAddress = parsed.Value;
         if (listAddress.IsNull)
         {
             platform.FreeArgs(rdArgs);
             return (int)ShellCommandResult.Error;
         }
 
-        uint codeCount = 0;
-        while (codeCount < codeCapacity)
+        FaultReadArgsCodeCursor cursor = new()
         {
-            var listOffset = codeCount * 4;
-            if (listAddress.Raw > uint.MaxValue - listOffset - 4 ||
-                !platform.IsMapped(listAddress, listOffset + 4))
+            Base = listAddress,
+            MaximumCodes = codeCapacity,
+        };
+        while (true)
+        {
+            if (!FaultReadArgsCodeCursorCodec.TryReadCurrent(ref platform,
+                    ref cursor, out var numberAddress, out var hasValue))
             {
                 platform.FreeArgs(rdArgs);
                 return (int)ShellCommandResult.Fail;
             }
-            var numberAddress = APTR.FromPointer(
-                platform.ReadUInt32(listAddress, (int)listOffset));
-            if (numberAddress.IsNull)
+            if (!hasValue)
                 break;
-            if (numberAddress.Raw > uint.MaxValue - 4 ||
-                !platform.IsMapped(numberAddress, 4))
+            if (codes.Count >= codeCapacity)
+            {
+                platform.FreeArgs(rdArgs);
+                return (int)ShellCommandResult.Error;
+            }
+            if (!ReadArgsLongValueRecordCodec.TryRead(ref platform,
+                    numberAddress, out var errorCode))
             {
                 platform.FreeArgs(rdArgs);
                 return (int)ShellCommandResult.Fail;
             }
-            platform.WriteUInt32(errorCodeBuffer, (int)listOffset,
-                platform.ReadUInt32(numberAddress));
-            codeCount++;
-        }
-
-        if (codeCount == codeCapacity &&
-            (listAddress.Raw > uint.MaxValue - codeCount * 4 - 4 ||
-             !platform.IsMapped(listAddress, codeCount * 4 + 4) ||
-             platform.ReadUInt32(listAddress, (int)(codeCount * 4)) != 0))
-        {
-            platform.FreeArgs(rdArgs);
-            return (int)ShellCommandResult.Error;
+            if (!FaultErrorCodeBufferCodec.TryAppend(ref platform,
+                    ref codes, unchecked((uint)errorCode.Value)) ||
+                !FaultReadArgsCodeCursorCodec.TryAdvance(ref cursor))
+            {
+                platform.FreeArgs(rdArgs);
+                return (int)ShellCommandResult.Fail;
+            }
         }
         platform.FreeArgs(rdArgs);
-        if (codeCount == 0)
+        if (codes.Count == 0)
             return (int)ShellCommandResult.Error;
 
         return platform.TryWriteFault(
                 invocation.Output,
                 errorCodeBuffer,
-                codeCount)
+                codes.Count)
             ? (int)ShellCommandResult.Ok
             : (int)ShellCommandResult.Fail;
     }

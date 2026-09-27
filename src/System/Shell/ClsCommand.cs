@@ -18,15 +18,23 @@ public static class ClsCommand
             return (int)ShellCommandResult.Fail;
 
         if (!ReadArgsCommandSupport.Prepare(ref platform, tokenBuffer,
-                tokenCapacity, ReadArgsCommandTemplate.Cls, 4,
+                tokenCapacity, ReadArgsCommandTemplate.Cls,
+                ReadArgsWordResultRecord.Size,
                 out var resultArray, out var templateLength))
             return (int)ShellCommandResult.Error;
 
         if (!platform.TryReadArgs(invocation.ArgumentText,
                 invocation.ArgumentLength, tokenBuffer, templateLength,
-                resultArray, 4, out var rdArgs) || rdArgs.IsNull)
+                resultArray, ReadArgsWordResultRecord.Size,
+                out var rdArgs) || rdArgs.IsNull)
             return (int)ShellCommandResult.Error;
-        var reset = platform.ReadUInt32(resultArray);
+        if (!ReadArgsWordResultRecordCodec.TryRead(ref platform,
+                resultArray, out var parsed))
+        {
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
+        }
+        var reset = parsed.Value;
         platform.FreeArgs(rdArgs);
 
         return platform.ClearConsole(invocation.Output, reset)

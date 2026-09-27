@@ -27,22 +27,28 @@ public static class RunCommand
             return (int)ShellCommandResult.Fail;
 
         if (!ReadArgsCommandSupport.Prepare(ref platform, tokenBuffer,
-                tokenCapacity, ReadArgsCommandTemplate.Run, 20,
+                tokenCapacity, ReadArgsCommandTemplate.Run,
+                RunReadArgsResultRecord.Size,
                 out var resultArray, out var templateLength))
             return (int)ShellCommandResult.Error;
 
         if (!platform.TryReadArgs(invocation.ArgumentText,
                 invocation.ArgumentLength, tokenBuffer, templateLength,
-                resultArray, 20, out var rdArgs) || rdArgs.IsNull)
+                resultArray, RunReadArgsResultRecord.Size,
+                out var rdArgs) || rdArgs.IsNull)
             return (int)ShellCommandResult.Error;
 
-        var stackAddress = APTR.FromPointer(platform.ReadUInt32(resultArray, 8));
-        var priorityAddress = APTR.FromPointer(platform.ReadUInt32(resultArray, 12));
-        var command = APTR.FromPointer(platform.ReadUInt32(resultArray, 16));
-        if (!ReadNumberPointer(ref platform, stackAddress, out var stack) ||
-            !ReadNumberPointer(ref platform, priorityAddress, out var priority) ||
-            command.IsNull ||
-            !ReadArgsCommandSupport.CopyCString(ref platform, command,
+        if (!RunReadArgsResultRecordCodec.TryRead(ref platform, resultArray,
+                out var parsed))
+        {
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
+        }
+
+        if (!ReadNumberPointer(ref platform, parsed.Stack, out var stack) ||
+            !ReadNumberPointer(ref platform, parsed.Priority, out var priority) ||
+            parsed.Command.IsNull ||
+            !ReadArgsCommandSupport.CopyCString(ref platform, parsed.Command,
                 commandBuffer, commandCapacity, out var commandLength) ||
             commandLength == 0)
         {
@@ -50,10 +56,10 @@ public static class RunCommand
             return (int)ShellCommandResult.Error;
         }
 
-        var detach = platform.ReadUInt32(resultArray, 0) != 0 ? 1u : 0u;
-        var quiet = platform.ReadUInt32(resultArray, 4) != 0 ? 1u : 0u;
-        var stackPresent = stackAddress.IsNotNull ? 1u : 0u;
-        var priorityPresent = priorityAddress.IsNotNull ? 1u : 0u;
+        var detach = parsed.Detach != 0 ? 1u : 0u;
+        var quiet = parsed.Quiet != 0 ? 1u : 0u;
+        var stackPresent = parsed.Stack.IsNotNull ? 1u : 0u;
+        var priorityPresent = parsed.Priority.IsNotNull ? 1u : 0u;
         platform.FreeArgs(rdArgs);
 
         if (invocation.Continuation.IsNotNull &&
@@ -86,9 +92,10 @@ public static class RunCommand
         value = 0;
         if (address.IsNull)
             return true;
-        if (!platform.IsMapped(address, 4))
+        if (!ReadArgsLongValueRecordCodec.TryRead(ref platform, address,
+                out var number))
             return false;
-        value = platform.ReadUInt32(address);
+        value = unchecked((uint)number.Value);
         return true;
     }
 

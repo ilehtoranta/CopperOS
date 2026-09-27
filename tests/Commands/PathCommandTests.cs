@@ -183,6 +183,29 @@ public sealed class PathCommandTests
     }
 
     [Fact]
+    public void Path_rejects_a_multiple_result_without_a_terminator_within_its_bound()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.PathArgsMissingTerminator = true;
+        const string commandLine = "SYS:C";
+        APTR source = platform.Store.PutAt(16, commandLine);
+        CommandInvocation invocation = CreateInvocation(source,
+            commandLine.Length);
+
+        int result = PathCommand.Execute(
+            ref platform,
+            in invocation,
+            new APTR(80),
+            80,
+            new APTR(4000),
+            3000);
+
+        Assert.Equal((int)ShellCommandResult.Error, result);
+        Assert.Equal(0, platform.Store.CommandPathUpdateCount);
+        Assert.Equal(1, platform.Store.FreeArgsCount);
+    }
+
+    [Fact]
     public void Path_maps_dos_owner_failures()
     {
         EchoCommandTests.TestShellPlatform platform = new();
