@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "capture_id": "eval-wb31-leading-zero-20260928",
+  "kind": "disposable-reference-guest-observation-summary",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Eval",
+    "command_sha256": "e320ba5d36b788e83719a09c7481d2c91d511396787b0b534e29c496240af962",
+    "version": "eval 37.3 (26.3.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "frames": 2400
+  },
+  "probe": {
+    "path": "artifacts/workbench31-guest-probe-native-20260926-v2/CopperProbe",
+    "sha256": "037e73deff186867c39157a983a7d7cc76ca965caf726f94d87937d89eb53889"
+  },
+  "observations": [
+    {
+      "command": "C:Eval 08 + 1",
+      "output": "0\n",
+      "return": 0,
+      "post_system_i_o_err": 0,
+      "analysis": "artifacts/workbench31-guest-eval-08-original-20260928-v1/probe-analysis.json",
+      "analysis_sha256": "e3c10756d18f9e434e097074d62d1649963a62fd1c76b3df3359e4b5518a1c3e"
+    },
+    {
+      "command": "C:Eval 08",
+      "output": "0\n",
+      "return": 0,
+      "post_system_i_o_err": 0,
+      "analysis": "artifacts/workbench31-guest-eval-08-alone-original-20260928-v1/probe-analysis.json",
+      "analysis_sha256": "fbdfb8c4da25ee5b8568006e3ed202eb1849aa87d896d82166c8589717838752"
+    },
+    {
+      "command": "C:Eval 08+1",
+      "output": "0\n",
+      "return": 0,
+      "post_system_i_o_err": 0,
+      "analysis": "artifacts/workbench31-guest-eval-08plus1-no-spaces-original-20260928-v1/probe-analysis.json",
+      "analysis_sha256": "5571b2fa876fa0feae9d7c2e992c1b6a1364f85c3eb74eeb2aa7955907e7de24"
+    },
+    {
+      "command": "C:Eval 09+1",
+      "output": "0\n",
+      "return": 0,
+      "post_system_i_o_err": 0,
+      "analysis": "artifacts/workbench31-guest-eval-09plus1-no-spaces-original-20260928-v1/probe-analysis.json",
+      "analysis_sha256": "1694eeeab84f1eff90870629c835efc5ac2adb060154100eeac59f83228fec86"
+    },
+    {
+      "command": "C:Eval 010",
+      "output": "8\n",
+      "return": 0,
+      "post_system_i_o_err": 0,
+      "analysis": "artifacts/workbench31-guest-eval-010-alone-original-20260928-v1/probe-analysis.json",
+      "analysis_sha256": "4ebc3e79b17169fbf9673873705071db7f3d6481e6904a0c5d3349bc647efa35"
+    }
+  ],
+  "limits": [
+    "Each invocation used a fresh disposable derivative of the hash-bound original ADF; the original ADF and C/Eval member were not modified.",
+    "These original-only observations support the bounded 08/09 prefix behavior and leading-zero octal control. No candidate output comparison is credited.",
+    "This does not establish the full classic numeric grammar, malformed-input diagnostics, overflow, width, or PURE/resident admission."
+  ]
+}

@@ -17,6 +17,9 @@
     <ProjectReference Include="..\..\src\Commands\CopperOS.Commands.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSCopyModeSelection.cs" Link="NativeMorphOSCopyModeSelection.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 </Project>

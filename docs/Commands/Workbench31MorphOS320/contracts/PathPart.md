@@ -117,8 +117,10 @@ and combinations must still be captured on PathPart 52.0.
 `MorphOSPathPartCommand` now provides a standalone, invocation-local native
 body for the documented candidate `DIR/K,FILE/K,ADD/K/M` outer grammar. It
 uses `ReadArgs`/`FreeArgs` for parsing and delegates lexical operations to DOS
-`PathPart`, `FilePart`, and `AddPart`; it has one 1,024-byte invocation-owned
-scratch buffer and retains no path, CLI, or resident state. The private
+`PathPart`, `FilePart`, and `AddPart`; it sizes one invocation-owned scratch
+buffer from the parsed strings and `ADD` vector, with checked arithmetic and
+the DOS `Write` LONG range as its output bound. It retains no path, CLI, or
+resident state. The private
 [`Commands.PathPartNativeRoot`](D:/Koodit/GIT/CopperOS/tests/Commands.PathPartNativeRoot)
 compiles this body with a normal DOS startup entry. Its explicit cleanup path
 releases scratch storage and the ReadArgs lease before restoring IoErr and
@@ -130,14 +132,15 @@ closing DOS; it contains no managed exception region. Resident HUNK checkpoint:
 | 68020 | 3,148 | `a61c28e880ba091dbd87567e2b781267db1f4dae1a9634253e0fded6875be4a4` | `0x000003f3` |
 | 68040 | 3,088 | `31e9f26c47237796b5c2af7844b60aaaf18c115013eaaa1162d3ef3ee00ac70d` | `0x000003f3` |
 
-`qualify_pathpart_native_entry.ps1` compiles these three resident artifacts and
-executes 11 supplied post-ReadArgs vectors per CPU through Copper68k. The
-vectors cover DIR, FILE, ADD, the current candidate's combined and no-mode
-paths, ReadArgs/result-allocation failure, repeated calls and two
-instruction-interleaved callers sharing one loaded image. Every run reports
-zero shared-image writes and balanced Exec/DOS/RDArgs resources. The DOS
-adapters provide PathPart/FilePart/AddPart answers and do not parse command
-text, access a filesystem, or represent MorphOS output behavior.
+`qualify_pathpart_native_entry.ps1` currently compiles three resident artifacts
+and executes 15 supplied post-ReadArgs vectors per CPU through Copper68k. In
+addition to DIR, FILE, ADD, combined/no-mode, failure, repeat and
+instruction-interleaving cases. It also exercises scratch-allocation failure
+after ReadArgs succeeds, 1,100-byte directory and file results, and 70 ADD
+components producing a result longer than 1,024 bytes. Every run reports zero
+shared-image writes and balanced Exec/DOS/RDArgs resources. The DOS adapters provide
+PathPart/FilePart/AddPart answers and do not parse command text, access a
+filesystem, or represent MorphOS output behavior.
 
 The candidate combined-mode presentation, no-mode behavior, exact line output,
 status, diagnostics, capacity, cancellation, installed P policy, same-SegList
@@ -151,6 +154,37 @@ supplied invocations per CPU; current HUNK hashes are 68000
 68040 `f4e0d3836d9edc4ef8d22e761d21c2072aaeabceb6652c057d5b1f809960f52e`.
 This rerun does not close the open reference, packaging, or resident-lifecycle
 gates.
+
+## 2026-09-28 dynamic output sizing checkpoint
+
+`MorphOSPathPartCommand` no longer imposes the old 1,024-byte scratch-buffer
+limit or the 64-item `ADD` loop limit. It measures each retained `ReadArgs`
+string, scans the DOS-owned `/M` pointer vector to its terminator, and computes
+a conservative `AddPart` capacity with overflow guards. Output storage is
+invocation-owned and is capped only where the DOS `Write` interface's signed
+LONG byte count requires it. The same capacity is released after every path.
+
+The refreshed resident fixture passes 15 supplied vectors per CPU (45 total)
+on 68000/020/040. It includes directory and file output longer than 1,024
+bytes, 70 `ADD` components producing a path longer than 1,024 bytes, and a
+failed scratch allocation after successful parsing, plus the existing
+ReadArgs/result-allocation failures, repeated calls, and interleaved callers.
+All executions report one image load and zero shared-image writes; the static
+reports contain 18 reachable methods, no runtime features, managed allocations,
+helpers, external targets, fatal sites or exception regions. Receipt:
+`artifacts/cc10-pathpart-native-20260928-dynamic-output-v5/qualification.json`.
+The three HUNK SHA-256 values are:
+
+| CPU | Bytes | SHA-256 |
+| --- | ---: | --- |
+| 68000 | 4,008 | `d64424678473354a762276fe5b0d033d5f80eb8b94d16470b248e4d8b5aca88b` |
+| 68020 | 4,088 | `26c8ce3f4c42f9b1b4ac65c209f1bd33481a1f3c6bf7fc3bb5e40e5957b8d344` |
+| 68040 | 4,008 | `abb39cd0daf8fc6b2befabd257dcf660e3e745d94047ef19df1285747f93b4ac` |
+
+These are candidate path-helper fixtures, not a real MorphOS parser or
+filesystem comparison. Exact template and option interaction, original output,
+diagnostics, capacity boundary, installed P policy, lifecycle, PURE admission,
+licensing and package gates remain open.
 
 ## Completion gates
 

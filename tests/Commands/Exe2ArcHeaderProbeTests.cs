@@ -92,6 +92,48 @@ public sealed class Exe2ArcHeaderProbeTests
     }
 
     [Theory]
+    [InlineData(1u, 15u, 14u)]
+    [InlineData(123u, 4096u, 3973u)]
+    [InlineData(0xfffffff0u, 0xffffffffu, 15u)]
+    public void Ace_reports_EOF_payload_from_wrapper_offset_without_reading_payload(
+        uint offset, uint length, uint expected)
+    {
+        var memory = new HeaderMemory(Ace());
+
+        bool found = Exe2ArcHeaderProbe.TryGetAcePayloadLength(ref memory,
+            HeaderAddress, 14, offset, length, out uint payload);
+
+        Assert.True(found);
+        Assert.Equal(expected, payload);
+        Assert.Equal(7, memory.ReadCount);
+        Assert.Equal(13, memory.HighestReadOffset);
+        Assert.Equal(Ace(), memory.Bytes);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(6)]
+    public void Every_Ace_marker_byte_is_required(int changedByte)
+    {
+        byte[] bytes = Ace();
+        bytes[7 + changedByte] ^= 0x20;
+        var memory = new HeaderMemory(bytes);
+
+        bool found = Exe2ArcHeaderProbe.TryGetAcePayloadLength(ref memory,
+            HeaderAddress, 14, 1, 100, out uint payload);
+
+        Assert.False(found);
+        Assert.Equal(0u, payload);
+        Assert.InRange(memory.ReadCount, 1, 7);
+        Assert.Equal(7 + changedByte, memory.HighestReadOffset);
+    }
+
+    [Theory]
     [InlineData(21u, 0u, 21u, true)]
     [InlineData(21u, 20u, 30u, true)]
     [InlineData(21u, 21u, 30u, false)]
@@ -331,6 +373,10 @@ public sealed class Exe2ArcHeaderProbeTests
     }
 
     private static byte[] Rar4() => [0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x00];
+
+    private static byte[] Ace() =>
+        [0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,
+         (byte)'*', (byte)'*', (byte)'A', (byte)'C', (byte)'E', (byte)'*', (byte)'*'];
 
     private static byte[] Cabinet(uint length, uint tableOffset)
     {

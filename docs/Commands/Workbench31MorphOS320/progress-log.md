@@ -12680,3 +12680,306 @@ The HUNKs report 92 reachable methods, only the already-audited
 These use supplied argument slots; real MorphOS `ReadArgs`, original 3.20
 binary parity, source reuse licensing, lifecycle/PURE, and packaging remain
 open. Shipping totals remain 0/200 commands and 0/246 profiles.
+
+## 2026-09-28 - CC18 MorphOS ChangeTaskPri explicit PROCESS 0
+
+Added a supplied-DOS regression for the source-defined `PROCESS 0` case.
+Unlike omitting PROCESS, a present PROCESS slot containing zero is passed to
+`FindCliProc(0)` and then to MorphOS `FindTaskByPID(0)` when Exec supports that
+vector. The SDK defines PID zero as the current task. The fixture requires the
+pointer-indirect call to receive D0=0 inside Forbid and verifies that the
+returned current-task target receives priority 4. The 68000/020/040 resident
+qualification passes 15 vectors per CPU (45 total), with 22 reachable methods,
+no managed runtime features/helpers, external targets, exception regions,
+fatal sites, leaks, or shared-image writes:
+`artifacts/changetaskpri-morphos-native-20260928-pid-zero-v1/qualification.json`.
+The 68000 HUNK hash is
+`7a33599717a58a75c8d185c2fd07a5f1fc61923068129a36cbf0087663588774`; the
+020/040 hash is
+`8075a7fc6e1bf185fe87a42926f1e04434504298aac88192251e97ec2c0f644e`.
+This remains source-shaped fixture evidence, not original MorphOS guest
+parity. PID numbering/reuse, liveness/races, PURE/resident lifecycle, rights,
+packaging and shipping remain open at 0/200 commands and 0/246 profiles.
+
+## 2026-09-28 - CC18 Workbench ChangeTaskPri PROCESS 0 boundary
+
+Added the matching Workbench vector for explicit `PROCESS 0`. The classic
+profile calls only `FindCliProc(0)`, returns the missing-process diagnostic,
+and must not dispatch the MorphOS `FindTaskByPID` extension. The refreshed
+resident HUNK qualification passes 14 supplied vectors per CPU on 68000/020/040
+(42 total), with 13 reachable methods, no runtime features/helpers, external
+targets, exception regions, fatal sites, leaks, or shared-image writes. Receipt:
+`artifacts/changetaskpri-wb31-native-20260928-process-zero-v1/qualification.json`.
+The 68000 HUNK hash is
+`14722d2ab7675ff3cda9507f282274edcdb0f92e42ec82b15dcfc228ea5ce7f0`; 020/040
+share `d90746f571b973e04ef6bbdce8a15b29f47910c6d8053296489d31c999d42308`.
+This is supplied-DOS fixture evidence only; an original Workbench guest pair,
+full target/parser coverage, PURE/resident lifecycle, licensing, packaging and
+shipping remain open.
+
+## 2026-09-28 - CC18 Workbench ChangeTaskPri PROCESS 0 guest pair
+
+Ran `C:ChangeTaskPri 4 PROCESS 0` against the original Workbench 3.1 command
+and the current 3,452-byte resident candidate in separate fresh diagnostic
+derivatives of the hash-bound disk 2 image. Both emitted the exact 62-byte
+`Process 0 does not exist\nC:ChangeTaskPri failed returncode 20\n`, returned
+20, and left caller post-System IoErr at 0. The output/result/IoErr comparison
+is `captured-case-equal` at
+`artifacts/workbench31-guest-command-changetaskpri-process-zero-candidate-20260928-v1/comparison-output-result-ierr.json`.
+The effect-aware comparison was deliberately not accepted because this probe
+invocation did not publish a pre-System owner sample; no task-effect claim is
+made. The original ADF and ROM remain unchanged. This closes only this one
+Workbench target-zero case; MorphOS guest behavior, full argument/target
+coverage, lifecycle, PURE, licensing, package admission and shipping remain
+open.
+
+## 2026-09-28 - CC18 Workbench Break question-mark and unknown-switch parity
+
+Captured fresh original/candidate Workbench 3.1 guest pairs for `C:Break ?`
+and `C:Break 1 Z`. Both pairs are `captured-case-equal` for raw output,
+command return and caller post-System IoErr. The question-mark invocation does
+not enter extended help; the original ReadArgs path reports the missing
+required `PROCESS` argument, emitting 90 bytes and returning 20 with caller
+IoErr 116. The unknown extra switch reports `wrong number of arguments`,
+emitting 55 bytes and returning 20 with caller IoErr 118. Receipts:
+`artifacts/workbench31-guest-command-break-help-candidate-20260928-v1/comparison.json`
+and
+`artifacts/workbench31-guest-command-break-unknown-switch-candidate-20260928-v1/comparison.json`.
+These parser errors precede target resolution. No task-effect claim is made.
+MorphOS help/runtime parity, other error and target forms, lifecycle,
+PURE/rights/package admission and full shipping qualification remain open.
+
+## 2026-09-28 - CC18 Workbench ChangeTaskPri question-mark and unknown-switch parity
+
+Fresh original/candidate guest pairs match for `C:ChangeTaskPri ?` and
+`C:ChangeTaskPri 1 Z`. The question-mark invocation follows Workbench's normal
+ReadArgs failure path rather than extended help: exact output is 93 bytes,
+return is 20, and caller post-System IoErr is 116. The unknown extra argument
+prints `wrong number of arguments` plus the Shell failure line (63 bytes),
+returns 20, and leaves caller IoErr at 118. Comparisons:
+`artifacts/workbench31-guest-command-changetaskpri-help-candidate-20260928-v1/comparison.json`
+and
+`artifacts/workbench31-guest-command-changetaskpri-unknown-switch-candidate-20260928-v1/comparison.json`.
+Both are parser failures before task lookup; no task-effect claim is made.
+MorphOS extended-help guest parity, remaining parser/target cases, lifecycle,
+PURE, rights, package admission and complete shipping qualification remain
+open.
+
+## 2026-09-28 - CC10 Eval profile-specific 08/09 behavior
+
+Compared `EvalExpressionEvaluator` with selected MorphOS 3.20 `evalParser.y`
+(SHA-256 `e43ce37d001bae6012cfd22c7117c0777daccf1a861c5aedc56bf311d81b51df`).
+Its `08`/`09` branch falls through to `sscanf("%lli")`, which reads the leading
+zero as octal zero, then consumes the remaining digit run. MorphOS source-shaped
+`08 + 1` therefore evaluates to 1. CopperOS now preserves this behavior only
+for the MorphOS grammar.
+
+Five fresh original Workbench 3.1 guest captures establish a different result:
+`C:Eval 08 + 1`, `C:Eval 08`, `C:Eval 08+1`, and `C:Eval 09+1` each output
+`0\n`; the `C:Eval 010` control outputs `8\n`. Every invocation returns 0 and
+leaves caller post-System IoErr 0. The exact analyses and identities are bound
+by `docs/Commands/Workbench31MorphOS320/reference-captures/eval-wb31-leading-zero-20260928.json`.
+The Workbench evaluator now stops after the leading zero when 8/9 follows, so
+the two target grammars stay separate.
+
+The focused portable Eval set passes 148/148. MorphOS resident entry
+qualification passes 20 supplied post-ReadArgs vectors per CPU (60 total) at
+`artifacts/cc10-eval-morphos-native-20260928-leading-zero-v1/qualification.json`;
+each HUNK has 92 reachable methods, only the audited `nullable-values` feature,
+and zero managed allocation sites, fatal sites, runtime helpers, external
+targets, fixture leaks, and shared-image writes. Current 68000/020/040 HUNK
+hashes are `81093d0b22ad42b2f6302e8bfb1836aa0e236bcb545770af1e99e5d4a0bee556`,
+`bcc7a87514bac87e95c8543a36f01d53c5b0f71c7b2562dbca1f2234ff2991f3`, and
+`d52a6cff0aa94aa4f807e0e954fb3d5953d27a5ef63e20bc9bf3a0423ec34119`.
+
+Workbench resident entry qualification passes 13 supplied vectors per CPU
+(39 total) at
+`artifacts/cc10-eval-wb31-native-20260928-leading-zero-prefix-v1/qualification.json`.
+An attempted guest substitution using this private resident-root HUNK produced
+Workbench's `bad loadfile hunk` error (return 10, caller IoErr 235); that
+artifact is not a distributable command file, so no candidate behavior
+comparison is credited. The actual command build/package path must provide a
+loadable Eval artifact before guest parity can close. No MorphOS guest or real
+MorphOS `ReadArgs` run occurred; complete grammar, lifecycle, P/purity,
+licensing, package admission, and shipping remain open.
+
+## 2026-09-28 - CC10 Workbench Eval captured-subset matrix
+
+Added the already measured Workbench 37.3 examples from the classic numeric,
+grammar, and operator captures to the resident candidate suite. The expanded
+matrix covers captured left-to-right subtraction/multiplication, parentheses,
+unary minus, `0x`/`#x`/leading-zero octal, division, both modulo spellings,
+left-to-right bitwise order, XOR, equivalence, shifts, complement, decimal
+LFORMAT, low-digit octal, and one-/two-digit X/x LFORMAT output. The existing
+caret prefix, TO, `08`/`09`, parser/allocation, repeat, and interleaving cases
+remain in the matrix.
+
+The focused `EvalExpressionEvaluatorTests` pass 67/67, and the broader portable
+Eval filter passes 165/165. The refreshed Workbench resident qualification
+passes 35 supplied post-ReadArgs vectors per CPU (105 total) on 68000/020/040
+at `artifacts/cc10-eval-wb31-native-20260928-captured-matrix-v1/qualification.json`.
+All three HUNK hashes are unchanged from the previous resident build; each
+compatibility report has 63 reachable methods, only `nullable-values`, zero
+managed allocation sites, fatal sites, helpers, external targets, and fixture
+leaks; executions report one image load and zero shared-image writes.
+
+This adds candidate-side vectors for selected original observations, not a
+guest differential. The root HUNK is still rejected by original Workbench DOS
+as `bad loadfile hunk`, the shipping manifest stays empty, and the full classic
+grammar, output/errors, ReadArgs parity, lifecycle, PURE, licensing, and package
+gates remain open.
+
+## 2026-09-28 - CC10 Workbench Eval symbol-free guest pairs
+
+The Eval resident qualifier now uses the compiler's supported `--symbols off`
+option for the Workbench candidate and records that setting in its receipt.
+The three-CPU resident matrix still passes 35 supplied post-ReadArgs vectors
+per CPU (105 total), with 63 reachable methods, only `nullable-values`, no
+managed allocation sites/helpers/external targets/fatal sites/fixture leaks,
+one image load per CPU, and zero shared-image writes. The refreshed receipt is
+`artifacts/cc10-eval-wb31-native-20260928-loadable-v1/qualification.json`;
+its 68000/020/040 HUNK hashes are
+`5d51031ab980e334e5cd2064974d7ed9eeeabbf524a2558bdb2f7a09ce51f74e`,
+`5f7b2e3eaae387c0bcd1916c82debf6c388d21b97403e0b4daea59d954478775`, and
+`95b3d33b84809aac2ae0515bc6df1705336cae9905771661749c58b96a5cef26`.
+
+Original Workbench DOS rejected this Eval root's symbols-on HUNK with
+`bad loadfile hunk` (return 10, caller IoErr 235). The symbol-free build was
+loaded through the original Shell and its `ReadArgs` path. Exact guest pairs
+for `C:Eval 08 + 1`, `C:Eval 010`, and `C:Eval 20-5*2` match original output,
+return and caller post-System IoErr. Their receipts are
+`artifacts/workbench31-guest-eval-08-candidate-symbols-off-20260928-v1/effect-comparison.json`,
+`artifacts/workbench31-guest-eval-010-candidate-symbols-off-20260928-v1/effect-comparison.json`,
+and
+`artifacts/workbench31-guest-eval-20minus5times2-candidate-symbols-off-20260928-v1/effect-comparison.json`.
+These are three case-level parity results, not full Eval qualification. The
+private HUNK is not release-manifest-admitted; remaining command behavior,
+diagnostics, lifecycle, PURE, licensing, package admission and project-wide
+shipping remain open.
+
+## 2026-09-28 - CC10 Workbench Eval expanded guest parity
+
+Seven more fresh original/candidate guest pairs now match: parentheses
+(`1+(2*3)` → `7\n`), left-to-right bitwise order (`1|2&4` → `0\n`), XOR
+(`6 xor 3` → `5\n`), complement (`~1` → `-2\n`), width-limited octal
+LFORMAT (`9 LFORMAT="p=%o2"` → `p=11` with no final LF), equivalence
+(`6 eqv 3` → `-6\n`), and the `mod` spelling (`20 mod 6` → `2\n`). Every
+comparison reports `captured-case-equal` and exact agreement in raw output,
+return 0, and caller post-System IoErr 0. Together with the three earlier
+symbol-free pairs, this gives ten case-level guest comparisons; it does not
+qualify the full command.
+
+The fresh pairs use hash-bound disposable derivatives of the audited original
+Workbench disk 2 and the symbol-free 68000 Eval candidate. Comparison receipts:
+`artifacts/workbench31-guest-eval-paren-candidate-20260928-v2/effect-comparison.json`,
+`artifacts/workbench31-guest-eval-bitwise-stream-candidate-20260928-v1/effect-comparison.json`,
+`artifacts/workbench31-guest-eval-xor-candidate-20260928-v1/effect-comparison.json`,
+`artifacts/workbench31-guest-eval-complement-candidate-20260928-v1/effect-comparison.json`,
+`artifacts/workbench31-guest-eval-lformat-octal-width-candidate-20260928-v1/effect-comparison.json`,
+`artifacts/workbench31-guest-eval-eqv-candidate-20260928-v2/effect-comparison.json`,
+and
+`artifacts/workbench31-guest-eval-mod-candidate-20260928-v2/effect-comparison.json`.
+The native 35-vector matrix remains private; full grammar and option coverage,
+diagnostics, original PURE/resident admission, licensing, and release packaging
+remain open.
+
+## 2026-09-28 - CC10 Workbench Eval division and shift guest parity
+
+Three more fresh original/candidate pairs match captured Workbench output:
+`20/5` → `4\n`, `1 lsh 4` → `16\n`, and `16 rsh 2` → `4\n`. Each reports
+`captured-case-equal`, with exact raw output, return 0 and caller post-System
+IoErr 0. The bounded captured guest set is now thirteen cases; the complete
+command contract and release gates remain open.
+
+Comparison receipts:
+`artifacts/workbench31-guest-eval-divide-candidate-20260928-v1/effect-comparison.json`,
+`artifacts/workbench31-guest-eval-left-shift-candidate-20260928-v1/effect-comparison.json`,
+and
+`artifacts/workbench31-guest-eval-right-shift-candidate-20260928-v1/effect-comparison.json`.
+
+## 2026-09-28 - CC10 MorphOS PathPart removes candidate scratch caps
+
+The native `PathPart` body now measures `DIR`, `FILE`, and every `ADD/K/M`
+component before allocation. It allocates an invocation-local output buffer
+large enough for the selected path operation, with overflow checks against
+DOS `Write`'s signed LONG count. This removes the candidate's former 1,024-byte
+buffer ceiling and arbitrary 64-component scan ceiling while retaining
+`ReadArgs`/`FreeArgs`, public DOS `PathPart`/`FilePart`/`AddPart`, borrowed
+`Output()`, and balanced cleanup.
+
+The native qualifier passes 15 supplied post-ReadArgs vectors per CPU (45
+total) on 68000/020/040. New cases cover a 1,100-byte directory result, a
+1,100-byte file result, 70 `ADD` components producing output longer than 1,024
+bytes, and scratch-allocation failure after ReadArgs succeeds. The run reports
+18 reachable methods, no runtime features, managed allocations, helpers,
+external targets, exception/fatal sites, leaks or shared-image writes. Receipt:
+`artifacts/cc10-pathpart-native-20260928-dynamic-output-v5/qualification.json`.
+This remains candidate-only fixture evidence; MorphOS reference mode/output,
+installed P policy, original parity, lifecycle, licensing and release admission
+remain open.
+
+## 2026-09-28 - CC10 Workbench Eval caret-prefix guest parity
+
+A fresh original/candidate Workbench guest pair for C:Eval 2^3 is captured-case-equal. Both sides emit the exact bytes 32 0A, return 0, and leave caller post-System IoErr at 0. The result confirms this captured caret-prefix behavior only; it does not establish general exponentiation semantics or full command parity.
+
+The hash-bound comparison receipt is artifacts/workbench31-guest-eval-caret-candidate-20260928-v1/effect-comparison.json. The original and candidate captures, analyses, and disposable prepared derivatives are preserved under their corresponding workbench31-guest-eval-caret-* and wb31-eval-caret-* paths.
+
+## 2026-09-28 - CC10 Workbench Eval caret after addition guest parity
+
+A fresh original/candidate guest pair for C:Eval 2 + 3 ^ 4 is captured-case-equal. Both sides emit the exact bytes 35 0A, return 0, and leave caller post-System IoErr at 0. Together with C:Eval 2^3, this provides two exact cases for caret-prefix handling; neither proves general exponentiation semantics.
+
+Comparison receipt: artifacts/workbench31-guest-eval-caret-after-add-candidate-20260928-v1/effect-comparison.json. Original and candidate captures, analyses, and prepared derivatives are retained under the corresponding workbench31-guest-eval-caret-after-add-* and wb31-eval-caret-after-add-* paths.
+
+## 2026-09-28 - CC10 Workbench Eval multiplication failure parity
+
+Original Workbench guest observations show C:Eval 2* and C:Eval 2 ** 3 both emit 0 followed by LF, return 0, and leave caller post-System IoErr at 0. The prior candidate instead emitted a Shell return-code-10 failure for both cases. C:Eval 2+ remains a control that emits 2 followed by LF.
+
+The Workbench evaluator now maps only a malformed multiplication operand at end-of-input or an immediate second asterisk to the captured successful zero result. Other malformed operands remain errors. This branch is profile-specific and does not change MorphOS expression parsing.
+
+The refreshed native qualification passes 37 supplied post-ReadArgs vectors per CPU (111 total) on 68000/020/040, one image load per CPU, zero shared-image writes, and balanced fixture resources. Receipt: artifacts/cc10-eval-wb31-native-20260928-incomplete-multiply-v1/qualification.json. The 68000, 68020, and 68040 HUNK SHA-256 values are c1ac17a1981b16c16156f07a18349b68f5dac80122af702c3b4d2af399dbbaf9, 5f59d1bdf537ed590d8258e930cbececf8aea3e0690bc60fab024e2f12bcdede, and 9b079b229bd45387b4be84fefbd460890188c04f985adab28e0fdcc9539b5e93.
+
+Fresh original/candidate guest pairs against this refreshed HUNK match for C:Eval 2+ (2 LF), C:Eval 2* (0 LF), and C:Eval 2 ** 3 (0 LF). All three also match return 0 and caller post-System IoErr 0. Receipts: artifacts/workbench31-guest-eval-trailing-plus-candidate-20260928-v2/effect-comparison.json, artifacts/workbench31-guest-eval-trailing-star-candidate-20260928-v2/effect-comparison.json, and artifacts/workbench31-guest-eval-double-star-candidate-20260928-v2/effect-comparison.json. The total recorded Workbench Eval guest pairs is eighteen across two symbols-off HUNK identities; this remains case-level evidence, not full command qualification.
+
+The focused evaluator suite passes 71 tests, including regressions that keep other malformed multiplication operands as errors. Release packaging, complete grammar and diagnostic coverage, installed P/resident lifecycle, and profile admission remain open.
+
+## 2026-09-28 - CC02/CC03/CC04/CC06 native foundation refresh
+
+The current `tests/Commands` managed suite passes 843 tests. A fresh native
+foundation qualification passes all 264 supplied vectors across 68000, 68020,
+and 68040: 31 startup, 25 argument-boundary, and 32 I/O cases per CPU. The
+hash-bound receipt is
+`tests/Commands.NativeRoot/bin/Release/net10.0/qualification/3e1bbbbf271c43288b90a1ec8a141256/qualification.json`.
+All nine generated HUNK/suite reports pass, each CPU loads one image, fixture
+resources balance, and there are no shared-image writes. The startup suite now
+checks stdout as bytes; that fixed a false failure where the expected and
+actual Latin-1 byte sequences matched but their decoded Unicode strings did
+not.
+
+The fixture and host test builds now use a coherent local CopperSharp SDK
+surface for the executor/native root, and the native-root output includes its
+declared dependency closure for snapshotting. The host-only Shell project
+excludes the newly added DOS-native queue-handler source; the separate DOS
+Shell project builds successfully. These results are fixture and build
+evidence only: original Kickstart/CopperStart, real DOS parser and I/O,
+minimum-stack, PURE/resident, packaging, licensing, and shipping gates remain
+open. Shipping remains 0/200 commands and 0/246 profiles.
+
+## 2026-09-28 - CC10 Workbench Eval leading-zero guest parity
+
+Three fresh original/candidate Workbench guest pairs now match for `C:Eval
+08`, `C:Eval 08+1`, and `C:Eval 09+1`. Each produces the exact output bytes
+`30 0A`, returns 0, and leaves caller post-System IoErr at 0. The comparisons
+use the hash-bound symbol-free loadable HUNK with SHA-256
+`5d51031ab980e334e5cd2064974d7ed9eeeabbf524a2558bdb2f7a09ce51f74e`.
+
+Receipts:
+`artifacts/workbench31-guest-eval-08-alone-candidate-symbols-off-20260928-v2/effect-comparison.json`,
+`artifacts/workbench31-guest-eval-08plus1-no-spaces-candidate-symbols-off-20260928-v2/effect-comparison.json`, and
+`artifacts/workbench31-guest-eval-09plus1-no-spaces-candidate-symbols-off-20260928-v2/effect-comparison.json`.
+Together with the prior comparisons, the captured Workbench Eval set now has
+21 distinct case-level original/candidate invocation matches across two
+symbols-off HUNK identities. There are 23 passing comparison receipts because
+the `08 + 1` pair is a duplicate capture, and `2+` was compared on both HUNK identities.
+This does not close the complete Eval grammar, diagnostics, ReadArgs contract,
+PURE/resident lifecycle, licensing, release packaging, or shipping gates.
+Shipping remains 0/200 commands and 0/246 profiles.

@@ -26,5 +26,17 @@
     <Compile Include="..\QuoteRuleParser.cs" Link="QuoteRuleParser.cs" />
     <Compile Include="..\TypeTextFormatter.cs" Link="TypeTextFormatter.cs" />
     <Compile Include="..\Exe2ArcIo.cs" Link="Exe2ArcIo.cs" />
+    <Compile Include="..\Exe2ArcPayloadCopy.cs" Link="Exe2ArcPayloadCopy.cs" />
+    <Compile Include="..\Exe2ArcHeaderProbe.cs" Link="Exe2ArcHeaderProbe.cs" />
+    <Compile Include="..\Exe2ArcForwardScanner.cs" Link="Exe2ArcForwardScanner.cs" />
+    <Compile Include="..\Exe2ArcOutputName.cs" Link="Exe2ArcOutputName.cs" />
+    <Compile Include="..\Exe2ArcOutputSelection.cs" Link="Exe2ArcOutputSelection.cs" />
+    <Compile Include="..\Exe2ArcTypeSelection.cs" Link="Exe2ArcTypeSelection.cs" />
+    <Compile Include="..\Exe2ArcScannerSelection.cs" Link="Exe2ArcScannerSelection.cs" />
+    <Compile Include="..\Exe2ArcResultPolicy.cs" Link="Exe2ArcResultPolicy.cs" />
+    <Compile Include="..\Exe2ArcLhaScanner.cs" Link="Exe2ArcLhaScanner.cs" />
+    <Compile Include="..\Exe2ArcZipScanner.cs" Link="Exe2ArcZipScanner.cs" />
+    <Compile Include="..\Exe2ArcZipRecordRewriter.cs" Link="Exe2ArcZipRecordRewriter.cs" />
+    <Compile Include="..\Exe2ArcZipRecordExtractor.cs" Link="Exe2ArcZipRecordExtractor.cs" />
   </ItemGroup>
 </Project>

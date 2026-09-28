@@ -5,6 +5,35 @@ namespace CopperOS.Commands.Tests;
 
 public sealed class ShellProcessContinuationTests
 {
+    [Theory]
+    [InlineData(ShellProcessContinuationState.Completed)]
+    [InlineData(ShellProcessContinuationState.Aborted)]
+    [InlineData(ShellProcessContinuationState.Failed)]
+    public void Polling_accepts_matching_already_terminal_record_but_rejects_changed_result(
+        ShellProcessContinuationState terminal)
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        APTR record = new(3000);
+        ShellProcessContinuation value = new()
+        {
+            ParentCli = new APTR(8), State = terminal, Result = 17,
+        };
+        Assert.True(ShellProcessContinuationCodec.Initialize(ref platform,
+            record, in value));
+        platform.Store.ContinuationObservedState = terminal;
+        platform.Store.ContinuationResult = 17;
+        Assert.True(ShellProcessContinuationPolling.TryPoll(ref platform,
+            new APTR(8), record, out var observed, out var result));
+        Assert.Equal(terminal, observed);
+        Assert.Equal(17, result);
+        platform.Store.ContinuationResult = 18;
+        Assert.False(ShellProcessContinuationPolling.TryPoll(ref platform,
+            new APTR(8), record, out _, out _));
+        platform.Store.ContinuationResult = 17;
+        Assert.False(ShellProcessContinuationPolling.TryPoll(ref platform,
+            new APTR(12), record, out _, out _));
+    }
+
     [Fact]
     public void Codec_round_trips_fixed_width_process_state_and_result()
     {
@@ -167,8 +196,10 @@ public sealed class ShellProcessContinuationTests
             ref platform, new APTR(8), record, out _, out _));
     }
 
-    [Fact]
-    public void Teardown_releases_only_marked_resources_after_terminal_state()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Teardown_acknowledges_terminal_continuation_including_DOS_retired_marker(bool retired)
     {
         EchoCommandTests.TestShellPlatform platform = new();
         APTR record = new(3000);
@@ -177,7 +208,8 @@ public sealed class ShellProcessContinuationTests
             State = ShellProcessContinuationState.Completed,
             Flags = (uint)(ShellProcessContinuationFlags.InputOwned |
                 ShellProcessContinuationFlags.OutputOwned |
-                ShellProcessContinuationFlags.RecordOwned),
+                ShellProcessContinuationFlags.RecordOwned) |
+                (retired ? (uint)ShellProcessContinuationFlags.ResourcesClosed : 0),
         };
         Assert.True(ShellProcessContinuationCodec.Initialize(
             ref platform, record, in initial));
@@ -195,6 +227,35 @@ public sealed class ShellProcessContinuationTests
             (uint)ShellProcessContinuationFlags.ResourcesClosed) != 0);
         Assert.False(ShellProcessContinuationTeardown.TryRelease(
             ref platform, new APTR(8), record));
+    }
+
+    [Fact]
+    public void Teardown_does_not_dereference_retired_child_or_close_snapshot_handles()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        APTR record = new(3000);
+        ShellProcessContinuation initial = new()
+        {
+            ParentCli = new APTR(8),
+            ChildCli = new APTR(uint.MaxValue - 1),
+            Input = new BPTR(0x1000),
+            Output = new BPTR(0x2000),
+            Error = new BPTR(0x3000),
+            CurrentDirectory = new BPTR(0x4000),
+            State = ShellProcessContinuationState.Completed,
+            Flags = (uint)(ShellProcessContinuationFlags.InputOwned |
+                ShellProcessContinuationFlags.OutputOwned |
+                ShellProcessContinuationFlags.ErrorOwned |
+                ShellProcessContinuationFlags.DirectoryOwned),
+        };
+        Assert.True(ShellProcessContinuationCodec.Initialize(ref platform, record, in initial));
+        Assert.False(ShellProcessContinuationTeardown.TryRelease(ref platform, new APTR(12), record));
+        Assert.Equal(0, platform.Store.ContinuationReleaseCount);
+        Assert.True(ShellProcessContinuationTeardown.TryRelease(ref platform, new APTR(8), record));
+        Assert.Equal(1, platform.Store.ContinuationReleaseCount);
+        Assert.Equal(BPTR.Null, platform.Store.ClosedHandle);
+        Assert.Equal(0, platform.Store.RedirectionCloseCount);
+        Assert.Equal(52u, ShellProcessContinuationCodec.Size);
     }
 
     [Fact]

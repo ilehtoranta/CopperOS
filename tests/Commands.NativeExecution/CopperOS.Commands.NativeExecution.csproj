@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <Import Project="..\..\CopperOS.Portable.props" />
   <PropertyGroup>
+    <CopperOSUseLocalCopperSharp>true</CopperOSUseLocalCopperSharp>
     <OutputType>Exe</OutputType>
     <AssemblyName>CopperOS.Commands.NativeExecution</AssemblyName>
     <RootNamespace>CopperOS.Commands.NativeExecution</RootNamespace>
@@ -9,5 +10,60 @@
   <ItemGroup>
     <!-- Same released instruction executor as CopperSharp's native tests. -->
     <PackageReference Include="Copper68k" Version="1.4.0" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSCopyModeSelection.cs" Link="NativeMorphOSCopyModeSelection.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeCommandArguments.cs" Link="NativeCommandArguments.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSAddDataTypesCommand.cs" Link="NativeMorphOSAddDataTypesCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31AddDataTypesCommand.cs" Link="NativeWorkbench31AddDataTypesCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSRequestChoiceCommand.cs" Link="NativeMorphOSRequestChoiceCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31RequestChoiceCommand.cs" Link="NativeWorkbench31RequestChoiceCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31RequestFileCommand.cs" Link="NativeWorkbench31RequestFileCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31SetClockCommand.cs" Link="NativeWorkbench31SetClockCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeSetKeyboardCommand.cs" Link="NativeSetKeyboardCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSSetKeyboardCommand.cs" Link="NativeMorphOSSetKeyboardCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31SetFontCommand.cs" Link="NativeWorkbench31SetFontCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSRequestFileCommand.cs" Link="NativeMorphOSRequestFileCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSLockCommand.cs" Link="NativeMorphOSLockCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSDiskChangeCommand.cs" Link="NativeMorphOSDiskChangeCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSRebootCommand.cs" Link="NativeMorphOSRebootCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSResListCommand.cs" Link="NativeMorphOSResListCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSLibListCommand.cs" Link="NativeMorphOSLibListCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSDevListCommand.cs" Link="NativeMorphOSDevListCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSPortListCommand.cs" Link="NativeMorphOSPortListCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSModListCommand.cs" Link="NativeMorphOSModListCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSStatusCommand.cs" Link="NativeMorphOSStatusCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSDosListCommand.cs" Link="NativeMorphOSDosListCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSListCommand.cs" Link="NativeMorphOSListCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSDirCommand.cs" Link="NativeMorphOSDirCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31DirCommand.cs" Link="NativeWorkbench31DirCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSMakeDirCommand.cs" Link="NativeMorphOSMakeDirCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\Workbench31MakeDirCommand.cs" Link="Workbench31MakeDirCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31AssignCommand.cs" Link="NativeWorkbench31AssignCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSAssignCommand.cs" Link="NativeMorphOSAssignCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSJoinAppendLoop.cs" Link="NativeMorphOSJoinAppendLoop.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSJoinCommand.cs" Link="NativeMorphOSJoinCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31JoinCommand.cs" Link="NativeWorkbench31JoinCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSCopyLoop.cs" Link="NativeMorphOSCopyLoop.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeCommandIo.cs" Link="NativeCommandIo.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSCopyPatternClassifier.cs" Link="NativeMorphOSCopyPatternClassifier.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31ListCommand.cs" Link="NativeWorkbench31ListCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSSearchCommand.cs" Link="NativeMorphOSSearchCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSSearchSoftLinks.cs" Link="NativeMorphOSSearchSoftLinks.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31SearchCommand.cs" Link="NativeWorkbench31SearchCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSProtectCommand.cs" Link="NativeMorphOSProtectCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSTouchCommand.cs" Link="NativeMorphOSTouchCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSSetClockCommand.cs" Link="NativeMorphOSSetClockCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31InfoCommand.cs" Link="NativeWorkbench31InfoCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31Check2090Command.cs" Link="NativeWorkbench31Check2090Command.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31IconPosCommand.cs" Link="NativeWorkbench31IconPosCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31GuessBootDevCommand.cs" Link="NativeWorkbench31GuessBootDevCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31ExtractKickstartCommand.cs" Link="NativeWorkbench31ExtractKickstartCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSDiskFreeCommand.cs" Link="NativeMorphOSDiskFreeCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSAvailCommand.cs" Link="NativeMorphOSAvailCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSFormatCommand.cs" Link="NativeMorphOSFormatCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSMountCommand.cs" Link="NativeMorphOSMountCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31MountCommand.cs" Link="NativeWorkbench31MountCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSBindDriversCommand.cs" Link="NativeMorphOSBindDriversCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31BindDriversCommand.cs" Link="NativeWorkbench31BindDriversCommand.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSLoadMonDrvsCommand.cs" Link="NativeMorphOSLoadMonDrvsCommand.cs" />
   </ItemGroup>
 </Project>

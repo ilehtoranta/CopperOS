@@ -1,0 +1,11 @@
+; Disposable WB 3.1 Execute empty .DEF name probe. Output is retained in S:Shell-Startup.
+FailAt 21
+Echo "BEGIN" >RAM:execute-capture
+Echo ".KEY filename" >RAM:execute-probe
+Echo ".DEF =fallback" >>RAM:execute-probe
+Echo "Echo SHOULD-RUN >>RAM:execute-capture" >>RAM:execute-probe
+C:Execute RAM:execute-probe
+Echo "STATUS RC=$RC RESULT2=$Result2" >>RAM:execute-capture
+Echo "END" >>RAM:execute-capture
+Copy RAM:execute-capture S:Shell-Startup >NIL:
+EndCLI >NIL:

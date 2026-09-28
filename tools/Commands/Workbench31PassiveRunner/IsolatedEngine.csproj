@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>CopperMod.Amiga.Lightweight</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(EngineSourceDirectory)/*.cs" />
+    <Reference Include="Copper68k" HintPath="$(FrozenDependencyDirectory)/Copper68k.dll" />
+    <Reference Include="CopperDisk" HintPath="$(FrozenDependencyDirectory)/CopperDisk.dll" />
+    <Reference Include="CopperFloat" HintPath="$(FrozenDependencyDirectory)/CopperFloat.dll" />
+  </ItemGroup>
+  <Target Name="RequireExplicitInputs" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(EngineSourceDirectory)' == '' or '$(FrozenDependencyDirectory)' == ''" Text="Supply an immutable engine source snapshot and frozen dependency directory." />
+  </Target>
+</Project>

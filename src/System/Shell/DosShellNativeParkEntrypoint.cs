@@ -21,11 +21,11 @@ public static class DosShellNativeParkEntrypoint
 		[M68kRegister(M68kRegister.A0)] uint dosState,
 		[M68kRegister(M68kRegister.A6)] uint execBase)
 	{
-		var platform = new CopperSharpNativeDosPlatform(
-			APTR.FromPointer(execBase));
 		var state = APTR.FromPointer(dosState);
+		var platform = new CopperSharpNativeDosPlatform(dosState);
 		var parent = APTR.FromPointer(cli);
-		if (parent.IsNull) return 0;
+		if (parent.IsNull || !DosShellNativeContextCore.WriteExecBase(
+			ref platform, state, APTR.FromPointer(execBase))) return 0;
 		var runner = DosShellNativeBridge.FindScriptRunner(ref platform, state,
 			parent);
 		if (runner.IsNull || !DosShellNativeBridge.ReadScriptRunner(ref platform,

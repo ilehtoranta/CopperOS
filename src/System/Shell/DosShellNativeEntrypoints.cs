@@ -41,13 +41,25 @@ public static class DosShellNativeEntrypoints
 		APTR.ExportAddress("copperos.shell.execute-poll");
 
 	[MethodImpl(MethodImplOptions.NoInlining)]
+	[M68kExport("copperos.shell.entry")]
+	[return: M68kRegister(M68kRegister.D0)]
+	public static uint ShellTaskEntry() =>
+		DosShellNativeChildCore.RunFromCurrentTask();
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
 	[M68kExport("copperos.shell.child")]
 	[return: M68kRegister(M68kRegister.D0)]
 	public static uint ShellChildEntry(
-		[M68kRegister(M68kRegister.A6)] uint execBase) =>
-		DosShellNativeChildCore.RunFromCurrentTask(
-			APTR.FromPointer(execBase));
+		[M68kRegister(M68kRegister.A6)] uint execBase)
+	{
+		// Preserve the exported register signature, but a new Exec task does
+		// not inherit A6. The canonical ExecBase pointer is held at address 4.
+		_ = execBase;
+		return ShellTaskEntry();
+	}
 
+	public static APTR AddressOfShellTaskEntry() =>
+		APTR.ExportAddress("copperos.shell.entry");
 	public static APTR AddressOfShellChild() =>
 		APTR.ExportAddress("copperos.shell.child");
 	[MethodImpl(MethodImplOptions.NoInlining)]
@@ -64,7 +76,7 @@ public static class DosShellNativeEntrypoints
 	private static ulong Begin(APTR cli, APTR file, uint fileLength,
 		APTR dosState, APTR execBase)
 	{
-		var dos = new CopperSharpNativeDosPlatform(execBase);
+		var dos = new CopperSharpNativeDosPlatform(dosState.Raw);
 		if (!DosShellNativeContextCore.WriteExecBase(ref dos, dosState,
 			execBase)) return ReturnPair((uint)ShellScriptExecutionStatus.Failed,
 			unchecked((uint)ShellCommandResult.Error));
@@ -76,7 +88,7 @@ public static class DosShellNativeEntrypoints
 
 	private static ulong Poll(APTR cli, APTR dosState, APTR execBase)
 	{
-		var dos = new CopperSharpNativeDosPlatform(execBase);
+		var dos = new CopperSharpNativeDosPlatform(dosState.Raw);
 		if (!DosShellNativeContextCore.WriteExecBase(ref dos, dosState,
 			execBase)) return ReturnPair((uint)ShellScriptExecutionStatus.Failed,
 			unchecked((uint)ShellCommandResult.Error));

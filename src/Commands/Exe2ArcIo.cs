@@ -15,6 +15,19 @@ public interface IExe2ArcIo : IAmigaGuestMemory
     int IoErr();
 }
 
+/// <summary>
+/// Optional command-level signal owner. The original Exe2Arc only polls
+/// Ctrl-C in the ZIP record loop; when observed it sets ERROR_BREAK without
+/// forcing a failing command return. Component callers that do not model DOS
+/// signals simply omit this interface and retain the deterministic no-signal
+/// path.
+/// </summary>
+public interface IExe2ArcBreakSource
+{
+    bool IsBreakPending();
+    void SetIoErr(int ioError);
+}
+
 /// <summary>Component results, not AmigaDOS command return levels.</summary>
 public enum Exe2ArcIoStatus : uint
 {
@@ -26,6 +39,7 @@ public enum Exe2ArcIoStatus : uint
     InvalidBuffer = 5,
     UnsupportedRange = 6,
     InvalidHandle = 7,
+    InvalidRecord = 8,
 }
 
 public enum Exe2ArcIoStage : uint
@@ -37,6 +51,7 @@ public enum Exe2ArcIoStage : uint
     PayloadSeek = 4,
     PayloadRead = 5,
     PayloadWrite = 6,
+    DispatchSeek = 7,
 }
 
 /// <summary>
@@ -52,6 +67,8 @@ public readonly struct Exe2ArcIoObservation
     private readonly int _ioError;
     private readonly uint _requestedBytes;
     private readonly uint _bytesCompleted;
+    private readonly uint _breakObserved;
+    private readonly int _breakError;
 
     internal Exe2ArcIoObservation(Exe2ArcIoStage stage, int rawResult,
         uint requestedBytes, uint bytesCompleted, bool errorCaptured, int ioError)
@@ -63,6 +80,21 @@ public readonly struct Exe2ArcIoObservation
         _ioError = ioError;
         _requestedBytes = requestedBytes;
         _bytesCompleted = bytesCompleted;
+        _breakObserved = 0;
+        _breakError = 0;
+    }
+
+    private Exe2ArcIoObservation(Exe2ArcIoObservation source, int breakError)
+    {
+        _hasResult = source._hasResult;
+        _errorCaptured = source._errorCaptured;
+        _stage = source._stage;
+        _rawResult = source._rawResult;
+        _ioError = source._ioError;
+        _requestedBytes = source._requestedBytes;
+        _bytesCompleted = source._bytesCompleted;
+        _breakObserved = 1;
+        _breakError = breakError;
     }
 
     public bool HasResult => _hasResult != 0;
@@ -81,6 +113,18 @@ public readonly struct Exe2ArcIoObservation
     /// output and therefore always reports zero here.
     /// </summary>
     public uint BytesCompleted => _bytesCompleted;
+
+    /// <summary>True when the optional command signal owner observed Ctrl-C.</summary>
+    public bool BreakObserved => _breakObserved != 0;
+
+    /// <summary>
+    /// Error assigned by the signal owner when BreakObserved is true. This is
+    /// separate from IoErrCaptured because no failing DOS transfer occurred.
+    /// </summary>
+    public int BreakError => _breakError;
+
+    internal Exe2ArcIoObservation WithBreak(int ioError) =>
+        new(this, ioError);
 }
 
 internal static class Exe2ArcIoBounds

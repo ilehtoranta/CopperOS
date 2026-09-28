@@ -2,6 +2,13 @@ using Amiga;
 
 namespace CopperOS.Shell;
 
+/// <summary>Completed command status, captured before DOS cleanup changes IoErr.</summary>
+public struct ShellCommandDiagnostics
+{
+    public int ReturnCode;
+    public int IoError;
+}
+
 /// <summary>
 /// DOS/Shell-owned operations needed to advance one bounded script line.
 /// The engine supplies guest buffers and frame pointers; the platform owns
@@ -9,6 +16,29 @@ namespace CopperOS.Shell;
 /// </summary>
 public interface IShellScriptPlatform
 {
+    /// <summary>Clears process IoErr for a new command, retaining prior public CLI status.</summary>
+    bool TryBeginCommandDiagnostics(APTR cli);
+
+    /// <summary>Captures a synchronous command's result; success clears stale IoErr.</summary>
+    bool TryCaptureCommandDiagnostics(APTR cli, int returnCode,
+        out ShellCommandDiagnostics diagnostics);
+
+    /// <summary>
+    /// Reads a retired child's saved outcome before its continuation is
+    /// acknowledged. This must not use the parent's current IoErr or live
+    /// child handles, which may already have been reclaimed and reused.
+    /// </summary>
+    bool TryReadContinuationDiagnostics(APTR cli, APTR continuation,
+        out ShellCommandDiagnostics diagnostics);
+
+    /// <summary>Reads the last published CLI outcome without changing process IoErr.</summary>
+    bool TryReadPublishedCommandDiagnostics(APTR cli,
+        out ShellCommandDiagnostics diagnostics);
+
+    /// <summary>Publishes a completed command's status to its public CLI record.</summary>
+    bool TryPublishCommandDiagnostics(APTR cli,
+        in ShellCommandDiagnostics diagnostics);
+
     /// <summary>
     /// Polls Exec/DOS signal state without blocking. The platform owns signal
     /// masks and task delivery; Shell receives only a fixed-width event.
@@ -50,10 +80,22 @@ public interface IShellScriptPlatform
         APTR cli,
         APTR name,
         uint nameLength,
-        APTR path,
-        uint pathCapacity,
-        out ShellScriptLookupKind kind,
-        out uint pathLength);
+        in ShellScriptLookupWorkspace workspace,
+        out ShellScriptLookupResult lookup);
+
+    /// <summary>
+    /// Writes one DOS-owned prompt for an interactive CLI. Prompt storage and
+    /// substitutions remain owned by the CLI/DOS boundary.
+    /// </summary>
+    bool TryWriteScriptPrompt(APTR cli, BPTR output);
+
+    /// <summary>Copies a bounded snapshot of the active prompt template.</summary>
+    bool TryCopyScriptPromptTemplate(APTR cli, APTR destination,
+        uint destinationCapacity, out ShellScriptPromptTemplate template);
+
+    /// <summary>Writes one literal prompt segment with DOS substitutions.</summary>
+    bool TryWriteScriptPromptLiteral(APTR cli, BPTR output,
+        in ShellScriptPromptSegment segment);
 
     bool TryReadScriptLine(
         APTR cli,
@@ -70,11 +112,8 @@ public interface IShellScriptPlatform
     bool TryExecuteScriptCommand(
         APTR cli,
         APTR frame,
-        APTR line,
-        uint lineLength,
-        ShellScriptLookupKind lookupKind,
-        APTR resolvedPath,
-        uint resolvedPathLength,
+        in ShellScriptCommandInvocation command,
+        in ShellScriptLookupResult lookup,
         BPTR input,
         BPTR output,
         BPTR error,
@@ -108,6 +147,10 @@ public interface IShellScriptPlatform
 
     /// <summary>Removes an unpublished Execute work-file after its handle closes.</summary>
     bool TryDeleteScriptPath(APTR cli, APTR path, uint pathLength);
+
+	/// <summary>Tracks prompt-capture path and reader ownership in the runner.</summary>
+	bool TrySetScriptPromptCapture(APTR cli, APTR path, uint pathLength,
+		BPTR input);
 
     bool TryCloseScriptRedirection(APTR cli, BPTR handle);
 }

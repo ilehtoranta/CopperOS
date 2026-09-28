@@ -33,10 +33,13 @@ public struct ShellRedirectionSpec
     public APTR ErrorPath { get; set; }
     public uint ErrorLength { get; set; }
     public uint ErrorAppend { get; set; }
+    /// <summary>One when <c>*&lt;&gt;</c> routes errors to standard output.</summary>
+    public uint ErrorToOutput { get; set; }
 
     public bool HasInput => InputPath.IsNotNull && InputLength != 0;
     public bool HasOutput => OutputPath.IsNotNull && OutputLength != 0;
-    public bool HasError => ErrorPath.IsNotNull && ErrorLength != 0;
+    public bool HasErrorPath => ErrorPath.IsNotNull && ErrorLength != 0;
+    public bool HasError => HasErrorPath || ErrorToOutput != 0;
     public bool IsEmpty => !HasInput && !HasOutput && !HasError;
 }
 
@@ -86,7 +89,8 @@ public struct ShellRedirectionHandles
 
 /// <summary>
 /// Allocation-free parser for the bounded Shell redirection subset:
-/// <c>&lt;</c>, <c>&gt;</c>, <c>&gt;&gt;</c>, <c>2&gt;</c>, and <c>2&gt;&gt;</c>.
+/// <c>&lt;</c>, <c>&gt;</c>, <c>&gt;&gt;</c>, <c>*&gt;</c>, <c>*&gt;&gt;</c>,
+/// and <c>*&lt;&gt;</c>.
 /// Operators inside quotes or after a semicolon comment are ordinary text.
 /// </summary>
 public static class ShellRedirectionParser
@@ -123,6 +127,8 @@ public static class ShellRedirectionParser
         uint errorLength = 0;
         uint outputAppend = 0;
         uint errorAppend = 0;
+        uint errorToOutput = 0;
+        var errorRedirectSet = false;
         var quote = false;
         var position = 0u;
         var written = 0u;
@@ -148,28 +154,17 @@ public static class ShellRedirectionParser
                 position++;
                 continue;
             }
-            if (value == '*')
-            {
-                if (!CopyByte(ref platform, workspace.Command,
-                        workspace.CommandCapacity, ref written, value) ||
-                    ++position >= sourceLength ||
-                    !CopyByte(ref platform, workspace.Command,
-                        workspace.CommandCapacity, ref written,
-                        platform.ReadUInt8(source, (int)position)))
-                    return false;
-                position++;
-                continue;
-            }
-
             var kind = RedirectionKind.None;
             uint operatorLength = 0;
             uint append = 0;
-            if (!quote && value == '<')
+            var atOperatorBoundary = position == 0 || IsWhitespace(
+                platform.ReadUInt8(source, (int)(position - 1)));
+            if (!quote && atOperatorBoundary && value == '<')
             {
                 kind = RedirectionKind.Input;
                 operatorLength = 1;
             }
-            else if (!quote && value == '>')
+            else if (!quote && atOperatorBoundary && value == '>')
             {
                 kind = RedirectionKind.Output;
                 operatorLength = 1;
@@ -180,16 +175,22 @@ public static class ShellRedirectionParser
                     operatorLength = 2;
                 }
             }
-            else if (!quote && value == '2' &&
-                (position == 0 || IsWhitespace(platform.ReadUInt8(
-                    source, (int)(position - 1)))) &&
+            else if (!quote && atOperatorBoundary && value == '*' &&
+                position + 2 < sourceLength &&
+                platform.ReadUInt8(source, (int)(position + 1)) == '<' &&
+                platform.ReadUInt8(source, (int)(position + 2)) == '>')
+            {
+                kind = RedirectionKind.ErrorToOutput;
+                operatorLength = 3;
+            }
+            else if (!quote && atOperatorBoundary && value == '*' &&
                 position + 1 < sourceLength &&
                 platform.ReadUInt8(source, (int)(position + 1)) == '>')
             {
                 kind = RedirectionKind.Error;
                 operatorLength = 2;
-                if (position + 2 < sourceLength &&
-                    platform.ReadUInt8(source, (int)(position + 2)) == '>')
+                if (position + 2 < sourceLength && platform.ReadUInt8(
+                        source, (int)(position + 2)) == '>')
                 {
                     append = 1;
                     operatorLength = 3;
@@ -198,6 +199,18 @@ public static class ShellRedirectionParser
 
             if (kind == RedirectionKind.None)
             {
+                if (value == '*')
+                {
+                    if (!CopyByte(ref platform, workspace.Command,
+                            workspace.CommandCapacity, ref written, value) ||
+                        ++position >= sourceLength ||
+                        !CopyByte(ref platform, workspace.Command,
+                            workspace.CommandCapacity, ref written,
+                            platform.ReadUInt8(source, (int)position)))
+                        return false;
+                    position++;
+                    continue;
+                }
                 if (!CopyByte(ref platform, workspace.Command,
                         workspace.CommandCapacity, ref written, value))
                     return false;
@@ -209,6 +222,13 @@ public static class ShellRedirectionParser
                     workspace.CommandCapacity, ref written))
                 return false;
             position += operatorLength;
+            if (kind == RedirectionKind.ErrorToOutput)
+            {
+                if (errorRedirectSet) return false;
+                errorRedirectSet = true;
+                errorToOutput = 1;
+                continue;
+            }
             while (position < sourceLength && IsWhitespace(
                     platform.ReadUInt8(source, (int)position)))
                 position++;
@@ -227,11 +247,14 @@ public static class ShellRedirectionParser
                     path = workspace.OutputPath;
                     pathCapacity = workspace.OutputCapacity;
                     break;
-                default:
-                    if (error.IsNotNull) return false;
+                case RedirectionKind.Error:
+                    if (errorRedirectSet) return false;
+                    errorRedirectSet = true;
                     path = workspace.ErrorPath;
                     pathCapacity = workspace.ErrorCapacity;
                     break;
+                default:
+                    return false;
             }
 
             if (!ReadPath(ref platform, source, sourceLength, ref position,
@@ -269,6 +292,7 @@ public static class ShellRedirectionParser
         spec.ErrorPath = error;
         spec.ErrorLength = errorLength;
         spec.ErrorAppend = errorAppend;
+        spec.ErrorToOutput = errorToOutput;
         return true;
     }
 
@@ -278,6 +302,7 @@ public static class ShellRedirectionParser
         Input,
         Output,
         Error,
+        ErrorToOutput,
     }
 
     private static bool ReadPath<TPlatform>(
@@ -452,6 +477,9 @@ public static class ShellRedirectionTransaction
             Output = frame.Output,
             Error = frame.Error,
         };
+        if (spec.ErrorToOutput > 1 ||
+            (spec.ErrorToOutput != 0 && spec.HasErrorPath))
+            return false;
         if (spec.HasInput && (!platform.TryOpenScriptInput(
                 frame.Cli, spec.InputPath, spec.InputLength,
                 out handles.Input) || handles.Input.IsNull))
@@ -463,20 +491,22 @@ public static class ShellRedirectionTransaction
                 spec.OutputAppend, out handles.Output) ||
                 handles.Output.IsNull))
         {
-            Close(ref platform, in frame, ref handles);
+            Rollback(ref platform, in frame, ref handles);
             return false;
         }
         if (spec.HasOutput)
             handles.Owned |= 2;
-        if (spec.HasError && (!platform.TryOpenScriptOutput(
+        if (spec.HasErrorPath && (!platform.TryOpenScriptOutput(
                 frame.Cli, spec.ErrorPath, spec.ErrorLength,
                 spec.ErrorAppend, out handles.Error) || handles.Error.IsNull))
         {
-            Close(ref platform, in frame, ref handles);
+            Rollback(ref platform, in frame, ref handles);
             return false;
         }
-        if (spec.HasError)
+        if (spec.HasErrorPath)
             handles.Owned |= 4;
+        if (spec.ErrorToOutput != 0)
+            handles.Error = handles.Output;
         return true;
     }
 
@@ -484,19 +514,51 @@ public static class ShellRedirectionTransaction
         ref TPlatform platform,
         in ShellScriptFrameState frame,
         ref ShellRedirectionHandles handles)
+        where TPlatform : struct, IShellPlatform, IShellScriptPlatform =>
+        Close(ref platform, in frame, ref handles, out _, out _);
+
+    /// <summary>Closes every owned handle while retaining the first close error.</summary>
+    public static bool Close<TPlatform>(ref TPlatform platform,
+        in ShellScriptFrameState frame, ref ShellRedirectionHandles handles,
+        out ShellCommandDiagnostics failure, out bool failureCaptured)
         where TPlatform : struct, IShellPlatform, IShellScriptPlatform
     {
+        failure = default;
+        failureCaptured = false;
         var success = true;
         if ((handles.Owned & 4) != 0)
-            success &= platform.TryCloseScriptRedirection(
-                frame.Cli, handles.Error);
+            CloseOne(ref platform, frame.Cli, handles.Error,
+                ref success, ref failure, ref failureCaptured);
         if ((handles.Owned & 2) != 0)
-            success &= platform.TryCloseScriptRedirection(
-                frame.Cli, handles.Output);
+            CloseOne(ref platform, frame.Cli, handles.Output,
+                ref success, ref failure, ref failureCaptured);
         if ((handles.Owned & 1) != 0)
-            success &= platform.TryCloseScriptRedirection(
-                frame.Cli, handles.Input);
+            CloseOne(ref platform, frame.Cli, handles.Input,
+                ref success, ref failure, ref failureCaptured);
         handles.Owned = 0;
         return success;
+    }
+
+    private static void CloseOne<TPlatform>(ref TPlatform platform, APTR cli,
+        BPTR handle, ref bool success, ref ShellCommandDiagnostics failure,
+        ref bool failureCaptured)
+        where TPlatform : struct, IShellPlatform, IShellScriptPlatform
+    {
+        if (platform.TryCloseScriptRedirection(cli, handle)) return;
+        if (success)
+            failureCaptured = platform.TryCaptureCommandDiagnostics(cli,
+                (int)ShellCommandResult.Error, out failure);
+        success = false;
+    }
+
+    private static void Rollback<TPlatform>(ref TPlatform platform,
+        in ShellScriptFrameState frame, ref ShellRedirectionHandles handles)
+        where TPlatform : struct, IShellPlatform, IShellScriptPlatform
+    {
+        var captured = platform.TryCaptureCommandDiagnostics(frame.Cli,
+            (int)ShellCommandResult.Error, out var openingFailure);
+        Close(ref platform, in frame, ref handles);
+        if (captured)
+            platform.TryPublishCommandDiagnostics(frame.Cli, in openingFailure);
     }
 }

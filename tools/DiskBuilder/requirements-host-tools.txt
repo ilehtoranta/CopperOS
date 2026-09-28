@@ -1,0 +1,2 @@
+# External host tool, not a command/runtime dependency. GPLv2; invoked separately.
+amitools==0.8.1

@@ -10,6 +10,9 @@ namespace CopperOS.Commands.Native;
 /// </summary>
 public static class Workbench31MakeDirCommand
 {
+    public const string Template = "NAME/M";
+    public const int ResultCount = 1;
+
     /// <summary>
     /// Reads NAME/M through DOS, processes every name and returns the selected
     /// command level and secondary error. The caller retains library/startup
@@ -20,7 +23,7 @@ public static class Workbench31MakeDirCommand
     public static int Run(out int ioError)
     {
         ioError = 0;
-        if (!NativeCommandArguments.TryRead("NAME/M", 1, out var arguments))
+        if (!NativeCommandArguments.TryRead(Template, ResultCount, out var arguments))
         {
             // The shared lease reports ordinary parser failure as ERROR;
             // this command's original policy is FAIL for every parse failure.
@@ -53,22 +56,22 @@ public static class Workbench31MakeDirCommand
                     break;
 
                 var name = CString.FromPointer(nameAddress);
-                var existing = DOS.Lock(name, DOS.LockMode.Read);
-                if (existing.HasValue)
+                var existing = DOS.LockRaw(name, DOS.LockMode.Read);
+                if (existing.IsNotNull)
                 {
                     result = DOS.RETURN_ERROR;
                     ioError = 0;
                     // The live /M cell is already the one-LONG format argument
                     // array. VPrintf borrows it without mutation or copying.
                     DOS.VPrintf("%s already exists\n", nameSlot);
-                    DOS.UnLock(existing.Value);
+                    DOS.UnLock(existing);
                 }
                 else
                 {
-                    var created = DOS.CreateDir(name);
-                    if (created.HasValue)
+                    var created = DOS.CreateDirRaw(name);
+                    if (created.IsNotNull)
                     {
-                        DOS.UnLock(created.Value);
+                        DOS.UnLock(created);
                     }
                     else
                     {

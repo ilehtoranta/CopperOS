@@ -1,0 +1,16 @@
+; Disposable WB 3.1 Eval grammar and LFORMAT probe. Output is retained in S:Shell-Startup.
+FailAt 21
+Echo "BEGIN" >RAM:eval-capture
+C:Eval 42 >>RAM:eval-capture
+C:Eval 1+2*3+4 >>RAM:eval-capture
+C:Eval 15 LFORMAT="f=%x" >>RAM:eval-capture
+Echo "" >>RAM:eval-capture
+C:Eval 16 LFORMAT="s=%x" >>RAM:eval-capture
+Echo "" >>RAM:eval-capture
+C:Eval 42 LFORMAT="u=%X2" >>RAM:eval-capture
+Echo "" >>RAM:eval-capture
+C:Eval 42 LFORMAT="l=%x2" >>RAM:eval-capture
+Echo "" >>RAM:eval-capture
+Echo "END" >>RAM:eval-capture
+Copy RAM:eval-capture S:Shell-Startup >NIL:
+EndCLI >NIL:

@@ -9,7 +9,7 @@ public sealed class ShellRedirectionTests
     public void Parser_extracts_bounded_targets_and_removes_operators()
     {
         EchoCommandTests.TestShellPlatform platform = new();
-        const string sourceText = "Echo hello >out 2>>err <input";
+        const string sourceText = "Echo hello >out *>>err <input";
         APTR source = platform.Store.PutAt(16, sourceText);
         ShellRedirectionWorkspace workspace = new(
             new APTR(100), 128,
@@ -50,6 +50,49 @@ public sealed class ShellRedirectionTests
             in workspace, out var spec, out var commandLength));
         Assert.True(spec.IsEmpty);
         Assert.Equal(quotedText, platform.Store.ReadText(
+            workspace.Command, commandLength));
+
+        const string errorRedirectText = "Echo hello *>err";
+        source = platform.Store.PutAt(16, errorRedirectText);
+        Assert.True(ShellRedirectionParser.Parse(ref platform, source,
+            (uint)errorRedirectText.Length, in workspace, out var errorSpec,
+            out commandLength));
+        Assert.Equal("err", platform.Store.ReadText(errorSpec.ErrorPath,
+            errorSpec.ErrorLength));
+        Assert.Equal((uint)0, errorSpec.ErrorAppend);
+
+        const string mergeErrorText = "Echo hello >out *<>";
+        source = platform.Store.PutAt(16, mergeErrorText);
+        Assert.True(ShellRedirectionParser.Parse(ref platform, source,
+            (uint)mergeErrorText.Length, in workspace, out var mergeSpec,
+            out commandLength));
+        Assert.Equal("out", platform.Store.ReadText(mergeSpec.OutputPath,
+            mergeSpec.OutputLength));
+        Assert.True(mergeSpec.ErrorPath.IsNull);
+        Assert.Equal(1u, mergeSpec.ErrorToOutput);
+        Assert.True(mergeSpec.HasError);
+
+        const string duplicateErrorRoute = "Echo hello *<> *>err";
+        source = platform.Store.PutAt(16, duplicateErrorRoute);
+        Assert.False(ShellRedirectionParser.Parse(ref platform, source,
+            (uint)duplicateErrorRoute.Length, in workspace, out _, out _));
+
+        const string oldUnixErrorRedirect = "Echo hello 2>err";
+        source = platform.Store.PutAt(16, oldUnixErrorRedirect);
+        Assert.True(ShellRedirectionParser.Parse(ref platform, source,
+            (uint)oldUnixErrorRedirect.Length, in workspace, out var literalSpec,
+            out commandLength));
+        Assert.True(literalSpec.IsEmpty);
+        Assert.Equal(oldUnixErrorRedirect, platform.Store.ReadText(
+            workspace.Command, commandLength));
+
+        const string adjacentOperatorText = "Echo hello>err";
+        source = platform.Store.PutAt(16, adjacentOperatorText);
+        Assert.True(ShellRedirectionParser.Parse(ref platform, source,
+            (uint)adjacentOperatorText.Length, in workspace, out var adjacentSpec,
+            out commandLength));
+        Assert.True(adjacentSpec.IsEmpty);
+        Assert.Equal(adjacentOperatorText, platform.Store.ReadText(
             workspace.Command, commandLength));
 
         const string escapedQuoteText = "Echo \"a*\"b\"";
@@ -100,6 +143,35 @@ public sealed class ShellRedirectionTests
         Assert.Equal(1, platform.Store.RedirectionOpenCount);
         Assert.Equal(1, platform.Store.RedirectionCloseCount);
         Assert.Equal((uint)0, handles.Owned);
+    }
+
+    [Fact]
+    public void Error_to_output_shares_the_output_handle_without_double_ownership()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        APTR outputPath = platform.Store.PutAt(48, "out");
+        ShellRedirectionSpec spec = new(
+            APTR.Null, 0,
+            outputPath, 3, 0,
+            APTR.Null, 0, 0)
+        {
+            ErrorToOutput = 1,
+        };
+        ShellScriptFrameState frame = new()
+        {
+            Cli = new APTR(8),
+            Input = new BPTR(1),
+            Output = new BPTR(2),
+            Error = new BPTR(3),
+        };
+
+        Assert.True(ShellRedirectionTransaction.TryOpen(
+            ref platform, in frame, in spec, out var handles));
+        Assert.Equal(handles.Output.Raw, handles.Error.Raw);
+        Assert.Equal(2u, handles.Owned);
+        Assert.True(ShellRedirectionTransaction.Close(
+            ref platform, in frame, ref handles));
+        Assert.Equal(1, platform.Store.RedirectionCloseCount);
     }
 
     [Fact]

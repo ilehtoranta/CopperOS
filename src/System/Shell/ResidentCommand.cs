@@ -37,54 +37,116 @@ public static class ResidentCommand
             return (int)ShellCommandResult.Fail;
 
         if (!ReadArgsCommandSupport.Prepare(ref platform, tokenBuffer,
-                tokenCapacity, ReadArgsCommandTemplate.Resident, 36,
+                tokenCapacity, ReadArgsCommandTemplate.Resident,
+                ResidentReadArgsResultRecord.Size,
                 out var resultArray, out var templateLength))
             return (int)ShellCommandResult.Error;
         if (!platform.TryReadArgs(invocation.ArgumentText,
                 invocation.ArgumentLength, tokenBuffer, templateLength,
-                resultArray, 36, out var rdArgs) || rdArgs.IsNull)
+                resultArray, ResidentReadArgsResultRecord.Size,
+                out var rdArgs) || rdArgs.IsNull)
             return (int)ShellCommandResult.Error;
 
-        var name = APTR.FromPointer(platform.ReadUInt32(resultArray));
-        var file = APTR.FromPointer(platform.ReadUInt32(resultArray, 4));
-        var alias = APTR.FromPointer(platform.ReadUInt32(resultArray, 8));
-        if (!CopyOptional(ref platform, name, nameBuffer, nameCapacity,
+        if (!ResidentReadArgsResultRecordCodec.TryRead(ref platform,
+                resultArray, out var parsed))
+        {
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
+        }
+
+        if (!CopyOptional(ref platform, parsed.Name, nameBuffer, nameCapacity,
                 out var nameLength) ||
-            !CopyOptional(ref platform, file, fileBuffer, fileCapacity,
+            !CopyOptional(ref platform, parsed.File, fileBuffer, fileCapacity,
                 out var fileLength) ||
-            !CopyOptional(ref platform, alias, aliasBuffer, aliasCapacity,
+            !CopyOptional(ref platform, parsed.Alias, aliasBuffer, aliasCapacity,
                 out var aliasLength))
         {
             platform.FreeArgs(rdArgs);
             return (int)ShellCommandResult.Error;
         }
 
-        var remove = platform.ReadUInt32(resultArray, 12);
-        var add = platform.ReadUInt32(resultArray, 16);
-        var replace = platform.ReadUInt32(resultArray, 20);
-        var force = platform.ReadUInt32(resultArray, 24);
-        var system = platform.ReadUInt32(resultArray, 28);
-        var defer = platform.ReadUInt32(resultArray, 32);
         platform.FreeArgs(rdArgs);
 
+        if (!ValidSwitchResult(parsed.Remove) ||
+            !ValidSwitchResult(parsed.Add) ||
+            !ValidSwitchResult(parsed.Replace) ||
+            !ValidSwitchResult(parsed.Force) ||
+            !ValidSwitchResult(parsed.System) ||
+            !ValidSwitchResult(parsed.Defer))
+            return (int)ShellCommandResult.Error;
+
+        var remove = NormalizeSwitchResult(parsed.Remove);
+        var add = NormalizeSwitchResult(parsed.Add);
+        var replace = NormalizeSwitchResult(parsed.Replace);
+        var force = NormalizeSwitchResult(parsed.Force);
+        var system = NormalizeSwitchResult(parsed.System);
+        var defer = NormalizeSwitchResult(parsed.Defer);
+        var operationCount = remove + add + replace;
+        var aliasOperation = parsed.Alias.IsNotNull;
+        if (operationCount > 1 ||
+            (aliasOperation && (parsed.File.IsNotNull || remove != 0 ||
+                force != 0 || defer != 0)) ||
+            (!aliasOperation && parsed.File.IsNull &&
+                (add != 0 || force != 0 || defer != 0)))
+            return (int)ShellCommandResult.Error;
+
         var nameArgument = nameBuffer;
-        if (name.IsNull) nameArgument = APTR.FromPointer(0);
+        if (parsed.Name.IsNull) nameArgument = APTR.FromPointer(0);
         var fileArgument = fileBuffer;
-        if (file.IsNull) fileArgument = APTR.FromPointer(0);
+        if (parsed.File.IsNull) fileArgument = APTR.FromPointer(0);
         var aliasArgument = aliasBuffer;
-        if (alias.IsNull) aliasArgument = APTR.FromPointer(0);
-        return platform.TryManageResident(invocation.Cli,
-                invocation.Output,
-                nameArgument,
-                nameLength,
-                fileArgument,
-                fileLength,
-                aliasArgument,
-                aliasLength,
-                remove, add, replace, force, system, defer)
-            ? (int)ShellCommandResult.Ok
-            : (int)ShellCommandResult.Fail;
+        if (parsed.Alias.IsNull) aliasArgument = APTR.FromPointer(0);
+
+        var internalCommand = nameLength == 0
+            ? ShellInternalCommand.Unknown
+            : ShellInternalCommandResolver.Resolve(ref platform, nameBuffer,
+                nameLength);
+        if (!aliasOperation && parsed.File.IsNull && internalCommand !=
+                ShellInternalCommand.Unknown && (remove != 0 || replace != 0))
+        {
+            var enabled = remove != 0 ? 0u : 1u;
+            return platform.TrySetInternalCommandEnabled(invocation.Cli,
+                    (uint)internalCommand, enabled)
+                ? (int)ShellCommandResult.Ok
+                : (int)ShellCommandResult.Fail;
+        }
+
+        var listing = parsed.File.IsNull && !aliasOperation && remove == 0;
+        if (!listing && remove == 0 && add == 0 && replace == 0)
+        {
+            if (aliasOperation) add = 1;
+            else replace = 1;
+        }
+        var request = new ShellResidentManagementRequest
+        {
+            Output = invocation.Output,
+            Name = nameArgument,
+            NameLength = nameLength,
+            File = fileArgument,
+            FileLength = fileLength,
+            Alias = aliasArgument,
+            AliasLength = aliasLength,
+            Remove = listing ? 0u : remove,
+            Add = listing ? 0u : add,
+            Replace = listing ? 0u : replace,
+            Force = listing ? 0u : force,
+            System = system,
+            Defer = listing ? 0u : defer,
+        };
+        var success = platform.TryManageResident(invocation.Cli,
+            in request);
+        if (!success) return (int)ShellCommandResult.Fail;
+        if (listing && !ShellInternalCommandResolver.WriteResidentNames(
+            ref platform, invocation.Cli, invocation.Output, system))
+            return (int)ShellCommandResult.Fail;
+        return (int)ShellCommandResult.Ok;
     }
+
+    private static bool ValidSwitchResult(uint value) =>
+        value == 0 || value == 1 || value == uint.MaxValue;
+
+    private static uint NormalizeSwitchResult(uint value) => value == 0
+        ? 0u : 1u;
 
     private static bool CopyOptional<TPlatform>(
         ref TPlatform platform,

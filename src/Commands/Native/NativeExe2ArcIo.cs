@@ -8,12 +8,15 @@ namespace CopperOS.Commands.Native;
 /// scratch. This one-APTR value borrows those resources and never frees them.
 /// Mapping here records the caller's allocation claim; it is not an OS probe.
 /// </summary>
-public readonly struct NativeExe2ArcIo(APTR scratch) : IExe2ArcIo
+public readonly struct NativeExe2ArcIo(APTR scratch) : IExe2ArcIo,
+    IExe2ArcBreakSource
 {
     public int Read(BPTR file, APTR buffer, int length) => DOS.Read(file, buffer, length);
     public int Write(BPTR file, APTR buffer, int length) => DOS.Write(file, buffer, length);
     public int Seek(BPTR file, int position, int mode) => DOS.Seek(file, position, mode);
     public int IoErr() => (int)DOS.IoErr();
+    public bool IsBreakPending() => NativeCommandIo.IsCtrlCPending();
+    public void SetIoErr(int ioError) => DOS.SetIoErr((DOS.Error)ioError);
 
     public bool IsMapped(APTR address, uint byteSize) =>
         !scratch.IsNull &&

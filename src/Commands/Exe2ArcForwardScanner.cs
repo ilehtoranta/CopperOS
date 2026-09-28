@@ -3,7 +3,7 @@ using Amiga;
 namespace CopperOS.Commands;
 
 /// <summary>
-/// Source-contract forward RAR4/CAB searches over borrowed DOS handles and a
+/// Source-contract forward RAR4/CAB/ACE/ARJ searches over borrowed DOS handles and a
 /// caller-owned 102400-byte scratch area. No allocation, output copy, resource
 /// acquisition/release, diagnostic, command return or cancellation policy.
 /// </summary>
@@ -27,7 +27,7 @@ public static class Exe2ArcForwardScanner
         out uint archiveOffset, out uint payloadLength,
         out Exe2ArcIoObservation observation)
         where TIo : struct, IExe2ArcIo =>
-        Scan(ref io, input, scratch, scratchCapacity, fileLength, false,
+        Scan(ref io, input, scratch, scratchCapacity, fileLength, ScanKind.Rar4,
             out archiveOffset, out payloadLength, out observation);
 
     /// <summary>
@@ -39,11 +39,48 @@ public static class Exe2ArcForwardScanner
         out uint archiveOffset, out uint payloadLength,
         out Exe2ArcIoObservation observation)
         where TIo : struct, IExe2ArcIo =>
-        Scan(ref io, input, scratch, scratchCapacity, fileLength, true,
+        Scan(ref io, input, scratch, scratchCapacity, fileLength, ScanKind.Cabinet,
+            out archiveOffset, out payloadLength, out observation);
+
+    /// <summary>
+    /// Scans for the source's <c>**ACE**</c> marker at candidate offset +7.
+    /// The returned payload begins at the candidate wrapper offset and runs to
+    /// EOF, matching ACE's shared copy-to-EOF extractor.
+    /// </summary>
+    public static Exe2ArcIoStatus ScanAce<TIo>(ref TIo io, BPTR input,
+        APTR scratch, uint scratchCapacity, uint fileLength,
+        out uint archiveOffset, out uint payloadLength,
+        out Exe2ArcIoObservation observation)
+        where TIo : struct, IExe2ArcIo =>
+        Scan(ref io, input, scratch, scratchCapacity, fileLength, ScanKind.Ace,
+            out archiveOffset, out payloadLength, out observation);
+
+    /// <summary>
+    /// Scans for the source's ARJ marker and valid reflected CRC header. The
+    /// returned payload begins at the marker and runs to EOF.
+    /// </summary>
+    public static Exe2ArcIoStatus ScanArj<TIo>(ref TIo io, BPTR input,
+        APTR scratch, uint scratchCapacity, uint fileLength,
+        out uint archiveOffset, out uint payloadLength,
+        out Exe2ArcIoObservation observation)
+        where TIo : struct, IExe2ArcIo =>
+        Scan(ref io, input, scratch, scratchCapacity, fileLength, ScanKind.Arj,
+            out archiveOffset, out payloadLength, out observation);
+
+    /// <summary>
+    /// Scans for the source's LZH marker and its scan-window level predicate.
+    /// The returned payload begins at the candidate and runs to EOF.
+    /// </summary>
+    public static Exe2ArcIoStatus ScanLzh<TIo>(ref TIo io, BPTR input,
+        APTR scratch, uint scratchCapacity, uint fileLength,
+        out uint archiveOffset, out uint payloadLength,
+        out Exe2ArcIoObservation observation)
+        where TIo : struct, IExe2ArcIo =>
+        Scan(ref io, input, scratch, scratchCapacity, fileLength, ScanKind.Lzh,
             out archiveOffset, out payloadLength, out observation);
 
     private static Exe2ArcIoStatus Scan<TIo>(ref TIo io, BPTR input,
-        APTR scratch, uint scratchCapacity, uint fileLength, bool cabinet,
+        APTR scratch, uint scratchCapacity, uint fileLength, ScanKind kind,
         out uint archiveOffset, out uint payloadLength,
         out Exe2ArcIoObservation observation)
         where TIo : struct, IExe2ArcIo
@@ -54,7 +91,14 @@ public static class Exe2ArcForwardScanner
         if (fileLength > int.MaxValue)
             return Exe2ArcIoStatus.UnsupportedRange;
 
-        uint headerBytes = cabinet ? 20u : 7u;
+        uint headerBytes = kind switch
+        {
+            ScanKind.Cabinet => 20u,
+            ScanKind.Ace => 14u,
+            ScanKind.Arj => 50u,
+            ScanKind.Lzh => 21u,
+            _ => 7u,
+        };
         if (fileLength <= headerBytes)
             return Exe2ArcIoStatus.NoMatch;
         if (input.IsNull)
@@ -87,11 +131,19 @@ public static class Exe2ArcForwardScanner
                 APTR candidate = new(scratch.Raw + index);
                 uint offset = windowStart + index;
                 uint length;
-                bool recognized = cabinet
-                    ? Exe2ArcHeaderProbe.TryInspectCabinet(ref io, candidate,
-                        headerBytes, offset, fileLength, out length)
-                    : Exe2ArcHeaderProbe.TryInspectRar4(ref io, candidate,
-                        headerBytes, offset, fileLength, out length);
+                bool recognized = kind switch
+                {
+                    ScanKind.Cabinet => Exe2ArcHeaderProbe.TryInspectCabinet(ref io,
+                        candidate, headerBytes, offset, fileLength, out length),
+                    ScanKind.Ace => Exe2ArcHeaderProbe.TryInspectAce(ref io, candidate,
+                        headerBytes, offset, fileLength, out length),
+                    ScanKind.Arj => Exe2ArcHeaderProbe.TryInspectArj(ref io, candidate,
+                        headerBytes, offset, fileLength, out length),
+                    ScanKind.Lzh => Exe2ArcHeaderProbe.TryInspectLzh(ref io, candidate,
+                        scratch, headerBytes, offset, fileLength, out length),
+                    _ => Exe2ArcHeaderProbe.TryInspectRar4(ref io, candidate,
+                        headerBytes, offset, fileLength, out length),
+                };
                 if (!recognized)
                     continue;
 
@@ -121,5 +173,14 @@ public static class Exe2ArcForwardScanner
             windowStart += lastCandidate + 1;
         }
         return Exe2ArcIoStatus.NoMatch;
+    }
+
+    private enum ScanKind : byte
+    {
+        Rar4,
+        Cabinet,
+        Ace,
+        Arj,
+        Lzh,
     }
 }

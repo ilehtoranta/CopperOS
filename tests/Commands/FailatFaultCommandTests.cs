@@ -27,11 +27,11 @@ public sealed class FailatFaultCommandTests
     }
 
     [Theory]
-    [InlineData("")]
     [InlineData("0")]
+    [InlineData("-5")]
     [InlineData("bad")]
     [InlineData("5 extra")]
-    public void Failat_rejects_missing_invalid_or_extra_arguments(string commandLine)
+    public void Failat_rejects_nonpositive_invalid_or_extra_arguments(string commandLine)
     {
         EchoCommandTests.TestShellPlatform platform = new();
         APTR source = commandLine.Length == 0
@@ -48,6 +48,26 @@ public sealed class FailatFaultCommandTests
         Assert.Equal((int)ShellCommandResult.Error, result);
         Assert.Equal((uint)10, platform.Store.FailureLimit);
         Assert.Equal(0, platform.Store.WriteFailureLimitCount);
+    }
+
+    [Fact]
+    public void Failat_without_an_argument_displays_the_current_cli_limit()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.FailureLimit = 5;
+        CommandInvocation invocation = CreateInvocation(APTR.Null, 0);
+
+        int result = FailatCommand.Execute(
+            ref platform,
+            in invocation,
+            new APTR(80),
+            32);
+
+        Assert.Equal((int)ShellCommandResult.Ok, result);
+        Assert.Equal("5\n", platform.Store.OutputText);
+        Assert.Equal(0, platform.Store.WriteFailureLimitCount);
+        Assert.Equal(1, platform.Store.ReadArgsCount);
+        Assert.Equal(1, platform.Store.FreeArgsCount);
     }
 
     [Fact]

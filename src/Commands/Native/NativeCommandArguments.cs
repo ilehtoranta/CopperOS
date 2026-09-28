@@ -26,6 +26,42 @@ public struct NativeCommandArguments
     public int IoError => _ioError;
 
     /// <summary>
+    /// Parses into caller-owned, cleared LONG storage using a caller-owned
+    /// DOS_RDARGS object. Both must remain live until ReleaseBorrowed. This
+    /// path deliberately leaves DOS failure/cleanup IoErr timing unchanged.
+    /// </summary>
+    public static bool TryReadBorrowed(CString template, APTR results,
+        uint count, APTR rdArgs, out NativeCommandArguments arguments)
+    {
+        arguments = default;
+        arguments._returnLevel = DOS.RETURN_FAIL;
+        if (DOS.ReadArgs(template, results, rdArgs).IsNull)
+        {
+            arguments._ioError = (int)DOS.IoErr();
+            return false;
+        }
+        arguments._resultArray = results;
+        arguments._resultCount = count;
+        arguments._rdArgs = rdArgs;
+        arguments._returnLevel = DOS.RETURN_OK;
+        return true;
+    }
+
+    /// <summary>
+    /// Releases only DOS parser allocations from TryReadBorrowed. The caller
+    /// then frees its DOS_RDARGS object and result storage in original order.
+    /// Do not use Release on a borrowed lease or this method on an owned lease.
+    /// </summary>
+    public void ReleaseBorrowed()
+    {
+        var rdArgs = _rdArgs;
+        _rdArgs = APTR.Null;
+        _resultArray = APTR.Null;
+        _resultCount = 0;
+        if (rdArgs.IsNotNull) DOS.FreeArgs(rdArgs);
+    }
+
+    /// <summary>
     /// Parses the current DOS input using the supplied original template.
     /// resultCount must match its option count; this helper does not reparse
     /// DOS template grammar. Release any earlier lease before replacing it.
@@ -106,6 +142,20 @@ public struct NativeCommandArguments
 
         var slot = APTR.FromPointer(_resultArray.Raw + index * ResultSlotBytes);
         value = APTR.ReadUInt32(slot, 0);
+        return true;
+    }
+
+    /// <summary>
+    /// Returns one invocation-owned result LONG address while this lease is
+    /// live. Callers may reuse a slot only after copying its parsed value and
+    /// only for a DOS vector that borrows a raw argument array.
+    /// </summary>
+    public bool TryGetResultSlot(uint index, out APTR slot)
+    {
+        slot = APTR.Null;
+        if (_rdArgs.IsNull || _resultArray.IsNull || index >= _resultCount)
+            return false;
+        slot = APTR.FromPointer(_resultArray.Raw + index * ResultSlotBytes);
         return true;
     }
 

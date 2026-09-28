@@ -22,26 +22,49 @@ public static class FailatCommand
             return (int)ShellCommandResult.Fail;
 
         if (!ReadArgsCommandSupport.Prepare(ref platform, tokenBuffer,
-                tokenCapacity, ReadArgsCommandTemplate.Failat, 4,
+                tokenCapacity, ReadArgsCommandTemplate.Failat,
+                ReadArgsPointerResultRecord.Size,
                 out var resultArray, out var templateLength))
             return (int)ShellCommandResult.Error;
 
         if (!platform.TryReadArgs(invocation.ArgumentText,
                 invocation.ArgumentLength, tokenBuffer, templateLength,
-                resultArray, 4, out var rdArgs) || rdArgs.IsNull)
+                resultArray, ReadArgsPointerResultRecord.Size,
+                out var rdArgs) || rdArgs.IsNull)
             return (int)ShellCommandResult.Error;
 
-        var failureAddress = APTR.FromPointer(platform.ReadUInt32(resultArray));
-        var failureLimit = failureAddress.IsNotNull
-            ? platform.ReadUInt32(failureAddress)
-            : 0;
+        if (!ReadArgsPointerResultRecordCodec.TryRead(ref platform,
+                resultArray, out var parsed))
+        {
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
+        }
+
+        var failureAddress = parsed.Value;
+        if (failureAddress.IsNull)
+        {
+            platform.FreeArgs(rdArgs);
+            if (invocation.Output.IsNull ||
+                !platform.TryReadCliFailureLimit(invocation.Cli,
+                    out var currentFailureLimit))
+                return (int)ShellCommandResult.Fail;
+            return ShellUnsignedOutput.WriteLine(ref platform,
+                invocation.Output, currentFailureLimit);
+        }
+
+        if (!ReadArgsLongValueRecordCodec.TryRead(ref platform,
+                failureAddress, out var failureLimitValue))
+        {
+            platform.FreeArgs(rdArgs);
+            return (int)ShellCommandResult.Error;
+        }
         platform.FreeArgs(rdArgs);
-        if (failureAddress.IsNull || failureLimit == 0)
+        if (failureLimitValue.Value <= 0)
             return (int)ShellCommandResult.Error;
 
         return platform.TryWriteCliFailureLimit(
                 invocation.Cli,
-                failureLimit)
+                (uint)failureLimitValue.Value)
             ? (int)ShellCommandResult.Ok
             : (int)ShellCommandResult.Fail;
     }

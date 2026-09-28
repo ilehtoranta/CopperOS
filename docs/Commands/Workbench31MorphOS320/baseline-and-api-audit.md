@@ -39,6 +39,7 @@ by these slices.
 | Alignment regression before the correction | Commands test project filtered to `FullyQualifiedName~ReadArgsCommandSupportTests` | 17 failures, 6 passes. Cases exposed odd/misaligned result slots, mutation of undersized workspaces, and a high-address write before alignment-span rejection. One all-command fixture also needed a valid Ask input handle; that fixture was corrected before the final runs. |
 | Alignment regression after the correction | `dotnet test tests/Commands/CopperOS.Commands.Tests.csproj --filter FullyQualifiedName~ReadArgsCommandSupportTests --verbosity minimal` | **23 passed, 0 failed, 0 skipped**. |
 | Complete post-alignment baseline | `dotnet test tests/Commands/CopperOS.Commands.Tests.csproj --verbosity minimal` | **232 passed, 0 failed, 0 skipped**, including the original 209 cases and 23 new alignment/boundary cases. |
+| Current worktree (2026-09-28) | `dotnet test tests/Commands/CopperOS.Commands.Tests.csproj --configuration Release --no-restore` | **843 passed, 0 failed, 0 skipped**. This covers the current managed Shell/command suite only. |
 
 The missing type was a project dependency problem. Local
 `Sdk.Amiga/CopperSharp.Sdk.Amiga.csproj` excludes `GuestMemory/**/*.cs` and
@@ -485,3 +486,28 @@ Real Kickstart 3.1 load/RunCommand/ReadArgs execution, CopperStart integration,
 Workbench-message lifecycle, complete resource accounting, installed protection
 metadata, and original MorphOS differential comparisons remain separate gates.
 None is marked complete by the baseline test or this source audit.
+
+## 2026-09-28 current-worktree regression and native foundation refresh
+
+The complete managed command/Shell suite passes 843 tests on the current dirty
+worktree. The native foundation qualifier also passes all nine CPU/suite
+executions: 31 startup, 25 argument-boundary, and 32 I/O vectors per CPU, 264
+total across 68000/020/040. The byte-preservation vector now compares raw
+expected and actual output bytes; previously its Latin-1 bytes matched but a
+decoded Unicode-string comparison falsely rejected the case. The receipt is
+`tests/Commands.NativeRoot/bin/Release/net10.0/qualification/3e1bbbbf271c43288b90a1ec8a141256/qualification.json`.
+Every image loaded once per CPU; all nine reports pass with no leaked fixture
+resources or shared-image writes. The run records `realKickstartExecution`,
+`realCopperStartExecution`, `realDosParser`, `realDosIo`, `minimumStackQualified`,
+and `shippingOrPureApproval` as false. These are mocked-vector ABI fixtures, not
+original-OS conformance or shipping evidence.
+
+The successful run required the executor and native root to bind the same local
+CopperSharp SDK surface so the `DOS.*Raw` declarations are available. The root
+fixture now copies its declared package runtime closure before the hash-bound
+snapshot. The host-only `CopperOS.Shell` excludes
+`DosQueueHandlerTaskNativeCore.cs`; the separate `CopperOS.Shell.Dos` project
+still compiles it and built successfully with zero warnings/errors. These
+changes repair qualification/build wiring and preserve the managed/native
+project boundary; the larger API ownership and real-OS obligations above remain
+open.

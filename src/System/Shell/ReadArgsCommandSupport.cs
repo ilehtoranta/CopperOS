@@ -163,7 +163,7 @@ internal static class ReadArgsCommandSupport
         {
             case ReadArgsCommandTemplate.Empty: return 0;
             case ReadArgsCommandTemplate.Stack: return 6;
-            case ReadArgsCommandTemplate.Failat: return 9;
+            case ReadArgsCommandTemplate.Failat: return 7;
             case ReadArgsCommandTemplate.Fault: return 9;
             case ReadArgsCommandTemplate.Quit: return 4;
             case ReadArgsCommandTemplate.Name: return 6;
@@ -219,8 +219,6 @@ internal static class ReadArgsCommandSupport
                 AppendByte(ref platform, ref writer, (byte)'L');
                 AppendByte(ref platform, ref writer, (byte)'I');
                 AppendByte(ref platform, ref writer, (byte)'M');
-                AppendByte(ref platform, ref writer, (byte)'/');
-                AppendByte(ref platform, ref writer, (byte)'A');
                 AppendByte(ref platform, ref writer, (byte)'/');
                 AppendByte(ref platform, ref writer, (byte)'N');
                 AppendByte(ref platform, ref writer, 0);

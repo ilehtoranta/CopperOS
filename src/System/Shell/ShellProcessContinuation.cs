@@ -279,8 +279,22 @@ public static class ShellProcessContinuationPolling
                 cli, continuation, out var observed, out var observedResult) ||
             !ValidState(observed) ||
             !ShellProcessContinuationCodec.TryRead(
-                ref platform, continuation, out var current))
+                ref platform, continuation, out var current) ||
+            (current.ParentCli.IsNotNull && current.ParentCli != cli))
             return false;
+
+        // DOS can write the shared record before the Shell first polls it.
+        // An identical terminal observation is reconciliation, not a second
+        // transition. Reject changed results and any terminal-state reversal.
+        if (current.State is ShellProcessContinuationState.Completed or
+            ShellProcessContinuationState.Aborted or ShellProcessContinuationState.Failed)
+        {
+            if (observed != current.State || observedResult != current.Result)
+                return false;
+            state = current.State;
+            result = current.Result;
+            return true;
+        }
 
         if (observed is ShellProcessContinuationState.Completed)
         {
@@ -323,8 +337,9 @@ public static class ShellProcessContinuationPolling
 }
 
 /// <summary>
-/// Requests DOS-owned release of resources marked on a terminal continuation.
-/// A failed release leaves the ownership flags intact so the owner can retry.
+/// Acknowledges a terminal continuation after DOS-owned resource retirement.
+/// Child handle snapshots are never reclaimed by Shell. A failed
+/// acknowledgement leaves the flags intact so the owner can retry.
 /// </summary>
 public static class ShellProcessContinuationTeardown
 {
@@ -337,30 +352,16 @@ public static class ShellProcessContinuationTeardown
         if (cli.IsNull || continuation.IsNull ||
             !ShellProcessContinuationCodec.TryRead(
                 ref platform, continuation, out var current) ||
+            (current.ParentCli.IsNotNull && current.ParentCli != cli) ||
             current.State is ShellProcessContinuationState.Pending or
-                ShellProcessContinuationState.Running ||
-            (current.Flags &
-                (uint)ShellProcessContinuationFlags.ResourcesClosed) != 0)
+                ShellProcessContinuationState.Running)
             return false;
 
         var owned = current.Flags & ~(uint)
             ShellProcessContinuationFlags.ResourcesClosed;
-        var closedFlags = (ShellProcessContinuationFlags)(current.Flags |
-            (uint)ShellProcessContinuationFlags.ResourcesClosed);
-        if (!ShellProcessContinuationCodec.TrySetFlags(
-                ref platform, continuation, closedFlags))
-            return false;
-        if (!platform.TryReleaseShellContinuation(
-                cli, continuation, owned))
-        {
-            ShellProcessContinuationCodec.TrySetFlags(
-                ref platform,
-                continuation,
-                (ShellProcessContinuationFlags)current.Flags);
-            return false;
-        }
-        // Marking closed before the callback permits DOS to reclaim a record
-        // that carries RecordOwned without a post-release guest write.
-        return true;
+        // ResourcesClosed describes DOS retirement, not parent receipt.
+        // DOS owns exactly-once acknowledgement and may reclaim the record
+        // during this call, so Shell must neither premark nor write afterward.
+        return platform.TryReleaseShellContinuation(cli, continuation, owned);
     }
 }

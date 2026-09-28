@@ -1,0 +1,9 @@
+; Disposable WB 3.1 Eval probe. Output is retained in S:Shell-Startup.
+FailAt 21
+Echo "BEGIN" >RAM:eval-capture
+C:Eval 1+2*3 >>RAM:eval-capture
+C:Eval 1 + 2 >>RAM:eval-capture
+C:Eval 42 LFORMAT="x=%x" >>RAM:eval-capture
+Echo "END" >>RAM:eval-capture
+Copy RAM:eval-capture S:Shell-Startup >NIL:
+EndCLI >NIL:

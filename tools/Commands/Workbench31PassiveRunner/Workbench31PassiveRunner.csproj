@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Reference Include="CopperMod.Amiga.Lightweight" HintPath="$(EngineAssemblyDirectory)/CopperMod.Amiga.Lightweight.dll" />
+    <Reference Include="Copper68k" HintPath="$(FrozenDependencyDirectory)/Copper68k.dll" />
+    <Reference Include="CopperDisk" HintPath="$(FrozenDependencyDirectory)/CopperDisk.dll" />
+    <Reference Include="CopperFloat" HintPath="$(FrozenDependencyDirectory)/CopperFloat.dll" />
+  </ItemGroup>
+  <Target Name="RequireExplicitInputs" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(EngineAssemblyDirectory)' == '' or '$(FrozenDependencyDirectory)' == ''" Text="Supply an isolated engine output and frozen dependency directory." />
+  </Target>
+</Project>

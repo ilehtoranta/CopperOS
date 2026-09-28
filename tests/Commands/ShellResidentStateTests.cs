@@ -46,9 +46,15 @@ public sealed class ShellResidentStateTests
             NameLength = 4,
         };
 
+        ShellResidentAdmission admission = new()
+        {
+            Force = 1,
+            Segment = BPTR.FromRaw(1),
+            SegmentOwner = new APTR(500),
+        };
+
         Assert.True(ShellResidentPolicy.TryAdmit(
-            ref state, 0, 1, 0, 0, BPTR.FromRaw(1),
-            new APTR(500)));
+            ref state, in admission));
         Assert.True((state.Flags & ShellResidentEntryFlags.Unsafe) != 0);
         Assert.False((state.Flags & ShellResidentEntryFlags.VerifiedPure) != 0);
         Assert.True(ShellResidentPolicy.CanAcquire(in state));
@@ -63,9 +69,17 @@ public sealed class ShellResidentStateTests
             NameLength = 4,
         };
 
+        ShellResidentAdmission admission = new()
+        {
+            Force = 1,
+            Deferred = 1,
+        };
+
         Assert.True(ShellResidentPolicy.TryAdmit(
-            ref state, 1, 0, 0, 1, BPTR.Null, APTR.Null));
+            ref state, in admission));
         Assert.True((state.Flags & ShellResidentEntryFlags.Deferred) != 0);
+        Assert.True((state.Flags & ShellResidentEntryFlags.Unsafe) != 0);
+        Assert.False((state.Flags & ShellResidentEntryFlags.VerifiedPure) != 0);
         Assert.False((state.Flags & ShellResidentEntryFlags.Loaded) != 0);
         Assert.False(ShellResidentPolicy.CanAcquire(in state));
     }
@@ -79,11 +93,26 @@ public sealed class ShellResidentStateTests
             NameLength = 4,
         };
 
+        ShellResidentAdmission conflictingAdmission = new()
+        {
+            VerifiedPure = 1,
+            Force = 1,
+            Segment = BPTR.FromRaw(1),
+            SegmentOwner = new APTR(500),
+        };
+        ShellResidentAdmission missingSegmentAdmission = new();
+        ShellResidentAdmission unqualifiedAdmission = new()
+        {
+            Segment = BPTR.FromRaw(1),
+            SegmentOwner = new APTR(500),
+        };
+
         Assert.False(ShellResidentPolicy.TryAdmit(
-            ref state, 1, 1, 0, 0, BPTR.FromRaw(1),
-            new APTR(500)));
+            ref state, in conflictingAdmission));
         Assert.False(ShellResidentPolicy.TryAdmit(
-            ref state, 0, 0, 0, 0, BPTR.Null, APTR.Null));
+            ref state, in missingSegmentAdmission));
+        Assert.False(ShellResidentPolicy.TryAdmit(
+            ref state, in unqualifiedAdmission));
     }
 
     [Fact]

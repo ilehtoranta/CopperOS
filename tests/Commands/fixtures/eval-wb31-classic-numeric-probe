@@ -1,0 +1,18 @@
+; Disposable WB 3.1 Eval arithmetic and numeric-format probe. Output is retained in S:Shell-Startup.
+FailAt 21
+Echo "BEGIN" >RAM:eval-capture
+C:Eval 20-5*2 >>RAM:eval-capture
+C:Eval 1+(2*3) >>RAM:eval-capture
+C:Eval -2+3 >>RAM:eval-capture
+C:Eval 0x10 >>RAM:eval-capture
+C:Eval #x10 >>RAM:eval-capture
+C:Eval 010 >>RAM:eval-capture
+C:Eval 9 LFORMAT="n=%n" >>RAM:eval-capture
+Echo "" >>RAM:eval-capture
+C:Eval 9 LFORMAT="o=%o" >>RAM:eval-capture
+Echo "" >>RAM:eval-capture
+C:Eval 9 LFORMAT="p=%o2" >>RAM:eval-capture
+Echo "" >>RAM:eval-capture
+Echo "END" >>RAM:eval-capture
+Copy RAM:eval-capture S:Shell-Startup >NIL:
+EndCLI >NIL:

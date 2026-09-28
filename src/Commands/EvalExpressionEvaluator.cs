@@ -83,7 +83,23 @@ public static class EvalExpressionEvaluator
             out var op))
         {
             if (!TryParseWorkbench31Primary(ref memory, source, ref cursor,
-                    out var right, out status)) return false;
+                    out var right, out status))
+            {
+                // The Workbench 3.1 binary returns a successful zero for the
+                // captured malformed multiplication forms "2*" and "2**3".
+                // Preserve only that observed empty/consecutive-star operand
+                // case; other malformed operator operands remain errors.
+                if (op == Operator.Multiply &&
+                    status == EvalExpressionStatus.Malformed &&
+                    IsWorkbench31EmptyMultiplyOperand(ref memory, source,
+                        ref cursor))
+                {
+                    value = 0;
+                    status = EvalExpressionStatus.Success;
+                    return true;
+                }
+                return false;
+            }
             if (op == Operator.Add || op == Operator.Subtract)
             {
                 if (!TryAdd(value, right, op == Operator.Subtract, out value))
@@ -136,6 +152,15 @@ public static class EvalExpressionEvaluator
         return true;
     }
 
+    private static bool IsWorkbench31EmptyMultiplyOperand<TMemory>(
+        ref TMemory memory, APTR source, ref Cursor cursor)
+        where TMemory : struct, IAmigaGuestMemory
+    {
+        SkipWhitespace(ref memory, source, ref cursor);
+        return cursor.Position == cursor.Length ||
+            memory.ReadUInt8(source, (int)cursor.Position) == (byte)'*';
+    }
+
     private static bool TryParseWorkbench31Primary<TMemory>(ref TMemory memory,
         APTR source, ref Cursor cursor, out long value,
         out EvalExpressionStatus status) where TMemory : struct, IAmigaGuestMemory
@@ -173,7 +198,8 @@ public static class EvalExpressionEvaluator
             }
             return true;
         }
-        return TryParseNumber(ref memory, source, ref cursor, out value, out status);
+        return TryParseNumber(ref memory, source, ref cursor,
+            EvalNumberSyntax.Workbench31, out value, out status);
     }
 
     private static bool TryReadWorkbench31ArithmeticOperator<TMemory>(
@@ -385,11 +411,13 @@ public static class EvalExpressionEvaluator
             value = memory.ReadUInt8(source, (int)cursor.Position++);
             return true;
         }
-        return TryParseNumber(ref memory, source, ref cursor, out value, out status);
+        return TryParseNumber(ref memory, source, ref cursor,
+            EvalNumberSyntax.MorphOS320, out value, out status);
     }
 
     private static bool TryParseNumber<TMemory>(ref TMemory memory, APTR source,
-        ref Cursor cursor, out long value, out EvalExpressionStatus status)
+        ref Cursor cursor, EvalNumberSyntax syntax, out long value,
+        out EvalExpressionStatus status)
         where TMemory : struct, IAmigaGuestMemory
     {
         value = 0;
@@ -424,6 +452,35 @@ public static class EvalExpressionEvaluator
             if (next is >= (byte)'0' and <= (byte)'7')
                 return TryParseUnsigned(ref memory, source, ref cursor, 8, true,
                     out value, out status);
+            if (syntax == EvalNumberSyntax.MorphOS320 &&
+                (next == (byte)'8' || next == (byte)'9'))
+            {
+                // MorphOS Eval's lexer falls through for 08/09, then scans
+                // the token with sscanf("%lli"). Base autodetection converts
+                // the leading zero as octal zero; its following isdigit loop
+                // consumes the rest of the decimal-looking token.
+                while (cursor.Position < cursor.Length)
+                {
+                    var digit = memory.ReadUInt8(source, (int)cursor.Position);
+                    if (digit is < (byte)'0' or > (byte)'9') break;
+                    cursor.Position++;
+                }
+                value = 0;
+                status = EvalExpressionStatus.Success;
+                return true;
+            }
+            if (syntax == EvalNumberSyntax.Workbench31 &&
+                (next == (byte)'8' || next == (byte)'9'))
+            {
+                // Original Workbench Eval accepts the leading-zero numeric
+                // prefix and ignores the remaining evaluated suffix. Keep the
+                // cursor after only the initial zero (unlike MorphOS, whose
+                // lexer consumes the whole digit run).
+                cursor.Position++;
+                value = 0;
+                status = EvalExpressionStatus.Success;
+                return true;
+            }
         }
         return TryParseDecimal(ref memory, source, ref cursor, out value, out status);
     }
@@ -941,6 +998,8 @@ public static class EvalExpressionEvaluator
         None, Add, Subtract, Multiply, Divide, Modulo, Power, And, Or, Xor,
         Equivalence, LeftShift, RightShift,
     }
+
+    private enum EvalNumberSyntax : byte { Workbench31, MorphOS320 }
 
     private struct Cursor(uint length)
     {
