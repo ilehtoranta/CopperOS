@@ -50,6 +50,14 @@ public static class DosShellNativeEntrypoints
 
 	public static APTR AddressOfShellChild() =>
 		APTR.ExportAddress("copperos.shell.child");
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	[M68kExport("copperos.shell.queue-handler-task")]
+	[return: M68kRegister(M68kRegister.D0)]
+	public static uint QueueHandlerTaskEntry() =>
+		DosQueueHandlerTaskNativeCore.RunFromCurrentTask();
+
+	public static APTR AddressOfQueueHandlerTaskEntry() =>
+		APTR.ExportAddress("copperos.shell.queue-handler-task");
 	public static APTR AddressOfExecutePark() =>
 		DosShellNativeParkEntrypoint.AddressOfExecutePark();
 

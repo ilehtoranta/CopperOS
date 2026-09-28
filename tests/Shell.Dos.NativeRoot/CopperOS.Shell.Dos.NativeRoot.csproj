@@ -12,6 +12,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="DosShellNativeRoots.cs" />
+    <Compile Include="DosQueueBufferNativeRoots.cs" />
     <Compile Include="..\..\src\System\Shell\DosShellNativeEntrypoints.cs"
              Link="Production\DosShellNativeEntrypoints.cs" />
     <Compile Include="..\..\src\System\Shell\DosShellNativeParkEntrypoint.cs"
