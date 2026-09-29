@@ -1,4 +1,4 @@
-# Native RAR4/CAB DOS component fixture
+# Native RAR4/CAB/ACE DOS component fixture
 
 This standalone fixture executes the generated production
 `Exe2ArcForwardScanner`, `Exe2ArcPayloadCopy` and `NativeExe2ArcIo` under pinned
@@ -29,7 +29,7 @@ source/restore/compiler closures and all failed runs. Do not copy reference
 media or vendor implementations into these projects or snapshots.
 
 ```text
-dotnet exec <executor.dll> <generated.hunk> <68000|68020|68040> <new-report.json> exe2arc-rar4-cab-dos-components
+dotnet exec <executor.dll> <generated.hunk> <68000|68020|68040> <new-report.json> exe2arc-rar4-cab-ace-dos-components
 ```
 
 Use a fresh JSON path. Existing paths, including hardlink/symlink aliases, are
@@ -37,8 +37,9 @@ never truncated, even on admission failure. The runner rejects an absent HUNK,
 unknown CPU/suite, unsupported HUNK layout or unpinned loaded Copper68k DLL.
 Source identity is not silently inferred from a successful build or filename.
 
-The finite corpus is **77 component invocations per CPU**: 69 sequential and
-eight caller invocations in four instruction-interleaved pairs. Each CPU run
+The finite corpus is **84 component invocations per CPU**: the original RAR4/CAB
+cases plus seven ACE cases and the existing caller invocations in instruction-
+interleaved pairs. Each CPU run
 loads one image. Tests include all six source-window EOF triplets, exact 6/19
 byte overlap, crossing/third-window candidates, candidate offset-zero stopping,
 CAB predicate failures before a later marker, RAR5 rejection, first-marker
