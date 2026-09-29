@@ -93,6 +93,19 @@ public sealed class MuiStringAttachedListAdmissionTests
 			ref platform, recordAddress,
 			MuiStringAttachedListStateField.Listview, out var listviewAddress));
 		Assert.Equal(0x1D24u, listviewAddress.Raw);
+		var listviewCursor = new MuiStringAttachedListStateFieldCursor
+		{
+			Record = recordAddress,
+			Field = MuiStringAttachedListStateField.Listview,
+		};
+		Assert.True(MuiStringAttachedListStateFieldCursorCodec.TryGetAddress(ref platform,
+			listviewCursor, out var cursorListviewAddress, out var cursorFieldSize));
+		Assert.Equal(listviewAddress, cursorListviewAddress);
+		Assert.Equal(MuiStringAttachedListStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiStringAttachedListStateRecordMemoryCodec.TryGetAddress(ref platform,
+			listviewCursor, out var memoryListviewAddress, out var memoryFieldSize));
+		Assert.Equal(cursorListviewAddress, memoryListviewAddress);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiStringAttachedListStateRecordMemoryCodec.TryReadUInt32(
 			ref platform, recordAddress, MuiStringAttachedListStateField.Listview,
 			out var listview));
@@ -113,6 +126,13 @@ public sealed class MuiStringAttachedListAdmissionTests
 			ref platform, APTR.Null, MuiStringAttachedListStateField.Magic, out _));
 		Assert.False(MuiStringAttachedListStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
+		listviewCursor.Field = (MuiStringAttachedListStateField)255;
+		Assert.False(MuiStringAttachedListStateFieldCursorCodec.TryGetAddress(ref platform,
+			listviewCursor, out _, out _));
+		listviewCursor.Record = APTR.Null;
+		listviewCursor.Field = MuiStringAttachedListStateField.Listview;
+		Assert.False(MuiStringAttachedListStateFieldCursorCodec.TryGetAddress(ref platform,
+			listviewCursor, out _, out _));
 	}
 
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR stringClass,

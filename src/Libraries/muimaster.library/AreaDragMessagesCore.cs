@@ -241,234 +241,287 @@ internal static class MuiAreaDragMessageMemoryCodec
 		return false;
 	}
 
-	private static bool TryResolve(MuiAreaDragPacketKind packet,
-		MuiAreaDragField field, out uint offset)
+	private static bool TryResolveFieldIndex(MuiAreaDragPacketKind packet,
+		MuiAreaDragField field, out uint index, out uint packetSize)
 	{
 		switch (packet)
 		{
 			case MuiAreaDragPacketKind.Method:
 				if (field == MuiAreaDragField.MethodId)
 				{
-					offset = MuiAreaDragMethodMessage.MethodIdOffset;
+					index = 0;
+					packetSize = MuiAreaDragMethodMessage.Size;
 					return true;
 				}
 				break;
 			case MuiAreaDragPacketKind.Begin:
 				if (field == MuiAreaDragField.MethodId)
 				{
-					offset = MuiAreaDragBeginMessage.MethodIdOffset;
+					index = 0;
+					packetSize = MuiAreaDragBeginMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.Object)
 				{
-					offset = MuiAreaDragBeginMessage.ObjectOffset;
+					index = 1;
+					packetSize = MuiAreaDragBeginMessage.Size;
 					return true;
 				}
 				break;
 			case MuiAreaDragPacketKind.DoDrag:
 				if (field == MuiAreaDragField.MethodId)
 				{
-					offset = MuiAreaDoDragMessage.MethodIdOffset;
+					index = 0;
+					packetSize = MuiAreaDoDragMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.TouchX)
 				{
-					offset = MuiAreaDoDragMessage.TouchXOffset;
+					index = 1;
+					packetSize = MuiAreaDoDragMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.TouchY)
 				{
-					offset = MuiAreaDoDragMessage.TouchYOffset;
+					index = 2;
+					packetSize = MuiAreaDoDragMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.Flags)
 				{
-					offset = MuiAreaDoDragMessage.FlagsOffset;
+					index = 3;
+					packetSize = MuiAreaDoDragMessage.Size;
 					return true;
 				}
 				break;
 			case MuiAreaDragPacketKind.Drop:
 				if (field == MuiAreaDragField.MethodId)
 				{
-					offset = MuiAreaDragDropMessage.MethodIdOffset;
+					index = 0;
+					packetSize = MuiAreaDragDropMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.Object)
 				{
-					offset = MuiAreaDragDropMessage.ObjectOffset;
+					index = 1;
+					packetSize = MuiAreaDragDropMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.X)
 				{
-					offset = MuiAreaDragDropMessage.XOffset;
+					index = 2;
+					packetSize = MuiAreaDragDropMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.Y)
 				{
-					offset = MuiAreaDragDropMessage.YOffset;
+					index = 3;
+					packetSize = MuiAreaDragDropMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.Qualifier)
 				{
-					offset = MuiAreaDragDropMessage.QualifierOffset;
+					index = 4;
+					packetSize = MuiAreaDragDropMessage.Size;
 					return true;
 				}
 				break;
 			case MuiAreaDragPacketKind.Event:
 				if (field == MuiAreaDragField.MethodId)
 				{
-					offset = MuiAreaDragEventMessage.MethodIdOffset;
+					index = 0;
+					packetSize = MuiAreaDragEventMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.Window)
 				{
-					offset = MuiAreaDragEventMessage.WindowOffset;
+					index = 1;
+					packetSize = MuiAreaDragEventMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.Object)
 				{
-					offset = MuiAreaDragEventMessage.ObjectOffset;
+					index = 2;
+					packetSize = MuiAreaDragEventMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.DragImage)
 				{
-					offset = MuiAreaDragEventMessage.DragImageOffset;
+					index = 3;
+					packetSize = MuiAreaDragEventMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.IntuiMessage)
 				{
-					offset = MuiAreaDragEventMessage.IntuiMessageOffset;
+					index = 4;
+					packetSize = MuiAreaDragEventMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.MuiKey)
 				{
-					offset = MuiAreaDragEventMessage.MuiKeyOffset;
+					index = 5;
+					packetSize = MuiAreaDragEventMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.MousePointerType)
 				{
-					offset = MuiAreaDragEventMessage.MousePointerTypeOffset;
+					index = 6;
+					packetSize = MuiAreaDragEventMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.Flags)
 				{
-					offset = MuiAreaDragEventMessage.FlagsOffset;
+					index = 7;
+					packetSize = MuiAreaDragEventMessage.Size;
 					return true;
 				}
 				break;
 			case MuiAreaDragPacketKind.Finish:
 				if (field == MuiAreaDragField.MethodId)
 				{
-					offset = MuiAreaDragFinishMessage.MethodIdOffset;
+					index = 0;
+					packetSize = MuiAreaDragFinishMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.Object)
 				{
-					offset = MuiAreaDragFinishMessage.ObjectOffset;
+					index = 1;
+					packetSize = MuiAreaDragFinishMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.DropFollows)
 				{
-					offset = MuiAreaDragFinishMessage.DropFollowsOffset;
+					index = 2;
+					packetSize = MuiAreaDragFinishMessage.Size;
 					return true;
 				}
 				break;
 			case MuiAreaDragPacketKind.Query:
 				if (field == MuiAreaDragField.MethodId)
 				{
-					offset = MuiAreaDragQueryMessage.MethodIdOffset;
+					index = 0;
+					packetSize = MuiAreaDragQueryMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.Object)
 				{
-					offset = MuiAreaDragQueryMessage.ObjectOffset;
+					index = 1;
+					packetSize = MuiAreaDragQueryMessage.Size;
 					return true;
 				}
 				break;
 			case MuiAreaDragPacketKind.Report:
 				if (field == MuiAreaDragField.MethodId)
 				{
-					offset = MuiAreaDragReportMessage.MethodIdOffset;
+					index = 0;
+					packetSize = MuiAreaDragReportMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.Object)
 				{
-					offset = MuiAreaDragReportMessage.ObjectOffset;
+					index = 1;
+					packetSize = MuiAreaDragReportMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.X)
 				{
-					offset = MuiAreaDragReportMessage.XOffset;
+					index = 2;
+					packetSize = MuiAreaDragReportMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.Y)
 				{
-					offset = MuiAreaDragReportMessage.YOffset;
+					index = 3;
+					packetSize = MuiAreaDragReportMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.Update)
 				{
-					offset = MuiAreaDragReportMessage.UpdateOffset;
+					index = 4;
+					packetSize = MuiAreaDragReportMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.Qualifier)
 				{
-					offset = MuiAreaDragReportMessage.QualifierOffset;
+					index = 5;
+					packetSize = MuiAreaDragReportMessage.Size;
 					return true;
 				}
 				break;
 			case MuiAreaDragPacketKind.CreateImage:
 				if (field == MuiAreaDragField.MethodId)
 				{
-					offset = MuiAreaCreateDragImageMessage.MethodIdOffset;
+					index = 0;
+					packetSize = MuiAreaCreateDragImageMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.TouchX)
 				{
-					offset = MuiAreaCreateDragImageMessage.TouchXOffset;
+					index = 1;
+					packetSize = MuiAreaCreateDragImageMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.TouchY)
 				{
-					offset = MuiAreaCreateDragImageMessage.TouchYOffset;
+					index = 2;
+					packetSize = MuiAreaCreateDragImageMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.Flags)
 				{
-					offset = MuiAreaCreateDragImageMessage.FlagsOffset;
+					index = 3;
+					packetSize = MuiAreaCreateDragImageMessage.Size;
 					return true;
 				}
 				break;
 			case MuiAreaDragPacketKind.DeleteImage:
 				if (field == MuiAreaDragField.MethodId)
 				{
-					offset = MuiAreaDeleteDragImageMessage.MethodIdOffset;
+					index = 0;
+					packetSize = MuiAreaDeleteDragImageMessage.Size;
 					return true;
 				}
 				if (field == MuiAreaDragField.DragImage)
 				{
-					offset = MuiAreaDeleteDragImageMessage.DragImageOffset;
+					index = 1;
+					packetSize = MuiAreaDeleteDragImageMessage.Size;
 					return true;
 				}
 				break;
 		}
-		offset = 0;
+		index = uint.MaxValue;
+		packetSize = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaDragFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Packet, cursor.Field, out var index,
+			out var packetSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Message,
+				packetSize, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiAreaDragMethodMessage.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiAreaDragMethodMessage.FieldSize;
+				return true;
+			}
+		}
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaDragFieldCursor cursor, out APTR address)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset) ||
-			!TryGetPacketSize(cursor.Packet, out var packetSize) ||
-			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Message, packetSize))
-			return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, MuiAreaDragMethodMessage.FieldSize);
-	}
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryGetAddress(ref platform, cursor, out address, out _);
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR message, MuiAreaDragPacketKind packet, MuiAreaDragField field,
@@ -736,16 +789,20 @@ internal static class MuiAreaDragMessageMemoryCodec
 	}
 }
 
-// Compatibility adapter retained for callers that still construct the typed
-// drag field cursor. Live drag packet consumers use the named packet memory
-// codec directly.
+// Typed cursor adapter for callers that need an address plus its packed field
+// width. The packet-aware struct traversal above is the canonical path.
 internal static class MuiAreaDragFieldCursorCodec
 {
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaDragFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory =>
+		TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaDragFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
 		MuiAreaDragMessageMemoryCodec.TryGetAddress(ref platform, cursor,
-			out address);
+			out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR message, MuiAreaDragPacketKind packet, MuiAreaDragField field,

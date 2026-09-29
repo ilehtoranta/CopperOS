@@ -113,6 +113,14 @@ public sealed class MuiAreaDragTests
 		Assert.True(MuiAreaDragFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out address));
 		Assert.Equal(0x121Cu, address.Raw);
+		Assert.True(MuiAreaDragFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedAddress, out var typedSize));
+		Assert.Equal(address, typedAddress);
+		Assert.Equal(MuiAreaDragMethodMessage.FieldSize, typedSize);
+		Assert.True(MuiAreaDragMessageMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryAddress, out var memorySize));
+		Assert.Equal(typedAddress, memoryAddress);
+		Assert.Equal(typedSize, memorySize);
 
 		Assert.True(MuiAreaDragFieldCursorCodec.TryWriteUInt32(ref platform,
 			packet, MuiAreaDragPacketKind.Drop, MuiAreaDragField.X,
@@ -135,6 +143,13 @@ public sealed class MuiAreaDragTests
 				Packet = MuiAreaDragPacketKind.Report,
 				Field = MuiAreaDragField.Qualifier,
 			}, out _));
+		Assert.False(MuiAreaDragFieldCursorCodec.TryGetAddress(ref platform,
+			new MuiAreaDragFieldCursor
+			{
+				Message = APTR.Null,
+				Packet = MuiAreaDragPacketKind.Event,
+				Field = MuiAreaDragField.Flags,
+			}, out _, out _));
 	}
 
 	[Fact]
@@ -182,6 +197,21 @@ public sealed class MuiAreaDragTests
 		Assert.True(MuiAreaDragStateFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out address));
 		Assert.Equal(APTR.FromPointer(0x1710), address);
+		Assert.True(MuiAreaDragStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedAddress, out var typedSize));
+		Assert.Equal(address, typedAddress);
+		Assert.Equal(MuiAreaDragState.FieldSize, typedSize);
+		Assert.True(MuiAreaDragStateMemoryCodec.TryGetAddress(ref platform, cursor,
+			out var memoryAddress, out var memorySize));
+		Assert.Equal(typedAddress, memoryAddress);
+		Assert.Equal(typedSize, memorySize);
+		cursor.Field = (MuiAreaDragStateField)255;
+		Assert.False(MuiAreaDragStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiAreaDragStateField.LastY;
+		Assert.False(MuiAreaDragStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 	}
 
 	[Fact]

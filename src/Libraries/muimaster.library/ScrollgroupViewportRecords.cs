@@ -97,10 +97,14 @@ internal static class MuiScrollgroupViewportFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiScrollgroupViewportFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiScrollgroupViewportStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Address, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiScrollgroupViewportFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiScrollgroupViewportStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiScrollgroupViewportField field, out uint value)
@@ -124,34 +128,34 @@ internal static class MuiScrollgroupViewportFieldCursorCodec
 // translation is isolated here.
 internal static class MuiScrollgroupViewportStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiScrollgroupViewportField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiScrollgroupViewportField field,
+		out uint index)
 	{
 		if (field == MuiScrollgroupViewportField.Magic)
-			offset = MuiScrollgroupViewportStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiScrollgroupViewportField.ViewportWidth)
-			offset = MuiScrollgroupViewportStateRecord.ViewportWidthOffset;
+			index = 1;
 		else if (field == MuiScrollgroupViewportField.ViewportHeight)
-			offset = MuiScrollgroupViewportStateRecord.ViewportHeightOffset;
+			index = 2;
 		else if (field == MuiScrollgroupViewportField.ContentWidth)
-			offset = MuiScrollgroupViewportStateRecord.ContentWidthOffset;
+			index = 3;
 		else if (field == MuiScrollgroupViewportField.ContentHeight)
-			offset = MuiScrollgroupViewportStateRecord.ContentHeightOffset;
+			index = 4;
 		else if (field == MuiScrollgroupViewportField.MaximumScrollX)
-			offset = MuiScrollgroupViewportStateRecord.MaximumScrollXOffset;
+			index = 5;
 		else if (field == MuiScrollgroupViewportField.MaximumScrollY)
-			offset = MuiScrollgroupViewportStateRecord.MaximumScrollYOffset;
+			index = 6;
 		else if (field == MuiScrollgroupViewportField.ScrollLeft)
-			offset = MuiScrollgroupViewportStateRecord.ScrollLeftOffset;
+			index = 7;
 		else if (field == MuiScrollgroupViewportField.ScrollTop)
-			offset = MuiScrollgroupViewportStateRecord.ScrollTopOffset;
+			index = 8;
 		else if (field == MuiScrollgroupViewportField.HorizontalBarVisible)
-			offset = MuiScrollgroupViewportStateRecord.HorizontalBarVisibleOffset;
+			index = 9;
 		else if (field == MuiScrollgroupViewportField.VerticalBarVisible)
-			offset = MuiScrollgroupViewportStateRecord.VerticalBarVisibleOffset;
+			index = 10;
 		else
 		{
-			offset = 0;
+			index = 0;
 			return false;
 		}
 		return true;
@@ -161,12 +165,35 @@ internal static class MuiScrollgroupViewportStateRecordMemoryCodec
 		APTR record, MuiScrollgroupViewportField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiScrollgroupViewportFieldCursor);
+		cursor.Address = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiScrollgroupViewportFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiScrollgroupViewportStateRecord.Size) &&
-			platform.IsMapped(address, MuiScrollgroupViewportStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Address,
+				MuiScrollgroupViewportStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiScrollgroupViewportStateRecord.FieldSize, out var candidate))
+				return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiScrollgroupViewportStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

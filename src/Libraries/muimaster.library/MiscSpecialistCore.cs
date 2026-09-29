@@ -325,243 +325,131 @@ internal struct MuiMiscRecordFieldCursor
 
 internal static class MuiMiscRecordMemoryCodec
 {
-	private static bool TryResolve(MuiMiscRecordKind record,
-		MuiMiscRecordField field, out uint offset, out uint size)
+	private static bool TryResolveFieldIndex(MuiMiscRecordKind record,
+		MuiMiscRecordField field, out uint index, out uint recordSize)
 	{
-		offset = 0;
-		size = 0;
+		index = uint.MaxValue;
+		recordSize = 0;
 		switch (record)
 		{
 			case MuiMiscRecordKind.Header:
-				switch (field)
-				{
-					case MuiMiscRecordField.Magic:
-						offset = 0;
-						size = MuiMiscSpecialistHeader.Size;
-						return true;
-					case MuiMiscRecordField.Class:
-						offset = 4;
-						size = MuiMiscSpecialistHeader.Size;
-						return true;
-					case MuiMiscRecordField.Flags:
-						offset = 8;
-						size = MuiMiscSpecialistHeader.Size;
-						return true;
-					case MuiMiscRecordField.NotifyAttribute:
-						offset = 12;
-						size = MuiMiscSpecialistHeader.Size;
-						return true;
-					case MuiMiscRecordField.NotifyValue:
-						offset = 16;
-						size = MuiMiscSpecialistHeader.Size;
-						return true;
-					case MuiMiscRecordField.NotifyCount:
-						offset = 20;
-						size = MuiMiscSpecialistHeader.Size;
-						return true;
-				}
+				if (field == MuiMiscRecordField.Magic) { index = 0; recordSize = MuiMiscSpecialistHeader.Size; return true; }
+				if (field == MuiMiscRecordField.Class) { index = 1; recordSize = MuiMiscSpecialistHeader.Size; return true; }
+				if (field == MuiMiscRecordField.Flags) { index = 2; recordSize = MuiMiscSpecialistHeader.Size; return true; }
+				if (field == MuiMiscRecordField.NotifyAttribute) { index = 3; recordSize = MuiMiscSpecialistHeader.Size; return true; }
+				if (field == MuiMiscRecordField.NotifyValue) { index = 4; recordSize = MuiMiscSpecialistHeader.Size; return true; }
+				if (field == MuiMiscRecordField.NotifyCount) { index = 5; recordSize = MuiMiscSpecialistHeader.Size; return true; }
 				break;
 			case MuiMiscRecordKind.KeyadjustPolicy:
-				switch (field)
+				if (field == MuiMiscRecordField.ForceKeyCode)
 				{
-					case MuiMiscRecordField.ForceKeyCode:
-						offset = 0;
-						size = MuiKeyadjustPolicyStateRecord.Size;
-						return true;
+					index = 0; recordSize = MuiKeyadjustPolicyStateRecord.Size;
+					return true;
 				}
 				break;
 			case MuiMiscRecordKind.Title:
-				switch (field)
+				if (field >= MuiMiscRecordField.Pages &&
+					field <= MuiMiscRecordField.Clickable)
 				{
-					case MuiMiscRecordField.Pages:
-						offset = 0;
-						size = MuiMiscTitleState.Size;
-						return true;
-					case MuiMiscRecordField.PageCount:
-						offset = 4;
-						size = MuiMiscTitleState.Size;
-						return true;
-					case MuiMiscRecordField.ActivePage:
-						offset = 8;
-						size = MuiMiscTitleState.Size;
-						return true;
-					case MuiMiscRecordField.PageSequence:
-						offset = 12;
-						size = MuiMiscTitleState.Size;
-						return true;
-					case MuiMiscRecordField.Position:
-						offset = 16;
-						size = MuiMiscTitleState.Size;
-						return true;
-					case MuiMiscRecordField.EventPriority:
-						offset = 20;
-						size = MuiMiscTitleState.Size;
-						return true;
-					case MuiMiscRecordField.OnLastClose:
-						offset = 24;
-						size = MuiMiscTitleState.Size;
-						return true;
-					case MuiMiscRecordField.Clickable:
-						offset = 28;
-						size = MuiMiscTitleState.Size;
-						return true;
+					index = (uint)field - (uint)MuiMiscRecordField.Pages;
+					recordSize = MuiMiscTitleState.Size;
+					return true;
 				}
 				break;
 			case MuiMiscRecordKind.FilepanelService:
-				switch (field)
+				if (field >= MuiMiscRecordField.FilterFunc &&
+					field <= MuiMiscRecordField.HookMsg)
 				{
-					case MuiMiscRecordField.FilterFunc:
-						offset = 0;
-						size = MuiMiscFilepanelServiceState.Size;
-						return true;
-					case MuiMiscRecordField.AslState:
-						offset = 4;
-						size = MuiMiscFilepanelServiceState.Size;
-						return true;
-					case MuiMiscRecordField.Rows:
-						offset = 8;
-						size = MuiMiscFilepanelServiceState.Size;
-						return true;
-					case MuiMiscRecordField.RowCount:
-						offset = 12;
-						size = MuiMiscFilepanelServiceState.Size;
-						return true;
-					case MuiMiscRecordField.HookMsg:
-						offset = 16;
-						size = MuiMiscFilepanelServiceState.Size;
-						return true;
+					index = (uint)field - (uint)MuiMiscRecordField.FilterFunc;
+					recordSize = MuiMiscFilepanelServiceState.Size;
+					return true;
 				}
 				break;
 			case MuiMiscRecordKind.OwnedStringSlot:
-				switch (field)
+				if (field == MuiMiscRecordField.Value)
 				{
-					case MuiMiscRecordField.Value:
-						offset = 0;
-						size = MuiMiscOwnedStringSlot.Size;
-						return true;
-					case MuiMiscRecordField.AllocationSize:
-						offset = 4;
-						size = MuiMiscOwnedStringSlot.Size;
-						return true;
+					index = 0; recordSize = MuiMiscOwnedStringSlot.Size;
+					return true;
+				}
+				if (field == MuiMiscRecordField.AllocationSize)
+				{
+					index = 1; recordSize = MuiMiscOwnedStringSlot.Size;
+					return true;
 				}
 				break;
 			case MuiMiscRecordKind.Mccprefs:
-				switch (field)
+				if (field >= MuiMiscRecordField.Registry &&
+					field <= MuiMiscRecordField.RegistryOriginator)
 				{
-					case MuiMiscRecordField.Registry:
-						offset = 0;
-						size = MuiMiscMccprefsState.Size;
-						return true;
-					case MuiMiscRecordField.RegistryCount:
-						offset = 4;
-						size = MuiMiscMccprefsState.Size;
-						return true;
-					case MuiMiscRecordField.RegistryConfig:
-						offset = 8;
-						size = MuiMiscMccprefsState.Size;
-						return true;
-					case MuiMiscRecordField.RegistryOriginator:
-						offset = 12;
-						size = MuiMiscMccprefsState.Size;
-						return true;
+					index = (uint)field - (uint)MuiMiscRecordField.Registry;
+					recordSize = MuiMiscMccprefsState.Size;
+					return true;
 				}
 				break;
 			case MuiMiscRecordKind.Scrmodelist:
-				switch (field)
+				if (field >= MuiMiscRecordField.Modes &&
+					field <= MuiMiscRecordField.ActiveMode)
 				{
-					case MuiMiscRecordField.Modes:
-						offset = 0;
-						size = MuiMiscScrmodelistState.Size;
-						return true;
-					case MuiMiscRecordField.ModeCount:
-						offset = 4;
-						size = MuiMiscScrmodelistState.Size;
-						return true;
-					case MuiMiscRecordField.ActiveMode:
-						offset = 8;
-						size = MuiMiscScrmodelistState.Size;
-						return true;
+					index = (uint)field - (uint)MuiMiscRecordField.Modes;
+					recordSize = MuiMiscScrmodelistState.Size;
+					return true;
 				}
 				break;
 			case MuiMiscRecordKind.WindowPanel:
-				switch (field)
+				if (field == MuiMiscRecordField.Application)
 				{
-					case MuiMiscRecordField.Application:
-						offset = 0;
-						size = MuiMiscWindowPanelState.Size;
-						return true;
-					case MuiMiscRecordField.PanelWindow:
-						offset = 4;
-						size = MuiMiscWindowPanelState.Size;
-						return true;
+					index = 0; recordSize = MuiMiscWindowPanelState.Size;
+					return true;
+				}
+				if (field == MuiMiscRecordField.PanelWindow)
+				{
+					index = 1; recordSize = MuiMiscWindowPanelState.Size;
+					return true;
 				}
 				break;
 			case MuiMiscRecordKind.Fontdisplay:
-				switch (field)
+				if (field == MuiMiscRecordField.Width)
 				{
-					case MuiMiscRecordField.Width:
-						offset = 0;
-						size = MuiMiscFontdisplaySize.Size;
-						return true;
-					case MuiMiscRecordField.Height:
-						offset = 4;
-						size = MuiMiscFontdisplaySize.Size;
-						return true;
+					index = 0; recordSize = MuiMiscFontdisplaySize.Size;
+					return true;
+				}
+				if (field == MuiMiscRecordField.Height)
+				{
+					index = 1; recordSize = MuiMiscFontdisplaySize.Size;
+					return true;
 				}
 				break;
 			case MuiMiscRecordKind.TitlePage:
-				switch (field)
+				if (field == MuiMiscRecordField.Handle)
 				{
-					case MuiMiscRecordField.Handle:
-						offset = 0;
-						size = MuiTitlePageRecord.Size;
-						return true;
-					case MuiMiscRecordField.PageFlags:
-						offset = 4;
-						size = MuiTitlePageRecord.Size;
-						return true;
+					index = 0; recordSize = MuiTitlePageRecord.Size;
+					return true;
+				}
+				if (field == MuiMiscRecordField.PageFlags)
+				{
+					index = 1; recordSize = MuiTitlePageRecord.Size;
+					return true;
 				}
 				break;
 			case MuiMiscRecordKind.MccprefsRegistry:
-				switch (field)
+				if (field >= MuiMiscRecordField.Gadget &&
+					field <= MuiMiscRecordField.Label)
 				{
-					case MuiMiscRecordField.Gadget:
-						offset = 0;
-						size = MuiMccprefsRegistryRecord.Size;
-						return true;
-					case MuiMiscRecordField.Id:
-						offset = 4;
-						size = MuiMccprefsRegistryRecord.Size;
-						return true;
-					case MuiMiscRecordField.Params:
-						offset = 8;
-						size = MuiMccprefsRegistryRecord.Size;
-						return true;
-					case MuiMiscRecordField.Title:
-						offset = 12;
-						size = MuiMccprefsRegistryRecord.Size;
-						return true;
-					case MuiMiscRecordField.Attr:
-						offset = 16;
-						size = MuiMccprefsRegistryRecord.Size;
-						return true;
-					case MuiMiscRecordField.Label:
-						offset = 20;
-						size = MuiMccprefsRegistryRecord.Size;
-						return true;
+					index = (uint)field - (uint)MuiMiscRecordField.Gadget;
+					recordSize = MuiMccprefsRegistryRecord.Size;
+					return true;
 				}
 				break;
 			case MuiMiscRecordKind.FilepanelRow:
-				switch (field)
+				if (field == MuiMiscRecordField.Label)
 				{
-					case MuiMiscRecordField.Label:
-						offset = 0;
-						size = MuiFilepanelRowRecord.Size;
-						return true;
-					case MuiMiscRecordField.Contents:
-						offset = 4;
-						size = MuiFilepanelRowRecord.Size;
-						return true;
+					index = 0; recordSize = MuiFilepanelRowRecord.Size;
+					return true;
+				}
+				if (field == MuiMiscRecordField.Contents)
+				{
+					index = 1; recordSize = MuiFilepanelRowRecord.Size;
+					return true;
 				}
 				break;
 		}
@@ -573,7 +461,7 @@ internal static class MuiMiscRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		return TryGetAddress(ref platform, cursor.Address, cursor.Record,
-			cursor.Field, out address);
+			cursor.Field, out address, out _);
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -581,12 +469,33 @@ internal static class MuiMiscRecordMemoryCodec
 		MuiMiscRecordField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		return TryGetAddress(ref platform, baseAddress, record, field,
+			out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR baseAddress, MuiMiscRecordKind record,
+		MuiMiscRecordField field, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(record, field, out var offset, out var size) ||
-			baseAddress.IsNull || baseAddress.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(baseAddress, size)) return false;
-		address = APTR.FromPointer(baseAddress.Raw + offset);
-		return platform.IsMapped(address, 4);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(record, field, out var index,
+			out var recordSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, baseAddress, recordSize,
+				out var guestCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref guestCursor, 4,
+				out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = 4;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -622,6 +531,12 @@ internal static class MuiMiscRecordFieldCursorCodec
 		MuiMiscRecordFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiMiscRecordMemoryCodec.TryGetAddress(ref platform, cursor, out address);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMiscRecordFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiMiscRecordMemoryCodec.TryGetAddress(ref platform, cursor.Address,
+			cursor.Record, cursor.Field, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiMiscRecordKind record, MuiMiscRecordField field,

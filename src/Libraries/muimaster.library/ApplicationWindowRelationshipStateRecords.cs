@@ -96,26 +96,36 @@ internal static class MuiApplicationWindowRelationshipStateFieldCursorCodec
 }
 
 // Fixed Application_Window relationship state is transferred as a named
-// record. Numeric guest positions are confined to the bounded ABI adapter;
-// production consumers exchange the declaration-order struct through the
-// sequential cursor below.
+// record. The bounded cursor walks the complete packed struct before selecting
+// a field; offset constants remain ABI documentation/compatibility aliases.
 internal static class MuiApplicationWindowRelationshipStateRecordMemoryCodec
 {
-	private static bool TryResolve(
-		MuiApplicationWindowRelationshipStateField field, out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor,
+		MuiApplicationWindowRelationshipStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (field == MuiApplicationWindowRelationshipStateField.Magic)
-			offset = MuiApplicationWindowRelationshipStateRecord.MagicOffset;
-		else if (field == MuiApplicationWindowRelationshipStateField.LastWindow)
-			offset = MuiApplicationWindowRelationshipStateRecord.LastWindowOffset;
-		else if (field == MuiApplicationWindowRelationshipStateField.AddedCount)
-			offset = MuiApplicationWindowRelationshipStateRecord.AddedCountOffset;
-		else
+		address = APTR.Null;
+		switch (field)
 		{
-			offset = 0;
-			return false;
+			case MuiApplicationWindowRelationshipStateField.Magic:
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowRelationshipStateRecord.FieldSize, out address);
+			case MuiApplicationWindowRelationshipStateField.LastWindow:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowRelationshipStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowRelationshipStateRecord.FieldSize, out address);
+			case MuiApplicationWindowRelationshipStateField.AddedCount:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowRelationshipStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowRelationshipStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowRelationshipStateRecord.FieldSize, out address);
+			default:
+				return false;
 		}
-		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -124,14 +134,11 @@ internal static class MuiApplicationWindowRelationshipStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiApplicationWindowRelationshipStateRecord.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address))
 			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record,
-			MuiApplicationWindowRelationshipStateRecord.Size) &&
-			platform.IsMapped(address,
-				MuiApplicationWindowRelationshipStateRecord.FieldSize);
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

@@ -24,6 +24,19 @@ public sealed class MuiAreaShortHelpStructAdapterTests
 			ref platform, address, MuiAreaShortHelpStateField.Text,
 			out var textAddress));
 		Assert.Equal(0x3604u, textAddress.Raw);
+		var cursor = new MuiAreaShortHelpStateFieldCursor
+		{
+			Record = address,
+			Field = MuiAreaShortHelpStateField.Text,
+		};
+		Assert.True(MuiAreaShortHelpStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedTextAddress, out var typedTextSize));
+		Assert.Equal(textAddress, typedTextAddress);
+		Assert.Equal(MuiAreaShortHelpStateRecord.FieldSize, typedTextSize);
+		Assert.True(MuiAreaShortHelpStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryTextAddress, out var memoryTextSize));
+		Assert.Equal(typedTextAddress, memoryTextAddress);
+		Assert.Equal(typedTextSize, memoryTextSize);
 		Assert.True(MuiAreaShortHelpStateRecordCodec.TryReadStructural(ref platform,
 			address, out var decoded));
 		Assert.Equal(value.Text, decoded.Text);
@@ -31,6 +44,13 @@ public sealed class MuiAreaShortHelpStructAdapterTests
 			ref platform, address, (MuiAreaShortHelpStateField)255, out _));
 		Assert.False(MuiAreaShortHelpStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiAreaShortHelpStateField.Magic, out _));
+		cursor.Field = (MuiAreaShortHelpStateField)255;
+		Assert.False(MuiAreaShortHelpStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiAreaShortHelpStateField.Text;
+		Assert.False(MuiAreaShortHelpStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 		Assert.False(MuiAreaShortHelpStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

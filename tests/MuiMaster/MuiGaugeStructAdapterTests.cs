@@ -24,6 +24,19 @@ public sealed class MuiGaugeStructAdapterTests
 		Assert.True(MuiGaugeStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, MuiGaugeStateField.Horizontal, out var horizontalAddress));
 		Assert.Equal(0x3510u, horizontalAddress.Raw);
+		var gaugeCursor = new MuiGaugeStateFieldCursor
+		{
+			Record = address,
+			Field = MuiGaugeStateField.Horizontal,
+		};
+		Assert.True(MuiGaugeStateFieldCursorCodec.TryGetAddress(ref platform,
+			gaugeCursor, out var cursorHorizontalAddress, out var cursorFieldSize));
+		Assert.Equal(horizontalAddress, cursorHorizontalAddress);
+		Assert.Equal(MuiGaugeStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiGaugeStateRecordMemoryCodec.TryGetAddress(ref platform,
+			gaugeCursor, out var memoryHorizontalAddress, out var memoryFieldSize));
+		Assert.Equal(cursorHorizontalAddress, memoryHorizontalAddress);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiGaugeStateRecordMemoryCodec.TryReadUInt32(ref platform,
 			address, MuiGaugeStateField.Current, out var current));
 		Assert.Equal(17u, current);
@@ -36,6 +49,13 @@ public sealed class MuiGaugeStructAdapterTests
 			APTR.FromPointer(0x30FED), MuiGaugeStateField.Magic, out _));
 		Assert.False(MuiGaugeStateRecordMemoryCodec.TryGetAddress(ref platform,
 			APTR.Null, MuiGaugeStateField.Magic, out _));
+		gaugeCursor.Field = (MuiGaugeStateField)255;
+		Assert.False(MuiGaugeStateFieldCursorCodec.TryGetAddress(ref platform,
+			gaugeCursor, out _, out _));
+		gaugeCursor.Record = APTR.Null;
+		gaugeCursor.Field = MuiGaugeStateField.Horizontal;
+		Assert.False(MuiGaugeStateFieldCursorCodec.TryGetAddress(ref platform,
+			gaugeCursor, out _, out _));
 	}
 
 	[Fact]

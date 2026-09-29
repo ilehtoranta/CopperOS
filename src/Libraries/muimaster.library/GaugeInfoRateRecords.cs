@@ -24,8 +24,6 @@ internal struct MuiGaugeInfoRateStateRecord
 {
 	internal const uint Size = 8;
 	internal const uint FieldSize = 4;
-	internal const uint MagicOffset = 0;
-	internal const uint InfoRateOffset = 4;
 	internal const uint Cookie = 0x4D474952u; // 'MGIR'
 
 	internal uint Magic;
@@ -50,8 +48,14 @@ internal static class MuiGaugeInfoRateStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiGaugeInfoRateStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory =>
+		TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiGaugeInfoRateStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
 		MuiGaugeInfoRateStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiGaugeInfoRateStateField field, out uint value)
@@ -66,20 +70,20 @@ internal static class MuiGaugeInfoRateStateFieldCursorCodec
 			record, field, value);
 }
 
-// The only layer that translates the fixed guest record into addresses.  All
-// Gauge.InfoRate consumers operate on the named record or semantic value.
+// The bounded cursor walks the complete packed record before selecting a field.
+// All Gauge.InfoRate consumers operate on the named record or semantic value.
 internal static class MuiGaugeInfoRateStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiGaugeInfoRateStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiGaugeInfoRateStateField field,
+		out uint index)
 	{
 		if (field == MuiGaugeInfoRateStateField.Magic)
-			offset = MuiGaugeInfoRateStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiGaugeInfoRateStateField.InfoRate)
-			offset = MuiGaugeInfoRateStateRecord.InfoRateOffset;
+			index = 1;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -89,12 +93,34 @@ internal static class MuiGaugeInfoRateStateRecordMemoryCodec
 		APTR record, MuiGaugeInfoRateStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiGaugeInfoRateStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiGaugeInfoRateStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
-			MuiGaugeInfoRateStateRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiGaugeInfoRateStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiGaugeInfoRateStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiGaugeInfoRateStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiGaugeInfoRateStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

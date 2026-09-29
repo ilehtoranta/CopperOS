@@ -16,6 +16,7 @@ public sealed class MuiCommonControlClassTests
 	private const uint Selected = 0x8042654B;
 	private const uint InputMode = 0x8042FB04;
 	private const uint Pressed = 0x80423535;
+	private const uint ControlChar = 0x8042120B;
 	private const uint ShowMe = 0x80429BA8;
 	private const uint Background = 0x8042545B;
 	private const uint Frame = 0x8042AC64;
@@ -297,6 +298,10 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(MuiImageGeometryFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out var address));
 		Assert.Equal(APTR.FromPointer(0x3486), address);
+		Assert.True(MuiImageGeometryFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedAddress, out var typedSize));
+		Assert.Equal(address, typedAddress);
+		Assert.Equal(2u, typedSize);
 		Assert.True(MuiImageGeometryFieldCursorCodec.TryWriteUInt16(ref platform,
 			record, MuiImageGeometryField.LeftEdge, unchecked((ushort)-7)));
 		Assert.True(MuiImageGeometryFieldCursorCodec.TryReadUInt16(ref platform,
@@ -576,6 +581,10 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(MuiCommonFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out fieldAddress));
 		Assert.Equal(address.Raw + 20, fieldAddress.Raw);
+		Assert.True(MuiCommonFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out fieldAddress, out var fieldSize));
+		Assert.Equal(address.Raw + 20, fieldAddress.Raw);
+		Assert.Equal(4u, fieldSize);
 
 		Assert.True(MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, address,
 			MuiCommonPacketKind.ScaleToValue, MuiCommonField.Value,
@@ -1519,6 +1528,108 @@ public sealed class MuiCommonControlClassTests
 		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
 			radio, packet));
 		Assert.Equal(textBefore + 1, platform.TextCount);
+	}
+
+	[Theory]
+	[InlineData("Cycle.mui", false)]
+	[InlineData("Cycle.mui", true)]
+	[InlineData("Radio.mui", false)]
+	[InlineData("Radio.mui", true)]
+	public void ChoiceConstructionRequiresAvailableValidActiveState(string className, bool denyMapping)
+	{
+		var platform = NewPlatform();
+		Register(ref platform, 0x1100, "Text.mui");
+		var cl = Register(ref platform, 0x1140, className);
+		var entries = APTR.FromPointer(0x1800);
+		var label = APTR.FromPointer(0x1900);
+		platform.WriteCString(label, "First");
+		Assert.True(MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform, entries, 0, out var first));
+		Assert.True(MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform, entries, 1, out var end));
+		Assert.True(MuiGuestUlongStorageCodec.WriteValue(ref platform, first, label.Raw));
+		Assert.True(MuiGuestUlongStorageCodec.WriteValue(ref platform, end, 0));
+		var isRadio = className == "Radio.mui";
+		var tags = BuildTags(ref platform, 0x1A00,
+			new[] { (isRadio ? RadioEntries : CycleEntries, entries.Raw) });
+		var choice = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, tags);
+		Assert.True(choice.IsNotNull);
+		var scratch = APTR.FromPointer(0x1B00);
+		var valid = default(MuiChoiceActiveStateRecord);
+		valid.Magic = MuiChoiceActiveStateRecord.Cookie;
+		valid.Active = 0;
+		Assert.True(MuiChoiceActiveStateRecordCodec.Write(ref platform, scratch, valid));
+		Assert.True(MuiStoreCore.DataspaceAdd(ref platform, State, choice, ChoiceActiveStateKey,
+			scratch, (int)MuiChoiceActiveStateRecord.Size));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, choice, ChoiceActiveStateKey);
+		Assert.True(block.IsNotNull);
+		if (denyMapping)
+			platform.MappingAdmission = (address, size) => address.Raw != block.Raw;
+		else
+		{
+			var malformed = valid;
+			malformed.Magic = 0;
+			Assert.True(MuiChoiceActiveStateRecordCodec.WriteRecord(ref platform, block, malformed));
+		}
+		var constructors = platform.ConstructorCalls;
+		Assert.False(MuiCommonControlCore.Construct(ref platform, State, cl, choice));
+		platform.MappingAdmission = null;
+		Assert.Equal(constructors, platform.ConstructorCalls);
+		var owner = MuiHeadlessObjectCore.FindObject(ref platform, State, choice);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, owner, out var rejected));
+		Assert.True(rejected.ChildrenHead.IsNull && rejected.ChildrenTail.IsNull);
+		Assert.Equal(0u, rejected.Flags & (MuiHeadlessObjectCore.ObjectControlConstructionActive |
+			MuiHeadlessObjectCore.ObjectRadioConstructionPending | MuiHeadlessObjectCore.ObjectRadioConstructionComplete));
+		Assert.True(MuiChoiceActiveStateRecordCodec.Write(ref platform, block, valid));
+		Assert.True(MuiCommonControlCore.Construct(ref platform, State, cl, choice));
+		Assert.True(MuiCommonControlCore.TryGetChoiceActiveStateRecord(ref platform, State, choice, out var active));
+		Assert.Equal(0u, active.Active);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, choice));
+		Assert.True(MuiHeadlessStateCodec.TryRead(ref platform, State, out var registry));
+		Assert.True(registry.Objects.IsNull);
+		Assert.Equal(isRadio ? 2u : 1u, platform.NativeObjectDisposalCount);
+	}
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public void ChoiceConstructionNormalizesActiveBeforeRetainingRadioLabels(bool isRadio)
+	{
+		var platform = NewPlatform();
+		Register(ref platform, 0x1100, "Text.mui");
+		var cl = Register(ref platform, 0x1140, isRadio ? "Radio.mui" : "Cycle.mui");
+		var entries = APTR.FromPointer(0x1800);
+		var label = APTR.FromPointer(0x1900);
+		platform.WriteCString(label, "First");
+		Assert.True(MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform, entries, 0, out var first));
+		Assert.True(MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform, entries, 1, out var end));
+		Assert.True(MuiGuestUlongStorageCodec.WriteValue(ref platform, first, label.Raw));
+		Assert.True(MuiGuestUlongStorageCodec.WriteValue(ref platform, end, 0));
+		var activeAttribute = isRadio ? RadioActive : CycleActive;
+		var tags = BuildTags(ref platform, 0x1A00, new[] {
+			(isRadio ? RadioEntries : CycleEntries, entries.Raw), (activeAttribute, 5u) });
+		var choice = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, tags);
+		Assert.True(choice.IsNotNull);
+		var observedNormalized = false;
+		platform.BeforeObjectRetain = child =>
+		{
+			Assert.True(MuiCommonControlCore.TryGetChoiceActiveStateRecord(ref platform, State, choice,
+				out var duringRetain));
+			Assert.Equal(0u, duringRetain.Active);
+			Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, choice,
+				activeAttribute, out var raw));
+			Assert.Equal(0u, raw);
+			observedNormalized = true;
+		};
+		Assert.True(MuiCommonControlCore.Construct(ref platform, State, cl, choice));
+		Assert.Equal(isRadio, observedNormalized);
+		platform.BeforeObjectRetain = null;
+		Assert.True(MuiCommonControlCore.TryGetChoiceActiveStateRecord(ref platform, State, choice, out var active));
+		Assert.Equal(0u, active.Active);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, choice, activeAttribute, out var finalRaw));
+		Assert.Equal(0u, finalRaw);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, choice));
+		Assert.True(MuiHeadlessStateCodec.TryRead(ref platform, State, out var registry));
+		Assert.True(registry.Objects.IsNull);
+		Assert.Equal(isRadio ? 2u : 1u, platform.NativeObjectDisposalCount);
 	}
 
 	[Fact]
@@ -3433,6 +3544,65 @@ public sealed class MuiCommonControlClassTests
 	}
 
 	[Fact]
+	public void LaterSlotReservationFailurePreservesEarlierChildOwnership()
+	{
+		var platform = NewPlatform();
+		var cl = Register(ref platform, 0x1100, "Gadget.mui");
+		var parent = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var owner = MuiHeadlessObjectCore.FindObject(ref platform, State, parent);
+		Assert.True(MuiConstructionChildSlotsCore.ReserveNext(ref platform, owner, out var first));
+		Assert.True(MuiConstructionChildSlotsCore.CreateOwned(ref platform, State, owner, first, cl).IsNotNull);
+		platform.AllocationAdmission = (size, flags) => false;
+		Assert.False(MuiConstructionChildSlotsCore.ReserveNext(ref platform, owner, out var second));
+		Assert.True(second.IsNull);
+		platform.AllocationAdmission = null;
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, owner, out var value));
+		Assert.Equal(first.Raw, value.ChildrenHead.Raw);
+		Assert.Equal(first.Raw, value.ChildrenTail.Raw);
+		Assert.Equal(0u, value.Flags & MuiHeadlessObjectCore.ObjectConstructionBinding);
+		Assert.True(MuiHeadlessChildCodec.TryRead(ref platform, first, out var link));
+		Assert.True(link.Next.IsNull && link.Object.IsNotNull);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, parent));
+		Assert.Equal(2u, platform.NativeObjectDisposalCount);
+	}
+
+	[Fact]
+	public void RadioRetainRefusalMustLeaveChildOwnedForParentRetry()
+	{
+		var platform = NewPlatform();
+		Register(ref platform, 0x1100, "Text.mui");
+		var cl = Register(ref platform, 0x1140, "Radio.mui");
+		var entries = APTR.FromPointer(0x1800);
+		var label = APTR.FromPointer(0x1900);
+		platform.WriteCString(label, "First");
+		Assert.True(MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform, entries, 0, out var first));
+		Assert.True(MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform, entries, 1, out var end));
+		Assert.True(MuiGuestUlongStorageCodec.WriteValue(ref platform, first, label.Raw));
+		Assert.True(MuiGuestUlongStorageCodec.WriteValue(ref platform, end, 0));
+		var tags = BuildTags(ref platform, 0x1A00, new[] { (RadioEntries, entries.Raw) });
+		var radio = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, tags);
+		var childRecord = APTR.Null;
+		platform.BeforeObjectRetain = child =>
+		{
+			childRecord = MuiHeadlessObjectCore.FindObject(ref platform, State, child);
+			Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, childRecord, out var value));
+			value.Flags |= MuiHeadlessObjectCore.ObjectProviderBusy;
+			Assert.True(MuiHeadlessObjectCodec.Write(ref platform, childRecord, value));
+		};
+		platform.RefuseObjectRetain = true;
+		Assert.False(MuiCommonControlCore.Construct(ref platform, State, cl, radio));
+		Assert.True(childRecord.IsNotNull);
+		platform.RefuseObjectRetain = false;
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, childRecord, out var pending));
+		pending.Flags &= ~MuiHeadlessObjectCore.ObjectProviderBusy;
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, childRecord, pending));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, radio));
+		Assert.True(MuiHeadlessStateCodec.TryRead(ref platform, State, out var registry));
+		Assert.True(registry.Objects.IsNull);
+		Assert.Equal(2u, platform.NativeObjectDisposalCount);
+	}
+
+	[Fact]
 	public void RadioConstructsOwnsLaysOutAndDisposesOneChildPerEntry()
 	{
 		var platform = NewPlatform();
@@ -3448,6 +3618,9 @@ public sealed class MuiCommonControlClassTests
 		var radio = MuiCommonControlCore.CreateControl(ref platform, State,
 			radioClass, tags);
 		Assert.True(radio.IsNotNull);
+		var constructors = platform.ConstructorCalls;
+		Assert.True(MuiCommonControlCore.Construct(ref platform, State, radioClass, radio));
+		Assert.Equal(constructors, platform.ConstructorCalls);
 		var first = MuiFamilyCore.GetChild(ref platform, State, radio, 0, APTR.Null);
 		var second = MuiFamilyCore.GetChild(ref platform, State, radio, 1, APTR.Null);
 		Assert.True(first.IsNotNull);
@@ -3470,6 +3643,118 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, radio));
 		Assert.True(MuiHeadlessObjectCore.FindObject(ref platform, State, first).IsNull);
 		Assert.True(MuiHeadlessObjectCore.FindObject(ref platform, State, second).IsNull);
+	}
+
+	[Fact]
+	public void RadioEntryReadFailureKeepsPendingOwnershipUntilDisposal()
+	{
+		var platform = NewPlatform();
+		Register(ref platform, 0x1100, "Text.mui");
+		var cl = Register(ref platform, 0x1140, "Radio.mui");
+		var entries = APTR.FromPointer(0x1800);
+		var label = APTR.FromPointer(0x1900);
+		platform.WriteCString(label, "First");
+		Assert.True(MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform, entries, 0, out var first));
+		Assert.True(MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform, entries, 1, out var second));
+		Assert.True(MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform, entries, 2, out var end));
+		Assert.True(MuiGuestUlongStorageCodec.WriteValue(ref platform, first, label.Raw));
+		Assert.True(MuiGuestUlongStorageCodec.WriteValue(ref platform, second, label.Raw));
+		Assert.True(MuiGuestUlongStorageCodec.WriteValue(ref platform, end, 0));
+		var tags = BuildTags(ref platform, 0x1A00, new[] { (RadioEntries, entries.Raw) });
+		var radio = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, tags);
+		Assert.True(radio.IsNotNull);
+		var denySecond = false;
+		platform.MappingAdmission = (address, size) => !denySecond || address.Raw != second.Raw;
+		platform.BeforeObjectRetain = child => denySecond = true;
+		Assert.False(MuiCommonControlCore.Construct(ref platform, State, cl, radio));
+		Assert.True(denySecond);
+		denySecond = false;
+		platform.MappingAdmission = null;
+		var owner = MuiHeadlessObjectCore.FindObject(ref platform, State, radio);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, owner, out var pending));
+		Assert.NotEqual(0u, pending.Flags & MuiHeadlessObjectCore.ObjectRadioConstructionPending);
+		Assert.Equal(0u, pending.Flags & (MuiHeadlessObjectCore.ObjectRadioConstructionComplete |
+			MuiHeadlessObjectCore.ObjectControlConstructionActive | MuiHeadlessObjectCore.ObjectConstructionBinding));
+		Assert.True(pending.ChildrenHead.IsNotNull);
+		Assert.Equal(pending.ChildrenHead.Raw, pending.ChildrenTail.Raw);
+		Assert.True(MuiHeadlessChildCodec.TryRead(ref platform, pending.ChildrenHead, out var link));
+		Assert.True(link.Object.IsNotNull && link.Next.IsNull);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, link.Object, out var childState));
+		Assert.Equal(owner.Raw, childState.Parent.Raw);
+		var constructors = platform.ConstructorCalls;
+		Assert.False(MuiCommonControlCore.Construct(ref platform, State, cl, radio));
+		Assert.Equal(constructors, platform.ConstructorCalls);
+		Assert.False(MuiFamilyCore.Remove(ref platform, State, radio, childState.Boopsi));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, radio));
+		Assert.True(MuiHeadlessStateCodec.TryRead(ref platform, State, out var registry));
+		Assert.True(registry.Objects.IsNull);
+		Assert.Equal(2u, platform.NativeObjectDisposalCount);
+	}
+
+	[Theory]
+	[InlineData(0)] // A populated list without a completion marker.
+	[InlineData(1)] // Missing tail.
+	[InlineData(2)] // Invalid predecessor.
+	[InlineData(3)] // Wrong link owner.
+	[InlineData(4)] // Busy child.
+	[InlineData(5)] // Uninitialized child.
+	[InlineData(6)] // Completion marker but missing topology.
+	[InlineData(7)] // Wrong parent backlink.
+	[InlineData(8)] // Child with pending Radio construction.
+	[InlineData(9)] // Child with pending Scrollbar construction.
+	public void RadioRepeatedConstructionRejectsIncompleteTopology(int damage)
+	{
+		var platform = NewPlatform();
+		Register(ref platform, 0x1100, "Text.mui");
+		var cl = Register(ref platform, 0x1140, "Radio.mui");
+		var entries = APTR.FromPointer(0x1800);
+		var label = APTR.FromPointer(0x1900);
+		platform.WriteCString(label, "First");
+		Assert.True(MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform, entries, 0, out var first));
+		Assert.True(MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform, entries, 1, out var end));
+		Assert.True(MuiGuestUlongStorageCodec.WriteValue(ref platform, first, label.Raw));
+		Assert.True(MuiGuestUlongStorageCodec.WriteValue(ref platform, end, 0));
+		var tags = BuildTags(ref platform, 0x1A00, new[] { (RadioEntries, entries.Raw) });
+		var radio = MuiCommonControlCore.CreateControl(ref platform, State, cl, tags);
+		Assert.True(radio.IsNotNull);
+		var owner = MuiHeadlessObjectCore.FindObject(ref platform, State, radio);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, owner, out var originalOwner));
+		Assert.True(MuiHeadlessChildCodec.TryRead(ref platform, originalOwner.ChildrenHead, out var originalLink));
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, originalLink.Object, out var originalChild));
+		var damagedOwner = originalOwner;
+		var damagedLink = originalLink;
+		var damagedChild = originalChild;
+		if (damage == 0) damagedOwner.Flags &= ~MuiHeadlessObjectCore.ObjectRadioConstructionComplete;
+		if (damage == 1) damagedOwner.ChildrenTail = APTR.Null;
+		if (damage == 2) damagedLink.Previous = originalOwner.ChildrenHead;
+		if (damage == 3) damagedLink.Owner = originalLink.Object;
+		if (damage == 4) damagedChild.Flags |= MuiHeadlessObjectCore.ObjectProviderBusy;
+		if (damage == 5) damagedChild.Flags &= ~MuiHeadlessObjectCore.ObjectInitialized;
+		if (damage == 6)
+		{
+			damagedOwner.ChildrenHead = APTR.Null;
+			damagedOwner.ChildrenTail = APTR.Null;
+		}
+		if (damage == 7) damagedChild.Parent = APTR.Null;
+		if (damage == 8) damagedChild.Flags |= MuiHeadlessObjectCore.ObjectRadioConstructionPending;
+		if (damage == 9) damagedChild.Flags |= MuiHeadlessObjectCore.ObjectScrollbarConstructionPending;
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, owner, damagedOwner));
+		Assert.True(MuiHeadlessChildCodec.Write(ref platform, originalOwner.ChildrenHead, damagedLink));
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, originalLink.Object, damagedChild));
+		var constructors = platform.ConstructorCalls;
+		Assert.False(MuiCommonControlCore.Construct(ref platform, State, cl, radio));
+		Assert.Equal(constructors, platform.ConstructorCalls);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, owner, out var rejected));
+		Assert.Equal(0u, rejected.Flags & MuiHeadlessObjectCore.ObjectControlConstructionActive);
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, owner, originalOwner));
+		Assert.True(MuiHeadlessChildCodec.Write(ref platform, originalOwner.ChildrenHead, originalLink));
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, originalLink.Object, originalChild));
+		Assert.True(MuiCommonControlCore.Construct(ref platform, State, cl, radio));
+		Assert.Equal(constructors, platform.ConstructorCalls);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, radio));
+		Assert.True(MuiHeadlessStateCodec.TryRead(ref platform, State, out var registry));
+		Assert.True(registry.Objects.IsNull);
+		Assert.Equal(2u, platform.NativeObjectDisposalCount);
 	}
 
 
@@ -10234,6 +10519,657 @@ public sealed class MuiCommonControlClassTests
 	}
 
 	[Fact]
+	public void ControlConstructionRejectsCallbackTopologyMutation()
+	{
+		var platform = NewPlatform();
+		var cl = Register(ref platform, 0x1100, "Gadget.mui");
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var child = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var candidate = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var destination = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, obj, child));
+		var invoked = false;
+		platform.AllocationAdmission = (size, flags) =>
+		{
+			if (invoked) return true;
+			invoked = true;
+			Assert.False(MuiFamilyCore.AddTail(ref platform, State, obj, candidate));
+			Assert.False(MuiFamilyCore.Remove(ref platform, State, obj, child));
+			Assert.False(MuiFamilyCore.MoveAfter(ref platform, State, obj, child, APTR.Null));
+			Assert.False(MuiFamilyCore.Transfer(ref platform, State, destination, obj));
+			return true;
+		};
+		Assert.True(MuiCommonControlCore.Construct(ref platform, State, cl, obj));
+		Assert.True(invoked);
+		platform.AllocationAdmission = null;
+		Assert.Equal(child.Raw, MuiFamilyCore.GetChild(ref platform, State, obj, 0, APTR.Null).Raw);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, candidate));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, destination));
+		Assert.Equal(4u, platform.NativeObjectDisposalCount);
+	}
+
+	[Theory]
+	[InlineData("Gadget.mui", true)]
+	[InlineData("Scrollbar.mui", true)]
+	[InlineData("Gadget.mui", false)]
+	[InlineData("Scrollbar.mui", false)]
+	public void ControlConstructionRejectsDisposalFromEarlyAllocationCallback(string className, bool succeeds)
+	{
+		var platform = NewPlatform();
+		var cl = Register(ref platform, 0x1100, className);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var invoked = false;
+		platform.AllocationAdmission = (size, flags) =>
+		{
+			if (invoked) return true;
+			invoked = true;
+			Assert.False(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+			Assert.False(MuiHeadlessObjectCore.DisposeObjectState(ref platform, State, obj, false));
+			Assert.False(MuiCommonControlCore.Construct(ref platform, State, cl, obj));
+			return succeeds;
+		};
+		Assert.Equal(succeeds, MuiCommonControlCore.Construct(ref platform, State, cl, obj));
+		Assert.True(invoked);
+		platform.AllocationAdmission = null;
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+	}
+
+	[Fact]
+	public void ReservedCreationAcceptsFreshConstructorAttachedSidecar()
+	{
+		var platform = NewPlatform();
+		var cl = Register(ref platform, 0x1100, "Gadget.mui");
+		var parent = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var owner = MuiHeadlessObjectCore.FindObject(ref platform, State, parent);
+		Assert.True(MuiConstructionChildSlotsCore.Reserve(ref platform, owner, out var slots));
+		platform.ConstructorAttachmentClass = cl;
+		var child = MuiConstructionChildSlotsCore.CreateOwned(ref platform, State, owner, slots.First, cl);
+		platform.ConstructorAttachmentClass = APTR.Null;
+		Assert.True(child.IsNotNull);
+		Assert.True(MuiHeadlessChildCodec.TryRead(ref platform, slots.First, out var slot));
+		Assert.Equal(MuiHeadlessObjectCore.FindObject(ref platform, State, child).Raw, slot.Object.Raw);
+		Assert.True(MuiHeadlessClassCodec.TryRead(ref platform, cl, out var classState));
+		Assert.Equal(2u, classState.ObjectCount);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, parent));
+		Assert.Equal(2u, platform.NativeObjectDisposalCount);
+		Assert.True(MuiHeadlessStateCodec.TryRead(ref platform, State, out var registry));
+		Assert.True(registry.Objects.IsNull);
+	}
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public void ReservedCreationRejectsConstructorResultAlreadyOwnedElsewhere(bool unbound)
+	{
+		var platform = NewPlatform();
+		var cl = Register(ref platform, 0x1100, "Gadget.mui");
+		var original = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var target = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var originalOwner = MuiHeadlessObjectCore.FindObject(ref platform, State, original);
+		var targetOwner = MuiHeadlessObjectCore.FindObject(ref platform, State, target);
+		Assert.True(MuiConstructionChildSlotsCore.Reserve(ref platform, targetOwner, out var targetSlots));
+		APTR child;
+		if (unbound)
+		{
+			Assert.True(MuiConstructionChildSlotsCore.Reserve(ref platform, originalOwner, out var originalSlots));
+			child = MuiConstructionChildSlotsCore.CreateOwned(ref platform, State, originalOwner,
+				originalSlots.First, cl);
+		}
+		else
+		{
+			child = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+			Assert.True(MuiFamilyCore.AddTail(ref platform, State, original, child));
+		}
+		Assert.True(child.IsNotNull);
+		platform.ConstructorExistingResult = child;
+		Assert.True(MuiConstructionChildSlotsCore.CreateOwned(ref platform, State, targetOwner,
+			targetSlots.First, cl).IsNull);
+		platform.ConstructorExistingResult = APTR.Null;
+		Assert.True(MuiHeadlessChildCodec.TryRead(ref platform, targetSlots.First, out var rejected));
+		Assert.True(rejected.Object.IsNull);
+		Assert.Equal(0u, platform.NativeObjectDisposalCount);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, target));
+		Assert.True(MuiHeadlessObjectCore.FindObject(ref platform, State, child).IsNotNull);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, original));
+		Assert.Equal(3u, platform.NativeObjectDisposalCount);
+	}
+
+	[Fact]
+	public void ReservedChildOwnershipSurvivesTheIntervalBeforeBinding()
+	{
+		var platform = NewPlatform();
+		var cl = Register(ref platform, 0x1100, "Gadget.mui");
+		var parent = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var other = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var owner = MuiHeadlessObjectCore.FindObject(ref platform, State, parent);
+		var otherOwner = MuiHeadlessObjectCore.FindObject(ref platform, State, other);
+		Assert.True(MuiConstructionChildSlotsCore.Reserve(ref platform, owner, out var slots));
+		Assert.True(MuiConstructionChildSlotsCore.Reserve(ref platform, otherOwner, out var otherSlots));
+		var child = MuiConstructionChildSlotsCore.CreateOwned(ref platform, State, owner, slots.First, cl);
+		Assert.True(child.IsNotNull);
+		Assert.False(MuiHeadlessObjectCore.DisposeObject(ref platform, State, child));
+		Assert.False(MuiHeadlessObjectCore.DisposeObjectState(ref platform, State, child, false));
+		Assert.False(MuiFamilyCore.AddTail(ref platform, State, other, child));
+		Assert.False(MuiConstructionChildSlotsCore.Bind(ref platform, State, otherOwner, otherSlots.First, child));
+		Assert.False(MuiConstructionChildSlotsCore.BindCreated(ref platform, State, otherOwner,
+			otherSlots.First, child, out _));
+		Assert.False(MuiConstructionChildSlotsCore.BindCreated(ref platform, State, owner,
+			slots.Second, child, out _));
+		Assert.True(MuiConstructionChildSlotsCore.BindCreated(ref platform, State, owner,
+			slots.First, child, out var transferred));
+		Assert.True(transferred);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, parent));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, other));
+		Assert.Equal(3u, platform.NativeObjectDisposalCount);
+	}
+
+	[Theory]
+	[InlineData(0)]
+	[InlineData(1)]
+	[InlineData(2)]
+	public void ReservedCreationFailureBeforeRegistrationLeavesEmptySlot(int failure)
+	{
+		var platform = NewPlatform();
+		var cl = Register(ref platform, 0x1100, "Gadget.mui");
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var owner = MuiHeadlessObjectCore.FindObject(ref platform, State, obj);
+		Assert.True(MuiConstructionChildSlotsCore.Reserve(ref platform, owner, out var slots));
+		platform.NewObjectFailure = failure == 0;
+		var attempts = 0;
+		platform.AllocationAdmission = (size, flags) => ++attempts != failure;
+		Assert.True(MuiConstructionChildSlotsCore.CreateOwned(ref platform, State, owner,
+			slots.First, cl).IsNull);
+		platform.AllocationAdmission = null;
+		platform.NewObjectFailure = false;
+		Assert.Equal(failure, attempts);
+		Assert.True(MuiHeadlessChildCodec.TryRead(ref platform, slots.First, out var slot));
+		Assert.True(slot.Object.IsNull);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, owner, out var parent));
+		Assert.Equal(0u, parent.Flags & MuiHeadlessObjectCore.ObjectConstructionBinding);
+		Assert.True(MuiHeadlessStateCodec.TryRead(ref platform, State, out var registry));
+		Assert.Equal(owner.Raw, registry.Objects.Raw);
+		Assert.True(parent.Next.IsNull);
+		Assert.True(MuiHeadlessClassCodec.TryRead(ref platform, cl, out var classState));
+		Assert.Equal(1u, classState.ObjectCount);
+		Assert.Equal(failure == 2 ? 1u : 0u, platform.NativeObjectDisposalCount);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+		Assert.Equal(failure == 2 ? 2u : 1u, platform.NativeObjectDisposalCount);
+	}
+
+	[Fact]
+	public void ReservedCreationOwnsChildBeforeStoreInitializationFailure()
+	{
+		var platform = NewPlatform();
+		var parentClass = Register(ref platform, 0x1100, "Gadget.mui");
+		var childClass = Register(ref platform, 0x1140, "Dataspace.mui");
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, parentClass, APTR.Null);
+		var owner = MuiHeadlessObjectCore.FindObject(ref platform, State, obj);
+		Assert.True(MuiConstructionChildSlotsCore.Reserve(ref platform, owner, out var slots));
+		var refused = false;
+		platform.AllocationAdmission = (size, flags) =>
+		{
+			Assert.True(MuiHeadlessChildCodec.TryRead(ref platform, slots.First, out var link));
+			if (link.Object.IsNull) return true;
+			refused = true;
+			return false;
+		};
+		Assert.True(MuiConstructionChildSlotsCore.CreateOwned(ref platform, State, owner,
+			slots.First, childClass).IsNull);
+		Assert.True(refused);
+		platform.AllocationAdmission = null;
+		Assert.True(MuiHeadlessChildCodec.TryRead(ref platform, slots.First, out var pending));
+		Assert.True(pending.Object.IsNotNull);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, pending.Object, out var child));
+		Assert.Equal(0u, child.Flags & MuiHeadlessObjectCore.ObjectInitialized);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+		Assert.Equal(2u, platform.NativeObjectDisposalCount);
+		Assert.True(MuiHeadlessStateCodec.TryRead(ref platform, State, out var registry));
+		Assert.True(registry.Objects.IsNull);
+	}
+
+	[Fact]
+	public void ScrollbarSlotAdmissionFailureKeepsBusyChildRecoverableByParent()
+	{
+		var platform = NewPlatform();
+		var propClass = Register(ref platform, 0x1100, "Prop.mui");
+		Register(ref platform, 0x1140, "Gadget.mui");
+		var cl = Register(ref platform, 0x1180, "Scrollbar.mui");
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var owner = MuiHeadlessObjectCore.FindObject(ref platform, State, obj);
+		var inside = false;
+		var refused = false;
+		var childRecord = APTR.Null;
+		platform.MappingAdmission = (address, size) =>
+		{
+			if (inside || refused) return true;
+			inside = true;
+			try
+			{
+				if (!MuiHeadlessStateCodec.TryRead(ref platform, State, out var registry) ||
+					!MuiHeadlessObjectCodec.TryRead(ref platform, registry.Objects, out var child) ||
+					child.Class.Raw != propClass.Raw ||
+					(child.Flags & MuiHeadlessObjectCore.ObjectInitialized) == 0) return true;
+				Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, owner, out var parent));
+				Assert.True(MuiHeadlessChildCodec.TryRead(ref platform, parent.ChildrenHead, out var first));
+				Assert.True(MuiHeadlessChildMemoryCodec.TryGetAddress(ref platform, first.Next,
+					MuiHeadlessChildField.Object, out var objectField));
+				if (address.Raw != objectField.Raw) return true;
+				childRecord = registry.Objects;
+				child.Flags |= MuiHeadlessObjectCore.ObjectProviderBusy;
+				Assert.True(MuiHeadlessObjectCodec.Write(ref platform, childRecord, child));
+				refused = true;
+				return false;
+			}
+			finally { inside = false; }
+		};
+		Assert.False(MuiCommonControlCore.Construct(ref platform, State, cl, obj));
+		Assert.True(refused);
+		platform.MappingAdmission = null;
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, childRecord, out var pending));
+		pending.Flags &= ~MuiHeadlessObjectCore.ObjectProviderBusy;
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, childRecord, pending));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+		Assert.True(MuiHeadlessStateCodec.TryRead(ref platform, State, out var final));
+		Assert.True(final.Objects.IsNull);
+		Assert.Equal(4u, platform.NativeObjectDisposalCount);
+	}
+
+	[Fact]
+	public void ScrollbarRetainRefusalPreservesParentCleanupOwnership()
+	{
+		var platform = NewPlatform();
+		Register(ref platform, 0x1100, "Prop.mui");
+		Register(ref platform, 0x1140, "Gadget.mui");
+		var cl = Register(ref platform, 0x1180, "Scrollbar.mui");
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var retainedChild = APTR.Null;
+		platform.BeforeObjectRetain = child =>
+		{
+			Assert.False(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+			Assert.False(MuiHeadlessObjectCore.DisposeObject(ref platform, State, child));
+			Assert.False(MuiFamilyCore.Remove(ref platform, State, obj, child));
+			retainedChild = MuiHeadlessObjectCore.FindObject(ref platform, State, child);
+			Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, retainedChild, out var value));
+			value.Flags |= MuiHeadlessObjectCore.ObjectProviderBusy;
+			Assert.True(MuiHeadlessObjectCodec.Write(ref platform, retainedChild, value));
+		};
+		platform.RefuseObjectRetain = true;
+		Assert.False(MuiCommonControlCore.Construct(ref platform, State, cl, obj));
+		Assert.True(retainedChild.IsNotNull);
+		platform.RefuseObjectRetain = false;
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, retainedChild, out var pending));
+		pending.Flags &= ~MuiHeadlessObjectCore.ObjectProviderBusy;
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, retainedChild, pending));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+		Assert.True(MuiHeadlessStateCodec.TryRead(ref platform, State, out var registry));
+		Assert.True(registry.Objects.IsNull);
+		Assert.Equal(4u, platform.NativeObjectDisposalCount);
+	}
+
+	[Fact]
+	public void ScrollbarConstructionRejectsRecursiveEntryDuringReservation()
+	{
+		var platform = NewPlatform();
+		Register(ref platform, 0x1100, "Prop.mui");
+		Register(ref platform, 0x1140, "Gadget.mui");
+		var cl = Register(ref platform, 0x1180, "Scrollbar.mui");
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var owner = MuiHeadlessObjectCore.FindObject(ref platform, State, obj);
+		var invoked = false;
+		platform.AllocationAdmission = (size, flags) =>
+		{
+			if (invoked) return true;
+			Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, owner, out var value));
+			if ((value.Flags & MuiHeadlessObjectCore.ObjectScrollbarConstructionPending) == 0)
+				return true;
+			invoked = true;
+			var allocations = platform.AllocationCount;
+			Assert.False(MuiCommonControlCore.Construct(ref platform, State, cl, obj));
+			Assert.Equal(allocations, platform.AllocationCount);
+			Assert.False(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+			return true;
+		};
+		Assert.True(MuiCommonControlCore.Construct(ref platform, State, cl, obj));
+		Assert.True(invoked);
+		platform.AllocationAdmission = null;
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+		Assert.Equal(4u, platform.NativeObjectDisposalCount);
+	}
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public void ScrollbarRequiresExplicitConstructionCompletion(bool pending)
+	{
+		var platform = NewPlatform();
+		Register(ref platform, 0x1100, "Prop.mui");
+		Register(ref platform, 0x1140, "Gadget.mui");
+		var cl = Register(ref platform, 0x1180, "Scrollbar.mui");
+		var obj = MuiCommonControlCore.CreateControl(ref platform, State, cl, APTR.Null);
+		Assert.True(obj.IsNotNull);
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, State, obj);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, record, out var saved));
+		Assert.NotEqual(0u, saved.Flags & MuiHeadlessObjectCore.ObjectScrollbarConstructionComplete);
+		Assert.Equal(0u, saved.Flags & MuiHeadlessObjectCore.ObjectScrollbarConstructionPending);
+		var incomplete = saved;
+		incomplete.Flags &= ~MuiHeadlessObjectCore.ObjectScrollbarConstructionComplete;
+		if (pending) incomplete.Flags |= MuiHeadlessObjectCore.ObjectScrollbarConstructionPending;
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, record, incomplete));
+		var allocations = platform.AllocationCount;
+		Assert.False(MuiCommonControlCore.Construct(ref platform, State, cl, obj));
+		if (pending) Assert.Equal(allocations, platform.AllocationCount);
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, record, saved));
+		Assert.True(MuiCommonControlCore.Construct(ref platform, State, cl, obj));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+	}
+
+	[Theory]
+	[InlineData(1, false)]
+	[InlineData(2, false)]
+	[InlineData(3, false)]
+	[InlineData(1, true)]
+	[InlineData(2, true)]
+	[InlineData(3, true)]
+	public void ScrollbarGeometryStopsAtFailedAttributeAllocation(int failure, bool horizontal)
+	{
+		var platform = NewPlatform();
+		var cl = Register(ref platform, 0x1100, "Gadget.mui");
+		var child = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var attempts = 0;
+		platform.AllocationAdmission = (size, flags) => ++attempts != failure;
+		Assert.False(MuiCommonControlCore.SetScrollbarPartGeometry(ref platform, State,
+			child, horizontal, false, true));
+		platform.AllocationAdmission = null;
+		Assert.Equal(failure, attempts);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, child));
+		Assert.Equal(1u, platform.NativeObjectDisposalCount);
+	}
+
+	[Theory]
+	[InlineData(0)]
+	[InlineData(1)]
+	[InlineData(2)]
+	public void ConstructionSlotBindingFailureLeavesChildCallerOwned(int failure)
+	{
+		var platform = NewPlatform();
+		var cl = Register(ref platform, 0x1100, "Gadget.mui");
+		var parent = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var owner = MuiHeadlessObjectCore.FindObject(ref platform, State, parent);
+		Assert.True(MuiConstructionChildSlotsCore.Reserve(ref platform, owner, out var slots));
+		var child = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var childRecord = MuiHeadlessObjectCore.FindObject(ref platform, State, child);
+		Assert.True(MuiHeadlessChildMemoryCodec.TryGetAddress(ref platform, slots.First,
+			MuiHeadlessChildField.Object, out var objectField));
+		Assert.True(MuiHeadlessObjectMemoryCodec.TryGetAddress(ref platform, childRecord,
+			MuiHeadlessObjectField.Parent, out var parentField));
+		var retains = platform.ObjectRetainCount;
+		var allocations = platform.AllocationCount;
+		platform.RefuseObjectRetain = failure == 2;
+		platform.MappingAdmission = (address, size) => failure == 2 ||
+			address.Raw != (failure == 0 ? objectField.Raw : parentField.Raw);
+		Assert.False(MuiConstructionChildSlotsCore.Bind(ref platform, State, owner, slots.First, child));
+		platform.MappingAdmission = null;
+		platform.RefuseObjectRetain = false;
+		Assert.Equal(retains, platform.ObjectRetainCount);
+		Assert.Equal(allocations, platform.AllocationCount);
+		Assert.True(MuiHeadlessChildCodec.TryRead(ref platform, slots.First, out var link));
+		Assert.True(link.Object.IsNull);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, childRecord, out var value));
+		Assert.True(value.Parent.IsNull);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, parent));
+		Assert.Equal(1u, platform.NativeObjectDisposalCount);
+		Assert.True(MuiHeadlessObjectCore.FindObject(ref platform, State, child).IsNotNull);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, child));
+		Assert.Equal(2u, platform.NativeObjectDisposalCount);
+	}
+
+	[Fact]
+	public void ConstructionSlotBindingTransfersCleanupWithoutAllocating()
+	{
+		var platform = NewPlatform();
+		var cl = Register(ref platform, 0x1100, "Gadget.mui");
+		var parent = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var owner = MuiHeadlessObjectCore.FindObject(ref platform, State, parent);
+		Assert.True(MuiConstructionChildSlotsCore.Reserve(ref platform, owner, out var slots));
+		var child = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var allocations = platform.AllocationCount;
+		Assert.True(MuiConstructionChildSlotsCore.Bind(ref platform, State, owner, slots.Second, child));
+		Assert.Equal(allocations, platform.AllocationCount);
+		Assert.False(MuiConstructionChildSlotsCore.Bind(ref platform, State, owner, slots.First, child));
+		Assert.True(MuiHeadlessChildCodec.TryRead(ref platform, slots.Second, out var link));
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, link.Object, out var value));
+		Assert.Equal(owner.Raw, value.Parent.Raw);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, parent));
+		Assert.Equal(2u, platform.NativeObjectDisposalCount);
+		Assert.True(MuiHeadlessStateCodec.TryRead(ref platform, State, out var registry));
+		Assert.True(registry.Objects.IsNull);
+	}
+
+	[Theory]
+	[InlineData(1)]
+	[InlineData(2)]
+	[InlineData(3)]
+	[InlineData(0)]
+	public void ConstructionSlotsReserveBeforeChildrenAndReleaseOnFailure(int refuseAllocation)
+	{
+		var platform = NewPlatform();
+		var cl = Register(ref platform, 0x1100, "Scrollbar.mui");
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var owner = MuiHeadlessObjectCore.FindObject(ref platform, State, obj);
+		var allocations = 0;
+		var freed = platform.FreeCount;
+		platform.AllocationAdmission = (size, flags) => ++allocations != refuseAllocation;
+		var result = MuiConstructionChildSlotsCore.Reserve(ref platform, owner, out var slots);
+		platform.AllocationAdmission = null;
+		Assert.Equal(refuseAllocation == 0, result);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, owner, out var parent));
+		if (!result)
+		{
+			Assert.True(parent.ChildrenHead.IsNull && parent.ChildrenTail.IsNull);
+			Assert.Equal(freed + (uint)(refuseAllocation - 1), platform.FreeCount);
+			Assert.True(slots.First.IsNull && slots.Second.IsNull && slots.Third.IsNull);
+		}
+		else
+		{
+			Assert.Equal(slots.First.Raw, parent.ChildrenHead.Raw);
+			Assert.Equal(slots.Third.Raw, parent.ChildrenTail.Raw);
+			Assert.True(MuiHeadlessChildCodec.TryRead(ref platform, slots.Second, out var middle));
+			Assert.Equal(slots.First.Raw, middle.Previous.Raw);
+			Assert.Equal(slots.Third.Raw, middle.Next.Raw);
+			Assert.True(middle.Object.IsNull);
+			Assert.Equal(owner.Raw, middle.Owner.Raw);
+			Assert.False(MuiConstructionChildSlotsCore.Reserve(ref platform, owner, out _));
+		}
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+	}
+
+	[Theory]
+	[InlineData(1)]
+	[InlineData(2)]
+	public void ScrollbarRollbackRetainsUnattachedPartsWhenLinkedChildCannotDispose(int linkedCount)
+	{
+		var platform = NewPlatform();
+		Register(ref platform, 0x1100, "Prop.mui");
+		Register(ref platform, 0x1140, "Gadget.mui");
+		var cl = Register(ref platform, 0x1180, "Scrollbar.mui");
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var owner = MuiHeadlessObjectCore.FindObject(ref platform, State, obj);
+		var refused = false;
+		var busyRecord = APTR.Null;
+		platform.AllocationAdmission = (size, flags) =>
+		{
+			if (refused || size != MuiHeadlessChildRecord.Size) return true;
+			Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, owner, out var parent));
+			if (parent.ChildrenHead.IsNull) return true;
+			var cursor = parent.ChildrenHead;
+			var count = 0;
+			var traversed = 0;
+			var candidate = APTR.Null;
+			while (cursor.IsNotNull)
+			{
+				Assert.True(traversed++ < 3);
+				Assert.True(MuiHeadlessChildCodec.TryRead(ref platform, cursor, out var node));
+				if (node.Object.IsNotNull)
+				{
+					count++;
+					if (candidate.IsNull) candidate = node.Object;
+				}
+				cursor = node.Next;
+			}
+			if (count != linkedCount) return true;
+			busyRecord = candidate;
+			Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, busyRecord, out var child));
+			child.Flags |= MuiHeadlessObjectCore.ObjectProviderBusy;
+			Assert.True(MuiHeadlessObjectCodec.Write(ref platform, busyRecord, child));
+			refused = true;
+			return false;
+		};
+		Assert.False(MuiCommonControlCore.Construct(ref platform, State, cl, obj));
+		Assert.True(refused);
+		platform.AllocationAdmission = null;
+		var allocationCount = platform.AllocationCount;
+		Assert.False(MuiCommonControlCore.Construct(ref platform, State, cl, obj));
+		Assert.Equal(allocationCount, platform.AllocationCount);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, busyRecord, out var pending));
+		pending.Flags &= ~MuiHeadlessObjectCore.ObjectProviderBusy;
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, busyRecord, pending));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+		Assert.True(MuiHeadlessStateCodec.TryRead(ref platform, State, out var registry));
+		Assert.True(registry.Objects.IsNull);
+		Assert.Equal(4u, platform.NativeObjectDisposalCount);
+	}
+
+	[Fact]
+	public void ScrollbarConstructionDoesNotAcceptOneChildAsComplete()
+	{
+		var platform = NewPlatform();
+		Register(ref platform, 0x1100, "Prop.mui");
+		var gadgetClass = Register(ref platform, 0x1140, "Gadget.mui");
+		var scrollbarClass = Register(ref platform, 0x1180, "Scrollbar.mui");
+		var scrollbar = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			scrollbarClass, APTR.Null);
+		var partialChild = MuiCommonControlCore.CreateControl(ref platform, State,
+			gadgetClass, APTR.Null);
+		Assert.True(scrollbar.IsNotNull);
+		Assert.True(partialChild.IsNotNull);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, scrollbar, partialChild));
+		Assert.False(MuiCommonControlCore.Construct(ref platform, State, scrollbarClass, scrollbar));
+		Assert.Equal(partialChild.Raw,
+			MuiFamilyCore.GetChild(ref platform, State, scrollbar, 0, APTR.Null).Raw);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, scrollbar));
+	}
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public void ScrollbarConstructionRejectsMalformedListEnd(bool wrongTail)
+	{
+		var platform = NewPlatform();
+		Register(ref platform, 0x1100, "Prop.mui");
+		Register(ref platform, 0x1140, "Gadget.mui");
+		var cl = Register(ref platform, 0x1180, "Scrollbar.mui");
+		var obj = MuiCommonControlCore.CreateControl(ref platform, State, cl, APTR.Null);
+		Assert.True(obj.IsNotNull);
+		Assert.True(MuiCommonControlCore.Construct(ref platform, State, cl, obj));
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, State, obj);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, record, out var original));
+		Assert.True(MuiHeadlessChildCodec.TryRead(ref platform, original.ChildrenTail, out var last));
+		if (wrongTail)
+		{
+			var malformed = original;
+			malformed.ChildrenTail = original.ChildrenHead;
+			Assert.True(MuiHeadlessObjectCodec.Write(ref platform, record, malformed));
+		}
+		else
+		{
+			var malformed = last;
+			malformed.Next = APTR.FromPointer(0xFFFFFFF0);
+			Assert.True(MuiHeadlessChildCodec.Write(ref platform, original.ChildrenTail, malformed));
+		}
+		Assert.False(MuiCommonControlCore.Construct(ref platform, State, cl, obj));
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, record, original));
+		Assert.True(MuiHeadlessChildCodec.Write(ref platform, original.ChildrenTail, last));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+	}
+
+	[Theory]
+	[InlineData(0)] // Completion marker but missing topology.
+	[InlineData(1)] // Wrong owning link.
+	[InlineData(2)] // Uninitialized component.
+	public void ScrollbarRepeatedConstructionRequiresIntactInitializedOwnership(int damage)
+	{
+		var platform = NewPlatform();
+		Register(ref platform, 0x1100, "Prop.mui");
+		Register(ref platform, 0x1140, "Gadget.mui");
+		var cl = Register(ref platform, 0x1180, "Scrollbar.mui");
+		var obj = MuiCommonControlCore.CreateControl(ref platform, State, cl, APTR.Null);
+		Assert.True(obj.IsNotNull);
+		var owner = MuiHeadlessObjectCore.FindObject(ref platform, State, obj);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, owner, out var original));
+		Assert.True(MuiHeadlessChildCodec.TryRead(ref platform, original.ChildrenHead, out var link));
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, link.Object, out var child));
+		var damagedOwner = original;
+		var damagedLink = link;
+		var damagedChild = child;
+		if (damage == 0)
+		{
+			damagedOwner.ChildrenHead = APTR.Null;
+			damagedOwner.ChildrenTail = APTR.Null;
+		}
+		if (damage == 1) damagedLink.Owner = link.Object;
+		if (damage == 2) damagedChild.Flags &= ~MuiHeadlessObjectCore.ObjectInitialized;
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, owner, damagedOwner));
+		Assert.True(MuiHeadlessChildCodec.Write(ref platform, original.ChildrenHead, damagedLink));
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, link.Object, damagedChild));
+		var constructors = platform.ConstructorCalls;
+		Assert.False(MuiCommonControlCore.Construct(ref platform, State, cl, obj));
+		Assert.Equal(constructors, platform.ConstructorCalls);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, owner, out var rejected));
+		Assert.Equal(0u, rejected.Flags & MuiHeadlessObjectCore.ObjectControlConstructionActive);
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, owner, original));
+		Assert.True(MuiHeadlessChildCodec.Write(ref platform, original.ChildrenHead, link));
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, link.Object, child));
+		Assert.True(MuiCommonControlCore.Construct(ref platform, State, cl, obj));
+		Assert.Equal(constructors, platform.ConstructorCalls);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+		Assert.True(MuiHeadlessStateCodec.TryRead(ref platform, State, out var registry));
+		Assert.True(registry.Objects.IsNull);
+		Assert.Equal(4u, platform.NativeObjectDisposalCount);
+	}
+
+	[Theory]
+	[InlineData(MuiHeadlessObjectCore.ObjectDisposing, false)]
+	[InlineData(MuiHeadlessObjectCore.ObjectProviderBusy, false)]
+	[InlineData(MuiHeadlessObjectCore.ObjectConstructionBinding, false)]
+	[InlineData(MuiHeadlessObjectCore.ObjectControlConstructionActive, false)]
+	[InlineData(MuiHeadlessObjectCore.ObjectRadioConstructionPending, false)]
+	[InlineData(MuiHeadlessObjectCore.ObjectScrollbarConstructionPending, false)]
+	[InlineData(MuiHeadlessObjectCore.ObjectDisposing, true)]
+	[InlineData(MuiHeadlessObjectCore.ObjectProviderBusy, true)]
+	public void ScrollbarConstructionRejectsUnavailablePart(uint flags, bool owner)
+	{
+		var platform = NewPlatform();
+		Register(ref platform, 0x1100, "Prop.mui");
+		Register(ref platform, 0x1140, "Gadget.mui");
+		var cl = Register(ref platform, 0x1180, "Scrollbar.mui");
+		var obj = MuiCommonControlCore.CreateControl(ref platform, State, cl, APTR.Null);
+		Assert.True(obj.IsNotNull);
+		var child = MuiFamilyCore.GetChild(ref platform, State, obj, 0, APTR.Null);
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, State, owner ? obj : child);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, record, out var original));
+		var unavailable = original;
+		unavailable.Flags |= flags;
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, record, unavailable));
+		var allocations = platform.AllocationCount;
+		Assert.False(MuiCommonControlCore.Construct(ref platform, State, cl, obj));
+		if (owner) Assert.Equal(allocations, platform.AllocationCount);
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, record, original));
+		Assert.True(MuiCommonControlCore.Construct(ref platform, State, cl, obj));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+	}
+
+	[Fact]
 	public void ScrollbarBuildsMorphosGroupChildrenAndForwardsPropState()
 	{
 		var platform = NewPlatform();
@@ -10544,6 +11480,95 @@ public sealed class MuiCommonControlClassTests
 		Assert.Equal(0u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
 			text, packet));
 		Assert.Equal(1u, Get(ref platform, text, Pressed));
+	}
+
+	[Fact]
+	public void AreaControlCharActsLikeReturnOnlyForActiveObjectAndUppercaseNeedsShift()
+	{
+		var platform = NewPlatform();
+		var windowClass = Register(ref platform, 0x1100, "Window.mui");
+		var gadgetClass = Register(ref platform, 0x1140, "Gadget.mui");
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			windowClass, APTR.Null);
+		var tags = BuildTags(ref platform, 0x1500, new[] {
+			(ControlChar, (uint)'B'), (InputMode, InputModeRelVerify) });
+		var gadget = MuiCommonControlCore.CreateControl(ref platform, State,
+			gadgetClass, tags);
+		Assert.NotEqual(APTR.Null, gadget);
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, window,
+			MuiWindowPublicCore.RootObject, gadget.Raw, false));
+		Assert.True(MuiApplicationWindowCore.OpenWindow(ref platform, State,
+			window, 0));
+
+		var message = APTR.FromPointer(0x1800);
+		var packet = APTR.FromPointer(0x1840);
+		var rawKey = default(MuiIntuiRawKeyMessage);
+		rawKey.Class = MuiIntuiMessageCodec.RawKeyClass;
+		rawKey.Code = (ushort)'b';
+		Assert.True(MuiIntuiMessageCodec.WriteRawKeyRecord(ref platform, message,
+			rawKey));
+		Assert.True(MuiCommonControlPacketCore.WriteHandleEvent(ref platform,
+			packet, message, -1, APTR.Null));
+
+		// A matching shortcut is ignored until this exact Area is active.
+		Assert.Equal(0u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			gadget, packet));
+		Assert.Equal(0u, Get(ref platform, gadget, Pressed));
+
+		Assert.True(MuiApplicationWindowCore.Activate(ref platform, State, window,
+			gadget));
+		Assert.Equal(0u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			gadget, packet));
+		Assert.Equal(0u, Get(ref platform, gadget, Pressed));
+
+		rawKey.Qualifier = (ushort)InputEventQualifier.RightShift;
+		Assert.True(MuiIntuiMessageCodec.WriteRawKeyRecord(ref platform, message,
+			rawKey));
+		Assert.True(MuiCommonControlPacketCore.WriteHandleEvent(ref platform,
+			packet, message, -1, APTR.Null));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			gadget, packet));
+		Assert.Equal(1u, Get(ref platform, gadget, Pressed));
+	}
+
+	[Fact]
+	public void AreaControlCharDoesNotActivateOnRawKeyRelease()
+	{
+		var platform = NewPlatform();
+		var windowClass = Register(ref platform, 0x1100, "Window.mui");
+		var gadgetClass = Register(ref platform, 0x1140, "Gadget.mui");
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			windowClass, APTR.Null);
+		// The fixture translator returns the code byte unchanged. Use the
+		// key-up form of a physical B raw code as the matching byte so this test
+		// proves the release is rejected before character translation.
+		var releaseCode = (ushort)(0x35 |
+			MuiIntuiMessageCodec.RawKeyUpPrefix);
+		var tags = BuildTags(ref platform, 0x1500, new[] {
+			(ControlChar, (uint)releaseCode), (InputMode, InputModeRelVerify) });
+		var gadget = MuiCommonControlCore.CreateControl(ref platform, State,
+			gadgetClass, tags);
+		Assert.NotEqual(APTR.Null, gadget);
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, window,
+			MuiWindowPublicCore.RootObject, gadget.Raw, false));
+		Assert.True(MuiApplicationWindowCore.OpenWindow(ref platform, State,
+			window, 0));
+		Assert.True(MuiApplicationWindowCore.Activate(ref platform, State, window,
+			gadget));
+
+		var message = APTR.FromPointer(0x1800);
+		var packet = APTR.FromPointer(0x1840);
+		var rawKey = default(MuiIntuiRawKeyMessage);
+		rawKey.Class = MuiIntuiMessageCodec.RawKeyClass;
+		rawKey.Code = releaseCode;
+		Assert.True(MuiIntuiMessageCodec.WriteRawKeyRecord(ref platform, message,
+			rawKey));
+		Assert.True(MuiCommonControlPacketCore.WriteHandleEvent(ref platform,
+			packet, message, -1, APTR.Null));
+
+		Assert.Equal(0u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			gadget, packet));
+		Assert.Equal(0u, Get(ref platform, gadget, Pressed));
 	}
 
 	private static APTR MakeShortenText(ref MuiHeadlessTestPlatform platform,

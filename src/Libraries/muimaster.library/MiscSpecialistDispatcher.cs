@@ -13,7 +13,6 @@ internal struct MuiMiscLifecycleMessage
 {
 	public const uint Size = 4;
 	public const uint FieldSize = 4;
-	public const uint MethodIdOffset = 0;
 	public uint MethodId;
 }
 
@@ -22,9 +21,6 @@ internal struct MuiMiscSpecialistGetMessage
 {
 	public const uint Size = 12;
 	public const uint FieldSize = 4;
-	public const uint MethodIdOffset = 0;
-	public const uint AttributeOffset = 4;
-	public const uint StorageOffset = 8;
 	public uint MethodId;
 	public uint Attribute;
 	public uint Storage;
@@ -35,7 +31,6 @@ internal struct MuiMiscSpecialistMethodMessage
 {
 	public const uint Size = 4;
 	public const uint FieldSize = 4;
-	public const uint MethodIdOffset = 0;
 	public uint MethodId;
 }
 
@@ -44,9 +39,6 @@ internal struct MuiMiscSpecialistSetMessage
 {
 	public const uint Size = 12;
 	public const uint FieldSize = 4;
-	public const uint MethodIdOffset = 0;
-	public const uint AttributeOffset = 4;
-	public const uint ValueOffset = 8;
 	public uint MethodId;
 	public uint Attribute;
 	public uint Value;
@@ -57,8 +49,6 @@ internal struct MuiMiscSpecialistPointerMessage
 {
 	public const uint Size = 8;
 	public const uint FieldSize = 4;
-	public const uint MethodIdOffset = 0;
-	public const uint PointerOffset = 4;
 	public uint MethodId;
 	public uint Pointer;
 }
@@ -68,9 +58,6 @@ internal struct MuiMiscSpecialistPairMessage
 {
 	public const uint Size = 12;
 	public const uint FieldSize = 4;
-	public const uint MethodIdOffset = 0;
-	public const uint FirstOffset = 4;
-	public const uint SecondOffset = 8;
 	public uint MethodId;
 	public uint First;
 	public uint Second;
@@ -81,9 +68,6 @@ internal struct MuiMiscHandleInputMessage
 {
 	public const uint Size = 12;
 	public const uint FieldSize = 4;
-	public const uint MethodIdOffset = 0;
-	public const uint IntuiMessageOffset = 4;
-	public const uint MuiKeyOffset = 8;
 	public uint MethodId;
 	public uint IntuiMessage;
 	public int MuiKey;
@@ -94,13 +78,6 @@ internal struct MuiMiscSpecialistRegisterGadgetMessage
 {
 	public const uint Size = 28;
 	public const uint FieldSize = 4;
-	public const uint MethodIdOffset = 0;
-	public const uint GadgetOffset = 4;
-	public const uint IdOffset = 8;
-	public const uint ParametersOffset = 12;
-	public const uint TitleOffset = 16;
-	public const uint AttributeOffset = 20;
-	public const uint LabelOffset = 24;
 	public uint MethodId;
 	public uint Gadget;
 	public uint Id;

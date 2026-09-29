@@ -98,34 +98,85 @@ internal static class MuiApplicationLifecycleStateFieldCursorCodec
 	}
 }
 
-// Fixed application lifecycle state is transferred as a named record. Numeric
-// guest positions are confined to this ABI adapter; the compatibility cursor
-// above remains available only to legacy callers and malformed-state tests.
+// Fixed application lifecycle state is transferred as a named record. Keep
+// field selection structural: the bounded cursor consumes the complete record
+// before exposing a field address to compatibility callers.
 internal static class MuiApplicationLifecycleStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiApplicationLifecycleStateField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiApplicationLifecycleStateField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (field == MuiApplicationLifecycleStateField.Magic)
-			offset = MuiApplicationLifecycleStateRecord.MagicOffset;
-		else if (field == MuiApplicationLifecycleStateField.Initialized)
-			offset = MuiApplicationLifecycleStateRecord.InitializedOffset;
-		else if (field == MuiApplicationLifecycleStateField.Iconified)
-			offset = MuiApplicationLifecycleStateRecord.IconifiedOffset;
-		else if (field == MuiApplicationLifecycleStateField.Active)
-			offset = MuiApplicationLifecycleStateRecord.ActiveOffset;
-		else if (field == MuiApplicationLifecycleStateField.SingleTask)
-			offset = MuiApplicationLifecycleStateRecord.SingleTaskOffset;
-		else if (field == MuiApplicationLifecycleStateField.DoubleStart)
-			offset = MuiApplicationLifecycleStateRecord.DoubleStartOffset;
-		else if (field == MuiApplicationLifecycleStateField.ForceQuit)
-			offset = MuiApplicationLifecycleStateRecord.ForceQuitOffset;
-		else
+		address = APTR.Null;
+		switch (field)
 		{
-			offset = 0;
-			return false;
+			case MuiApplicationLifecycleStateField.Magic:
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationLifecycleStateRecord.FieldSize, out address);
+			case MuiApplicationLifecycleStateField.Initialized:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationLifecycleStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationLifecycleStateRecord.FieldSize, out address);
+			case MuiApplicationLifecycleStateField.Iconified:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationLifecycleStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationLifecycleStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationLifecycleStateRecord.FieldSize, out address);
+			case MuiApplicationLifecycleStateField.Active:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationLifecycleStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationLifecycleStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationLifecycleStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationLifecycleStateRecord.FieldSize, out address);
+			case MuiApplicationLifecycleStateField.SingleTask:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationLifecycleStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationLifecycleStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationLifecycleStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationLifecycleStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationLifecycleStateRecord.FieldSize, out address);
+			case MuiApplicationLifecycleStateField.DoubleStart:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationLifecycleStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationLifecycleStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationLifecycleStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationLifecycleStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationLifecycleStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationLifecycleStateRecord.FieldSize, out address);
+			case MuiApplicationLifecycleStateField.ForceQuit:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationLifecycleStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationLifecycleStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationLifecycleStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationLifecycleStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationLifecycleStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationLifecycleStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationLifecycleStateRecord.FieldSize, out address);
+			default:
+				return false;
 		}
-		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -133,12 +184,11 @@ internal static class MuiApplicationLifecycleStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiApplicationLifecycleStateRecord.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address))
 			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiApplicationLifecycleStateRecord.Size) &&
-			platform.IsMapped(address, MuiApplicationLifecycleStateRecord.FieldSize);
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

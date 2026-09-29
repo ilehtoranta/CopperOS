@@ -16,6 +16,8 @@ internal struct MuiGroupGridStateRecord
 {
 	internal const uint Size = 36;
 	internal const uint FieldSize = 4;
+	// ABI/documentation aliases only. Field access advances the named record
+	// with MuiGuestStructCursor below.
 	internal const uint MagicOffset = 0;
 	internal const uint ColumnsOffset = 4;
 	internal const uint RowsOffset = 8;
@@ -102,10 +104,13 @@ internal static class MuiGroupGridStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiGroupGridStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiGroupGridStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Address, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiGroupGridStateFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGroupGridStateRecordMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiGroupGridStateField field, out uint value)
@@ -128,30 +133,30 @@ internal static class MuiGroupGridStateFieldCursorCodec
 // semantic record; this bounded adapter owns fixed guest-layout translation.
 internal static class MuiGroupGridStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiGroupGridStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiGroupGridStateField field,
+		out uint index)
 	{
 		if (field == MuiGroupGridStateField.Magic)
-			offset = MuiGroupGridStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiGroupGridStateField.Columns)
-			offset = MuiGroupGridStateRecord.ColumnsOffset;
+			index = 1;
 		else if (field == MuiGroupGridStateField.Rows)
-			offset = MuiGroupGridStateRecord.RowsOffset;
+			index = 2;
 		else if (field == MuiGroupGridStateField.HorizontalSpacing)
-			offset = MuiGroupGridStateRecord.HorizontalSpacingOffset;
+			index = 3;
 		else if (field == MuiGroupGridStateField.VerticalSpacing)
-			offset = MuiGroupGridStateRecord.VerticalSpacingOffset;
+			index = 4;
 		else if (field == MuiGroupGridStateField.SameWidth)
-			offset = MuiGroupGridStateRecord.SameWidthOffset;
+			index = 5;
 		else if (field == MuiGroupGridStateField.SameHeight)
-			offset = MuiGroupGridStateRecord.SameHeightOffset;
+			index = 6;
 		else if (field == MuiGroupGridStateField.HorizontalCenter)
-			offset = MuiGroupGridStateRecord.HorizontalCenterOffset;
+			index = 7;
 		else if (field == MuiGroupGridStateField.VerticalCenter)
-			offset = MuiGroupGridStateRecord.VerticalCenterOffset;
+			index = 8;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -161,12 +166,33 @@ internal static class MuiGroupGridStateRecordMemoryCodec
 		APTR record, MuiGroupGridStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiGroupGridStateFieldCursor);
+		cursor.Address = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiGroupGridStateFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiGroupGridStateRecord.Size) &&
-			platform.IsMapped(address, MuiGroupGridStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Address,
+				MuiGroupGridStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiGroupGridStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiGroupGridStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

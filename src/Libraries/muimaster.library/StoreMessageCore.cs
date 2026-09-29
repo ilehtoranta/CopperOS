@@ -123,52 +123,108 @@ internal struct MuiStoreFieldCursor
 // Struct-first guest-memory adapter for the store method packet family.
 internal static class MuiStoreMessageMemoryCodec
 {
-	private static bool TryResolve(MuiStorePacketKind packet,
-		MuiStoreField field, out uint offset, out uint size)
+	private static bool TryResolveFieldIndex(MuiStorePacketKind packet,
+		MuiStoreField field, out uint index, out uint recordSize)
 	{
-		size = 0;
+		index = uint.MaxValue;
+		recordSize = 0;
 		switch (packet)
 		{
 			case MuiStorePacketKind.Method:
-				size = MuiStoreMethodMessage.Size;
-				if (field == MuiStoreField.MethodId) { offset = MuiStoreMethodMessage.MethodIdOffset; return true; }
-				break;
+				if (field == MuiStoreField.MethodId)
+				{
+					index = 0; recordSize = MuiStoreMethodMessage.Size;
+					return true;
+				}
+				return false;
 			case MuiStorePacketKind.Clear:
-				size = MuiStoreClearMessage.Size;
-				if (field == MuiStoreField.MethodId) { offset = MuiStoreClearMessage.MethodIdOffset; return true; }
-				break;
+				if (field == MuiStoreField.MethodId)
+				{
+					index = 0; recordSize = MuiStoreClearMessage.Size;
+					return true;
+				}
+				return false;
 			case MuiStorePacketKind.Key:
-				size = MuiStoreKeyMessage.Size;
-				if (field == MuiStoreField.MethodId) { offset = MuiStoreKeyMessage.MethodIdOffset; return true; }
-				if (field == MuiStoreField.Key) { offset = MuiStoreKeyMessage.KeyOffset; return true; }
-				break;
+				if (field == MuiStoreField.MethodId)
+				{
+					index = 0; recordSize = MuiStoreKeyMessage.Size;
+					return true;
+				}
+				if (field == MuiStoreField.Key)
+				{
+					index = 1; recordSize = MuiStoreKeyMessage.Size;
+					return true;
+				}
+				return false;
 			case MuiStorePacketKind.Counter:
-				size = MuiStoreCounterMessage.Size;
-				if (field == MuiStoreField.MethodId) { offset = MuiStoreCounterMessage.MethodIdOffset; return true; }
-				if (field == MuiStoreField.Counter) { offset = MuiStoreCounterMessage.CounterOffset; return true; }
-				break;
+				if (field == MuiStoreField.MethodId)
+				{
+					index = 0; recordSize = MuiStoreCounterMessage.Size;
+					return true;
+				}
+				if (field == MuiStoreField.Counter)
+				{
+					index = 1; recordSize = MuiStoreCounterMessage.Size;
+					return true;
+				}
+				return false;
 			case MuiStorePacketKind.DatamapSet:
-				size = MuiDatamapSetMessage.Size;
-				if (field == MuiStoreField.MethodId) { offset = MuiDatamapSetMessage.MethodIdOffset; return true; }
-				if (field == MuiStoreField.Data) { offset = MuiDatamapSetMessage.DataOffset; return true; }
-				if (field == MuiStoreField.Length) { offset = MuiDatamapSetMessage.LengthOffset; return true; }
-				if (field == MuiStoreField.Key) { offset = MuiDatamapSetMessage.KeyOffset; return true; }
-				break;
+				if (field == MuiStoreField.MethodId)
+				{
+					index = 0; recordSize = MuiDatamapSetMessage.Size;
+					return true;
+				}
+				if (field == MuiStoreField.Data)
+				{
+					index = 1; recordSize = MuiDatamapSetMessage.Size;
+					return true;
+				}
+				if (field == MuiStoreField.Length)
+				{
+					index = 2; recordSize = MuiDatamapSetMessage.Size;
+					return true;
+				}
+				if (field == MuiStoreField.Key)
+				{
+					index = 3; recordSize = MuiDatamapSetMessage.Size;
+					return true;
+				}
+				return false;
 			case MuiStorePacketKind.DatamapGet:
-				size = MuiDatamapGetMessage.Size;
-				if (field == MuiStoreField.MethodId) { offset = MuiDatamapGetMessage.MethodIdOffset; return true; }
-				if (field == MuiStoreField.Key) { offset = MuiDatamapGetMessage.KeyOffset; return true; }
-				if (field == MuiStoreField.SizeStorage) { offset = MuiDatamapGetMessage.SizeStorageOffset; return true; }
-				break;
+				if (field == MuiStoreField.MethodId)
+				{
+					index = 0; recordSize = MuiDatamapGetMessage.Size;
+					return true;
+				}
+				if (field == MuiStoreField.Key)
+				{
+					index = 1; recordSize = MuiDatamapGetMessage.Size;
+					return true;
+				}
+				if (field == MuiStoreField.SizeStorage)
+				{
+					index = 2; recordSize = MuiDatamapGetMessage.Size;
+					return true;
+				}
+				return false;
 			case MuiStorePacketKind.ObjectmapSet:
-				size = MuiObjectmapSetMessage.Size;
-				if (field == MuiStoreField.MethodId) { offset = MuiObjectmapSetMessage.MethodIdOffset; return true; }
-				if (field == MuiStoreField.Object) { offset = MuiObjectmapSetMessage.ObjectOffset; return true; }
-				if (field == MuiStoreField.Key) { offset = MuiObjectmapSetMessage.KeyOffset; return true; }
-				break;
+				if (field == MuiStoreField.MethodId)
+				{
+					index = 0; recordSize = MuiObjectmapSetMessage.Size;
+					return true;
+				}
+				if (field == MuiStoreField.Object)
+				{
+					index = 1; recordSize = MuiObjectmapSetMessage.Size;
+					return true;
+				}
+				if (field == MuiStoreField.Key)
+				{
+					index = 2; recordSize = MuiObjectmapSetMessage.Size;
+					return true;
+				}
+				return false;
 		}
-		offset = 0;
-		size = 0;
 		return false;
 	}
 
@@ -177,13 +233,33 @@ internal static class MuiStoreMessageMemoryCodec
 		out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		return TryGetAddress(ref platform, message, packet, field,
+			out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR message, MuiStorePacketKind packet, MuiStoreField field,
+		out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(packet, field, out var offset, out var size) ||
-			message.IsNull || message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(message, size))
-			return false;
-		address = APTR.FromPointer(message.Raw + offset);
-		return platform.IsMapped(address, MuiStoreMethodMessage.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(packet, field, out var index,
+			out var recordSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, message, recordSize,
+				out var cursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 4,
+				out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = 4;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -192,10 +268,63 @@ internal static class MuiStoreMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, message, packet, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		if (!TryResolveFieldIndex(packet, field, out _, out var size) ||
+			message.IsNull || !platform.IsMapped(message, size)) return false;
+		switch (packet)
+		{
+			case MuiStorePacketKind.Method:
+				if (field != MuiStoreField.MethodId ||
+					!MuiStorePacketSequentialStructCodec.TryReadMethodIdValue(
+						ref platform, message, out value)) return false;
+				return true;
+			case MuiStorePacketKind.Clear:
+				if (field != MuiStoreField.MethodId ||
+					!MuiStorePacketSequentialStructCodec.TryReadClearMethodIdValue(
+						ref platform, message, out value)) return false;
+				return true;
+			case MuiStorePacketKind.Key:
+				if (!MuiStorePacketSequentialStructCodec.TryReadKey(ref platform,
+					message, out var key)) return false;
+				if (field == MuiStoreField.MethodId) value = key.MethodId;
+				else if (field == MuiStoreField.Key) value = key.Key.Raw;
+				else return false;
+				return true;
+			case MuiStorePacketKind.Counter:
+				if (!MuiStorePacketSequentialStructCodec.TryReadCounter(ref platform,
+					message, out var counter)) return false;
+				if (field == MuiStoreField.MethodId) value = counter.MethodId;
+				else if (field == MuiStoreField.Counter) value = counter.Counter.Raw;
+				else return false;
+				return true;
+			case MuiStorePacketKind.DatamapSet:
+				if (!MuiStorePacketSequentialStructCodec.TryReadDatamapSet(
+					ref platform, message, out var datamapSet)) return false;
+				if (field == MuiStoreField.MethodId) value = datamapSet.MethodId;
+				else if (field == MuiStoreField.Data) value = datamapSet.Data.Raw;
+				else if (field == MuiStoreField.Length)
+					value = unchecked((uint)datamapSet.Length);
+				else if (field == MuiStoreField.Key) value = datamapSet.Key.Raw;
+				else return false;
+				return true;
+			case MuiStorePacketKind.DatamapGet:
+				if (!MuiStorePacketSequentialStructCodec.TryReadDatamapGet(
+					ref platform, message, out var datamapGet)) return false;
+				if (field == MuiStoreField.MethodId) value = datamapGet.MethodId;
+				else if (field == MuiStoreField.Key) value = datamapGet.Key.Raw;
+				else if (field == MuiStoreField.SizeStorage)
+					value = datamapGet.SizeStorage.Raw;
+				else return false;
+				return true;
+			case MuiStorePacketKind.ObjectmapSet:
+				if (!MuiStorePacketSequentialStructCodec.TryReadObjectmapSet(
+					ref platform, message, out var objectmapSet)) return false;
+				if (field == MuiStoreField.MethodId) value = objectmapSet.MethodId;
+				else if (field == MuiStoreField.Object) value = objectmapSet.Object.Raw;
+				else if (field == MuiStoreField.Key) value = objectmapSet.Key.Raw;
+				else return false;
+				return true;
+		}
+		return false;
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -203,10 +332,74 @@ internal static class MuiStoreMessageMemoryCodec
 		uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, message, packet, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!TryResolveFieldIndex(packet, field, out _, out var size) ||
+			message.IsNull || !platform.IsMapped(message, size)) return false;
+		switch (packet)
+		{
+			case MuiStorePacketKind.Method:
+				if (field != MuiStoreField.MethodId ||
+					!MuiStorePacketSequentialStructCodec.TryWriteMethodIdValue(
+						ref platform, message, value)) return false;
+				return true;
+			case MuiStorePacketKind.Clear:
+				if (field != MuiStoreField.MethodId ||
+					!MuiStorePacketSequentialStructCodec.TryWriteClearMethodIdValue(
+						ref platform, message, value)) return false;
+				return true;
+			case MuiStorePacketKind.Key:
+				if (!MuiStorePacketSequentialStructCodec.TryReadKey(ref platform,
+					message, out var key)) return false;
+				if (field == MuiStoreField.MethodId) key.MethodId = value;
+				else if (field == MuiStoreField.Key) key.Key = APTR.FromPointer(value);
+				else return false;
+				return MuiStorePacketSequentialStructCodec.WriteKey(ref platform,
+					message, key);
+			case MuiStorePacketKind.Counter:
+				if (!MuiStorePacketSequentialStructCodec.TryReadCounter(ref platform,
+					message, out var counter)) return false;
+				if (field == MuiStoreField.MethodId) counter.MethodId = value;
+				else if (field == MuiStoreField.Counter)
+					counter.Counter = APTR.FromPointer(value);
+				else return false;
+				return MuiStorePacketSequentialStructCodec.WriteCounter(ref platform,
+					message, counter);
+			case MuiStorePacketKind.DatamapSet:
+				if (!MuiStorePacketSequentialStructCodec.TryReadDatamapSet(
+					ref platform, message, out var datamapSet)) return false;
+				if (field == MuiStoreField.MethodId) datamapSet.MethodId = value;
+				else if (field == MuiStoreField.Data)
+					datamapSet.Data = APTR.FromPointer(value);
+				else if (field == MuiStoreField.Length)
+					datamapSet.Length = unchecked((int)value);
+				else if (field == MuiStoreField.Key)
+					datamapSet.Key = APTR.FromPointer(value);
+				else return false;
+				return MuiStorePacketSequentialStructCodec.WriteDatamapSet(
+					ref platform, message, datamapSet);
+			case MuiStorePacketKind.DatamapGet:
+				if (!MuiStorePacketSequentialStructCodec.TryReadDatamapGet(
+					ref platform, message, out var datamapGet)) return false;
+				if (field == MuiStoreField.MethodId) datamapGet.MethodId = value;
+				else if (field == MuiStoreField.Key)
+					datamapGet.Key = APTR.FromPointer(value);
+				else if (field == MuiStoreField.SizeStorage)
+					datamapGet.SizeStorage = APTR.FromPointer(value);
+				else return false;
+				return MuiStorePacketSequentialStructCodec.WriteDatamapGet(
+					ref platform, message, datamapGet);
+			case MuiStorePacketKind.ObjectmapSet:
+				if (!MuiStorePacketSequentialStructCodec.TryReadObjectmapSet(
+					ref platform, message, out var objectmapSet)) return false;
+				if (field == MuiStoreField.MethodId) objectmapSet.MethodId = value;
+				else if (field == MuiStoreField.Object)
+					objectmapSet.Object = APTR.FromPointer(value);
+				else if (field == MuiStoreField.Key)
+					objectmapSet.Key = APTR.FromPointer(value);
+				else return false;
+				return MuiStorePacketSequentialStructCodec.WriteObjectmapSet(
+					ref platform, message, objectmapSet);
+		}
+		return false;
 	}
 }
 
@@ -219,6 +412,12 @@ internal static class MuiStoreFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiStoreMessageMemoryCodec.TryGetAddress(ref platform, cursor.Message,
 			cursor.Packet, cursor.Field, out address);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStoreFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStoreMessageMemoryCodec.TryGetAddress(ref platform, cursor.Message,
+			cursor.Packet, cursor.Field, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR message, MuiStorePacketKind packet, MuiStoreField field,
@@ -292,6 +491,17 @@ internal static class MuiStorePacketSequentialStructCodec
 		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
 			MuiStoreMethodMessage.Size, out var cursor) ||
 			!TryReadUlong(ref platform, ref cursor, out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryWriteMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiStoreMethodMessage.Size, out var cursor) ||
+			!TryWriteUlong(ref platform, ref cursor, methodId)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 

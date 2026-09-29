@@ -120,35 +120,101 @@ internal static class MuiApplicationHelpStateFieldCursorCodec
 }
 
 // Fixed application-help records are read and written as named value types.
-// Keep the packed guest positions in this ABI adapter; production state
-// consumers never select a field through the compatibility cursor.
+// Keep field selection structural: the bounded cursor consumes the complete
+// record before exposing a field address to compatibility callers.
 internal static class MuiApplicationHelpStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiApplicationHelpStateField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiApplicationHelpStateField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (field == MuiApplicationHelpStateField.Magic)
-			offset = MuiApplicationHelpStateRecord.MagicOffset;
-		else if (field == MuiApplicationHelpStateField.AboutReferenceWindow)
-			offset = MuiApplicationHelpStateRecord.AboutReferenceWindowOffset;
-		else if (field == MuiApplicationHelpStateField.AboutRequests)
-			offset = MuiApplicationHelpStateRecord.AboutRequestsOffset;
-		else if (field == MuiApplicationHelpStateField.HelpWindow)
-			offset = MuiApplicationHelpStateRecord.HelpWindowOffset;
-		else if (field == MuiApplicationHelpStateField.HelpName)
-			offset = MuiApplicationHelpStateRecord.HelpNameOffset;
-		else if (field == MuiApplicationHelpStateField.HelpNode)
-			offset = MuiApplicationHelpStateRecord.HelpNodeOffset;
-		else if (field == MuiApplicationHelpStateField.HelpLine)
-			offset = MuiApplicationHelpStateRecord.HelpLineOffset;
-		else if (field == MuiApplicationHelpStateField.HelpRequests)
-			offset = MuiApplicationHelpStateRecord.HelpRequestsOffset;
-		else
+		address = APTR.Null;
+		switch (field)
 		{
-			offset = 0;
-			return false;
+			case MuiApplicationHelpStateField.Magic:
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationHelpStateRecord.FieldSize, out address);
+			case MuiApplicationHelpStateField.AboutReferenceWindow:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationHelpStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationHelpStateRecord.FieldSize, out address);
+			case MuiApplicationHelpStateField.AboutRequests:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationHelpStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationHelpStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationHelpStateRecord.FieldSize, out address);
+			case MuiApplicationHelpStateField.HelpWindow:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationHelpStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationHelpStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationHelpStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationHelpStateRecord.FieldSize, out address);
+			case MuiApplicationHelpStateField.HelpName:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationHelpStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationHelpStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationHelpStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationHelpStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationHelpStateRecord.FieldSize, out address);
+			case MuiApplicationHelpStateField.HelpNode:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationHelpStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationHelpStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationHelpStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationHelpStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationHelpStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationHelpStateRecord.FieldSize, out address);
+			case MuiApplicationHelpStateField.HelpLine:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationHelpStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationHelpStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationHelpStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationHelpStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationHelpStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationHelpStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationHelpStateRecord.FieldSize, out address);
+			case MuiApplicationHelpStateField.HelpRequests:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationHelpStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationHelpStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationHelpStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationHelpStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationHelpStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationHelpStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationHelpStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationHelpStateRecord.FieldSize, out address);
+			default:
+				return false;
 		}
-		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -156,12 +222,11 @@ internal static class MuiApplicationHelpStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiApplicationHelpStateRecord.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address))
 			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiApplicationHelpStateRecord.Size) &&
-			platform.IsMapped(address, MuiApplicationHelpStateRecord.FieldSize);
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

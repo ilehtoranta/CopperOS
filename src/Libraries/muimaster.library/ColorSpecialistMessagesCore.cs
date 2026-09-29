@@ -39,37 +39,30 @@ internal struct MuiColorSpecialistFieldCursor
 }
 
 // Struct-first guest-memory adapter for the fixed pen/color specialist
-// packets. Packet kinds own complete MorphOS record spans; field names select
-// members without exposing numeric positions to dispatch code.
+// packets. Packet kinds own complete MorphOS record spans; typed field
+// addresses walk declaration-ordered named records without exposing numeric
+// positions to dispatch code.
 internal static class MuiColorSpecialistMessageMemoryCodec
 {
-	private static bool TryResolve(MuiColorSpecialistPacketKind packet,
-		MuiColorSpecialistField field, out uint offset, out uint size)
+	private static bool TryResolveFieldIndex(MuiColorSpecialistPacketKind packet,
+		MuiColorSpecialistField field, out uint index, out uint size)
 	{
+		index = 0;
 		switch (packet)
 		{
 			case MuiColorSpecialistPacketKind.Method:
 				size = MuiColorSpecialistMethodMessage.Size;
-				if (field == MuiColorSpecialistField.MethodId)
-					offset = MuiColorSpecialistMethodMessage.MethodIdOffset;
-				else
-				{
-					offset = 0;
-					size = 0;
-					return false;
-				}
-				return true;
+				return field == MuiColorSpecialistField.MethodId;
 			case MuiColorSpecialistPacketKind.Get:
 				size = MuiColorSpecialistGetMessage.Size;
 				if (field == MuiColorSpecialistField.MethodId)
-					offset = MuiColorSpecialistGetMessage.MethodIdOffset;
+					index = 0;
 				else if (field == MuiColorSpecialistField.Attribute)
-					offset = MuiColorSpecialistGetMessage.AttributeOffset;
+					index = 1;
 				else if (field == MuiColorSpecialistField.Storage)
-					offset = MuiColorSpecialistGetMessage.StorageOffset;
+					index = 2;
 				else
 				{
-					offset = 0;
 					size = 0;
 					return false;
 				}
@@ -77,14 +70,13 @@ internal static class MuiColorSpecialistMessageMemoryCodec
 			case MuiColorSpecialistPacketKind.Set:
 				size = MuiColorSpecialistSetMessage.Size;
 				if (field == MuiColorSpecialistField.MethodId)
-					offset = MuiColorSpecialistSetMessage.MethodIdOffset;
+					index = 0;
 				else if (field == MuiColorSpecialistField.Attribute)
-					offset = MuiColorSpecialistSetMessage.AttributeOffset;
+					index = 1;
 				else if (field == MuiColorSpecialistField.Value)
-					offset = MuiColorSpecialistSetMessage.ValueOffset;
+					index = 2;
 				else
 				{
-					offset = 0;
 					size = 0;
 					return false;
 				}
@@ -92,12 +84,11 @@ internal static class MuiColorSpecialistMessageMemoryCodec
 			case MuiColorSpecialistPacketKind.Pointer:
 				size = MuiColorSpecialistPointerMessage.Size;
 				if (field == MuiColorSpecialistField.MethodId)
-					offset = MuiColorSpecialistPointerMessage.MethodIdOffset;
+					index = 0;
 				else if (field == MuiColorSpecialistField.Pointer)
-					offset = MuiColorSpecialistPointerMessage.PointerOffset;
+					index = 1;
 				else
 				{
-					offset = 0;
 					size = 0;
 					return false;
 				}
@@ -105,23 +96,42 @@ internal static class MuiColorSpecialistMessageMemoryCodec
 			case MuiColorSpecialistPacketKind.Rgb:
 				size = MuiColorSpecialistRgbMessage.Size;
 				if (field == MuiColorSpecialistField.MethodId)
-					offset = MuiColorSpecialistRgbMessage.MethodIdOffset;
+					index = 0;
 				else if (field == MuiColorSpecialistField.Red)
-					offset = MuiColorSpecialistRgbMessage.RedOffset;
+					index = 1;
 				else if (field == MuiColorSpecialistField.Green)
-					offset = MuiColorSpecialistRgbMessage.GreenOffset;
+					index = 2;
 				else if (field == MuiColorSpecialistField.Blue)
-					offset = MuiColorSpecialistRgbMessage.BlueOffset;
+					index = 3;
 				else
 				{
-					offset = 0;
 					size = 0;
 					return false;
 				}
 				return true;
 		}
-		offset = 0;
 		size = 0;
+		return false;
+	}
+
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiColorSpecialistPacketKind packet,
+		MuiColorSpecialistField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolveFieldIndex(packet, field, out var index, out _))
+			return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiColorSpecialistMethodMessage.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				return true;
+			}
+		}
 		return false;
 	}
 
@@ -131,12 +141,10 @@ internal static class MuiColorSpecialistMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(packet, field, out var offset, out var size) ||
-			message.IsNull || message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(message, size)) return false;
-		address = APTR.FromPointer(message.Raw + offset);
-		return platform.IsMapped(address,
-			MuiColorSpecialistMethodMessage.FieldSize);
+		if (!TryResolveFieldIndex(packet, field, out _, out var size) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, message, size,
+				out var cursor)) return false;
+		return TryTakeField(ref platform, ref cursor, packet, field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -145,10 +153,64 @@ internal static class MuiColorSpecialistMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, message, packet, field,
-			out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		switch (packet)
+		{
+			case MuiColorSpecialistPacketKind.Method:
+				return field == MuiColorSpecialistField.MethodId &&
+					MuiColorSpecialistMethodHeaderCodec.TryReadValue(ref platform,
+						message, out value);
+			case MuiColorSpecialistPacketKind.Get:
+				if (!MuiColorSpecialistMessageStructCodec.TryReadGet(ref platform,
+					message, out var get)) return false;
+				value = field switch
+				{
+					MuiColorSpecialistField.MethodId => get.MethodId,
+					MuiColorSpecialistField.Attribute => get.Attribute,
+					MuiColorSpecialistField.Storage => get.Storage,
+					_ => 0,
+				};
+				return field is MuiColorSpecialistField.MethodId or
+					MuiColorSpecialistField.Attribute or MuiColorSpecialistField.Storage;
+			case MuiColorSpecialistPacketKind.Set:
+				if (!MuiColorSpecialistMessageStructCodec.TryReadSet(ref platform,
+					message, out var set)) return false;
+				value = field switch
+				{
+					MuiColorSpecialistField.MethodId => set.MethodId,
+					MuiColorSpecialistField.Attribute => set.Attribute,
+					MuiColorSpecialistField.Value => set.Value,
+					_ => 0,
+				};
+				return field is MuiColorSpecialistField.MethodId or
+					MuiColorSpecialistField.Attribute or MuiColorSpecialistField.Value;
+			case MuiColorSpecialistPacketKind.Pointer:
+				if (!MuiColorSpecialistMessageStructCodec.TryReadPointer(
+					ref platform, message, out var pointer)) return false;
+				value = field switch
+				{
+					MuiColorSpecialistField.MethodId => pointer.MethodId,
+					MuiColorSpecialistField.Pointer => pointer.Pointer,
+					_ => 0,
+				};
+				return field is MuiColorSpecialistField.MethodId or
+					MuiColorSpecialistField.Pointer;
+			case MuiColorSpecialistPacketKind.Rgb:
+				if (!MuiColorSpecialistMessageStructCodec.TryReadRgb(ref platform,
+					message, out var rgb)) return false;
+				value = field switch
+				{
+					MuiColorSpecialistField.MethodId => rgb.MethodId,
+					MuiColorSpecialistField.Red => rgb.Red,
+					MuiColorSpecialistField.Green => rgb.Green,
+					MuiColorSpecialistField.Blue => rgb.Blue,
+					_ => 0,
+				};
+				return field is MuiColorSpecialistField.MethodId or
+					MuiColorSpecialistField.Red or MuiColorSpecialistField.Green or
+					MuiColorSpecialistField.Blue;
+			default:
+				return false;
+		}
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -156,10 +218,63 @@ internal static class MuiColorSpecialistMessageMemoryCodec
 		MuiColorSpecialistField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, message, packet, field,
-			out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		switch (packet)
+		{
+			case MuiColorSpecialistPacketKind.Method:
+				return field == MuiColorSpecialistField.MethodId &&
+					MuiColorSpecialistMethodHeaderCodec.WriteValue(ref platform,
+						message, value);
+			case MuiColorSpecialistPacketKind.Get:
+				if (!MuiColorSpecialistMessageStructCodec.TryReadGet(ref platform,
+					message, out var get)) return false;
+				switch (field)
+				{
+					case MuiColorSpecialistField.MethodId: get.MethodId = value; break;
+					case MuiColorSpecialistField.Attribute: get.Attribute = value; break;
+					case MuiColorSpecialistField.Storage: get.Storage = value; break;
+					default: return false;
+				}
+				return MuiColorSpecialistMessageStructCodec.WriteGet(ref platform,
+					message, get);
+			case MuiColorSpecialistPacketKind.Set:
+				if (!MuiColorSpecialistMessageStructCodec.TryReadSet(ref platform,
+					message, out var set)) return false;
+				switch (field)
+				{
+					case MuiColorSpecialistField.MethodId: set.MethodId = value; break;
+					case MuiColorSpecialistField.Attribute: set.Attribute = value; break;
+					case MuiColorSpecialistField.Value: set.Value = value; break;
+					default: return false;
+				}
+				return MuiColorSpecialistMessageStructCodec.WriteSet(ref platform,
+					message, set);
+			case MuiColorSpecialistPacketKind.Pointer:
+				if (!MuiColorSpecialistMessageStructCodec.TryReadPointer(
+					ref platform, message, out var pointer)) return false;
+				switch (field)
+				{
+					case MuiColorSpecialistField.MethodId: pointer.MethodId = value; break;
+					case MuiColorSpecialistField.Pointer: pointer.Pointer = value; break;
+					default: return false;
+				}
+				return MuiColorSpecialistMessageStructCodec.WritePointer(ref platform,
+					message, pointer);
+			case MuiColorSpecialistPacketKind.Rgb:
+				if (!MuiColorSpecialistMessageStructCodec.TryReadRgb(ref platform,
+					message, out var rgb)) return false;
+				switch (field)
+				{
+					case MuiColorSpecialistField.MethodId: rgb.MethodId = value; break;
+					case MuiColorSpecialistField.Red: rgb.Red = value; break;
+					case MuiColorSpecialistField.Green: rgb.Green = value; break;
+					case MuiColorSpecialistField.Blue: rgb.Blue = value; break;
+					default: return false;
+				}
+				return MuiColorSpecialistMessageStructCodec.WriteRgb(ref platform,
+					message, rgb);
+			default:
+				return false;
+		}
 	}
 }
 

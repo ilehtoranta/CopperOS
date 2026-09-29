@@ -501,81 +501,103 @@ internal struct MuiDrawingRecordFieldCursor
 // Struct-first guest-memory adapter for drawing service state and records.
 internal static class MuiDrawingRecordMemoryCodec
 {
-	private static bool TryResolve(MuiDrawingRecordKind record,
-		MuiDrawingRecordField field, out uint offset, out uint size)
+	private const uint MuiDrawingRecordMemoryFieldSize = 4;
+
+	private static bool TryResolveFieldIndex(MuiDrawingRecordKind record,
+		MuiDrawingRecordField field, out uint index, out uint size)
 	{
-		offset = 0;
+		index = 0;
 		size = 0;
 		switch (record)
 		{
 			case MuiDrawingRecordKind.State:
 				size = MuiDrawingServiceStateRecord.Size;
-					offset = field switch
+				index = field switch
 				{
-					MuiDrawingRecordField.Magic => MuiDrawingServiceStateRecord.MagicOffset,
-					MuiDrawingRecordField.ClipHead => MuiDrawingServiceStateRecord.ClipHeadOffset,
-					MuiDrawingRecordField.RefreshHead => MuiDrawingServiceStateRecord.RefreshHeadOffset,
-					MuiDrawingRecordField.PenHead => MuiDrawingServiceStateRecord.PenHeadOffset,
-					MuiDrawingRecordField.Generation => MuiDrawingServiceStateRecord.GenerationOffset,
+					MuiDrawingRecordField.Magic => 0u,
+					MuiDrawingRecordField.ClipHead => 1u,
+					MuiDrawingRecordField.RefreshHead => 2u,
+					MuiDrawingRecordField.PenHead => 3u,
+					MuiDrawingRecordField.Generation => 4u,
 					_ => uint.MaxValue,
 				};
 				break;
 			case MuiDrawingRecordKind.Clip:
 				size = MuiDrawingClipRecord.Size;
-					offset = field switch
+				index = field switch
 				{
-					MuiDrawingRecordField.Next => MuiDrawingClipRecord.NextOffset,
-					MuiDrawingRecordField.Kind => MuiDrawingClipRecord.KindOffset,
-					MuiDrawingRecordField.Layer => MuiDrawingClipRecord.LayerOffset,
-					MuiDrawingRecordField.Token => MuiDrawingClipRecord.TokenOffset,
+					MuiDrawingRecordField.Next => 0u,
+					MuiDrawingRecordField.Kind => 1u,
+					MuiDrawingRecordField.Layer => 2u,
+					MuiDrawingRecordField.Token => 3u,
 					_ => uint.MaxValue,
 				};
 				break;
 			case MuiDrawingRecordKind.Refresh:
 				size = MuiDrawingRefreshRecord.Size;
-					offset = field switch
+				index = field switch
 				{
-					MuiDrawingRecordField.Next => MuiDrawingRefreshRecord.NextOffset,
-					MuiDrawingRecordField.RenderInfo => MuiDrawingRefreshRecord.RenderInfoOffset,
-					MuiDrawingRecordField.Layer => MuiDrawingRefreshRecord.LayerOffset,
-					MuiDrawingRecordField.SavedFlags => MuiDrawingRefreshRecord.SavedFlagsOffset,
+					MuiDrawingRecordField.Next => 0u,
+					MuiDrawingRecordField.RenderInfo => 1u,
+					MuiDrawingRecordField.Layer => 2u,
+					MuiDrawingRecordField.SavedFlags => 3u,
 					_ => uint.MaxValue,
 				};
 				break;
 			case MuiDrawingRecordKind.Pen:
 				size = MuiDrawingPenRecord.Size;
-					offset = field switch
+				index = field switch
 				{
-					MuiDrawingRecordField.Next => MuiDrawingPenRecord.NextOffset,
-					MuiDrawingRecordField.RenderInfo => MuiDrawingPenRecord.RenderInfoOffset,
-					MuiDrawingRecordField.Token => MuiDrawingPenRecord.TokenOffset,
+					MuiDrawingRecordField.Next => 0u,
+					MuiDrawingRecordField.RenderInfo => 1u,
+					MuiDrawingRecordField.Token => 2u,
 					_ => uint.MaxValue,
 				};
 				break;
 			case MuiDrawingRecordKind.RenderInfo:
 				size = MuiDrawingRenderInfoRecord.Size;
-					offset = field switch
+				index = field switch
 				{
-					MuiDrawingRecordField.WindowObject => MuiDrawingRenderInfoRecord.WindowObjectOffset,
-					MuiDrawingRecordField.Screen => MuiDrawingRenderInfoRecord.ScreenOffset,
-					MuiDrawingRecordField.DrawInfo => MuiDrawingRenderInfoRecord.DrawInfoOffset,
-					MuiDrawingRecordField.Pens => MuiDrawingRenderInfoRecord.PensOffset,
-					MuiDrawingRecordField.Window => MuiDrawingRenderInfoRecord.WindowOffset,
-					MuiDrawingRecordField.RastPort => MuiDrawingRenderInfoRecord.RastPortOffset,
-					MuiDrawingRecordField.Flags => MuiDrawingRenderInfoRecord.FlagsOffset,
+					MuiDrawingRecordField.WindowObject => 0u,
+					MuiDrawingRecordField.Screen => 1u,
+					MuiDrawingRecordField.DrawInfo => 2u,
+					MuiDrawingRecordField.Pens => 3u,
+					MuiDrawingRecordField.Window => 4u,
+					MuiDrawingRecordField.RastPort => 5u,
+					MuiDrawingRecordField.Flags => 6u,
 					_ => uint.MaxValue,
 				};
 				break;
 			case MuiDrawingRecordKind.RasterPort:
 				size = MuiDrawingRasterPortRecord.Size;
-				offset = field == MuiDrawingRecordField.Layer ?
-					MuiDrawingRasterPortRecord.LayerOffset : uint.MaxValue;
+				index = field == MuiDrawingRecordField.Layer ? 0u : uint.MaxValue;
 				break;
 			default:
-				offset = uint.MaxValue;
+				index = uint.MaxValue;
 				break;
 		}
-		return offset != uint.MaxValue;
+		return index != uint.MaxValue;
+	}
+
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiDrawingRecordKind record,
+		MuiDrawingRecordField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolveFieldIndex(record, field, out var index, out _))
+			return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiDrawingRecordMemoryFieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -584,11 +606,10 @@ internal static class MuiDrawingRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(record, field, out var offset, out var size) ||
-			recordAddress.IsNull || recordAddress.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(recordAddress, size)) return false;
-		address = APTR.FromPointer(recordAddress.Raw + offset);
-		return platform.IsMapped(address, MuiDrawingServiceStateRecord.FieldSize);
+		if (!TryResolveFieldIndex(record, field, out _, out var size) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, recordAddress, size,
+				out var cursor)) return false;
+		return TryTakeField(ref platform, ref cursor, record, field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -759,7 +780,7 @@ public static class MuiDrawingServiceCore
 	// state is preserved so outstanding clips, refreshes and pens are not
 	// dropped.
 	public static bool Initialize<TPlatform>(ref TPlatform platform,
-		APTR serviceState) where TPlatform : struct, IMuiServicePlatform
+		APTR serviceState) where TPlatform : struct, IMuiDrawingServicePlatform
 	{
 		if (serviceState.IsNull ||
 			!platform.IsMapped(serviceState, MuiDrawingServiceStateRecord.Size))
@@ -782,7 +803,7 @@ public static class MuiDrawingServiceCore
 	// handle, or Null on a malformed render info / allocation failure (atomic).
 	public static APTR AddClipping<TPlatform>(ref TPlatform platform,
 		APTR serviceState, APTR renderInfo, int left, int top, int width,
-		int height) where TPlatform : struct, IMuiServicePlatform
+		int height) where TPlatform : struct, IMuiDrawingServicePlatform
 	{
 		if (!Ready(ref platform, serviceState)) return APTR.Null;
 		var layer = Layer(ref platform, renderInfo);
@@ -805,7 +826,7 @@ public static class MuiDrawingServiceCore
 	// rectangle-clip record. Returns success.
 	public static bool RemoveClipping<TPlatform>(ref TPlatform platform,
 		APTR serviceState, APTR renderInfo, APTR handle)
-		where TPlatform : struct, IMuiServicePlatform =>
+		where TPlatform : struct, IMuiDrawingServicePlatform =>
 		RemoveClip(ref platform, serviceState, renderInfo, handle,
 			MuiDrawingServiceLayout.ClipKindRectangle);
 
@@ -815,7 +836,7 @@ public static class MuiDrawingServiceCore
 	// region / allocation failure (atomic).
 	public static APTR AddClipRegion<TPlatform>(ref TPlatform platform,
 		APTR serviceState, APTR renderInfo, APTR region)
-		where TPlatform : struct, IMuiServicePlatform
+		where TPlatform : struct, IMuiDrawingServicePlatform
 	{
 		if (!Ready(ref platform, serviceState) || region.IsNull) return APTR.Null;
 		var layer = Layer(ref platform, renderInfo);
@@ -837,13 +858,13 @@ public static class MuiDrawingServiceCore
 	// LIFO: the handle must be the top of the clip stack and a region record.
 	public static bool RemoveClipRegion<TPlatform>(ref TPlatform platform,
 		APTR serviceState, APTR renderInfo, APTR handle)
-		where TPlatform : struct, IMuiServicePlatform =>
+		where TPlatform : struct, IMuiDrawingServicePlatform =>
 		RemoveClip(ref platform, serviceState, renderInfo, handle,
 			MuiDrawingServiceLayout.ClipKindRegion);
 
 	private static bool RemoveClip<TPlatform>(ref TPlatform platform,
 		APTR serviceState, APTR renderInfo, APTR handle, uint kind)
-		where TPlatform : struct, IMuiServicePlatform
+		where TPlatform : struct, IMuiDrawingServicePlatform
 	{
 		if (!Ready(ref platform, serviceState) || handle.IsNull) return false;
 		if (!MuiDrawingServiceStateCodec.TryRead(ref platform, serviceState,
@@ -871,7 +892,7 @@ public static class MuiDrawingServiceCore
 
 	private static void PushClipRecord<TPlatform>(ref TPlatform platform,
 		APTR serviceState, APTR record, uint kind, APTR layer, APTR token)
-		where TPlatform : struct, IMuiServicePlatform
+		where TPlatform : struct, IMuiDrawingServicePlatform
 	{
 		if (!MuiDrawingServiceStateCodec.TryRead(ref platform, serviceState,
 			out var state)) return;
@@ -894,7 +915,7 @@ public static class MuiDrawingServiceCore
 	// refresh record for balanced EndRefresh. Returns success.
 	public static bool BeginRefresh<TPlatform>(ref TPlatform platform,
 		APTR serviceState, APTR renderInfo, uint flags)
-		where TPlatform : struct, IMuiServicePlatform
+		where TPlatform : struct, IMuiDrawingServicePlatform
 	{
 		if (!Ready(ref platform, serviceState) || flags != 0) return false;
 		var layer = Layer(ref platform, renderInfo);
@@ -965,7 +986,7 @@ public static class MuiDrawingServiceCore
 	// of the refresh stack, which must belong to this render info.
 	public static bool EndRefresh<TPlatform>(ref TPlatform platform,
 		APTR serviceState, APTR renderInfo, uint flags)
-		where TPlatform : struct, IMuiServicePlatform
+		where TPlatform : struct, IMuiDrawingServicePlatform
 	{
 		if (!Ready(ref platform, serviceState) || flags != 0 ||
 			renderInfo.IsNull) return false;
@@ -1003,7 +1024,7 @@ public static class MuiDrawingServiceCore
 	// a negative value on failure.
 	public static int ObtainPen<TPlatform>(ref TPlatform platform,
 		APTR serviceState, APTR renderInfo, APTR penSpec, uint flags)
-		where TPlatform : struct, IMuiServicePlatform
+		where TPlatform : struct, IMuiDrawingServicePlatform
 	{
 		if (!Ready(ref platform, serviceState)) return -1;
 		if (renderInfo.IsNull ||
@@ -1055,7 +1076,7 @@ public static class MuiDrawingServiceCore
 	// an unknown token or a duplicate release fails.
 	public static bool ReleasePen<TPlatform>(ref TPlatform platform,
 		APTR serviceState, APTR renderInfo, int pen)
-		where TPlatform : struct, IMuiServicePlatform
+		where TPlatform : struct, IMuiDrawingServicePlatform
 	{
 		if (!Ready(ref platform, serviceState) || renderInfo.IsNull) return false;
 		var wanted = unchecked((uint)pen);
@@ -1103,7 +1124,7 @@ public static class MuiDrawingServiceCore
 	// through the MG09 pen capability. The spec is never interpreted here.
 	public static bool GetRGBColor<TPlatform>(ref TPlatform platform,
 		APTR serviceState, APTR renderInfo, APTR penSpec, APTR rgbColor)
-		where TPlatform : struct, IMuiServicePlatform
+		where TPlatform : struct, IMuiDrawingServicePlatform
 	{
 		if (!Ready(ref platform, serviceState)) return false;
 		if (renderInfo.IsNull ||
@@ -1124,7 +1145,7 @@ public static class MuiDrawingServiceCore
 	// malformed render info, a null/unmapped rast port or a null layer yields
 	// Null so the clipping/refresh entry points can fail cleanly.
 	private static APTR Layer<TPlatform>(ref TPlatform platform, APTR renderInfo)
-		where TPlatform : struct, IMuiServicePlatform
+		where TPlatform : struct, IMuiDrawingServicePlatform
 	{
 		MuiDrawingRenderInfoRecord renderInfoValue = default;
 		if (!MuiDrawingRenderInfoCodec.TryRead(ref platform, renderInfo,
@@ -1136,7 +1157,7 @@ public static class MuiDrawingServiceCore
 	}
 
 	private static bool Ready<TPlatform>(ref TPlatform platform, APTR serviceState)
-		where TPlatform : struct, IMuiServicePlatform =>
+		where TPlatform : struct, IMuiDrawingServicePlatform =>
 		MuiDrawingServiceStateCodec.TryRead(ref platform, serviceState,
 			out var record) && record.Magic == MuiDrawingServiceLayout.Magic &&
 		record.Generation == MuiDrawingServiceLayout.Version;

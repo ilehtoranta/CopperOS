@@ -10,7 +10,7 @@ public sealed class MuiAreaBackfillTests
 	[Fact]
 	public void RenderingCapabilityRequestsUseNamedPackedLayouts()
 	{
-		Assert.Equal(56, System.Runtime.InteropServices.Marshal.SizeOf<
+		Assert.Equal(60, System.Runtime.InteropServices.Marshal.SizeOf<
 			MuiDoubleBufferRenderRequest>());
 		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
 			MuiDoubleBufferRenderRequest>(nameof(MuiDoubleBufferRenderRequest.Object)).ToInt32());
@@ -18,6 +18,8 @@ public sealed class MuiAreaBackfillTests
 			MuiDoubleBufferRenderRequest>(nameof(MuiDoubleBufferRenderRequest.Left)).ToInt32());
 		Assert.Equal(52, System.Runtime.InteropServices.Marshal.OffsetOf<
 			MuiDoubleBufferRenderRequest>(nameof(MuiDoubleBufferRenderRequest.Flags)).ToInt32());
+		Assert.Equal(56, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiDoubleBufferRenderRequest>(nameof(MuiDoubleBufferRenderRequest.TargetBitmap)).ToInt32());
 
 		Assert.Equal(64, System.Runtime.InteropServices.Marshal.SizeOf<
 			MuiBackfillRenderRequest>());

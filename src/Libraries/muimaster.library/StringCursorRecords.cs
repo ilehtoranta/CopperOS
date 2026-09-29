@@ -56,35 +56,17 @@ internal struct MuiStringCursorStateFieldCursor
 
 internal static class MuiStringCursorStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiStringCursorStateField field,
-		out uint offset)
-	{
-		if (field == MuiStringCursorStateField.Magic)
-			offset = MuiStringCursorStateRecord.MagicOffset;
-		else if (field == MuiStringCursorStateField.BufferPos)
-			offset = MuiStringCursorStateRecord.BufferPosOffset;
-		else if (field == MuiStringCursorStateField.DisplayPos)
-			offset = MuiStringCursorStateRecord.DisplayPosOffset;
-		else
-		{
-			offset = 0;
-			return false;
-		}
-		return true;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiStringCursorStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiStringCursorStateRecord.Size))
-			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, MuiStringCursorStateRecord.FieldSize);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringCursorStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStringCursorStateRecordMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiStringCursorStateField field, out uint value)
@@ -119,18 +101,18 @@ internal static class MuiStringCursorStateFieldCursorCodec
 // fields; this bounded adapter owns fixed guest-layout translation.
 internal static class MuiStringCursorStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiStringCursorStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiStringCursorStateField field,
+		out uint index)
 	{
 		if (field == MuiStringCursorStateField.Magic)
-			offset = MuiStringCursorStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiStringCursorStateField.BufferPos)
-			offset = MuiStringCursorStateRecord.BufferPosOffset;
+			index = 1;
 		else if (field == MuiStringCursorStateField.DisplayPos)
-			offset = MuiStringCursorStateRecord.DisplayPosOffset;
+			index = 2;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -140,9 +122,34 @@ internal static class MuiStringCursorStateRecordMemoryCodec
 		APTR record, MuiStringCursorStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiStringCursorStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringCursorStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		return TryResolve(field, out var offset) &&
-			TryGetAddress(ref platform, record, offset, out address);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiStringCursorStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiStringCursorStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiStringCursorStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

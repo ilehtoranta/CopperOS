@@ -16,9 +16,6 @@ internal struct MuiAreaDragPolicyStateRecord
 {
 	internal const uint Size = 12;
 	internal const uint FieldSize = 4;
-	internal const uint MagicOffset = 0;
-	internal const uint DraggableOffset = 4;
-	internal const uint DropableOffset = 8;
 	internal const uint Cookie = 0x41445250u; // 'ADRP'
 
 	internal uint Magic;
@@ -58,10 +55,14 @@ internal static class MuiAreaDragPolicyStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaDragPolicyStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiAreaDragPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaDragPolicyStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiAreaDragPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiAreaDragPolicyStateField field, out uint value)
@@ -80,24 +81,21 @@ internal static class MuiAreaDragPolicyStateFieldCursorCodec
 	}
 }
 
-// Fixed Area drag-policy state is transferred as a named record. Numeric
-// guest positions are confined to this ABI adapter; the compatibility cursor
-// above remains available only to legacy callers and malformed-state
-// diagnostics.
+// Fixed Area drag-policy state is transferred as a named record. The bounded
+// cursor walks the complete packed struct before selecting a field; the
+// compatibility cursor above remains available only to legacy callers and
+// malformed-state diagnostics.
 internal static class MuiAreaDragPolicyStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiAreaDragPolicyStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiAreaDragPolicyStateField field,
+		out uint index)
 	{
-		if (field == MuiAreaDragPolicyStateField.Magic)
-			offset = MuiAreaDragPolicyStateRecord.MagicOffset;
-		else if (field == MuiAreaDragPolicyStateField.Draggable)
-			offset = MuiAreaDragPolicyStateRecord.DraggableOffset;
-		else if (field == MuiAreaDragPolicyStateField.Dropable)
-			offset = MuiAreaDragPolicyStateRecord.DropableOffset;
+		if (field == MuiAreaDragPolicyStateField.Magic) index = 0;
+		else if (field == MuiAreaDragPolicyStateField.Draggable) index = 1;
+		else if (field == MuiAreaDragPolicyStateField.Dropable) index = 2;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -107,13 +105,34 @@ internal static class MuiAreaDragPolicyStateRecordMemoryCodec
 		APTR record, MuiAreaDragPolicyStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiAreaDragPolicyStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaDragPolicyStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiAreaDragPolicyStateRecord.Size) &&
-			platform.IsMapped(address, MuiAreaDragPolicyStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiAreaDragPolicyStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiAreaDragPolicyStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiAreaDragPolicyStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

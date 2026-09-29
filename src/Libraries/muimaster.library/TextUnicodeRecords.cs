@@ -44,32 +44,17 @@ internal struct MuiTextUnicodeStateFieldCursor
 
 internal static class MuiTextUnicodeStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiTextUnicodeStateField field,
-		out uint offset)
-	{
-		if (field == MuiTextUnicodeStateField.Magic)
-			offset = MuiTextUnicodeStateRecord.MagicOffset;
-		else if (field == MuiTextUnicodeStateField.Unicode)
-			offset = MuiTextUnicodeStateRecord.UnicodeOffset;
-		else
-		{
-			offset = 0;
-			return false;
-		}
-		return true;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiTextUnicodeStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
-			cursor.Record, MuiTextUnicodeStateRecord.Size)) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, MuiTextUnicodeStateRecord.FieldSize);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiTextUnicodeStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiTextUnicodeStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiTextUnicodeStateField field, out uint value)
@@ -103,16 +88,16 @@ internal static class MuiTextUnicodeStateFieldCursorCodec
 // compatibility and malformed-state diagnostics.
 internal static class MuiTextUnicodeStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiTextUnicodeStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiTextUnicodeStateField field,
+		out uint index)
 	{
 		if (field == MuiTextUnicodeStateField.Magic)
-			offset = MuiTextUnicodeStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiTextUnicodeStateField.Unicode)
-			offset = MuiTextUnicodeStateRecord.UnicodeOffset;
+			index = 1;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -122,9 +107,34 @@ internal static class MuiTextUnicodeStateRecordMemoryCodec
 		APTR record, MuiTextUnicodeStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiTextUnicodeStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiTextUnicodeStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		return TryResolve(field, out var offset) &&
-			TryGetAddress(ref platform, record, offset, out address);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiTextUnicodeStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiTextUnicodeStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiTextUnicodeStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

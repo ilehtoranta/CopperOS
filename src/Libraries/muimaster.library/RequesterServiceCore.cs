@@ -42,31 +42,53 @@ internal struct MuiRequesterServiceStateFieldCursor
 // record owns its packed field positions and complete-record admission.
 internal static class MuiRequesterServiceStateMemoryCodec
 {
-	private static bool TryResolve(MuiRequesterServiceStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiRequesterServiceStateField field,
+		out uint index)
 	{
-		offset = field switch
+		if (field == MuiRequesterServiceStateField.Magic)
+			index = 0;
+		else if (field == MuiRequesterServiceStateField.Generation)
+			index = 1;
+		else
 		{
-			MuiRequesterServiceStateField.Magic =>
-				MuiRequesterServiceStateRecord.MagicOffset,
-			MuiRequesterServiceStateField.Generation =>
-				MuiRequesterServiceStateRecord.GenerationOffset,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			index = uint.MaxValue;
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiRequesterServiceStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiRequesterServiceStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiRequesterServiceStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiRequesterServiceStateRecord.Size))
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiRequesterServiceStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiRequesterServiceStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiRequesterServiceStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiRequesterServiceStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -107,8 +129,14 @@ internal static class MuiRequesterServiceStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiRequesterServiceStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiRequesterServiceStateMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
+		TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiRequesterServiceStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiRequesterServiceStateMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiRequesterServiceStateField field, out uint value)
@@ -200,15 +228,16 @@ public static class MuiRequesterServiceRecordPacketCore
 
 // Bounded synchronous MUI_RequestA/MUI_RequestObjectA gateway. Title and gadget
 // arguments stay caller-owned guest pointers; the payload core validates their
-// bounded representation and the formatter materializes supported conversions
-// into a temporary guest C string before entry. The object form consumes one
+// bounded representation, preserves the caller's presentation flags for the
+// selected platform, and materializes supported conversions into a temporary
+// guest C string before entry. The object form consumes one
 // caller-owned reference after the modal request closes; callers that need the
 // object afterwards must retain it before entry, as the autodoc requires.
 // No managed state, exceptions, callbacks, or host UI are used in production.
 public static class MuiRequesterServiceCore
 {
 	public static bool Initialize<TPlatform>(ref TPlatform platform,
-		APTR serviceState) where TPlatform : struct, IMuiServicePlatform
+		APTR serviceState) where TPlatform : struct, IMuiGuestMemory
 	{
 		if (serviceState.IsNull ||
 			!platform.IsMapped(serviceState, MuiRequesterServiceStateRecord.Size))
@@ -226,17 +255,37 @@ public static class MuiRequesterServiceCore
 
 	public static int Request<TPlatform>(ref TPlatform platform, APTR serviceState,
 		APTR application, APTR window, uint flags, APTR title, APTR gadgets,
-		APTR format, APTR parameters) where TPlatform : struct, IMuiServicePlatform
+		APTR format, APTR parameters) where TPlatform : struct, IMuiRequesterServicePlatform
 	{
-		if (!Ready(ref platform, serviceState) || flags != 0 ||
-			!MuiRequesterPayloadCore.Validate(ref platform, title, gadgets,
-				format, parameters)) return 0;
-		if (!MuiRequesterFormatCore.TryMaterialize(ref platform, format, parameters,
+		var request = new MuiRequesterCallRecord
+		{
+			Application = application,
+			Window = window,
+			Flags = flags,
+			Title = title,
+			Gadgets = gadgets,
+			Format = format,
+			Parameters = parameters,
+		};
+		return Request(ref platform, serviceState, request);
+	}
+
+	internal static int Request<TPlatform>(ref TPlatform platform,
+		APTR serviceState, MuiRequesterCallRecord request)
+		where TPlatform : struct, IMuiRequesterServicePlatform
+	{
+		if (!Ready(ref platform, serviceState) ||
+			!MuiRequesterPayloadCore.Validate(ref platform, request.Title,
+				request.Gadgets, request.Format, request.Parameters)) return 0;
+		if (!MuiRequesterFormatCore.TryMaterialize(ref platform, request.Format,
+			request.Parameters,
 			out var preparedFormat, out var allocationSize)) return 0;
-		APTR preparedParameters = parameters;
-		if (allocationSize != 0) preparedParameters = APTR.Null;
-		var result = platform.Request(application, window, flags, title, gadgets,
-			preparedFormat, preparedParameters);
+		if (allocationSize != 0)
+		{
+			request.Format = preparedFormat;
+			request.Parameters = APTR.Null;
+		}
+		var result = platform.Request(request);
 		if (allocationSize != 0) platform.Free(preparedFormat, allocationSize);
 		return result;
 	}
@@ -244,28 +293,54 @@ public static class MuiRequesterServiceCore
 	public static int RequestObject<TPlatform>(ref TPlatform platform,
 		APTR serviceState, APTR application, APTR window, uint flags, APTR title,
 		APTR gadgets, APTR obj, APTR format, APTR parameters)
-		where TPlatform : struct, IMuiServicePlatform
+		where TPlatform : struct, IMuiRequesterCapability
 	{
-		if (!Ready(ref platform, serviceState) || flags != 0 ||
-			!MuiRequesterPayloadCore.Validate(ref platform, title, gadgets,
-				format, parameters) || obj.IsNull) return 0;
-		if (!MuiRequesterFormatCore.TryMaterialize(ref platform, format, parameters,
+		var request = new MuiRequesterCallRecord
+		{
+			Application = application,
+			Window = window,
+			Flags = flags,
+			Title = title,
+			Gadgets = gadgets,
+			Object = obj,
+			Format = format,
+			Parameters = parameters,
+		};
+		return RequestObject(ref platform, serviceState, request);
+	}
+
+	internal static int RequestObject<TPlatform>(ref TPlatform platform,
+		APTR serviceState, MuiRequesterCallRecord request)
+		where TPlatform : struct, IMuiRequesterCapability
+	{
+		if (!Ready(ref platform, serviceState) ||
+			!MuiRequesterPayloadCore.Validate(ref platform, request.Title,
+				request.Gadgets, request.Format, request.Parameters) ||
+			request.Object.IsNull) return 0;
+		if (!MuiRequesterFormatCore.TryMaterialize(ref platform, request.Format,
+			request.Parameters,
 			out var preparedFormat, out var allocationSize)) return 0;
-		APTR preparedParameters = parameters;
-		if (allocationSize != 0) preparedParameters = APTR.Null;
-		var result = platform.RequestObject(application, window, flags, title,
-			gadgets, obj, preparedFormat, preparedParameters);
+		if (allocationSize != 0)
+		{
+			request.Format = preparedFormat;
+			request.Parameters = APTR.Null;
+		}
+		var result = platform.RequestObject(request, out var consumeReference);
 		if (allocationSize != 0) platform.Free(preparedFormat, allocationSize);
 		// The requester consumes one object reference when it closes. A caller
 		// that needs the object afterwards must issue OM_RETAIN before entering,
 		// exactly as documented for MUI_RequestObjectA.
-		platform.ReleaseObject(obj);
+		if (consumeReference) platform.ReleaseObject(request.Object);
 		return result;
 	}
 
 	private static bool Ready<TPlatform>(ref TPlatform platform, APTR state)
-		where TPlatform : struct, IMuiServicePlatform =>
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadReadyState(ref platform, state);
+
+	internal static bool TryReadReadyState<TPlatform>(ref TPlatform platform,
+		APTR state) where TPlatform : struct, IMuiGuestMemory =>
 		!state.IsNull && MuiRequesterServiceStateCodec.TryRead(ref platform, state,
 			out var record) && record.Magic == MuiRequesterServiceLayout.Magic &&
-		record.Generation == MuiRequesterServiceLayout.Version;
+			record.Generation == MuiRequesterServiceLayout.Version;
 }

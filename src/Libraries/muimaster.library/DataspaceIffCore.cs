@@ -17,6 +17,8 @@ internal struct MuiDataspaceReadIffMessage
 {
 	internal const uint Size = 8;
 	internal const uint FieldSize = 4;
+	// ABI/documentation aliases retained for diagnostics; production access is
+	// declaration-ordered cursor traversal below.
 	internal const uint MethodIdOffset = 0;
 	internal const uint HandleOffset = 4;
 	internal uint MethodId;
@@ -39,20 +41,25 @@ internal struct MuiDataspaceReadIffFieldCursor
 // Struct-first guest-memory adapter for the fixed ReadIFF packet.
 internal static class MuiDataspaceReadIffMessageMemoryCodec
 {
-	private static bool TryResolve(MuiDataspaceReadIffField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiDataspaceReadIffField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
+		address = APTR.Null;
 		switch (field)
 		{
 			case MuiDataspaceReadIffField.MethodId:
-				offset = MuiDataspaceReadIffMessage.MethodIdOffset;
-				return true;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiDataspaceReadIffMessage.FieldSize, out address);
 			case MuiDataspaceReadIffField.Handle:
-				offset = MuiDataspaceReadIffMessage.HandleOffset;
-				return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiDataspaceReadIffMessage.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiDataspaceReadIffMessage.FieldSize, out address);
+			default:
+				return false;
 		}
-		offset = 0;
-		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -60,12 +67,10 @@ internal static class MuiDataspaceReadIffMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || message.IsNull ||
-			message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(message, MuiDataspaceReadIffMessage.Size))
-			return false;
-		address = APTR.FromPointer(message.Raw + offset);
-		return platform.IsMapped(address, MuiDataspaceReadIffMessage.FieldSize);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDataspaceReadIffMessage.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address)) return false;
+		return true;
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -73,9 +78,11 @@ internal static class MuiDataspaceReadIffMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, message, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiDataspaceIffMessageCodec.TryReadReadIffRecord(ref platform,
+			message, out var packet)) return false;
+		if (field == MuiDataspaceReadIffField.MethodId) value = packet.MethodId;
+		else if (field == MuiDataspaceReadIffField.Handle) value = packet.Handle.Raw;
+		else return false;
 		return true;
 	}
 
@@ -83,10 +90,14 @@ internal static class MuiDataspaceReadIffMessageMemoryCodec
 		APTR message, MuiDataspaceReadIffField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, message, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiDataspaceIffMessageCodec.TryReadReadIffRecord(ref platform,
+			message, out var packet)) return false;
+		if (field == MuiDataspaceReadIffField.MethodId) packet.MethodId = value;
+		else if (field == MuiDataspaceReadIffField.Handle)
+			packet.Handle = APTR.FromPointer(value);
+		else return false;
+		return MuiDataspaceIffMessageCodec.WriteReadIffStructuralRecord(
+			ref platform, message, packet);
 	}
 }
 
@@ -117,6 +128,8 @@ internal struct MuiDataspaceWriteIffMessage
 {
 	internal const uint Size = 16;
 	internal const uint FieldSize = 4;
+	// ABI/documentation aliases retained for diagnostics; production access is
+	// declaration-ordered cursor traversal below.
 	internal const uint MethodIdOffset = 0;
 	internal const uint HandleOffset = 4;
 	internal const uint TypeOffset = 8;
@@ -145,26 +158,41 @@ internal struct MuiDataspaceWriteIffFieldCursor
 // Struct-first guest-memory adapter for the fixed WriteIFF packet.
 internal static class MuiDataspaceWriteIffMessageMemoryCodec
 {
-	private static bool TryResolve(MuiDataspaceWriteIffField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiDataspaceWriteIffField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
+		address = APTR.Null;
 		switch (field)
 		{
 			case MuiDataspaceWriteIffField.MethodId:
-				offset = MuiDataspaceWriteIffMessage.MethodIdOffset;
-				return true;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiDataspaceWriteIffMessage.FieldSize, out address);
 			case MuiDataspaceWriteIffField.Handle:
-				offset = MuiDataspaceWriteIffMessage.HandleOffset;
-				return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiDataspaceWriteIffMessage.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiDataspaceWriteIffMessage.FieldSize, out address);
 			case MuiDataspaceWriteIffField.Type:
-				offset = MuiDataspaceWriteIffMessage.TypeOffset;
-				return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiDataspaceWriteIffMessage.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiDataspaceWriteIffMessage.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiDataspaceWriteIffMessage.FieldSize, out address);
 			case MuiDataspaceWriteIffField.Id:
-				offset = MuiDataspaceWriteIffMessage.IdOffset;
-				return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiDataspaceWriteIffMessage.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiDataspaceWriteIffMessage.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiDataspaceWriteIffMessage.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiDataspaceWriteIffMessage.FieldSize, out address);
+			default:
+				return false;
 		}
-		offset = 0;
-		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -172,12 +200,10 @@ internal static class MuiDataspaceWriteIffMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || message.IsNull ||
-			message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(message, MuiDataspaceWriteIffMessage.Size))
-			return false;
-		address = APTR.FromPointer(message.Raw + offset);
-		return platform.IsMapped(address, MuiDataspaceWriteIffMessage.FieldSize);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDataspaceWriteIffMessage.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address)) return false;
+		return true;
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -185,9 +211,13 @@ internal static class MuiDataspaceWriteIffMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, message, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiDataspaceIffMessageCodec.TryReadWriteIffRecord(ref platform,
+			message, out var packet)) return false;
+		if (field == MuiDataspaceWriteIffField.MethodId) value = packet.MethodId;
+		else if (field == MuiDataspaceWriteIffField.Handle) value = packet.Handle.Raw;
+		else if (field == MuiDataspaceWriteIffField.Type) value = packet.Type;
+		else if (field == MuiDataspaceWriteIffField.Id) value = packet.Id;
+		else return false;
 		return true;
 	}
 
@@ -195,10 +225,16 @@ internal static class MuiDataspaceWriteIffMessageMemoryCodec
 		APTR message, MuiDataspaceWriteIffField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, message, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiDataspaceIffMessageCodec.TryReadWriteIffRecord(ref platform,
+			message, out var packet)) return false;
+		if (field == MuiDataspaceWriteIffField.MethodId) packet.MethodId = value;
+		else if (field == MuiDataspaceWriteIffField.Handle)
+			packet.Handle = APTR.FromPointer(value);
+		else if (field == MuiDataspaceWriteIffField.Type) packet.Type = value;
+		else if (field == MuiDataspaceWriteIffField.Id) packet.Id = value;
+		else return false;
+		return MuiDataspaceIffMessageCodec.WriteWriteIffStructuralRecord(
+			ref platform, message, packet);
 	}
 }
 
@@ -246,6 +282,8 @@ internal struct MuiDataspaceIffEntryHeader
 {
 	internal const uint Size = 8;
 	internal const uint FieldSize = 4;
+	// ABI/documentation aliases retained for diagnostics; production access is
+	// declaration-ordered cursor traversal below.
 	internal const uint IdOffset = 0;
 	internal const uint LengthOffset = 4;
 	internal uint Id;
@@ -267,27 +305,37 @@ internal struct MuiDataspaceIffEntryHeaderFieldCursor
 
 internal static class MuiDataspaceIffEntryHeaderFieldCursorCodec
 {
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiDataspaceIffEntryHeaderField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		switch (field)
+		{
+			case MuiDataspaceIffEntryHeaderField.Id:
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiDataspaceIffEntryHeader.FieldSize, out address);
+			case MuiDataspaceIffEntryHeaderField.Length:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiDataspaceIffEntryHeader.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiDataspaceIffEntryHeader.FieldSize, out address);
+			default:
+				return false;
+		}
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiDataspaceIffEntryHeaderFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		uint offset;
-		switch (cursor.Field)
-		{
-			case MuiDataspaceIffEntryHeaderField.Id:
-				offset = MuiDataspaceIffEntryHeader.IdOffset;
-				break;
-			case MuiDataspaceIffEntryHeaderField.Length:
-				offset = MuiDataspaceIffEntryHeader.LengthOffset;
-				break;
-			default:
-				return false;
-		}
-		if (cursor.Header.IsNull || cursor.Header.Raw >
-			uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Header.Raw + offset);
-		return platform.IsMapped(address, MuiDataspaceIffEntryHeader.FieldSize);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, cursor.Header,
+			MuiDataspaceIffEntryHeader.Size, out var recordCursor) ||
+			!TryTakeField(ref platform, ref recordCursor, cursor.Field,
+				out address)) return false;
+		return true;
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -295,11 +343,12 @@ internal static class MuiDataspaceIffEntryHeaderFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiDataspaceIffEntryHeaderFieldCursor);
-		cursor.Header = header;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiDataspaceIffEntryHeaderCodec.TryRead(ref platform, header,
+			out var record)) return false;
+		if (field == MuiDataspaceIffEntryHeaderField.Id) value = record.Id;
+		else if (field == MuiDataspaceIffEntryHeaderField.Length)
+			value = record.Length;
+		else return false;
 		return true;
 	}
 
@@ -307,12 +356,13 @@ internal static class MuiDataspaceIffEntryHeaderFieldCursorCodec
 		APTR header, MuiDataspaceIffEntryHeaderField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiDataspaceIffEntryHeaderFieldCursor);
-		cursor.Header = header;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiDataspaceIffEntryHeaderCodec.TryRead(ref platform, header,
+			out var record)) return false;
+		if (field == MuiDataspaceIffEntryHeaderField.Id) record.Id = value;
+		else if (field == MuiDataspaceIffEntryHeaderField.Length)
+			record.Length = value;
+		else return false;
+		return MuiDataspaceIffEntryHeaderCodec.Write(ref platform, header, record);
 	}
 }
 
@@ -459,25 +509,16 @@ internal static class MuiDataspaceIffMethodFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiDataspaceIffMethodFieldCursor);
-		cursor.Message = message;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return field == MuiDataspaceIffMethodField.MethodId &&
+			MuiDataspaceIffMethodHeaderCodec.TryReadValue(ref platform, message,
+				out value);
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiDataspaceIffMethodField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		var cursor = default(MuiDataspaceIffMethodFieldCursor);
-		cursor.Message = message;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
-	}
+		=> field == MuiDataspaceIffMethodField.MethodId &&
+			MuiDataspaceIffMethodHeaderCodec.WriteValue(ref platform, message, value);
 }
 
 internal static class MuiDataspaceIffMessageCodec
@@ -518,7 +559,8 @@ internal static class MuiDataspaceIffMessageCodec
 	internal static bool TryReadReadIff<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiDataspaceReadIffMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-		=> TryReadReadIffRecord(ref platform, message, out packet);
+		=> TryReadReadIffRecord(ref platform, message, out packet) &&
+		packet.MethodId == ReadIffMethod;
 
 	internal static bool TryReadReadIffRecord<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiDataspaceReadIffMessage packet)
@@ -530,9 +572,8 @@ internal static class MuiDataspaceIffMessageCodec
 			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var rawMethodId) ||
 			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out var rawHandle) ||
-			!MuiGuestStructCursor.IsComplete(cursor) ||
-			rawMethodId != ReadIffMethod) return false;
+				out var rawHandle) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
 		packet.MethodId = rawMethodId;
 		packet.Handle = APTR.FromPointer(rawHandle);
 		return true;
@@ -541,7 +582,8 @@ internal static class MuiDataspaceIffMessageCodec
 	internal static bool TryReadWriteIff<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiDataspaceWriteIffMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-		=> TryReadWriteIffRecord(ref platform, message, out packet);
+		=> TryReadWriteIffRecord(ref platform, message, out packet) &&
+		packet.MethodId == WriteIffMethod;
 
 	internal static bool TryReadWriteIffRecord<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiDataspaceWriteIffMessage packet)
@@ -557,9 +599,7 @@ internal static class MuiDataspaceIffMessageCodec
 			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var type) ||
 			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out var id) ||
-			!MuiGuestStructCursor.IsComplete(cursor) ||
-			rawMethodId != WriteIffMethod) return false;
+				out var id) || !MuiGuestStructCursor.IsComplete(cursor)) return false;
 		packet.MethodId = rawMethodId;
 		packet.Handle = APTR.FromPointer(rawHandle);
 		packet.Type = type;
@@ -576,10 +616,18 @@ internal static class MuiDataspaceIffMessageCodec
 		APTR message, MuiDataspaceReadIffMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		packet.MethodId = ReadIffMethod;
+		return WriteReadIffStructuralRecord(ref platform, message, packet);
+	}
+
+	internal static bool WriteReadIffStructuralRecord<TPlatform>(
+		ref TPlatform platform, APTR message, MuiDataspaceReadIffMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
 			MuiDataspaceReadIffMessage.Size, out var cursor) ||
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				ReadIffMethod) ||
+				packet.MethodId) ||
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 				packet.Handle.Raw)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
@@ -594,10 +642,18 @@ internal static class MuiDataspaceIffMessageCodec
 		APTR message, MuiDataspaceWriteIffMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		packet.MethodId = WriteIffMethod;
+		return WriteWriteIffStructuralRecord(ref platform, message, packet);
+	}
+
+	internal static bool WriteWriteIffStructuralRecord<TPlatform>(
+		ref TPlatform platform, APTR message, MuiDataspaceWriteIffMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
 			MuiDataspaceWriteIffMessage.Size, out var cursor) ||
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				WriteIffMethod) ||
+				packet.MethodId) ||
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 				packet.Handle.Raw) ||
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,

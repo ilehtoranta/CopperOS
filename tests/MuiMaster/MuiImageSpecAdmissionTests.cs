@@ -67,6 +67,19 @@ public sealed class MuiImageSpecAdmissionTests
 			address, MuiImageSpecStateField.Builtin, out var typedBuiltin));
 		Assert.Equal(address.Raw + MuiImageSpecStateRecord.BuiltinOffset,
 			typedBuiltin.Raw);
+		var builtinCursor = new MuiImageSpecStateFieldCursor
+		{
+			Record = address,
+			Field = MuiImageSpecStateField.Builtin,
+		};
+		Assert.True(MuiImageSpecStateFieldCursorCodec.TryGetAddress(ref platform,
+			builtinCursor, out var cursorBuiltin, out var cursorFieldSize));
+		Assert.Equal(typedBuiltin, cursorBuiltin);
+		Assert.Equal(MuiImageSpecStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiImageSpecStateRecordMemoryCodec.TryGetAddress(ref platform,
+			builtinCursor, out var memoryBuiltin, out var memoryFieldSize));
+		Assert.Equal(cursorBuiltin, memoryBuiltin);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiImageSpecStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiImageSpecStateField.Raw, 0x2B00));
 		Assert.True(MuiImageSpecStateRecordMemoryCodec.TryReadUInt32(ref platform,
@@ -82,6 +95,13 @@ public sealed class MuiImageSpecAdmissionTests
 			address, MuiImageSpecStateRecord.Size, out _));
 		Assert.False(MuiImageSpecStateRecordMemoryCodec.TryGetAddress(ref platform,
 			APTR.Null, (uint)0, out _));
+		builtinCursor.Field = (MuiImageSpecStateField)255;
+		Assert.False(MuiImageSpecStateFieldCursorCodec.TryGetAddress(ref platform,
+			builtinCursor, out _, out _));
+		builtinCursor.Record = APTR.Null;
+		builtinCursor.Field = MuiImageSpecStateField.Builtin;
+		Assert.False(MuiImageSpecStateFieldCursorCodec.TryGetAddress(ref platform,
+			builtinCursor, out _, out _));
 		Assert.False(MuiImageSpecStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

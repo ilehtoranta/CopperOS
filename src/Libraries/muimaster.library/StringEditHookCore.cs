@@ -97,15 +97,8 @@ internal static class MuiStringEditCommandCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (record.IsNull || record.Raw > uint.MaxValue -
-			MuiStringEditCommandRecord.CommandOffset || !platform.IsMapped(record,
-			MuiStringEditCommandRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw +
-			MuiStringEditCommandRecord.CommandOffset);
-		return platform.IsMapped(address, MuiStringEditCommandRecord.FieldSize);
-	}
+		=> MuiGuestUlongStorageMemoryCodec.TryGetAddress(ref platform, record,
+			MuiGuestUlongStorageField.Value, out address);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiStringEditCommandRecord record)
@@ -132,19 +125,6 @@ internal struct MuiStringEditWorkRecord
 	internal const uint Size = 44;
 	internal const uint LongFieldSize = 4;
 	internal const uint WordFieldSize = 2;
-	internal const uint GadgetOffset = 0;
-	internal const uint StringInfoOffset = 4;
-	internal const uint WorkBufferOffset = 8;
-	internal const uint PrevBufferOffset = 12;
-	internal const uint ModesOffset = 16;
-	internal const uint InputEventOffset = 20;
-	internal const uint CodeOffset = 24;
-	internal const uint BufferPosOffset = 26;
-	internal const uint NumCharsOffset = 28;
-	internal const uint ActionsOffset = 30;
-	internal const uint LongIntOffset = 34;
-	internal const uint GadgetInfoOffset = 38;
-	internal const uint EditOpOffset = 42;
 	internal APTR Gadget;
 	internal APTR StringInfo;
 	internal APTR WorkBuffer;
@@ -189,47 +169,68 @@ internal struct MuiStringEditRecordFieldCursor
 // the complete record before exposing a field address.
 internal static class MuiStringEditWorkRecordMemoryCodec
 {
-	private static bool TryResolve(MuiStringEditRecordField field,
-		out uint offset, out uint fieldSize)
+	private static bool TryResolveFieldIndex(MuiStringEditRecordField field,
+		out uint index, out uint fieldSize)
 	{
-		offset = field switch
+		if (field == MuiStringEditRecordField.Gadget) index = 0;
+		else if (field == MuiStringEditRecordField.StringInfo) index = 1;
+		else if (field == MuiStringEditRecordField.WorkBuffer) index = 2;
+		else if (field == MuiStringEditRecordField.PrevBuffer) index = 3;
+		else if (field == MuiStringEditRecordField.Modes) index = 4;
+		else if (field == MuiStringEditRecordField.InputEvent) index = 5;
+		else if (field == MuiStringEditRecordField.Code) index = 6;
+		else if (field == MuiStringEditRecordField.BufferPos) index = 7;
+		else if (field == MuiStringEditRecordField.NumChars) index = 8;
+		else if (field == MuiStringEditRecordField.Actions) index = 9;
+		else if (field == MuiStringEditRecordField.LongInt) index = 10;
+		else if (field == MuiStringEditRecordField.GadgetInfo) index = 11;
+		else if (field == MuiStringEditRecordField.EditOp) index = 12;
+		else
 		{
-			MuiStringEditRecordField.Gadget => MuiStringEditWorkRecord.GadgetOffset,
-			MuiStringEditRecordField.StringInfo => MuiStringEditWorkRecord.StringInfoOffset,
-			MuiStringEditRecordField.WorkBuffer => MuiStringEditWorkRecord.WorkBufferOffset,
-			MuiStringEditRecordField.PrevBuffer => MuiStringEditWorkRecord.PrevBufferOffset,
-			MuiStringEditRecordField.Modes => MuiStringEditWorkRecord.ModesOffset,
-			MuiStringEditRecordField.InputEvent => MuiStringEditWorkRecord.InputEventOffset,
-			MuiStringEditRecordField.Code => MuiStringEditWorkRecord.CodeOffset,
-			MuiStringEditRecordField.BufferPos => MuiStringEditWorkRecord.BufferPosOffset,
-			MuiStringEditRecordField.NumChars => MuiStringEditWorkRecord.NumCharsOffset,
-			MuiStringEditRecordField.Actions => MuiStringEditWorkRecord.ActionsOffset,
-			MuiStringEditRecordField.LongInt => MuiStringEditWorkRecord.LongIntOffset,
-			MuiStringEditRecordField.GadgetInfo => MuiStringEditWorkRecord.GadgetInfoOffset,
-			MuiStringEditRecordField.EditOp => MuiStringEditWorkRecord.EditOpOffset,
-			_ => uint.MaxValue,
-		};
-		fieldSize = field == MuiStringEditRecordField.Code ||
-			field == MuiStringEditRecordField.BufferPos ||
-			field == MuiStringEditRecordField.NumChars ||
-			field == MuiStringEditRecordField.EditOp ?
-			MuiStringEditWorkRecord.WordFieldSize :
-			MuiStringEditWorkRecord.LongFieldSize;
-		return offset != uint.MaxValue;
+			index = uint.MaxValue;
+			fieldSize = 0;
+			return false;
+		}
+		fieldSize = index >= 6 && index <= 8 || index == 12
+			? MuiStringEditWorkRecord.WordFieldSize
+			: MuiStringEditWorkRecord.LongFieldSize;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiStringEditRecordField field, out APTR address,
 		out uint fieldSize) where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiStringEditRecordFieldCursor);
+		cursor.Address = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out fieldSize);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringEditRecordFieldCursor cursor, out APTR address,
+		out uint fieldSize) where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
 		fieldSize = 0;
-		if (!TryResolve(field, out var offset, out fieldSize) ||
-			record.IsNull || record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiStringEditWorkRecord.Size))
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, fieldSize);
+		if (!TryResolveFieldIndex(cursor.Field, out var index,
+			out fieldSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Address,
+				MuiStringEditWorkRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			var currentSize = MuiStringEditWorkRecord.LongFieldSize;
+			if (current >= 6 && current <= 8 || current == 12)
+				currentSize = MuiStringEditWorkRecord.WordFieldSize;
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				currentSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

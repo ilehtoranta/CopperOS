@@ -58,66 +58,70 @@ internal struct MuiAreaCustomFontMessageFieldCursor
 // field instead of supplying untyped offsets.
 internal static class MuiAreaCustomFontMessageMemoryCodec
 {
-	private static bool TryGetPacketSize(MuiAreaCustomFontMessageKind kind,
-		out uint size)
+	private static bool TryResolveFieldIndex(MuiAreaCustomFontMessageKind kind,
+		MuiAreaCustomFontMessageField field, out uint index, out uint recordSize)
 	{
-		switch (kind)
+		if (kind == MuiAreaCustomFontMessageKind.Open &&
+			field == MuiAreaCustomFontMessageField.MethodId)
 		{
-			case MuiAreaCustomFontMessageKind.Open:
-				size = MuiAreaOpenCustomFontMessage.Size;
-				return true;
-			case MuiAreaCustomFontMessageKind.Close:
-				size = MuiAreaCloseCustomFontMessage.Size;
-				return true;
+			index = 0;
+			recordSize = MuiAreaOpenCustomFontMessage.Size;
+			return true;
 		}
-		size = 0;
-		return false;
-	}
-
-	private static bool TryResolve(MuiAreaCustomFontMessageKind kind,
-		MuiAreaCustomFontMessageField field, out uint offset)
-	{
-		if (kind == MuiAreaCustomFontMessageKind.Open)
+		if (kind == MuiAreaCustomFontMessageKind.Open &&
+			field == MuiAreaCustomFontMessageField.Pointer)
 		{
-			if (field == MuiAreaCustomFontMessageField.MethodId)
-			{
-				offset = MuiAreaOpenCustomFontMessage.MethodIdOffset;
-				return true;
-			}
-			if (field == MuiAreaCustomFontMessageField.Pointer)
-			{
-				offset = MuiAreaOpenCustomFontMessage.SpecOffset;
-				return true;
-			}
+			index = 1;
+			recordSize = MuiAreaOpenCustomFontMessage.Size;
+			return true;
 		}
-		else if (kind == MuiAreaCustomFontMessageKind.Close)
+		if (kind == MuiAreaCustomFontMessageKind.Close &&
+			field == MuiAreaCustomFontMessageField.MethodId)
 		{
-			if (field == MuiAreaCustomFontMessageField.MethodId)
-			{
-				offset = MuiAreaCloseCustomFontMessage.MethodIdOffset;
-				return true;
-			}
-			if (field == MuiAreaCustomFontMessageField.Pointer)
-			{
-				offset = MuiAreaCloseCustomFontMessage.FontOffset;
-				return true;
-			}
+			index = 0;
+			recordSize = MuiAreaCloseCustomFontMessage.Size;
+			return true;
 		}
-		offset = 0;
+		if (kind == MuiAreaCustomFontMessageKind.Close &&
+			field == MuiAreaCustomFontMessageField.Pointer)
+		{
+			index = 1;
+			recordSize = MuiAreaCloseCustomFontMessage.Size;
+			return true;
+		}
+		index = uint.MaxValue;
+		recordSize = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaCustomFontMessageFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaCustomFontMessageFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Kind, cursor.Field, out var offset) ||
-			!TryGetPacketSize(cursor.Kind, out var packetSize) ||
-			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Message, packetSize)) return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, MuiAreaOpenCustomFontMessage.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Kind, cursor.Field, out var index,
+			out var recordSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Message, recordSize,
+				out var guestCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref guestCursor,
+				MuiAreaOpenCustomFontMessage.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiAreaOpenCustomFontMessage.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -293,6 +297,13 @@ internal static class MuiAreaCustomFontMessageFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiAreaCustomFontMessageMemoryCodec.TryGetAddress(ref platform, cursor,
 			out address);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaCustomFontMessageFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAreaCustomFontMessageMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR message, MuiAreaCustomFontMessageKind kind,

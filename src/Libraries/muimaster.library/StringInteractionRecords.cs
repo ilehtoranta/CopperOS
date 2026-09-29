@@ -58,36 +58,17 @@ internal struct MuiStringInteractionStateFieldCursor
 
 internal static class MuiStringInteractionStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiStringInteractionStateField field,
-		out uint offset)
-	{
-		if (field == MuiStringInteractionStateField.Magic)
-			offset = MuiStringInteractionStateRecord.MagicOffset;
-		else if (field == MuiStringInteractionStateField.Editable)
-			offset = MuiStringInteractionStateRecord.EditableOffset;
-		else if (field == MuiStringInteractionStateField.AdvanceOnCR)
-			offset = MuiStringInteractionStateRecord.AdvanceOnCROffset;
-		else if (field == MuiStringInteractionStateField.Multiline)
-			offset = MuiStringInteractionStateRecord.MultilineOffset;
-		else
-		{
-			offset = 0;
-			return false;
-		}
-		return true;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiStringInteractionStateFieldCursor cursor, out APTR address)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
-				cursor.Record, MuiStringInteractionStateRecord.Size)) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, MuiStringInteractionStateRecord.FieldSize);
-	}
+	where TPlatform : struct, IMuiGuestMemory
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringInteractionStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+	where TPlatform : struct, IMuiGuestMemory
+		=> MuiStringInteractionStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiStringInteractionStateField field, out uint value)
@@ -119,20 +100,20 @@ internal static class MuiStringInteractionStateFieldCursorCodec
 // semantic record; this bounded adapter owns fixed guest-layout translation.
 internal static class MuiStringInteractionStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiStringInteractionStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiStringInteractionStateField field,
+		out uint index)
 	{
 		if (field == MuiStringInteractionStateField.Magic)
-			offset = MuiStringInteractionStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiStringInteractionStateField.Editable)
-			offset = MuiStringInteractionStateRecord.EditableOffset;
+			index = 1;
 		else if (field == MuiStringInteractionStateField.AdvanceOnCR)
-			offset = MuiStringInteractionStateRecord.AdvanceOnCROffset;
+			index = 2;
 		else if (field == MuiStringInteractionStateField.Multiline)
-			offset = MuiStringInteractionStateRecord.MultilineOffset;
+			index = 3;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -140,11 +121,36 @@ internal static class MuiStringInteractionStateRecordMemoryCodec
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiStringInteractionStateField field, out APTR address)
+	where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiStringInteractionStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringInteractionStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		return TryResolve(field, out var offset) &&
-			TryGetAddress(ref platform, record, offset, out address);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiStringInteractionStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiStringInteractionStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiStringInteractionStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

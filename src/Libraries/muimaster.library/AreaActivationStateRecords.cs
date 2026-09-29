@@ -16,6 +16,8 @@ internal struct MuiAreaActivationStateRecord
 {
 	internal const uint Size = 16;
 	internal const uint FieldSize = 4;
+	// Compatibility aliases for existing white-box callers. Production field
+	// admission uses the named cursor below rather than these wire constants.
 	internal const uint SignatureOffset = 0;
 	internal const uint ActiveOffset = 4;
 	internal const uint FlagsOffset = 8;
@@ -63,10 +65,14 @@ internal static class MuiAreaActivationStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaActivationStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiAreaActivationStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Address, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaActivationStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiAreaActivationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR address, MuiAreaActivationStateField field, out uint value)
@@ -90,20 +96,20 @@ internal static class MuiAreaActivationStateFieldCursorCodec
 // remains available only to legacy callers and malformed-state diagnostics.
 internal static class MuiAreaActivationStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiAreaActivationStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiAreaActivationStateField field,
+		out uint index)
 	{
 		if (field == MuiAreaActivationStateField.Signature)
-			offset = MuiAreaActivationStateRecord.SignatureOffset;
+			index = 0;
 		else if (field == MuiAreaActivationStateField.Active)
-			offset = MuiAreaActivationStateRecord.ActiveOffset;
+			index = 1;
 		else if (field == MuiAreaActivationStateField.Flags)
-			offset = MuiAreaActivationStateRecord.FlagsOffset;
+			index = 2;
 		else if (field == MuiAreaActivationStateField.Generation)
-			offset = MuiAreaActivationStateRecord.GenerationOffset;
+			index = 3;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -113,13 +119,34 @@ internal static class MuiAreaActivationStateRecordMemoryCodec
 		APTR record, MuiAreaActivationStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiAreaActivationStateFieldCursor);
+		cursor.Address = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaActivationStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiAreaActivationStateRecord.Size) &&
-			platform.IsMapped(address, MuiAreaActivationStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Address,
+				MuiAreaActivationStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiAreaActivationStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiAreaActivationStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

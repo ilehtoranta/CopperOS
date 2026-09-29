@@ -37,22 +37,23 @@ internal struct MuiAslTagItemFieldCursor
 // complete named record and rejects odd, null, or truncated addresses.
 internal static class MuiAslTagItemMessageMemoryCodec
 {
-	private static bool TryResolve(MuiAslTagItemField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiAslTagItemField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		switch (field)
+		address = APTR.Null;
+		if (field == MuiAslTagItemField.Tag)
+			return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiAslTagItemRecord.FieldSize, out address);
+		if (field == MuiAslTagItemField.Data)
 		{
-			case MuiAslTagItemField.Tag:
-				offset = MuiAslTagItemRecord.TagOffset;
-				break;
-			case MuiAslTagItemField.Data:
-				offset = MuiAslTagItemRecord.DataOffset;
-				break;
-			default:
-				offset = 0;
-				return false;
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiAslTagItemRecord.FieldSize, out _)) return false;
+			return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiAslTagItemRecord.FieldSize, out address);
 		}
-		return true;
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -60,11 +61,11 @@ internal static class MuiAslTagItemMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			(record.Raw & 1u) != 0 || record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiAslTagItemRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiAslTagItemRecord.FieldSize);
+		if ((record.Raw & 1u) != 0 ||
+			!MuiGuestStructCursor.TryCreate(ref platform, record,
+				MuiAslTagItemRecord.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address)) return false;
+		return true;
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -273,11 +274,14 @@ public static class MuiAslTagListCore
 	public const uint MaximumSteps = 65535;
 
 	public static bool Validate<TPlatform>(ref TPlatform platform, APTR tags)
-		where TPlatform : struct, IMuiServicePlatform
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		uint ignored;
 		bool found;
-		return TryFind(ref platform, tags, 0xFFFFFFFFu, 0, out ignored,
+		// TAG_DONE is handled as termination before payload matching, so this
+		// walk cannot return early for an ordinary payload tag. No ULONG value
+		// in the payload space (including uint.MaxValue) is a safe sentinel.
+		return TryFind(ref platform, tags, TagDone, 0, out ignored,
 			out found);
 	}
 
@@ -295,7 +299,7 @@ public static class MuiAslTagListCore
 
 	private static bool TryFind<TPlatform>(ref TPlatform platform, APTR tags,
 		uint requestedTag, uint defaultValue, out uint result, out bool found)
-		where TPlatform : struct, IMuiServicePlatform
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		result = defaultValue;
 		found = false;

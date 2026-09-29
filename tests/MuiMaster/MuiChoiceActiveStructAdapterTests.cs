@@ -23,6 +23,21 @@ public sealed class MuiChoiceActiveStructAdapterTests
 			ref platform, address, MuiChoiceActiveStateField.Active,
 			out var activeAddress));
 		Assert.Equal(0x3504u, activeAddress.Raw);
+		var activeCursor = new MuiChoiceActiveStateFieldCursor
+		{
+			Record = address,
+			Field = MuiChoiceActiveStateField.Active,
+		};
+		Assert.True(MuiChoiceActiveStateFieldCursorCodec.TryGetAddress(
+			ref platform, activeCursor, out var cursorActiveAddress,
+			out var fieldSize));
+		Assert.Equal(activeAddress, cursorActiveAddress);
+		Assert.Equal(MuiChoiceActiveStateRecord.FieldSize, fieldSize);
+		Assert.True(MuiChoiceActiveStateRecordMemoryCodec.TryGetAddress(
+			ref platform, activeCursor, out var memoryCursorAddress,
+			out var memoryFieldSize));
+		Assert.Equal(cursorActiveAddress, memoryCursorAddress);
+		Assert.Equal(fieldSize, memoryFieldSize);
 		Assert.True(MuiChoiceActiveStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiChoiceActiveStateField.Active, 8));
 		Assert.True(MuiChoiceActiveStateRecordCodec.TryReadStructural(
@@ -33,6 +48,9 @@ public sealed class MuiChoiceActiveStructAdapterTests
 			MuiChoiceActiveStateField.Magic, out _));
 		Assert.False(MuiChoiceActiveStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiChoiceActiveStateField.Magic, out _));
+		activeCursor.Record = APTR.Null;
+		Assert.False(MuiChoiceActiveStateFieldCursorCodec.TryGetAddress(
+			ref platform, activeCursor, out _, out _));
 	}
 
 	[Fact]

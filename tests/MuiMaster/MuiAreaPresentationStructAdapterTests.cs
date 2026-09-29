@@ -27,6 +27,19 @@ public sealed class MuiAreaPresentationStructAdapterTests
 			ref platform, address, MuiAreaPresentationStateField.Frame,
 			out var frameAddress));
 		Assert.Equal(0x3510u, frameAddress.Raw);
+		var cursor = new MuiAreaPresentationStateFieldCursor
+		{
+			Record = address,
+			Field = MuiAreaPresentationStateField.Frame,
+		};
+		Assert.True(MuiAreaPresentationStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedFrameAddress, out var typedFrameSize));
+		Assert.Equal(frameAddress, typedFrameAddress);
+		Assert.Equal(MuiAreaPresentationStateRecord.FieldSize, typedFrameSize);
+		Assert.True(MuiAreaPresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryFrameAddress, out var memoryFrameSize));
+		Assert.Equal(typedFrameAddress, memoryFrameAddress);
+		Assert.Equal(typedFrameSize, memoryFrameSize);
 		Assert.True(MuiAreaPresentationStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiAreaPresentationStateField.Background,
 			0x00112233));
@@ -37,6 +50,13 @@ public sealed class MuiAreaPresentationStructAdapterTests
 			ref platform, address, (MuiAreaPresentationStateField)255, out _));
 		Assert.False(MuiAreaPresentationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiAreaPresentationStateField.Magic, out _));
+		cursor.Field = (MuiAreaPresentationStateField)255;
+		Assert.False(MuiAreaPresentationStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiAreaPresentationStateField.Magic;
+		Assert.False(MuiAreaPresentationStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 		Assert.False(MuiAreaPresentationStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

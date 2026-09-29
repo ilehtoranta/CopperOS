@@ -44,56 +44,32 @@ internal struct MuiLevelmeterPresentationStateFieldCursor
 
 internal static class MuiLevelmeterPresentationStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiLevelmeterPresentationStateField field,
-		out uint offset)
-	{
-		if (field == MuiLevelmeterPresentationStateField.Magic)
-			offset = MuiLevelmeterPresentationStateRecord.MagicOffset;
-		else if (field == MuiLevelmeterPresentationStateField.Horizontal)
-			offset = MuiLevelmeterPresentationStateRecord.HorizontalOffset;
-		else
-		{
-			offset = 0;
-			return false;
-		}
-		return true;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiLevelmeterPresentationStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
-			cursor.Record, MuiLevelmeterPresentationStateRecord.Size)) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, MuiLevelmeterPresentationStateRecord.FieldSize);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiLevelmeterPresentationStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiLevelmeterPresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiLevelmeterPresentationStateField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiLevelmeterPresentationStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiLevelmeterPresentationStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, record, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiLevelmeterPresentationStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiLevelmeterPresentationStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		return MuiLevelmeterPresentationStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, record, field, value);
 	}
 }
 
@@ -103,16 +79,16 @@ internal static class MuiLevelmeterPresentationStateFieldCursorCodec
 // malformed-state diagnostics.
 internal static class MuiLevelmeterPresentationStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiLevelmeterPresentationStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiLevelmeterPresentationStateField field,
+		out uint index)
 	{
 		if (field == MuiLevelmeterPresentationStateField.Magic)
-			offset = MuiLevelmeterPresentationStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiLevelmeterPresentationStateField.Horizontal)
-			offset = MuiLevelmeterPresentationStateRecord.HorizontalOffset;
+			index = 1;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -122,9 +98,34 @@ internal static class MuiLevelmeterPresentationStateRecordMemoryCodec
 		APTR record, MuiLevelmeterPresentationStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiLevelmeterPresentationStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiLevelmeterPresentationStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		return TryResolve(field, out var offset) &&
-			TryGetAddress(ref platform, record, offset, out address);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiLevelmeterPresentationStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiLevelmeterPresentationStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiLevelmeterPresentationStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

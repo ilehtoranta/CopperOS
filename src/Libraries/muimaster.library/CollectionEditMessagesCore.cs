@@ -63,36 +63,67 @@ internal static class MuiCollectionEditMessageMemoryCodec
 		return false;
 	}
 
-	private static bool TryResolve(MuiCollectionEditPacketKind packet,
-		MuiCollectionEditField field, out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiCollectionEditPacketKind packet,
+		MuiCollectionEditField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
+		address = APTR.Null;
+		uint fieldIndex;
 		switch (packet)
 		{
 			case MuiCollectionEditPacketKind.CreateEditObject:
-				if (field == MuiCollectionEditField.MethodId) { offset = MuiCollectionCreateEditObjectMessage.MethodIdOffset; return true; }
-				if (field == MuiCollectionEditField.Row) { offset = MuiCollectionCreateEditObjectMessage.RowOffset; return true; }
-				if (field == MuiCollectionEditField.Column) { offset = MuiCollectionCreateEditObjectMessage.ColumnOffset; return true; }
-				if (field == MuiCollectionEditField.Entry) { offset = MuiCollectionCreateEditObjectMessage.EntryOffset; return true; }
+				fieldIndex = field switch
+				{
+					MuiCollectionEditField.MethodId => 0,
+					MuiCollectionEditField.Row => 1,
+					MuiCollectionEditField.Column => 2,
+					MuiCollectionEditField.Entry => 3,
+					_ => uint.MaxValue,
+				};
 				break;
 			case MuiCollectionEditPacketKind.Edit:
-				if (field == MuiCollectionEditField.MethodId) { offset = MuiCollectionEditMessage.MethodIdOffset; return true; }
-				if (field == MuiCollectionEditField.Row) { offset = MuiCollectionEditMessage.RowOffset; return true; }
-				if (field == MuiCollectionEditField.Column) { offset = MuiCollectionEditMessage.ColumnOffset; return true; }
+				fieldIndex = field switch
+				{
+					MuiCollectionEditField.MethodId => 0,
+					MuiCollectionEditField.Row => 1,
+					MuiCollectionEditField.Column => 2,
+					_ => uint.MaxValue,
+				};
 				break;
 			case MuiCollectionEditPacketKind.EditDone:
-				if (field == MuiCollectionEditField.MethodId) { offset = MuiCollectionEditDoneMessage.MethodIdOffset; return true; }
-				if (field == MuiCollectionEditField.Row) { offset = MuiCollectionEditDoneMessage.RowOffset; return true; }
-				if (field == MuiCollectionEditField.Column) { offset = MuiCollectionEditDoneMessage.ColumnOffset; return true; }
-				if (field == MuiCollectionEditField.Entry) { offset = MuiCollectionEditDoneMessage.EntryOffset; return true; }
-				if (field == MuiCollectionEditField.EditObject) { offset = MuiCollectionEditDoneMessage.EditObjectOffset; return true; }
+				fieldIndex = field switch
+				{
+					MuiCollectionEditField.MethodId => 0,
+					MuiCollectionEditField.Row => 1,
+					MuiCollectionEditField.Column => 2,
+					MuiCollectionEditField.Entry => 3,
+					MuiCollectionEditField.EditObject => 4,
+					_ => uint.MaxValue,
+				};
 				break;
 			case MuiCollectionEditPacketKind.EndEdit:
-				if (field == MuiCollectionEditField.MethodId) { offset = MuiCollectionEndEditMessage.MethodIdOffset; return true; }
-				if (field == MuiCollectionEditField.Mode) { offset = MuiCollectionEndEditMessage.ModeOffset; return true; }
+				fieldIndex = field switch
+				{
+					MuiCollectionEditField.MethodId => 0,
+					MuiCollectionEditField.Mode => 1,
+					_ => uint.MaxValue,
+				};
 				break;
+			default:
+				return false;
 		}
-		offset = 0;
-		return false;
+		if (fieldIndex == uint.MaxValue) return false;
+		if (fieldIndex > 0 && !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, MuiCollectionMethodMessage.FieldSize, out _)) return false;
+		if (fieldIndex > 1 && !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, MuiCollectionMethodMessage.FieldSize, out _)) return false;
+		if (fieldIndex > 2 && !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, MuiCollectionMethodMessage.FieldSize, out _)) return false;
+		if (fieldIndex > 3 && !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, MuiCollectionMethodMessage.FieldSize, out _)) return false;
+		return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiCollectionMethodMessage.FieldSize, out address);
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -107,13 +138,12 @@ internal static class MuiCollectionEditMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(packet, field, out var offset) ||
-			!TryGetPacketSize(packet, out var packetSize) ||
-			message.IsNull || message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(message, packetSize))
-			return false;
-		address = APTR.FromPointer(message.Raw + offset);
-		return platform.IsMapped(address, MuiCollectionMethodMessage.FieldSize);
+		if (!TryGetPacketSize(packet, out var packetSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, message, packetSize,
+				out var guestCursor) ||
+			!TryTakeField(ref platform, ref guestCursor, packet, field,
+				out address)) return false;
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -122,10 +152,63 @@ internal static class MuiCollectionEditMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, message, packet, field,
-			out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		if (packet == MuiCollectionEditPacketKind.CreateEditObject)
+		{
+			if (!MuiCollectionEditStructPacketCodec.TryReadCreateEditObject(
+				ref platform, message, out var create)) return false;
+			if (field == MuiCollectionEditField.MethodId)
+				value = create.MethodId;
+			else if (field == MuiCollectionEditField.Row)
+				value = unchecked((uint)create.Row);
+			else if (field == MuiCollectionEditField.Column)
+				value = unchecked((uint)create.Column);
+			else if (field == MuiCollectionEditField.Entry)
+				value = create.Entry;
+			else return false;
+			return true;
+		}
+		if (packet == MuiCollectionEditPacketKind.Edit)
+		{
+			if (!MuiCollectionEditStructPacketCodec.TryReadEdit(ref platform,
+				message, out var edit)) return false;
+			if (field == MuiCollectionEditField.MethodId)
+				value = edit.MethodId;
+			else if (field == MuiCollectionEditField.Row)
+				value = unchecked((uint)edit.Row);
+			else if (field == MuiCollectionEditField.Column)
+				value = unchecked((uint)edit.Column);
+			else return false;
+			return true;
+		}
+		if (packet == MuiCollectionEditPacketKind.EditDone)
+		{
+			if (!MuiCollectionEditStructPacketCodec.TryReadEditDone(ref platform,
+				message, out var done)) return false;
+			if (field == MuiCollectionEditField.MethodId)
+				value = done.MethodId;
+			else if (field == MuiCollectionEditField.Row)
+				value = unchecked((uint)done.Row);
+			else if (field == MuiCollectionEditField.Column)
+				value = unchecked((uint)done.Column);
+			else if (field == MuiCollectionEditField.Entry)
+				value = done.Entry;
+			else if (field == MuiCollectionEditField.EditObject)
+				value = done.EditObject;
+			else return false;
+			return true;
+		}
+		if (packet == MuiCollectionEditPacketKind.EndEdit)
+		{
+			if (!MuiCollectionEditStructPacketCodec.TryReadEndEdit(ref platform,
+				message, out var endEdit)) return false;
+			if (field == MuiCollectionEditField.MethodId)
+				value = endEdit.MethodId;
+			else if (field == MuiCollectionEditField.Mode)
+				value = endEdit.Mode;
+			else return false;
+			return true;
+		}
+		return false;
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -133,10 +216,67 @@ internal static class MuiCollectionEditMessageMemoryCodec
 		MuiCollectionEditField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, message, packet, field,
-			out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (packet == MuiCollectionEditPacketKind.CreateEditObject)
+		{
+			if (!MuiCollectionEditStructPacketCodec.TryReadCreateEditObject(
+				ref platform, message, out var create)) return false;
+			if (field == MuiCollectionEditField.MethodId)
+				create.MethodId = value;
+			else if (field == MuiCollectionEditField.Row)
+				create.Row = unchecked((int)value);
+			else if (field == MuiCollectionEditField.Column)
+				create.Column = unchecked((int)value);
+			else if (field == MuiCollectionEditField.Entry)
+				create.Entry = value;
+			else return false;
+			return MuiCollectionEditStructPacketCodec.TryWriteCreateEditObject(
+				ref platform, message, create);
+		}
+		if (packet == MuiCollectionEditPacketKind.Edit)
+		{
+			if (!MuiCollectionEditStructPacketCodec.TryReadEdit(ref platform,
+				message, out var edit)) return false;
+			if (field == MuiCollectionEditField.MethodId)
+				edit.MethodId = value;
+			else if (field == MuiCollectionEditField.Row)
+				edit.Row = unchecked((int)value);
+			else if (field == MuiCollectionEditField.Column)
+				edit.Column = unchecked((int)value);
+			else return false;
+			return MuiCollectionEditStructPacketCodec.TryWriteEdit(ref platform,
+				message, edit);
+		}
+		if (packet == MuiCollectionEditPacketKind.EditDone)
+		{
+			if (!MuiCollectionEditStructPacketCodec.TryReadEditDone(ref platform,
+				message, out var done)) return false;
+			if (field == MuiCollectionEditField.MethodId)
+				done.MethodId = value;
+			else if (field == MuiCollectionEditField.Row)
+				done.Row = unchecked((int)value);
+			else if (field == MuiCollectionEditField.Column)
+				done.Column = unchecked((int)value);
+			else if (field == MuiCollectionEditField.Entry)
+				done.Entry = value;
+			else if (field == MuiCollectionEditField.EditObject)
+				done.EditObject = value;
+			else return false;
+			return MuiCollectionEditStructPacketCodec.TryWriteEditDone(ref platform,
+				message, done);
+		}
+		if (packet == MuiCollectionEditPacketKind.EndEdit)
+		{
+			if (!MuiCollectionEditStructPacketCodec.TryReadEndEdit(ref platform,
+				message, out var endEdit)) return false;
+			if (field == MuiCollectionEditField.MethodId)
+				endEdit.MethodId = value;
+			else if (field == MuiCollectionEditField.Mode)
+				endEdit.Mode = value;
+			else return false;
+			return MuiCollectionEditStructPacketCodec.TryWriteEndEdit(ref platform,
+				message, endEdit);
+		}
+		return false;
 	}
 }
 

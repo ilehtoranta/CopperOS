@@ -73,7 +73,7 @@ public static class MuiRequesterPayloadCore
 
 	public static bool Validate<TPlatform>(ref TPlatform platform, APTR title,
 		APTR gadgets, APTR format, APTR parameters)
-		where TPlatform : struct, IMuiHeadlessPlatform
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		uint ignored;
 		return ValidateCString(ref platform, title) &&
@@ -86,7 +86,7 @@ public static class MuiRequesterPayloadCore
 	// has zero alternatives; every nonempty segment contributes one result.
 	public static bool TryGetGadgetCount<TPlatform>(ref TPlatform platform,
 		APTR gadgets, out uint count)
-		where TPlatform : struct, IMuiHeadlessPlatform
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		count = 0;
 		if (gadgets.IsNull) return true;
@@ -114,7 +114,7 @@ public static class MuiRequesterPayloadCore
 	// MorphOS-specific text conversions are not rejected at this boundary.
 	public static bool TryGetFormatParameterCount<TPlatform>(
 		ref TPlatform platform, APTR format, out uint count)
-		where TPlatform : struct, IMuiHeadlessPlatform
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		count = 0;
 		if (format.IsNull) return true;
@@ -191,7 +191,7 @@ public static class MuiRequesterPayloadCore
 
 	private static bool ValidateCString<TPlatform>(ref TPlatform platform,
 		APTR value)
-		where TPlatform : struct, IMuiHeadlessPlatform
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (value.IsNull) return true;
 		uint length;
@@ -201,7 +201,7 @@ public static class MuiRequesterPayloadCore
 
 	private static bool ValidateParameterVector<TPlatform>(
 		ref TPlatform platform, APTR parameters, uint count)
-		where TPlatform : struct, IMuiHeadlessPlatform
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (count == 0) return true;
 		if (parameters.IsNull || (parameters.Raw & 1u) != 0) return false;
@@ -220,7 +220,7 @@ public static class MuiRequesterPayloadCore
 
 	private static byte ReadFormatByte<TPlatform>(ref TPlatform platform,
 		APTR format, uint index)
-		where TPlatform : struct, IMuiHeadlessPlatform
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		var cursor = default(MuiRequesterPayloadByteCursor);
 		cursor.Base = format;

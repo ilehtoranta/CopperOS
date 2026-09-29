@@ -53,6 +53,14 @@ public sealed class MuiAreaActivationAdmissionTests
 			Address = address,
 			Field = MuiAreaActivationStateField.Signature,
 		};
+		Assert.True(MuiAreaActivationStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedSignatureAddress, out var typedSignatureSize));
+		Assert.Equal(address.Raw, typedSignatureAddress.Raw);
+		Assert.Equal(MuiAreaActivationStateRecord.FieldSize, typedSignatureSize);
+		Assert.True(MuiAreaActivationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memorySignatureAddress, out var memorySignatureSize));
+		Assert.Equal(typedSignatureAddress, memorySignatureAddress);
+		Assert.Equal(typedSignatureSize, memorySignatureSize);
 		Assert.True(MuiAreaActivationStateFieldCursorCodec.TryWrite(ref platform,
 			address, MuiAreaActivationStateField.Signature, 0));
 		Assert.True(MuiAreaActivationStateCodec.TryReadStructural(ref platform,
@@ -63,5 +71,12 @@ public sealed class MuiAreaActivationAdmissionTests
 		Assert.True(MuiAreaActivationStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out var signatureAddress));
 		Assert.Equal(address.Raw, signatureAddress.Raw);
+		cursor.Field = (MuiAreaActivationStateField)255;
+		Assert.False(MuiAreaActivationStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
+		cursor.Address = APTR.Null;
+		cursor.Field = MuiAreaActivationStateField.Signature;
+		Assert.False(MuiAreaActivationStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 	}
 }

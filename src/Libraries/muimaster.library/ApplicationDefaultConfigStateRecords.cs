@@ -86,27 +86,45 @@ internal static class MuiApplicationDefaultConfigStateFieldCursorCodec
 }
 
 // Fixed DefaultConfigItem result state is read and written as a named value.
-// Keep packed guest positions in this small ABI adapter; production consumers
-// do not select fields through the compatibility cursor.
+// Keep field selection structural: the bounded cursor consumes the complete
+// record before exposing a field address to compatibility callers.
 internal static class MuiApplicationDefaultConfigStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiApplicationDefaultConfigStateField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor,
+		MuiApplicationDefaultConfigStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (field == MuiApplicationDefaultConfigStateField.Magic)
-			offset = MuiApplicationDefaultConfigStateRecord.MagicOffset;
-		else if (field == MuiApplicationDefaultConfigStateField.ConfigId)
-			offset = MuiApplicationDefaultConfigStateRecord.ConfigIdOffset;
-		else if (field == MuiApplicationDefaultConfigStateField.Value)
-			offset = MuiApplicationDefaultConfigStateRecord.ValueOffset;
-		else if (field == MuiApplicationDefaultConfigStateField.Requests)
-			offset = MuiApplicationDefaultConfigStateRecord.RequestsOffset;
-		else
+		address = APTR.Null;
+		switch (field)
 		{
-			offset = 0;
-			return false;
+			case MuiApplicationDefaultConfigStateField.Magic:
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationDefaultConfigStateRecord.FieldSize, out address);
+			case MuiApplicationDefaultConfigStateField.ConfigId:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationDefaultConfigStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationDefaultConfigStateRecord.FieldSize, out address);
+			case MuiApplicationDefaultConfigStateField.Value:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationDefaultConfigStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationDefaultConfigStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationDefaultConfigStateRecord.FieldSize, out address);
+			case MuiApplicationDefaultConfigStateField.Requests:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationDefaultConfigStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationDefaultConfigStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationDefaultConfigStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationDefaultConfigStateRecord.FieldSize, out address);
+			default:
+				return false;
 		}
-		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -114,14 +132,11 @@ internal static class MuiApplicationDefaultConfigStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiApplicationDefaultConfigStateRecord.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address))
 			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record,
-			MuiApplicationDefaultConfigStateRecord.Size) &&
-			platform.IsMapped(address,
-				MuiApplicationDefaultConfigStateRecord.FieldSize);
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

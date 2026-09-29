@@ -25,6 +25,19 @@ public sealed class MuiAreaBuiltinFontStructAdapterTests
 			ref platform, address, MuiAreaBuiltinFontStateField.Selector,
 			out var selectorAddress));
 		Assert.Equal(0x3504u, selectorAddress.Raw);
+		var cursor = new MuiAreaBuiltinFontStateFieldCursor
+		{
+			Record = address,
+			Field = MuiAreaBuiltinFontStateField.Selector,
+		};
+		Assert.True(MuiAreaBuiltinFontStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedSelectorAddress, out var typedSelectorSize));
+		Assert.Equal(selectorAddress, typedSelectorAddress);
+		Assert.Equal(MuiAreaBuiltinFontStateRecord.FieldSize, typedSelectorSize);
+		Assert.True(MuiAreaBuiltinFontStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memorySelectorAddress, out var memorySelectorSize));
+		Assert.Equal(typedSelectorAddress, memorySelectorAddress);
+		Assert.Equal(typedSelectorSize, memorySelectorSize);
 		Assert.True(MuiAreaBuiltinFontStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiAreaBuiltinFontStateField.Selector, 2));
 		Assert.True(MuiAreaBuiltinFontStateRecordCodec.TryReadStructural(ref platform,
@@ -34,6 +47,13 @@ public sealed class MuiAreaBuiltinFontStructAdapterTests
 			ref platform, address, (MuiAreaBuiltinFontStateField)255, out _));
 		Assert.False(MuiAreaBuiltinFontStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiAreaBuiltinFontStateField.Magic, out _));
+		cursor.Field = (MuiAreaBuiltinFontStateField)255;
+		Assert.False(MuiAreaBuiltinFontStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiAreaBuiltinFontStateField.Magic;
+		Assert.False(MuiAreaBuiltinFontStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 		Assert.False(MuiAreaBuiltinFontStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

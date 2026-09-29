@@ -49,13 +49,13 @@ internal enum MuiAreaHandledEventsStateField : byte
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiAreaHandledEventsStateFieldCursor
 {
-	internal APTR Address;
+	internal APTR Record;
 	internal MuiAreaHandledEventsStateField Field;
 }
 
-// Sequential codec for the complete handled-events registration record. The
-// field cursor above remains a compatibility/diagnostic surface; live state
-// publication and consumption use these declaration-ordered named members.
+// Sequential codec for the complete handled-events registration record. Live
+// state publication and consumption use these declaration-ordered named
+// members; no scalar offset cursor is needed.
 internal static class MuiAreaHandledEventsStateStructCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -121,52 +121,49 @@ internal static class MuiAreaHandledEventsStateStructCodec
 
 internal static class MuiAreaHandledEventsStateCodec
 {
-	private static bool TryResolve(MuiAreaHandledEventsStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(
+		MuiAreaHandledEventsStateField field, out uint index, out uint fieldSize)
 	{
-		switch (field)
+		if (field == MuiAreaHandledEventsStateField.Signature) { index = 0; fieldSize = 4; }
+		else if (field == MuiAreaHandledEventsStateField.Events) { index = 1; fieldSize = 4; }
+		else if (field == MuiAreaHandledEventsStateField.Window) { index = 2; fieldSize = 4; }
+		else if (field == MuiAreaHandledEventsStateField.Handler) { index = 3; fieldSize = 4; }
+		else if (field == MuiAreaHandledEventsStateField.Generation) { index = 4; fieldSize = 4; }
+		else if (field == MuiAreaHandledEventsStateField.HandlerFlags) { index = 5; fieldSize = 2; }
+		else if (field == MuiAreaHandledEventsStateField.Priority) { index = 6; fieldSize = 1; }
+		else if (field == MuiAreaHandledEventsStateField.Reserved) { index = 7; fieldSize = 1; }
+		else
 		{
-			case MuiAreaHandledEventsStateField.Signature:
-				offset = 0;
-				return true;
-			case MuiAreaHandledEventsStateField.Events:
-				offset = 4;
-				return true;
-			case MuiAreaHandledEventsStateField.Window:
-				offset = 8;
-				return true;
-			case MuiAreaHandledEventsStateField.Handler:
-				offset = 12;
-				return true;
-			case MuiAreaHandledEventsStateField.Generation:
-				offset = 16;
-				return true;
-			case MuiAreaHandledEventsStateField.HandlerFlags:
-				offset = 20;
-				return true;
-			case MuiAreaHandledEventsStateField.Priority:
-				offset = 22;
-				return true;
-			case MuiAreaHandledEventsStateField.Reserved:
-				offset = 23;
-				return true;
-			default:
-				offset = 0;
-				return false;
+			index = uint.MaxValue;
+			fieldSize = 0;
+			return false;
 		}
+		return true;
 	}
 
-	private static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiAreaHandledEventsStateFieldCursor cursor, uint size, out APTR address)
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaHandledEventsStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-			cursor.Address.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Address, MuiAreaHandledEventsStateRecord.Size))
-			return false;
-		address = APTR.FromPointer(cursor.Address.Raw + offset);
-		return platform.IsMapped(address, size);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index, out var selectedSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiAreaHandledEventsStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			var currentSize = current < 5 ? 4u : current == 5 ? 2u : 1u;
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				currentSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = selectedSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -174,11 +171,28 @@ internal static class MuiAreaHandledEventsStateCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAreaHandledEventsStateFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, 4, out var fieldAddress)) return false;
-		value = platform.ReadUInt32(fieldAddress, 0);
+		if (!MuiAreaHandledEventsStateStructCodec.TryRead(ref platform, address,
+			out var record)) return false;
+		switch (field)
+		{
+			case MuiAreaHandledEventsStateField.Signature:
+				value = record.Signature;
+				break;
+			case MuiAreaHandledEventsStateField.Events:
+				value = record.Events;
+				break;
+			case MuiAreaHandledEventsStateField.Window:
+				value = record.Window.Raw;
+				break;
+			case MuiAreaHandledEventsStateField.Handler:
+				value = record.Handler.Raw;
+				break;
+			case MuiAreaHandledEventsStateField.Generation:
+				value = record.Generation;
+				break;
+			default:
+				return false;
+		}
 		return true;
 	}
 
@@ -186,12 +200,30 @@ internal static class MuiAreaHandledEventsStateCodec
 		APTR address, MuiAreaHandledEventsStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAreaHandledEventsStateFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, 4, out var fieldAddress)) return false;
-		platform.WriteUInt32(fieldAddress, 0, value);
-		return true;
+		if (!MuiAreaHandledEventsStateStructCodec.TryRead(ref platform, address,
+			out var record)) return false;
+		switch (field)
+		{
+			case MuiAreaHandledEventsStateField.Signature:
+				record.Signature = value;
+				break;
+			case MuiAreaHandledEventsStateField.Events:
+				record.Events = value;
+				break;
+			case MuiAreaHandledEventsStateField.Window:
+				record.Window = APTR.FromPointer(value);
+				break;
+			case MuiAreaHandledEventsStateField.Handler:
+				record.Handler = APTR.FromPointer(value);
+				break;
+			case MuiAreaHandledEventsStateField.Generation:
+				record.Generation = value;
+				break;
+			default:
+				return false;
+		}
+		return MuiAreaHandledEventsStateStructCodec.Write(ref platform, address,
+			record);
 	}
 
 	private static bool TryReadUInt16<TPlatform>(ref TPlatform platform,
@@ -199,12 +231,10 @@ internal static class MuiAreaHandledEventsStateCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAreaHandledEventsStateFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
 		if (field != MuiAreaHandledEventsStateField.HandlerFlags ||
-			!TryGetAddress(ref platform, cursor, 2, out var fieldAddress)) return false;
-		value = platform.ReadUInt16(fieldAddress, 0);
+			!MuiAreaHandledEventsStateStructCodec.TryRead(ref platform, address,
+				out var record)) return false;
+		value = record.HandlerFlags;
 		return true;
 	}
 
@@ -213,13 +243,13 @@ internal static class MuiAreaHandledEventsStateCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAreaHandledEventsStateFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
 		if ((field != MuiAreaHandledEventsStateField.Priority &&
 			field != MuiAreaHandledEventsStateField.Reserved) ||
-			!TryGetAddress(ref platform, cursor, 1, out var fieldAddress)) return false;
-		value = platform.ReadUInt8(fieldAddress, 0);
+			!MuiAreaHandledEventsStateStructCodec.TryRead(ref platform, address,
+				out var record)) return false;
+		value = field == MuiAreaHandledEventsStateField.Priority
+			? unchecked((byte)record.Priority)
+			: record.Reserved;
 		return true;
 	}
 
@@ -227,27 +257,28 @@ internal static class MuiAreaHandledEventsStateCodec
 		APTR address, MuiAreaHandledEventsStateField field, ushort value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAreaHandledEventsStateFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
 		if (field != MuiAreaHandledEventsStateField.HandlerFlags ||
-			!TryGetAddress(ref platform, cursor, 2, out var fieldAddress)) return false;
-		platform.WriteUInt16(fieldAddress, 0, value);
-		return true;
+			!MuiAreaHandledEventsStateStructCodec.TryRead(ref platform, address,
+				out var record)) return false;
+		record.HandlerFlags = value;
+		return MuiAreaHandledEventsStateStructCodec.Write(ref platform, address,
+			record);
 	}
 
 	private static bool TryWriteUInt8<TPlatform>(ref TPlatform platform,
 		APTR address, MuiAreaHandledEventsStateField field, byte value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAreaHandledEventsStateFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
 		if ((field != MuiAreaHandledEventsStateField.Priority &&
 			field != MuiAreaHandledEventsStateField.Reserved) ||
-			!TryGetAddress(ref platform, cursor, 1, out var fieldAddress)) return false;
-		platform.WriteUInt8(fieldAddress, 0, value);
-		return true;
+			!MuiAreaHandledEventsStateStructCodec.TryRead(ref platform, address,
+				out var record)) return false;
+		if (field == MuiAreaHandledEventsStateField.Priority)
+			record.Priority = unchecked((sbyte)value);
+		else
+			record.Reserved = value;
+		return MuiAreaHandledEventsStateStructCodec.Write(ref platform, address,
+			record);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -266,6 +297,16 @@ internal static class MuiAreaHandledEventsStateCodec
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiAreaHandledEventsStateStructCodec.Write(ref platform, address,
 			record);
+}
+
+internal static class MuiAreaHandledEventsStateFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaHandledEventsStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAreaHandledEventsStateCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
 }
 
 internal enum MuiAreaEventHandlerPolicyField : byte

@@ -36,8 +36,8 @@ internal sealed record IoCase
 
 internal static class IoCases
 {
-    public const string Suite = "exe2arc-rar4-cab-dos-components";
-    public const int ExpectedInvocations = 77;
+    public const string Suite = "exe2arc-rar4-cab-ace-dos-components";
+    public const int ExpectedInvocations = 84;
 
     public static IEnumerable<IoCase[]> All()
     {
@@ -147,6 +147,22 @@ internal static class IoCases
 
         yield return Pipeline(false);
         yield return Pipeline(true);
+        yield return AceScan("EXA-ACE.small", 100, 8, [0], true);
+        yield return AceScan("EXA-ACE.zero", 100, 0, [0], true);
+        yield return AceScan("EXA-ACE.short", 14, -1, [], false);
+        yield return AceScan("EXA-ACE.last-first", 102400, 102386, [0], true);
+        yield return AceScan("EXA-ACE.at-next", 102401, 102387, [0], false);
+        yield return AceScan("EXA-ACE.inside-next", 102402, 102388, [0, 102387], true);
+        var acePipeline = AceScan("EXA-ACE.copy", 100, 8, [0], true);
+        yield return acePipeline with
+        {
+            Operation = 6, PayloadLength = 92, CopyStatus = 0,
+            CopyIo = Observation([new IoStep("Read", 92, 0, 92, 5),
+                new IoStep("Write", 92, 0, 92, 6)], 92),
+            Script = [..acePipeline.Script, new("Read", 92, 0, 92, 5),
+                new("Write", 92, 0, 92, 6)],
+            Output = acePipeline.Input.AsSpan(8, 92).ToArray(),
+        };
         var invalidScan = Scan("invalid", false, 100, 32, [0], true) with
         {
             Result = 5, ScanStatus = 5, Offset = 0, PayloadLength = 0,
@@ -195,6 +211,40 @@ internal static class IoCases
             Length = (uint)fileLength, Result = status, ScanStatus = status,
             Offset = recognized && marker != 0 ? (uint)marker : 0,
             PayloadLength = recognized && marker != 0 ? cabinet ? 1u : (uint)(fileLength - marker) : 0,
+            Script = script.ToArray(), ScanIo = Observation(script, 0),
+        };
+    }
+
+    private static IoCase AceScan(string id, int fileLength, int marker,
+        int[] windows, bool recognized)
+    {
+        byte[] input = Enumerable.Repeat((byte)0x55, fileLength).ToArray();
+        if (marker >= 0)
+            PutAce(input, marker);
+        var script = new List<IoStep>();
+        int cursor = 0;
+        foreach (int start in windows)
+        {
+            script.Add(new IoStep("Seek", start, -1, cursor, 1));
+            int bytes = Math.Min(102400, fileLength - start);
+            script.Add(new IoStep("Read", bytes, 0, bytes, 2));
+            cursor = start + bytes;
+        }
+        if (recognized)
+        {
+            int index = marker - windows[^1];
+            script.Add(new IoStep("Seek", -index, 0, cursor, 3));
+            cursor -= index;
+            if (marker != 0)
+                script.Add(new IoStep("Seek", marker, -1, cursor, 4));
+        }
+        uint status = !recognized ? 1u : marker == 0 ? 2u : 0u;
+        return new IoCase
+        {
+            Id = id, Operation = 5, Input = input, Length = (uint)fileLength,
+            Result = status, ScanStatus = status,
+            Offset = recognized && marker != 0 ? (uint)marker : 0,
+            PayloadLength = recognized && marker != 0 ? (uint)(fileLength - marker) : 0,
             Script = script.ToArray(), ScanIo = Observation(script, 0),
         };
     }
@@ -271,4 +321,8 @@ internal static class IoCases
             BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(offset + 16), table);
         }
     }
+
+    private static void PutAce(byte[] bytes, int offset) =>
+        new byte[] { (byte)'*', (byte)'*', (byte)'A', (byte)'C', (byte)'E',
+            (byte)'*', (byte)'*' }.CopyTo(bytes, offset + 7);
 }

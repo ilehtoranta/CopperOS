@@ -23,6 +23,19 @@ public sealed class MuiScalePresentationStructAdapterTests
 			ref platform, address, MuiScalePresentationStateField.Horizontal,
 			out var horizontalAddress));
 		Assert.Equal(0x3504u, horizontalAddress.Raw);
+		var horizontalCursor = new MuiScalePresentationStateFieldCursor
+		{
+			Record = address,
+			Field = MuiScalePresentationStateField.Horizontal,
+		};
+		Assert.True(MuiScalePresentationStateFieldCursorCodec.TryGetAddress(ref platform,
+			horizontalCursor, out var cursorHorizontal, out var cursorFieldSize));
+		Assert.Equal(horizontalAddress, cursorHorizontal);
+		Assert.Equal(MuiScalePresentationStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiScalePresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			horizontalCursor, out var memoryHorizontal, out var memoryFieldSize));
+		Assert.Equal(cursorHorizontal, memoryHorizontal);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiScalePresentationStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiScalePresentationStateField.Horizontal, 0));
 		Assert.True(MuiScalePresentationStateRecordCodec.TryReadRecord(
@@ -40,5 +53,12 @@ public sealed class MuiScalePresentationStructAdapterTests
 			MuiScalePresentationStateField.Magic, out _));
 		Assert.False(MuiScalePresentationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiScalePresentationStateField.Magic, out _));
+		horizontalCursor.Field = (MuiScalePresentationStateField)255;
+		Assert.False(MuiScalePresentationStateFieldCursorCodec.TryGetAddress(ref platform,
+			horizontalCursor, out _, out _));
+		horizontalCursor.Record = APTR.Null;
+		horizontalCursor.Field = MuiScalePresentationStateField.Horizontal;
+		Assert.False(MuiScalePresentationStateFieldCursorCodec.TryGetAddress(ref platform,
+			horizontalCursor, out _, out _));
 	}
 }

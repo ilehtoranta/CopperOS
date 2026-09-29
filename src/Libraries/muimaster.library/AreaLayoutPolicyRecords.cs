@@ -95,10 +95,14 @@ internal static class MuiAreaLayoutPolicyFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaLayoutPolicyFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiAreaLayoutPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Address, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaLayoutPolicyFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiAreaLayoutPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiAreaLayoutPolicyField field, out uint value)
@@ -118,41 +122,29 @@ internal static class MuiAreaLayoutPolicyFieldCursorCodec
 }
 
 // Struct-first guest-memory adapter. Layout consumers use the named policy
-// record; this bounded adapter is the only layer that translates its fixed
-// guest layout into addresses. The cursor codec remains for compatibility and
-// malformed-state diagnostics.
+// record; typed field selection walks the packed struct. The numeric overload
+// below remains only as a compatibility bridge for older callers; the cursor
+// codec remains available for compatibility and malformed-state diagnostics.
 internal static class MuiAreaLayoutPolicyStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiAreaLayoutPolicyField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiAreaLayoutPolicyField field,
+		out uint index)
 	{
-		if (field == MuiAreaLayoutPolicyField.Magic)
-			offset = MuiAreaLayoutPolicyStateRecord.MagicOffset;
-		else if (field == MuiAreaLayoutPolicyField.ShowMe)
-			offset = MuiAreaLayoutPolicyStateRecord.ShowMeOffset;
-		else if (field == MuiAreaLayoutPolicyField.FixWidth)
-			offset = MuiAreaLayoutPolicyStateRecord.FixWidthOffset;
-		else if (field == MuiAreaLayoutPolicyField.FixHeight)
-			offset = MuiAreaLayoutPolicyStateRecord.FixHeightOffset;
-		else if (field == MuiAreaLayoutPolicyField.MaxWidth)
-			offset = MuiAreaLayoutPolicyStateRecord.MaxWidthOffset;
-		else if (field == MuiAreaLayoutPolicyField.MaxHeight)
-			offset = MuiAreaLayoutPolicyStateRecord.MaxHeightOffset;
-		else if (field == MuiAreaLayoutPolicyField.InnerLeft)
-			offset = MuiAreaLayoutPolicyStateRecord.InnerLeftOffset;
-		else if (field == MuiAreaLayoutPolicyField.InnerRight)
-			offset = MuiAreaLayoutPolicyStateRecord.InnerRightOffset;
-		else if (field == MuiAreaLayoutPolicyField.InnerTop)
-			offset = MuiAreaLayoutPolicyStateRecord.InnerTopOffset;
-		else if (field == MuiAreaLayoutPolicyField.InnerBottom)
-			offset = MuiAreaLayoutPolicyStateRecord.InnerBottomOffset;
-		else if (field == MuiAreaLayoutPolicyField.HorizontalWeight)
-			offset = MuiAreaLayoutPolicyStateRecord.HorizontalWeightOffset;
-		else if (field == MuiAreaLayoutPolicyField.VerticalWeight)
-			offset = MuiAreaLayoutPolicyStateRecord.VerticalWeightOffset;
+		if (field == MuiAreaLayoutPolicyField.Magic) index = 0;
+		else if (field == MuiAreaLayoutPolicyField.ShowMe) index = 1;
+		else if (field == MuiAreaLayoutPolicyField.FixWidth) index = 2;
+		else if (field == MuiAreaLayoutPolicyField.FixHeight) index = 3;
+		else if (field == MuiAreaLayoutPolicyField.MaxWidth) index = 4;
+		else if (field == MuiAreaLayoutPolicyField.MaxHeight) index = 5;
+		else if (field == MuiAreaLayoutPolicyField.InnerLeft) index = 6;
+		else if (field == MuiAreaLayoutPolicyField.InnerRight) index = 7;
+		else if (field == MuiAreaLayoutPolicyField.InnerTop) index = 8;
+		else if (field == MuiAreaLayoutPolicyField.InnerBottom) index = 9;
+		else if (field == MuiAreaLayoutPolicyField.HorizontalWeight) index = 10;
+		else if (field == MuiAreaLayoutPolicyField.VerticalWeight) index = 11;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -162,12 +154,34 @@ internal static class MuiAreaLayoutPolicyStateRecordMemoryCodec
 		APTR record, MuiAreaLayoutPolicyField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiAreaLayoutPolicyFieldCursor);
+		cursor.Address = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaLayoutPolicyFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiAreaLayoutPolicyStateRecord.Size) &&
-			platform.IsMapped(address, MuiAreaLayoutPolicyStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Address,
+				MuiAreaLayoutPolicyStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiAreaLayoutPolicyStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiAreaLayoutPolicyStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

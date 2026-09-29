@@ -61,65 +61,28 @@ internal struct MuiImageRenderStateFieldCursor
 
 internal static class MuiImageRenderStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiImageRenderStateField field,
-		out uint offset)
-	{
-		if (field == MuiImageRenderStateField.Magic)
-			offset = MuiImageRenderStateRecord.MagicOffset;
-		else if (field == MuiImageRenderStateField.ImageState)
-			offset = MuiImageRenderStateRecord.ImageStateOffset;
-		else if (field == MuiImageRenderStateField.Selected)
-			offset = MuiImageRenderStateRecord.SelectedOffset;
-		else if (field == MuiImageRenderStateField.FreeHoriz)
-			offset = MuiImageRenderStateRecord.FreeHorizOffset;
-		else if (field == MuiImageRenderStateField.FreeVert)
-			offset = MuiImageRenderStateRecord.FreeVertOffset;
-		else if (field == MuiImageRenderStateField.ShowSelState)
-			offset = MuiImageRenderStateRecord.ShowSelStateOffset;
-		else
-		{
-			offset = 0;
-			return false;
-		}
-		return true;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiImageRenderStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
-				cursor.Record, MuiImageRenderStateRecord.Size)) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, MuiImageRenderStateRecord.FieldSize);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiImageRenderStateFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiImageRenderStateRecordMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiImageRenderStateField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = 0;
-		var cursor = default(MuiImageRenderStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
-	}
+		=> MuiImageRenderStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiImageRenderStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		var cursor = default(MuiImageRenderStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
-	}
+		=> MuiImageRenderStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
 }
 
 // Struct-first guest-memory adapter. Image consumers use the named render
@@ -128,24 +91,24 @@ internal static class MuiImageRenderStateFieldCursorCodec
 // malformed-state diagnostics.
 internal static class MuiImageRenderStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiImageRenderStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiImageRenderStateField field,
+		out uint index)
 	{
 		if (field == MuiImageRenderStateField.Magic)
-			offset = MuiImageRenderStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiImageRenderStateField.ImageState)
-			offset = MuiImageRenderStateRecord.ImageStateOffset;
+			index = 1;
 		else if (field == MuiImageRenderStateField.Selected)
-			offset = MuiImageRenderStateRecord.SelectedOffset;
+			index = 2;
 		else if (field == MuiImageRenderStateField.FreeHoriz)
-			offset = MuiImageRenderStateRecord.FreeHorizOffset;
+			index = 3;
 		else if (field == MuiImageRenderStateField.FreeVert)
-			offset = MuiImageRenderStateRecord.FreeVertOffset;
+			index = 4;
 		else if (field == MuiImageRenderStateField.ShowSelState)
-			offset = MuiImageRenderStateRecord.ShowSelStateOffset;
+			index = 5;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -155,9 +118,34 @@ internal static class MuiImageRenderStateRecordMemoryCodec
 		APTR record, MuiImageRenderStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiImageRenderStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiImageRenderStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		return TryResolve(field, out var offset) &&
-			TryGetAddress(ref platform, record, offset, out address);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiImageRenderStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiImageRenderStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiImageRenderStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

@@ -107,34 +107,85 @@ internal static class MuiApplicationIdentityStateFieldCursorCodec
 	}
 }
 
-// Fixed application identity state is transferred as a named record. Numeric
-// guest positions are confined to this ABI adapter; the compatibility cursor
-// above remains available only to legacy callers and malformed-state tests.
+// Fixed application identity state is transferred as a named record. The
+// bounded cursor walks the complete packed struct before selecting a field;
+// offset constants remain ABI documentation/compatibility aliases only.
 internal static class MuiApplicationIdentityStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiApplicationIdentityStateField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiApplicationIdentityStateField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (field == MuiApplicationIdentityStateField.Magic)
-			offset = MuiApplicationIdentityStateRecord.MagicOffset;
-		else if (field == MuiApplicationIdentityStateField.Author)
-			offset = MuiApplicationIdentityStateRecord.AuthorOffset;
-		else if (field == MuiApplicationIdentityStateField.Base)
-			offset = MuiApplicationIdentityStateRecord.BaseOffset;
-		else if (field == MuiApplicationIdentityStateField.Copyright)
-			offset = MuiApplicationIdentityStateRecord.CopyrightOffset;
-		else if (field == MuiApplicationIdentityStateField.Description)
-			offset = MuiApplicationIdentityStateRecord.DescriptionOffset;
-		else if (field == MuiApplicationIdentityStateField.Title)
-			offset = MuiApplicationIdentityStateRecord.TitleOffset;
-		else if (field == MuiApplicationIdentityStateField.Version)
-			offset = MuiApplicationIdentityStateRecord.VersionOffset;
-		else
+		address = APTR.Null;
+		switch (field)
 		{
-			offset = 0;
-			return false;
+			case MuiApplicationIdentityStateField.Magic:
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationIdentityStateRecord.FieldSize, out address);
+			case MuiApplicationIdentityStateField.Author:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationIdentityStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationIdentityStateRecord.FieldSize, out address);
+			case MuiApplicationIdentityStateField.Base:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationIdentityStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationIdentityStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationIdentityStateRecord.FieldSize, out address);
+			case MuiApplicationIdentityStateField.Copyright:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationIdentityStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationIdentityStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationIdentityStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationIdentityStateRecord.FieldSize, out address);
+			case MuiApplicationIdentityStateField.Description:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationIdentityStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationIdentityStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationIdentityStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationIdentityStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationIdentityStateRecord.FieldSize, out address);
+			case MuiApplicationIdentityStateField.Title:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationIdentityStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationIdentityStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationIdentityStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationIdentityStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationIdentityStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationIdentityStateRecord.FieldSize, out address);
+			case MuiApplicationIdentityStateField.Version:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationIdentityStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationIdentityStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationIdentityStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationIdentityStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationIdentityStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationIdentityStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationIdentityStateRecord.FieldSize, out address);
+			default:
+				return false;
 		}
-		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -142,12 +193,11 @@ internal static class MuiApplicationIdentityStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiApplicationIdentityStateRecord.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address))
 			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiApplicationIdentityStateRecord.Size) &&
-			platform.IsMapped(address, MuiApplicationIdentityStateRecord.FieldSize);
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

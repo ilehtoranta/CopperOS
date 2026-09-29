@@ -23,7 +23,7 @@ public static class Exe2ArcIoNativeProbe
             return 20;
         APTR control = argumentText.Address;
         uint operation = APTR.ReadUInt32(control, 0);
-        if (operation > 4)
+        if (operation > 6)
             return 20;
         BPTR input = new(APTR.ReadUInt32(control, 4));
         BPTR output = new(APTR.ReadUInt32(control, 8));
@@ -55,10 +55,14 @@ public static class Exe2ArcIoNativeProbe
             scanStatus = operation == 1 || operation == 4
                 ? Exe2ArcForwardScanner.ScanCabinet(ref io, input, scratch,
                     capacity, knownLength, out offset, out length, out scanObservation)
-                : Exe2ArcForwardScanner.ScanRar4(ref io, input, scratch,
-                    capacity, knownLength, out offset, out length, out scanObservation);
+                : operation == 5 || operation == 6
+                    ? Exe2ArcForwardScanner.ScanAce(ref io, input, scratch,
+                        capacity, knownLength, out offset, out length, out scanObservation)
+                    : Exe2ArcForwardScanner.ScanRar4(ref io, input, scratch,
+                        capacity, knownLength, out offset, out length, out scanObservation);
             result = scanStatus;
-            if (operation >= 3 && scanStatus == Exe2ArcIoStatus.Completed)
+            if ((operation == 3 || operation == 4 || operation == 6) &&
+                scanStatus == Exe2ArcIoStatus.Completed)
             {
                 copyStatus = Exe2ArcPayloadCopy.Copy(ref io, input, output, scratch,
                     capacity, length, out copyObservation);

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <CopperOSUseLocalCopperSharp>true</CopperOSUseLocalCopperSharp>
+  </PropertyGroup>
+  <Import Project="..\..\CopperOS.Portable.props" />
+  <PropertyGroup>
+    <AssemblyName>CopperOS.Commands.SearchNativeRoot</AssemblyName>
+    <RootNamespace>CopperOS.Commands.SearchNativeRoot</RootNamespace>
+    <ImplicitUsings>false</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="CopperSharp.Sdk.Amiga.Support" Version="$(CopperSharpSdkAmigaVersion)" />
+    <Compile Include="..\..\src\Commands\SearchLiteralMatcher.cs" Link="SearchLiteralMatcher.cs" />
+    <Compile Include="..\..\src\Commands\SearchLineFormatter.cs" Link="SearchLineFormatter.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeDosListTraversal.cs" Link="NativeDosListTraversal.cs" />
+  </ItemGroup>
+</Project>

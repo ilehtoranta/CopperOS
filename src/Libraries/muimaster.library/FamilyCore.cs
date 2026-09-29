@@ -9,6 +9,16 @@ namespace CopperOS.MuiMaster;
 
 public static class MuiFamilyCore
 {
+	private static bool CanMutateTopology<TPlatform>(ref TPlatform platform, APTR record)
+		where TPlatform : struct, IMuiHeadlessPlatform
+		=> MuiHeadlessObjectCodec.TryRead(ref platform, record, out var value) &&
+			(value.Flags & (MuiHeadlessObjectCore.ObjectDisposing |
+				MuiHeadlessObjectCore.ObjectProviderBusy |
+				MuiHeadlessObjectCore.ObjectConstructionBinding)) == 0 &&
+			(value.Flags & (MuiHeadlessObjectCore.ObjectControlConstructionActive |
+				MuiHeadlessObjectCore.ObjectScrollbarConstructionPending |
+				MuiHeadlessObjectCore.ObjectRadioConstructionPending)) == 0;
+
 	// MorphOS documents Family.mui as the common child-owning class. Group,
 	// Application, and Window also own Family-style children even though the
 	// historical BOOPSI hierarchy does not expose all of those relationships as
@@ -100,6 +110,10 @@ public static class MuiFamilyCore
 			!MuiHeadlessObjectCodec.TryRead(ref platform, familyRecord,
 				out var familyValue))
 			return false;
+		if (!CanMutateTopology(ref platform, familyRecord) ||
+			!CanMutateTopology(ref platform, childRecord)) return false;
+		// A cleared Parent backlink does not release a pending cleanup link.
+		if (!AdmitsChildDisposal(ref platform, state, childRecord, APTR.Null)) return false;
 		var node = MuiHeadlessMemory.Allocate(ref platform,
 			MuiHeadlessChildRecord.Size);
 		if (node.IsNull || !platform.RetainObject(child))
@@ -194,6 +208,8 @@ public static class MuiFamilyCore
 		var childRecord = MuiHeadlessObjectCore.FindObject(ref platform, state,
 			child);
 		if (familyRecord.IsNull || childRecord.IsNull) return false;
+		if (!CanMutateTopology(ref platform, familyRecord) ||
+			!CanMutateTopology(ref platform, childRecord)) return false;
 		var node = FindChildNode(ref platform, familyRecord, child);
 		if (node.IsNull) return false;
 		if (!MuiHeadlessObjectCodec.TryRead(ref platform, childRecord,
@@ -270,6 +286,10 @@ public static class MuiFamilyCore
 		APTR destination, APTR source)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!CanMutateTopology(ref platform,
+			MuiHeadlessObjectCore.FindObject(ref platform, state, destination)) ||
+			!CanMutateTopology(ref platform,
+				MuiHeadlessObjectCore.FindObject(ref platform, state, source))) return false;
 		if (destination.Raw == source.Raw) return true;
 		var child = GetChild(ref platform, state, source, 0, APTR.Null);
 		uint moved = 0;
@@ -316,6 +336,9 @@ public static class MuiFamilyCore
 		var familyRecord = MuiHeadlessObjectCore.FindObject(ref platform, state,
 			family);
 		if (familyRecord.IsNull) return false;
+		if (!CanMutateTopology(ref platform, familyRecord) ||
+			!CanMutateTopology(ref platform,
+				MuiHeadlessObjectCore.FindObject(ref platform, state, child))) return false;
 		var node = FindChildNode(ref platform, familyRecord, child);
 		if (node.IsNull) return false;
 		var previous = APTR.Null;
@@ -365,23 +388,56 @@ public static class MuiFamilyCore
 		return true;
 	}
 
-	internal static void RemoveAllChildren<TPlatform>(ref TPlatform platform,
+	// A retained link remains ownership even after Parent is cleared. Only
+	// its cleanup traversal may dispose that child while the owner is retiring.
+	// Reserved creation also owns a child before its Parent backlink is bound.
+	internal static bool AdmitsChildDisposal<TPlatform>(ref TPlatform platform,
+		APTR state, APTR childRecord, APTR cleanupOwner)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!MuiHeadlessObjectCodec.TryRead(ref platform, childRecord, out var childState) ||
+			!MuiHeadlessStateCodec.TryRead(ref platform, state, out var registry))
+			return false;
+		var current = registry.Objects;
+		uint visited = 0;
+		while (current.IsNotNull)
+		{
+			if (visited++ >= MuiHeadlessLayout.MaximumTraversal ||
+				!MuiHeadlessObjectCodec.TryRead(ref platform, current, out var owner))
+				return false;
+			if (childState.Parent.IsNull || (owner.Flags & (MuiHeadlessObjectCore.ObjectDisposing |
+				MuiHeadlessObjectCore.ObjectConstructionBinding |
+				MuiHeadlessObjectCore.ObjectControlConstructionActive)) != 0)
+			{
+				var link = owner.ChildrenHead;
+				uint children = 0;
+				while (link.IsNotNull)
+				{
+					if (children++ >= MuiHeadlessLayout.MaximumTraversal ||
+						!MuiHeadlessChildCodec.TryRead(ref platform, link, out var child))
+						return false;
+					if (child.Object.Raw == childRecord.Raw &&
+						current.Raw != cleanupOwner.Raw) return false;
+					link = child.Next;
+				}
+			}
+			current = owner.Next;
+		}
+		return true;
+	}
+
+	internal static bool RemoveAllChildren<TPlatform>(ref TPlatform platform,
 		APTR state, APTR familyRecord, bool disposeChildren)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (!MuiHeadlessObjectCodec.TryRead(ref platform, familyRecord,
-			out var familyValue)) return;
+			out var familyValue)) return false;
 		var current = familyValue.ChildrenHead;
-		familyValue.ChildrenHead = APTR.Null;
-		familyValue.ChildrenTail = APTR.Null;
-		if (!MuiHeadlessObjectCodec.Write(ref platform, familyRecord,
-			familyValue)) return;
 		uint visited = 0;
 		while (current.IsNotNull && visited++ < MuiHeadlessLayout.MaximumTraversal)
 		{
-			if (!platform.IsMapped(current, MuiHeadlessChildRecord.Size)) break;
 			if (!MuiHeadlessChildCodec.TryRead(ref platform, current,
-				out var childNode)) break;
+				out var childNode)) return false;
 			var next = childNode.Next;
 			var childRecord = childNode.Object;
 			APTR child = APTR.Null;
@@ -389,14 +445,17 @@ public static class MuiFamilyCore
 				ref platform, childRecord, out var childValue))
 			{
 				childValue.Parent = APTR.Null;
-				MuiHeadlessObjectCodec.Write(ref platform, childRecord,
-					childValue);
+				if (!MuiHeadlessObjectCodec.Write(ref platform, childRecord,
+					childValue)) return false;
 				MuiAreaEventHandlerCore.Reconcile(ref platform, state,
 					childValue.Boopsi);
 				child = childValue.Boopsi;
 			}
-			platform.Clear(current, MuiHeadlessChildRecord.Size);
-			platform.Free(current, MuiHeadlessChildRecord.Size);
+			else if (childRecord.IsNotNull) return false;
+			// Retain the link until its child releases ownership. Parent is null
+			// in the child so its own disposal cannot free this pending link.
+			if (!MuiHeadlessChildMemoryCodec.TryGetAddress(ref platform, current,
+				MuiHeadlessChildField.Object, out var objectField)) return false;
 			if (child.IsNotNull)
 			{
 				var preserveSubWindow = disposeChildren &&
@@ -404,11 +463,30 @@ public static class MuiFamilyCore
 						MuiWindowPublicCore.IsSubWindow, out var isSubWindow) &&
 					isSubWindow != 0;
 				if (disposeChildren && !preserveSubWindow)
-					MuiHeadlessObjectCore.DisposeObject(ref platform, state, child);
+				{
+					if (!MuiHeadlessObjectCore.DisposeOwnedObjectState(ref platform,
+						state, child, true, familyRecord))
+						return false;
+				}
 				else platform.ReleaseObject(child);
 			}
+			// A completed child must not be retried if unlink admission fails.
+			platform.WriteUInt32(objectField, 0, 0);
+			if (!MuiHeadlessObjectMemoryCodec.TryGetAddress(ref platform, familyRecord,
+				MuiHeadlessObjectField.ChildrenHead, out var headField) ||
+				!MuiHeadlessObjectMemoryCodec.TryGetAddress(ref platform, familyRecord,
+				MuiHeadlessObjectField.ChildrenTail, out var tailField)) return false;
+			APTR previousField = APTR.Null;
+			if (next.IsNotNull && !MuiHeadlessChildMemoryCodec.TryGetAddress(ref platform,
+				next, MuiHeadlessChildField.Previous, out previousField)) return false;
+			platform.WriteUInt32(headField, 0, next.Raw);
+			if (next.IsNull) platform.WriteUInt32(tailField, 0, 0);
+			else platform.WriteUInt32(previousField, 0, 0);
+			platform.Clear(current, MuiHeadlessChildRecord.Size);
+			platform.Free(current, MuiHeadlessChildRecord.Size);
 			current = next;
 		}
+		return current.IsNull;
 	}
 
 	internal static void DetachFromParent<TPlatform>(ref TPlatform platform,

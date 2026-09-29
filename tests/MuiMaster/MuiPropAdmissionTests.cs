@@ -164,6 +164,19 @@ public sealed class MuiPropAdmissionTests
 			address, MuiPropPolicyStateField.DeltaFactor, out var typedDelta));
 		Assert.Equal(address.Raw + MuiPropPolicyStateRecord.DeltaFactorOffset,
 			typedDelta.Raw);
+		var deltaCursor = new MuiPropPolicyStateFieldCursor
+		{
+			Record = address,
+			Field = MuiPropPolicyStateField.DeltaFactor,
+		};
+		Assert.True(MuiPropPolicyStateFieldCursorCodec.TryGetAddress(ref platform,
+			deltaCursor, out var cursorDelta, out var cursorFieldSize));
+		Assert.Equal(typedDelta, cursorDelta);
+		Assert.Equal(MuiPropPolicyStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiPropPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			deltaCursor, out var memoryDelta, out var memoryFieldSize));
+		Assert.Equal(cursorDelta, memoryDelta);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiPropPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiPropPolicyStateField.UseWinBorder, 1));
 		Assert.True(MuiPropPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
@@ -179,6 +192,13 @@ public sealed class MuiPropAdmissionTests
 			address, MuiPropPolicyStateRecord.Size, out _));
 		Assert.False(MuiPropPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
 			APTR.Null, (uint)0, out _));
+		deltaCursor.Field = (MuiPropPolicyStateField)255;
+		Assert.False(MuiPropPolicyStateFieldCursorCodec.TryGetAddress(ref platform,
+			deltaCursor, out _, out _));
+		deltaCursor.Record = APTR.Null;
+		deltaCursor.Field = MuiPropPolicyStateField.DeltaFactor;
+		Assert.False(MuiPropPolicyStateFieldCursorCodec.TryGetAddress(ref platform,
+			deltaCursor, out _, out _));
 		Assert.False(MuiPropPolicyStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}
@@ -211,6 +231,19 @@ public sealed class MuiPropAdmissionTests
 			address, MuiPropRangeStateField.Visible, out var typedVisible));
 		Assert.Equal(address.Raw + MuiPropRangeStateRecord.VisibleOffset,
 			typedVisible.Raw);
+		var visibleCursor = new MuiPropRangeStateFieldCursor
+		{
+			Record = address,
+			Field = MuiPropRangeStateField.Visible,
+		};
+		Assert.True(MuiPropRangeStateFieldCursorCodec.TryGetAddress(ref platform,
+			visibleCursor, out var cursorVisible, out var cursorFieldSize));
+		Assert.Equal(typedVisible, cursorVisible);
+		Assert.Equal(MuiPropRangeStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiPropRangeStateRecordMemoryCodec.TryGetAddress(ref platform,
+			visibleCursor, out var memoryVisible, out var memoryFieldSize));
+		Assert.Equal(cursorVisible, memoryVisible);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiPropRangeStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiPropRangeStateField.Entries, 120));
 		Assert.True(MuiPropRangeStateRecordMemoryCodec.TryReadUInt32(ref platform,
@@ -226,6 +259,13 @@ public sealed class MuiPropAdmissionTests
 			address, MuiPropRangeStateRecord.Size, out _));
 		Assert.False(MuiPropRangeStateRecordMemoryCodec.TryGetAddress(ref platform,
 			APTR.Null, (uint)0, out _));
+		visibleCursor.Field = (MuiPropRangeStateField)255;
+		Assert.False(MuiPropRangeStateFieldCursorCodec.TryGetAddress(ref platform,
+			visibleCursor, out _, out _));
+		visibleCursor.Record = APTR.Null;
+		visibleCursor.Field = MuiPropRangeStateField.Visible;
+		Assert.False(MuiPropRangeStateFieldCursorCodec.TryGetAddress(ref platform,
+			visibleCursor, out _, out _));
 		Assert.False(MuiPropRangeStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

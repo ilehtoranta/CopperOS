@@ -33,6 +33,28 @@ public sealed class MuiGroupLayoutPolicyStructAdapterTests
 		Assert.Equal(value.SameWidth, decoded.SameWidth);
 		Assert.Equal(value.SameHeight, decoded.SameHeight);
 		Assert.Equal(value.PageMode, decoded.PageMode);
+		var policyCursor = new MuiGroupLayoutPolicyFieldCursor
+		{
+			Address = address,
+			Field = MuiGroupLayoutPolicyField.PageMode,
+		};
+		Assert.True(MuiGroupLayoutPolicyFieldCursorCodec.TryGetAddress(
+			ref platform, policyCursor, out var cursorPageModeAddress,
+			out var cursorFieldSize));
+		Assert.Equal(APTR.FromPointer(0x3D18), cursorPageModeAddress);
+		Assert.Equal(MuiGroupLayoutPolicyStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiGroupLayoutPolicyStateRecordMemoryCodec.TryGetAddress(
+			ref platform, policyCursor, out var memoryPageModeAddress,
+			out var memoryFieldSize));
+		Assert.Equal(cursorPageModeAddress, memoryPageModeAddress);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
+		policyCursor.Field = (MuiGroupLayoutPolicyField)255;
+		Assert.False(MuiGroupLayoutPolicyFieldCursorCodec.TryGetAddress(
+			ref platform, policyCursor, out _, out _));
+		policyCursor.Address = APTR.Null;
+		policyCursor.Field = MuiGroupLayoutPolicyField.PageMode;
+		Assert.False(MuiGroupLayoutPolicyFieldCursorCodec.TryGetAddress(
+			ref platform, policyCursor, out _, out _));
 
 		var crossingEnd = APTR.FromPointer(0x30FF1);
 		Assert.False(MuiGroupLayoutPolicyStateRecordCodec.WriteRecord(ref platform,

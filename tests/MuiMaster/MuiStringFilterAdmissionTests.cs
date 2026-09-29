@@ -102,6 +102,19 @@ public sealed class MuiStringFilterAdmissionTests
 			ref platform, recordAddress, MuiStringFilterStateField.Reject,
 			out var typedRejectAddress));
 		Assert.Equal(0x1D68u, typedRejectAddress.Raw);
+		var rejectCursor = new MuiStringFilterStateFieldCursor
+		{
+			Record = recordAddress,
+			Field = MuiStringFilterStateField.Reject,
+		};
+		Assert.True(MuiStringFilterStateFieldCursorCodec.TryGetAddress(ref platform,
+			rejectCursor, out var cursorRejectAddress, out var cursorFieldSize));
+		Assert.Equal(typedRejectAddress, cursorRejectAddress);
+		Assert.Equal(MuiStringFilterStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiStringFilterStateRecordMemoryCodec.TryGetAddress(ref platform,
+			rejectCursor, out var memoryRejectAddress, out var memoryFieldSize));
+		Assert.Equal(cursorRejectAddress, memoryRejectAddress);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiStringFilterStateRecordMemoryCodec.TryReadUInt32(
 			ref platform, recordAddress, MuiStringFilterStateField.Accept,
 			out var typedAccept));
@@ -137,6 +150,13 @@ public sealed class MuiStringFilterAdmissionTests
 			APTR.Null, (uint)0, out _));
 		Assert.False(MuiStringFilterStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
+		rejectCursor.Field = (MuiStringFilterStateField)255;
+		Assert.False(MuiStringFilterStateFieldCursorCodec.TryGetAddress(ref platform,
+			rejectCursor, out _, out _));
+		rejectCursor.Record = APTR.Null;
+		rejectCursor.Field = MuiStringFilterStateField.Reject;
+		Assert.False(MuiStringFilterStateFieldCursorCodec.TryGetAddress(ref platform,
+			rejectCursor, out _, out _));
 	}
 
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR stringClass,

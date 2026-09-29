@@ -111,7 +111,9 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 	private uint _slot;
 	private const uint Allocator = 0x00036F00;
 	private const uint ArenaStart = 0x00037000;
-	private const uint ArenaEnd = 0x0003F000;
+	// Keep the dynamic arena below the named IFF storage at 0x4E000 while
+	// leaving enough room for the long ownership/re-entry regression.
+	private const uint ArenaEnd = 0x0004D000;
 	private const uint SettingsFileHandle = 0x0004F000;
 	private const uint SettingsFileLength = 0x0004F004;
 	private const uint SettingsFilePosition = 0x0004F008;
@@ -174,8 +176,25 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 	// fixed-width state block.  The marker is disabled by default so existing
 	// fallback qualification roots continue to observe caller-owned static help.
 
+	// Keep this platform's four-byte compiler representation unchanged.
+	public uint RefuseConstructionRetain
+	{
+		get
+		{
+			MuiGuestUlongStorageMemoryCodec.TryRead(ref this, APTR.FromPointer(0x00036140),
+				MuiGuestUlongStorageField.Value, out var value);
+			return value;
+		}
+		set => MuiGuestUlongStorageMemoryCodec.TryWrite(ref this, APTR.FromPointer(0x00036140),
+			MuiGuestUlongStorageField.Value, value);
+	}
+
 	public void Reset()
 	{
+		RefuseConstructionRetain = 0;
+		BoopsiLifecycleProbe = APTR.Null;
+		MuiNativeAllocationReentryControlCodec.Write(default);
+		MuiNativeAllocationReentryCodec.Write(ref this, default);
 		_slot = 0;
 		APTR.WriteUInt32(APTR.FromPointer(Allocator), 0, ArenaStart);
 		APTR.WriteUInt32(APTR.FromPointer(SettingsFileLength), 0, 0);
@@ -241,6 +260,30 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 
 	public APTR Allocate(uint byteSize, uint flags)
 	{
+		var reentry = MuiNativeAllocationReentryControlCodec.Read();
+		if (byteSize == MuiHeadlessObjectRecord.Size && reentry.Mode != 0)
+		{
+			var mode = reentry.Mode;
+			reentry.Mode = 0;
+			// Publish the cleared mode before the nested attach. The callback is
+			// entered through the same allocator seam, so a local copy alone would
+			// recursively request another re-entry.
+			MuiNativeAllocationReentryControlCodec.Write(reentry);
+			// Keep the re-entered value-type platform independent from the active
+			// interface call frame. The guest records are shared memory, while the
+			// copy prevents a nested ref-this call from aliasing the outer allocator
+			// receiver in the freestanding compiler.
+			var nestedPlatform = this;
+			var nested = MuiHeadlessObjectCore.AttachConstructedObject(
+				ref nestedPlatform, reentry.State, reentry.Class,
+				reentry.NativeObject, APTR.Null, out var ownership);
+			this = nestedPlatform;
+			reentry.NestedObject = nested;
+			reentry.NestedOwnership = (uint)ownership;
+			MuiNativeAllocationReentryControlCodec.Write(reentry);
+			if (mode == MuiNativeAllocationReentryRecord.RunAndRefuseOuter)
+				return APTR.Null;
+		}
 		if (byteSize == 0) return APTR.Null;
 		var next = APTR.ReadUInt32(APTR.FromPointer(Allocator), 0);
 		var aligned = (byteSize + 3u) & ~3u;
@@ -297,6 +340,16 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 		{
 			WriteUInt32(result, 0, classPointer.Raw);
 			WriteUInt32(result, 4, 1);
+			// The real superclass has returned before the base constructor starts
+			// sidecar admission. Publish that result into the named in-flight
+			// control so the allocator callback receives the actual object without
+			// touching the guest diagnostic record during recursive entry.
+			var reentry = MuiNativeAllocationReentryControlCodec.Read();
+			if (reentry.Mode != 0 && reentry.NativeObject.IsNull)
+			{
+				reentry.NativeObject = result;
+				MuiNativeAllocationReentryControlCodec.Write(reentry);
+			}
 		}
 		return result;
 	}
@@ -360,10 +413,24 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 	public void DisposeObject(APTR obj)
 	{
 	}
-	public uint DoSuperMethod(APTR classPointer, APTR obj, APTR message) => 1;
+	// Optional, guest-resident simulator capture; disabled for ordinary roots.
+	public APTR BoopsiLifecycleProbe
+	{
+		get
+		{
+			MuiGuestUlongStorageMemoryCodec.TryRead(ref this, APTR.FromPointer(0x00036144),
+				MuiGuestUlongStorageField.Value, out var value);
+			return APTR.FromPointer(value);
+		}
+		set => MuiGuestUlongStorageMemoryCodec.TryWrite(ref this, APTR.FromPointer(0x00036144),
+			MuiGuestUlongStorageField.Value, value.Raw);
+	}
+	public uint DoSuperMethod(APTR classPointer, APTR obj, APTR message) =>
+		MuiNativeBoopsiLifecycleProbeCore.Dispatch(ref this, classPointer, obj, message);
 	public APTR InstanceData(APTR classPointer, APTR obj) => obj;
 	public bool RetainObject(APTR obj)
 	{
+		if (RefuseConstructionRetain != 0) return false;
 		if (!IsMapped(obj, 8)) return false;
 		var count = ReadUInt32(obj, 4);
 		WriteUInt32(obj, 4, count + 1);
@@ -1007,15 +1074,17 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 	public APTR AllocateRequest(uint requestType, APTR tags) => Allocate(16, 0);
 	public int Request(APTR requester, APTR tags) => requester.IsNotNull ? 1 : 0;
 	public void FreeRequest(APTR requester) { }
-	public int Request(APTR application, APTR window, uint flags, APTR title,
-		APTR gadgets, APTR format, APTR parameters) => 1;
-	public int RequestObject(APTR application, APTR window, uint flags,
-		APTR title, APTR gadgets, APTR obj, APTR format, APTR parameters) =>
-		obj.IsNotNull ? 1 : 0;
+	public int Request(MuiRequesterCallRecord request) => 1;
+	public int RequestObject(MuiRequesterCallRecord request,
+		out bool consumeReference)
+	{
+		consumeReference = request.Object.IsNotNull;
+		return consumeReference ? 1 : 0;
+	}
 
 	// ---- MG09 class-service capability --------------------------------------
 	// Deterministic freestanding loader fixture for the external-class closure.
-	// The only published class is Foo.mcc; no host filesystem or loader is
+	// The only supplied class is Foo.mcc; no host filesystem or loader is
 	// reached. The fixed pointers are opaque guest tokens owned by this fixture.
 	public APTR OpenLibrary(APTR name, ushort minimumVersion)
 	{
@@ -1042,9 +1111,10 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 		return result;
 	}
 	public bool FreeCustomClass(APTR classPointer) => classPointer.IsNotNull;
-	public APTR ResolvePublicClass(APTR classId)
+	public APTR ResolveExternalClass(APTR library, APTR classId)
 	{
-		if (classId.IsNull || !IsMapped(classId, 7)) return APTR.Null;
+		if (library.Raw != 0x00036500 || classId.IsNull || !IsMapped(classId, 7))
+			return APTR.Null;
 		if (ReadUInt8(classId, 0) != (byte)'F' ||
 			ReadUInt8(classId, 1) != (byte)'o' ||
 			ReadUInt8(classId, 2) != (byte)'o' ||

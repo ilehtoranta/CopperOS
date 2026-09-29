@@ -22,6 +22,19 @@ public sealed class MuiAreaWeightStructAdapterTests
 		Assert.True(MuiAreaWeightStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, MuiAreaWeightStateField.Weight, out var weightAddress));
 		Assert.Equal(0x3504u, weightAddress.Raw);
+		var cursor = new MuiAreaWeightStateFieldCursor
+		{
+			Record = address,
+			Field = MuiAreaWeightStateField.Weight,
+		};
+		Assert.True(MuiAreaWeightStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedWeightAddress, out var typedWeightSize));
+		Assert.Equal(weightAddress, typedWeightAddress);
+		Assert.Equal(MuiAreaWeightStateRecord.FieldSize, typedWeightSize);
+		Assert.True(MuiAreaWeightStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryWeightAddress, out var memoryWeightSize));
+		Assert.Equal(typedWeightAddress, memoryWeightAddress);
+		Assert.Equal(typedWeightSize, memoryWeightSize);
 		Assert.True(MuiAreaWeightStateRecordMemoryCodec.TryReadUInt32(ref platform,
 			address, MuiAreaWeightStateField.Weight, out var weight));
 		Assert.Equal(uint.MaxValue, weight);
@@ -34,6 +47,13 @@ public sealed class MuiAreaWeightStructAdapterTests
 			APTR.FromPointer(0x30FF9), MuiAreaWeightStateField.Magic, out _));
 		Assert.False(MuiAreaWeightStateRecordMemoryCodec.TryGetAddress(ref platform,
 			APTR.Null, MuiAreaWeightStateField.Magic, out _));
+		cursor.Field = (MuiAreaWeightStateField)255;
+		Assert.False(MuiAreaWeightStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiAreaWeightStateField.Weight;
+		Assert.False(MuiAreaWeightStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 	}
 
 	[Fact]

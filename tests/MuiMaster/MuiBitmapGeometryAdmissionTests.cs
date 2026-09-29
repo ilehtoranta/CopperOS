@@ -57,6 +57,21 @@ public sealed class MuiBitmapGeometryAdmissionTests
 			out var typedHeightAddress));
 		Assert.Equal(address.Raw + MuiBitmapGeometryStateRecord.HeightOffset,
 			typedHeightAddress.Raw);
+		var heightCursor = new MuiBitmapGeometryStateFieldCursor
+		{
+			Record = address,
+			Field = MuiBitmapGeometryStateField.Height,
+		};
+		Assert.True(MuiBitmapGeometryStateFieldCursorCodec.TryGetAddress(
+			ref platform, heightCursor, out var cursorHeightAddress,
+			out var fieldSize));
+		Assert.Equal(typedHeightAddress, cursorHeightAddress);
+		Assert.Equal(MuiBitmapGeometryStateRecord.FieldSize, fieldSize);
+		Assert.True(MuiBitmapGeometryStateRecordMemoryCodec.TryGetAddress(
+			ref platform, heightCursor, out var memoryCursorAddress,
+			out var memoryFieldSize));
+		Assert.Equal(cursorHeightAddress, memoryCursorAddress);
+		Assert.Equal(fieldSize, memoryFieldSize);
 		Assert.True(MuiBitmapGeometryStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiBitmapGeometryStateField.Width,
 			0x12345678));
@@ -75,6 +90,9 @@ public sealed class MuiBitmapGeometryAdmissionTests
 			ref platform, address, MuiBitmapGeometryStateRecord.Size, out _));
 		Assert.False(MuiBitmapGeometryStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, 0u, out _));
+		heightCursor.Record = APTR.Null;
+		Assert.False(MuiBitmapGeometryStateFieldCursorCodec.TryGetAddress(
+			ref platform, heightCursor, out _, out _));
 		Assert.False(MuiBitmapGeometryStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}
@@ -104,6 +122,38 @@ public sealed class MuiBitmapGeometryAdmissionTests
 			crossingEnd, value));
 		Assert.False(MuiBitmapGeometryStateRecordCodec.TryReadRecord(ref platform,
 			crossingEnd, out _));
+	}
+
+	[Fact]
+	public void BitmapGeometryOffsetBridgeUsesNamedUlongCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1C40);
+		var initial = new MuiBitmapGeometryStateRecord
+		{
+			Magic = MuiBitmapGeometryStateRecord.Cookie,
+			Width = 320,
+			Height = 200,
+		};
+
+		Assert.True(MuiBitmapGeometryStateRecordCodec.WriteRecord(ref platform,
+			address, initial));
+		Assert.True(MuiBitmapGeometryStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiBitmapGeometryStateRecord.WidthOffset,
+			0xF1020304u));
+		Assert.True(MuiBitmapGeometryStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiBitmapGeometryStateRecord.WidthOffset,
+			out var width));
+		Assert.Equal(0xF1020304u, width);
+		Assert.True(MuiBitmapGeometryStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.Equal(initial.Magic, decoded.Magic);
+		Assert.Equal(0xF1020304u, decoded.Width);
+		Assert.Equal(initial.Height, decoded.Height);
+		Assert.False(MuiBitmapGeometryStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiBitmapGeometryStateRecord.Size, out _));
+		Assert.False(MuiBitmapGeometryStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.Null, MuiBitmapGeometryStateRecord.HeightOffset, 1));
 	}
 
 	[Fact]

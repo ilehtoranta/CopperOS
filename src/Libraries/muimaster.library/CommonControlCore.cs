@@ -498,10 +498,12 @@ internal static class MuiChoiceEntryMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (field != MuiChoiceEntryField.Text || record.IsNull ||
-			!platform.IsMapped(record, MuiChoiceEntry.Size)) return false;
-		address = APTR.FromPointer(record.Raw + MuiChoiceEntry.TextOffset);
-		return platform.IsMapped(address, MuiChoiceEntry.FieldSize);
+		if (field != MuiChoiceEntryField.Text ||
+			!MuiGuestStructCursor.TryCreate(ref platform, record,
+				MuiChoiceEntry.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiChoiceEntry.FieldSize, out address)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -509,9 +511,10 @@ internal static class MuiChoiceEntryMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
+		if (field != MuiChoiceEntryField.Text ||
+			!MuiChoiceEntryCodec.TryRead(ref platform, record, out var entry))
 			return false;
-		value = platform.ReadUInt32(address, 0);
+		value = entry.Text.Raw;
 		return true;
 	}
 
@@ -519,10 +522,11 @@ internal static class MuiChoiceEntryMemoryCodec
 		APTR record, MuiChoiceEntryField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
+		if (field != MuiChoiceEntryField.Text ||
+			!MuiChoiceEntryCodec.TryRead(ref platform, record, out var entry))
 			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		entry.Text = APTR.FromPointer(value);
+		return MuiChoiceEntryCodec.Write(ref platform, record, entry);
 	}
 }
 
@@ -740,30 +744,53 @@ internal struct MuiImageGeometryFieldCursor
 // MuiImageGeometryState value instead of carrying anonymous offsets.
 internal static class MuiImageGeometryMemoryCodec
 {
-	private static bool TryResolve(MuiImageGeometryField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiImageGeometryField field,
+		out uint index)
 	{
-		offset = field switch
+		if (field == MuiImageGeometryField.LeftEdge) index = 0;
+		else if (field == MuiImageGeometryField.TopEdge) index = 1;
+		else if (field == MuiImageGeometryField.Width) index = 2;
+		else if (field == MuiImageGeometryField.Height) index = 3;
+		else
 		{
-			MuiImageGeometryField.LeftEdge => MuiImageGeometryState.LeftEdgeOffset,
-			MuiImageGeometryField.TopEdge => MuiImageGeometryState.TopEdgeOffset,
-			MuiImageGeometryField.Width => MuiImageGeometryState.WidthOffset,
-			MuiImageGeometryField.Height => MuiImageGeometryState.HeightOffset,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			index = uint.MaxValue;
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiImageGeometryField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiImageGeometryFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiImageGeometryFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			!platform.IsMapped(record, MuiImageGeometryState.Size) ||
-			record.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiImageGeometryState.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiImageGeometryState.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiImageGeometryState.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiImageGeometryState.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt16<TPlatform>(ref TPlatform platform,
@@ -771,20 +798,51 @@ internal static class MuiImageGeometryMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt16(address, 0);
-		return true;
+		if (!MuiImageGeometryCodec.TryRead(ref platform, record,
+			out var geometry)) return false;
+		switch (field)
+		{
+			case MuiImageGeometryField.LeftEdge:
+				value = unchecked((ushort)geometry.LeftEdge);
+				return true;
+			case MuiImageGeometryField.TopEdge:
+				value = unchecked((ushort)geometry.TopEdge);
+				return true;
+			case MuiImageGeometryField.Width:
+				value = geometry.Width;
+				return true;
+			case MuiImageGeometryField.Height:
+				value = geometry.Height;
+				return true;
+			default:
+				return false;
+		}
 	}
 
 	internal static bool TryWriteUInt16<TPlatform>(ref TPlatform platform,
 		APTR record, MuiImageGeometryField field, ushort value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt16(address, 0, value);
-		return true;
+		if (!MuiImageGeometryCodec.TryRead(ref platform, record,
+			out var geometry)) return false;
+		switch (field)
+		{
+			case MuiImageGeometryField.LeftEdge:
+				geometry.LeftEdge = unchecked((short)value);
+				break;
+			case MuiImageGeometryField.TopEdge:
+				geometry.TopEdge = unchecked((short)value);
+				break;
+			case MuiImageGeometryField.Width:
+				geometry.Width = value;
+				break;
+			case MuiImageGeometryField.Height:
+				geometry.Height = value;
+				break;
+			default:
+				return false;
+		}
+		return MuiImageGeometryCodec.Write(ref platform, record, geometry);
 	}
 }
 
@@ -795,8 +853,13 @@ internal static class MuiImageGeometryFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiImageGeometryFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-		=> MuiImageGeometryMemoryCodec.TryGetAddress(ref platform, cursor.Record,
-			cursor.Field, out address);
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiImageGeometryFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiImageGeometryMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
 
 	internal static bool TryReadUInt16<TPlatform>(ref TPlatform platform,
 		APTR record, MuiImageGeometryField field, out ushort value)
@@ -1501,8 +1564,38 @@ public static class MuiCommonControlCore
 	public static bool Construct<TPlatform>(ref TPlatform platform, APTR state,
 		APTR classRecord, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (ClassifyRecord(ref platform, classRecord) == MuiControlClass.Unknown) return true;
+		var owner = MuiHeadlessObjectCore.FindObject(ref platform, state, obj);
+		if (!MuiHeadlessObjectCodec.TryRead(ref platform, owner, out var value) ||
+			(value.Flags & (MuiHeadlessObjectCore.ObjectDisposing |
+				MuiHeadlessObjectCore.ObjectProviderBusy |
+				MuiHeadlessObjectCore.ObjectConstructionBinding |
+				MuiHeadlessObjectCore.ObjectControlConstructionActive |
+				MuiHeadlessObjectCore.ObjectScrollbarConstructionPending |
+				MuiHeadlessObjectCore.ObjectRadioConstructionPending)) != 0 ||
+			!MuiHeadlessObjectMemoryCodec.TryGetAddress(ref platform, owner,
+				MuiHeadlessObjectField.Flags, out var flagsField)) return false;
+		platform.WriteUInt32(flagsField, 0, value.Flags | MuiHeadlessObjectCore.ObjectControlConstructionActive);
+		var result = ConstructCore(ref platform, state, classRecord, obj);
+		// The admitted owner remains protected through every nested allocation.
+		// Preserve pending/completed and provider flags; remove only our guard.
+		platform.WriteUInt32(flagsField, 0, platform.ReadUInt32(flagsField, 0) &
+			~MuiHeadlessObjectCore.ObjectControlConstructionActive);
+		return result;
+	}
+
+	private static bool ConstructCore<TPlatform>(ref TPlatform platform, APTR state,
+		APTR classRecord, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
+	{
 		var cls = ClassifyRecord(ref platform, classRecord);
 		if (cls == MuiControlClass.Unknown) return true;
+		var constructionOwner = MuiHeadlessObjectCore.FindObject(ref platform, state, obj);
+		if (!MuiHeadlessObjectCodec.TryRead(ref platform, constructionOwner, out var ownerState) ||
+			(ownerState.Flags & (MuiHeadlessObjectCore.ObjectDisposing |
+				MuiHeadlessObjectCore.ObjectProviderBusy |
+				MuiHeadlessObjectCore.ObjectConstructionBinding)) != 0) return false;
+		if ((ownerState.Flags & MuiHeadlessObjectCore.ObjectScrollbarConstructionPending) != 0)
+			return false;
 		// Datamap.mui and Dataspace.mui are store objects, not Area/controls. Their
 		// state is already represented by MuiStoreRecord values, so skip control
 		// defaults.
@@ -1777,9 +1870,8 @@ public static class MuiCommonControlCore
 				CycleEntries, 0));
 			if (!PublishChoiceEntriesState(ref platform, state, obj,
 				CycleEntries, entries)) return false;
-			NormalizeChoiceActive(ref platform, state, obj, CycleActive,
+			return NormalizeChoiceActive(ref platform, state, obj, CycleActive,
 				CycleEntries);
-			return true;
 		}
 		if (cls == MuiControlClass.Radio)
 		{
@@ -1789,10 +1881,12 @@ public static class MuiCommonControlCore
 				RadioEntries, 0));
 			if (!PublishChoiceEntriesState(ref platform, state, obj,
 				RadioEntries, entries)) return false;
+			// Child completion must be the final construction publication. Fail
+			// active-state admission before any child ownership is established.
+			if (!NormalizeChoiceActive(ref platform, state, obj, RadioActive,
+				RadioEntries)) return false;
 			if (!entries.Entries.IsNull && !BuildRadioChildren(ref platform, state,
 				classRecord, obj, entries.Entries)) return false;
-			NormalizeChoiceActive(ref platform, state, obj, RadioActive,
-				RadioEntries);
 			return true;
 		}
 		if (cls == MuiControlClass.Rectangle)
@@ -2141,6 +2235,32 @@ public static class MuiCommonControlCore
 	{
 		var count = CountEntries(ref platform, entries);
 		if (count <= 0) return false;
+		var owner = MuiHeadlessObjectCore.FindObject(ref platform, state, radio);
+		if (!MuiHeadlessObjectCodec.TryRead(ref platform, owner, out var topology)) return false;
+		if ((topology.Flags & MuiHeadlessObjectCore.ObjectRadioConstructionPending) != 0) return false;
+		if ((topology.Flags & MuiHeadlessObjectCore.ObjectRadioConstructionComplete) != 0 ||
+			topology.ChildrenHead.IsNotNull || topology.ChildrenTail.IsNotNull)
+		{
+			if ((topology.Flags & MuiHeadlessObjectCore.ObjectRadioConstructionComplete) == 0)
+				return false;
+			var node = topology.ChildrenHead;
+			var previous = APTR.Null;
+			for (var index = 0; index < count; index++)
+			{
+				if (!MuiHeadlessChildCodec.TryRead(ref platform, node, out var link) ||
+					link.Owner.Raw != owner.Raw || link.Previous.Raw != previous.Raw ||
+					!MuiHeadlessObjectCodec.TryRead(ref platform, link.Object, out var child) ||
+					!IsAvailableConstructionChild(child, owner)) return false;
+				previous = node;
+				node = link.Next;
+			}
+			return node.IsNull && previous.Raw == topology.ChildrenTail.Raw;
+		}
+		if (!MuiHeadlessObjectMemoryCodec.TryGetAddress(ref platform, owner,
+			MuiHeadlessObjectField.Flags, out var constructionFlags)) return false;
+		platform.WriteUInt32(constructionFlags, 0,
+			(topology.Flags | MuiHeadlessObjectCore.ObjectRadioConstructionPending) &
+			~MuiHeadlessObjectCore.ObjectRadioConstructionComplete);
 		var textClass = FindClassByControlClass(ref platform, state,
 			MuiControlClass.Text);
 		// Older headless callers register only Radio.mui. Preserve that bounded
@@ -2155,28 +2275,44 @@ public static class MuiCommonControlCore
 			if (!MuiChoiceEntryVectorCodec.TryReadValue(ref platform, entryCursor,
 				out var rawText)) return false;
 			var label = APTR.FromPointer(rawText);
-			var child = label.IsNull ? APTR.Null :
-				MuiHeadlessObjectCore.CreateObjectA(ref platform, state, textClass,
-					APTR.Null);
-			if (child.IsNull || !MuiHeadlessObjectCore.SetAttribute(ref platform,
-				state, child, TextContents, label.Raw, false) ||
-				!Construct(ref platform, state, textClass, child) ||
-				!MuiFamilyCore.AddTail(ref platform, state, radio, child))
+			if (label.IsNull || !MuiConstructionChildSlotsCore.ReserveNext(ref platform, owner,
+				out var slot))
 			{
-				if (child.IsNotNull && MuiHeadlessObjectCore.FindObject(ref platform,
-					state, child).IsNotNull)
-					MuiHeadlessObjectCore.DisposeObject(ref platform, state, child);
-				var record = MuiHeadlessObjectCore.FindObject(ref platform, state, radio);
-				if (record.IsNotNull)
-					MuiFamilyCore.RemoveAllChildren(ref platform, state, record, true);
+				MuiFamilyCore.RemoveAllChildren(ref platform, state, owner, true);
+				return false;
+			}
+			var child = MuiConstructionChildSlotsCore.CreateOwned(ref platform, state,
+				owner, slot, textClass);
+			if (child.IsNull || !MuiConstructionChildSlotsCore.BindCreated(ref platform, state,
+				owner, slot, child, out _) || !MuiHeadlessObjectCore.SetAttribute(ref platform,
+				state, child, TextContents, label.Raw, false) ||
+				!Construct(ref platform, state, textClass, child))
+			{
+				MuiFamilyCore.RemoveAllChildren(ref platform, state, owner, true);
 				return false;
 			}
 			if (index + 1 < count &&
 				!MuiChoiceEntryVectorCodec.TryAdvance(ref entryCursor, 1))
 				return false;
 		}
+		if (!MuiHeadlessObjectMemoryCodec.TryGetAddress(ref platform, owner,
+			MuiHeadlessObjectField.Flags, out constructionFlags)) return false;
+		platform.WriteUInt32(constructionFlags, 0,
+			(platform.ReadUInt32(constructionFlags, 0) &
+				~MuiHeadlessObjectCore.ObjectRadioConstructionPending) |
+			MuiHeadlessObjectCore.ObjectRadioConstructionComplete);
 		return true;
 	}
+
+	private static bool IsAvailableConstructionChild(MuiHeadlessObjectRecord child, APTR owner) =>
+		child.Boopsi.IsNotNull && child.Parent.Raw == owner.Raw &&
+		(child.Flags & MuiHeadlessObjectCore.ObjectInitialized) != 0 &&
+		(child.Flags & (MuiHeadlessObjectCore.ObjectDisposing |
+			MuiHeadlessObjectCore.ObjectProviderBusy |
+			MuiHeadlessObjectCore.ObjectConstructionBinding |
+			MuiHeadlessObjectCore.ObjectControlConstructionActive |
+			MuiHeadlessObjectCore.ObjectRadioConstructionPending |
+			MuiHeadlessObjectCore.ObjectScrollbarConstructionPending)) == 0;
 
 	// Scrollbar.mui is a Group subclass.  The real class exposes one Prop and
 	// two button children; keep that topology in the object family so group
@@ -2189,113 +2325,130 @@ public static class MuiCommonControlCore
 		APTR state, APTR classRecord, APTR scrollbar)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (MuiFamilyCore.GetChild(ref platform, state, scrollbar, 0,
-			APTR.Null).IsNotNull) return true;
 		if (!TryReadScrollbarLayoutState(ref platform, state, scrollbar,
 			out var layout)) return false;
 		var horizontal = layout.Horizontal != 0;
 		var type = layout.Type;
+		var owner = MuiHeadlessObjectCore.FindObject(ref platform, state, scrollbar);
+		if (!MuiHeadlessObjectCodec.TryRead(ref platform, owner, out var topology)) return false;
+		if ((topology.Flags & (MuiHeadlessObjectCore.ObjectDisposing |
+			MuiHeadlessObjectCore.ObjectProviderBusy |
+			MuiHeadlessObjectCore.ObjectScrollbarConstructionPending)) != 0) return false;
+		if ((topology.Flags & MuiHeadlessObjectCore.ObjectScrollbarConstructionComplete) != 0 ||
+			topology.ChildrenHead.IsNotNull || topology.ChildrenTail.IsNotNull)
+		{
+			if ((topology.Flags & MuiHeadlessObjectCore.ObjectScrollbarConstructionComplete) == 0)
+				return false;
+			// Existing topology may be a partially completed construction.
+			// Require all three named roles in the configured order.
+			var current = topology.ChildrenHead;
+			var previous = APTR.Null;
+			for (var index = 0; index < 3; index++)
+			{
+				if (!MuiHeadlessChildCodec.TryRead(ref platform, current, out var link) ||
+					link.Owner.Raw != owner.Raw || link.Previous.Raw != previous.Raw ||
+					!MuiHeadlessObjectCodec.TryRead(ref platform, link.Object, out var part) ||
+					!IsAvailableConstructionChild(part, owner)) return false;
+				var propIndex = type == ScrollbarTypeTop ? 2 :
+					type == ScrollbarTypeBottom ? 0 : 1;
+				if (part.Boopsi.IsNull || !MuiHeadlessObjectCore.GetRawAttribute(ref platform,
+					state, part.Boopsi, UserData, out var role) ||
+					role != (index == propIndex ? ScrollbarPartProp : ScrollbarPartArrow))
+					return false;
+				previous = current;
+				current = link.Next;
+			}
+			return current.IsNull && previous.Raw == topology.ChildrenTail.Raw;
+		}
 		var propClass = FindClassByControlClass(ref platform, state,
 			MuiControlClass.Prop);
 		var gadgetClass = FindClassByControlClass(ref platform, state,
 			MuiControlClass.Gadget);
+		if (!MuiHeadlessObjectMemoryCodec.TryGetAddress(ref platform, owner,
+			MuiHeadlessObjectField.Flags, out var constructionFlags)) return false;
+		platform.WriteUInt32(constructionFlags, 0,
+			(topology.Flags | MuiHeadlessObjectCore.ObjectScrollbarConstructionPending) &
+			~MuiHeadlessObjectCore.ObjectScrollbarConstructionComplete);
+		if (!MuiConstructionChildSlotsCore.Reserve(ref platform, owner, out var slots)) return false;
+		var propSlot = type == ScrollbarTypeTop ? slots.Third :
+			type == ScrollbarTypeBottom ? slots.First : slots.Second;
+		var firstSlot = type == ScrollbarTypeBottom ? slots.Second : slots.First;
+		var secondSlot = type == ScrollbarTypeTop ? slots.Second : slots.Third;
 		var prop = CreateScrollbarPart(ref platform, state, classRecord,
-			propClass, ScrollbarPartProp);
+			propClass, ScrollbarPartProp, owner, propSlot);
 		var firstArrow = CreateScrollbarPart(ref platform, state, classRecord,
-			gadgetClass, ScrollbarPartArrow);
+			gadgetClass, ScrollbarPartArrow, owner, firstSlot);
 		var secondArrow = CreateScrollbarPart(ref platform, state, classRecord,
-			gadgetClass, ScrollbarPartArrow);
+			gadgetClass, ScrollbarPartArrow, owner, secondSlot);
 		if (prop.IsNull || firstArrow.IsNull || secondArrow.IsNull)
 		{
-			DisposeScrollbarPart(ref platform, state, prop);
-			DisposeScrollbarPart(ref platform, state, firstArrow);
-			DisposeScrollbarPart(ref platform, state, secondArrow);
+			MuiFamilyCore.RemoveAllChildren(ref platform, state, owner, true);
 			return false;
 		}
 
-		SetScrollbarPartGeometry(ref platform, state, prop, horizontal,
-			false, type != ScrollbarTypeNone);
-		SetScrollbarPartGeometry(ref platform, state, firstArrow, horizontal,
-			true, type != ScrollbarTypeNone);
-		SetScrollbarPartGeometry(ref platform, state, secondArrow, horizontal,
-			true, type != ScrollbarTypeNone);
-		if (!SyncScrollbarProp(ref platform, state, scrollbar, prop))
+		if (!SetScrollbarPartGeometry(ref platform, state, prop, horizontal,
+				false, type != ScrollbarTypeNone) ||
+			!SetScrollbarPartGeometry(ref platform, state, firstArrow, horizontal,
+				true, type != ScrollbarTypeNone) ||
+			!SetScrollbarPartGeometry(ref platform, state, secondArrow, horizontal,
+				true, type != ScrollbarTypeNone) ||
+			!SyncScrollbarProp(ref platform, state, scrollbar, prop))
 		{
-			DisposeScrollbarPart(ref platform, state, prop);
-			DisposeScrollbarPart(ref platform, state, firstArrow);
-			DisposeScrollbarPart(ref platform, state, secondArrow);
+			MuiFamilyCore.RemoveAllChildren(ref platform, state, owner, true);
 			return false;
 		}
 
-		var record = MuiHeadlessObjectCore.FindObject(ref platform, state, scrollbar);
-		if (record.IsNull) return false;
-		var added = false;
-		if (type == ScrollbarTypeTop)
-			added = MuiFamilyCore.AddTail(ref platform, state, scrollbar, firstArrow) &&
-				MuiFamilyCore.AddTail(ref platform, state, scrollbar, secondArrow) &&
-				MuiFamilyCore.AddTail(ref platform, state, scrollbar, prop);
-		else if (type == ScrollbarTypeBottom)
-			added = MuiFamilyCore.AddTail(ref platform, state, scrollbar, prop) &&
-				MuiFamilyCore.AddTail(ref platform, state, scrollbar, firstArrow) &&
-				MuiFamilyCore.AddTail(ref platform, state, scrollbar, secondArrow);
-		else
-			added = MuiFamilyCore.AddTail(ref platform, state, scrollbar, firstArrow) &&
-				MuiFamilyCore.AddTail(ref platform, state, scrollbar, prop) &&
-				MuiFamilyCore.AddTail(ref platform, state, scrollbar, secondArrow);
-		if (added) return true;
-		MuiFamilyCore.RemoveAllChildren(ref platform, state, record, true);
-		DisposeScrollbarPart(ref platform, state, prop);
-		DisposeScrollbarPart(ref platform, state, firstArrow);
-		DisposeScrollbarPart(ref platform, state, secondArrow);
-		return false;
+		if (!MuiHeadlessObjectMemoryCodec.TryGetAddress(ref platform, owner,
+			MuiHeadlessObjectField.Flags, out constructionFlags)) return false;
+		platform.WriteUInt32(constructionFlags, 0,
+			(platform.ReadUInt32(constructionFlags, 0) &
+				~MuiHeadlessObjectCore.ObjectScrollbarConstructionPending) |
+			MuiHeadlessObjectCore.ObjectScrollbarConstructionComplete);
+		return true;
 	}
 
 	private static APTR CreateScrollbarPart<TPlatform>(ref TPlatform platform,
-		APTR state, APTR fallbackClass, APTR preferredClass, uint role)
+		APTR state, APTR fallbackClass, APTR preferredClass, uint role,
+		APTR owner, APTR slot)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		var childClass = preferredClass.IsNotNull ? preferredClass : fallbackClass;
-		var child = MuiHeadlessObjectCore.CreateObjectA(ref platform, state,
-			childClass, APTR.Null);
+		var child = MuiConstructionChildSlotsCore.CreateOwned(ref platform, state,
+			owner, slot, childClass);
 		if (child.IsNull) return APTR.Null;
+		if (!MuiConstructionChildSlotsCore.BindCreated(ref platform, state, owner, slot, child,
+			out _))
+		{
+			// Registration already transferred cleanup authority to the slot.
+			return APTR.Null;
+		}
 		if (preferredClass.IsNotNull && !Construct(ref platform, state,
 			preferredClass, child))
 		{
-			MuiHeadlessObjectCore.DisposeObject(ref platform, state, child);
 			return APTR.Null;
 		}
 		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, child,
 			UserData, role, false))
 		{
-			MuiHeadlessObjectCore.DisposeObject(ref platform, state, child);
 			return APTR.Null;
 		}
 		return child;
 	}
 
-	private static void DisposeScrollbarPart<TPlatform>(ref TPlatform platform,
-		APTR state, APTR child) where TPlatform : struct, IMuiHeadlessPlatform
-	{
-		if (child.IsNotNull && MuiHeadlessObjectCore.FindObject(ref platform,
-			state, child).IsNotNull)
-			MuiHeadlessObjectCore.DisposeObject(ref platform, state, child);
-	}
-
-	private static void SetScrollbarPartGeometry<TPlatform>(ref TPlatform platform,
+	internal static bool SetScrollbarPartGeometry<TPlatform>(ref TPlatform platform,
 		APTR state, APTR child, bool horizontal, bool arrow, bool shown)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		MuiHeadlessObjectCore.SetAttribute(ref platform, state, child, ShowMe,
-			shown ? 1u : 0u, false);
-		if (arrow || !horizontal)
-			MuiHeadlessObjectCore.SetAttribute(ref platform, state, child, FixWidth,
-				16, false);
-		if (arrow || horizontal)
-			MuiHeadlessObjectCore.SetAttribute(ref platform, state, child, FixHeight,
-				16, false);
-		if (!arrow)
-			MuiHeadlessObjectCore.SetAttribute(ref platform, state, child, PropHoriz,
-				horizontal ? 1u : 0u, false);
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, child, ShowMe,
+			shown ? 1u : 0u, false)) return false;
+		if ((arrow || !horizontal) &&
+			!MuiHeadlessObjectCore.SetAttribute(ref platform, state, child, FixWidth,
+				16, false)) return false;
+		if ((arrow || horizontal) &&
+			!MuiHeadlessObjectCore.SetAttribute(ref platform, state, child, FixHeight,
+				16, false)) return false;
+		return arrow || MuiHeadlessObjectCore.SetAttribute(ref platform, state, child,
+			PropHoriz, horizontal ? 1u : 0u, false);
 	}
 
 	private static APTR FindClassByControlClass<TPlatform>(ref TPlatform platform,
@@ -9358,11 +9511,19 @@ public static class MuiCommonControlCore
 		bool timerEvents)
 		where TPlatform : struct, IMuiLayoutPlatform
 	{
+		if (!TryReadAreaPresentationState(ref platform, state, obj,
+			out var areaPresentation) || areaPresentation.Disabled != 0) return 0;
+		// Raw key-up messages carry IECODE_UP_PREFIX in the named Code field.
+		// They are not printable input or ControlChar activations; a future
+		// preprocessed MUIKEY_RELEASE remains distinct from MUIKEY_NONE here.
+		if (muiKey == -1 && MuiIntuiMessageCodec.TryReadRawKeyRecord(ref platform,
+			intuiMessage, out var rawKey) &&
+			MuiIntuiMessageCodec.IsRawKeyRelease(rawKey.Code)) return 0;
+		if (TryResolveAreaControlCharKey(ref platform, state, obj, intuiMessage,
+			muiKey, out var controlCharKey)) muiKey = controlCharKey;
 		if (MuiScrollgroupCore.IsObject(ref platform, state, obj))
 			return MuiScrollgroupCore.HandleEvent(ref platform, state, obj,
 				intuiMessage, muiKey);
-		if (!TryReadAreaPresentationState(ref platform, state, obj,
-			out var areaPresentation) || areaPresentation.Disabled != 0) return 0;
 		var cls = Classify(ref platform, state, obj);
 		if (cls == MuiControlClass.Image)
 		{
@@ -9406,6 +9567,48 @@ public static class MuiCommonControlCore
 		if (step == 0) return 0;
 		return ChangeNumeric(ref platform, state, obj, step) ? 1u : 0u;
 	}
+
+	// MUIA_ControlChar is an Area-level keyboard shortcut, separate from the
+	// Text.mui MUIA_Text_ControlChar presentation/input policy. MorphOS maps a
+	// matching character to Return only when its own object is the Window's
+	// active object. Keep focus and raw-key data in their named records; this
+	// path does not inspect IntuiMessage bytes directly.
+	private static bool TryResolveAreaControlCharKey<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj, APTR intuiMessage,
+		int muiKey, out int resolvedKey)
+		where TPlatform : struct, IMuiLayoutPlatform
+	{
+		resolvedKey = muiKey;
+		if (!MuiAreaControlCharCore.TryReadState(ref platform, state, obj,
+			out var controlCharState) || controlCharState.Character == 0 ||
+			muiKey == KeyPress || muiKey == KeyToggle || muiKey == KeyUp)
+			return false;
+		var window = MuiApplicationWindowCore.FindContainingWindow(ref platform,
+			state, obj);
+		if (window.IsNull || !MuiApplicationWindowCore.TryGetWindowFocusState(
+			ref platform, state, window, out var focus) || focus.ActiveObject != obj)
+			return false;
+		var hasRawKey = MuiIntuiMessageCodec.TryReadRawKeyRecord(ref platform,
+			intuiMessage, out var rawKey);
+		var character = muiKey == -1
+			? (hasRawKey ? platform.TranslateTextInput(intuiMessage) : -1)
+			: muiKey;
+		if (character < 32 || character > 255 ||
+			Lower(unchecked((byte)character)) !=
+				Lower(unchecked((byte)controlCharState.Character))) return false;
+		if (RequiresShiftForAreaControlChar(controlCharState.Character))
+		{
+			var shiftQualifiers = (ushort)InputEventQualifier.LeftShift |
+				(ushort)InputEventQualifier.RightShift;
+			if (!hasRawKey || (rawKey.Qualifier & shiftQualifiers) == 0)
+				return false;
+		}
+		resolvedKey = KeyPress;
+		return true;
+	}
+
+	private static bool RequiresShiftForAreaControlChar(uint character) =>
+		character >= (byte)'A' && character <= (byte)'Z';
 
 	// MorphOS Numeric-family controls use the toggle key as a named reset to
 	// NumericDefault. Keep this as a small typed seam so native qualification can

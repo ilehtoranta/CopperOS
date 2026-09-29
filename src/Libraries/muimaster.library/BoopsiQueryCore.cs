@@ -76,38 +76,47 @@ internal struct MuiBoopsiQueryPacketFieldCursor
 // complete 40-byte record is validated before any named member is accessed.
 internal static class MuiBoopsiQueryMessageMemoryCodec
 {
-	private static bool TryResolve(MuiBoopsiQueryPacketField field,
-		out uint offset, out uint size)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiBoopsiQueryPacketField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		size = MuiBoopsiQueryMessage.Size;
+		address = APTR.Null;
+		uint fieldIndex;
 		switch (field)
 		{
-			case MuiBoopsiQueryPacketField.MethodId:
-				offset = MuiBoopsiQueryMessage.MethodIdOffset;
-				size = MuiBoopsiQueryMethodMessage.Size;
-				return true;
-			case MuiBoopsiQueryPacketField.Screen:
-				offset = MuiBoopsiQueryMessage.ScreenOffset; return true;
-			case MuiBoopsiQueryPacketField.Flags:
-				offset = MuiBoopsiQueryMessage.FlagsOffset; return true;
-			case MuiBoopsiQueryPacketField.MinWidth:
-				offset = MuiBoopsiQueryMessage.MinWidthOffset; return true;
-			case MuiBoopsiQueryPacketField.MinHeight:
-				offset = MuiBoopsiQueryMessage.MinHeightOffset; return true;
-			case MuiBoopsiQueryPacketField.MaxWidth:
-				offset = MuiBoopsiQueryMessage.MaxWidthOffset; return true;
-			case MuiBoopsiQueryPacketField.MaxHeight:
-				offset = MuiBoopsiQueryMessage.MaxHeightOffset; return true;
-			case MuiBoopsiQueryPacketField.DefaultWidth:
-				offset = MuiBoopsiQueryMessage.DefaultWidthOffset; return true;
-			case MuiBoopsiQueryPacketField.DefaultHeight:
-				offset = MuiBoopsiQueryMessage.DefaultHeightOffset; return true;
-			case MuiBoopsiQueryPacketField.RenderInfo:
-				offset = MuiBoopsiQueryMessage.RenderInfoOffset; return true;
+			case MuiBoopsiQueryPacketField.MethodId: fieldIndex = 0; break;
+			case MuiBoopsiQueryPacketField.Screen: fieldIndex = 1; break;
+			case MuiBoopsiQueryPacketField.Flags: fieldIndex = 2; break;
+			case MuiBoopsiQueryPacketField.MinWidth: fieldIndex = 3; break;
+			case MuiBoopsiQueryPacketField.MinHeight: fieldIndex = 4; break;
+			case MuiBoopsiQueryPacketField.MaxWidth: fieldIndex = 5; break;
+			case MuiBoopsiQueryPacketField.MaxHeight: fieldIndex = 6; break;
+			case MuiBoopsiQueryPacketField.DefaultWidth: fieldIndex = 7; break;
+			case MuiBoopsiQueryPacketField.DefaultHeight: fieldIndex = 8; break;
+			case MuiBoopsiQueryPacketField.RenderInfo: fieldIndex = 9; break;
+			default: return false;
 		}
-		offset = 0;
-		size = 0;
-		return false;
+		if (fieldIndex > 0 && !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, MuiBoopsiQueryMessage.FieldSize, out _)) return false;
+		if (fieldIndex > 1 && !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, MuiBoopsiQueryMessage.FieldSize, out _)) return false;
+		if (fieldIndex > 2 && !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, MuiBoopsiQueryMessage.FieldSize, out _)) return false;
+		if (fieldIndex > 3 && !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, MuiBoopsiQueryMessage.FieldSize, out _)) return false;
+		if (fieldIndex > 4 && !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, MuiBoopsiQueryMessage.FieldSize, out _)) return false;
+		if (fieldIndex > 5 && !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, MuiBoopsiQueryMessage.FieldSize, out _)) return false;
+		if (fieldIndex > 6 && !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, MuiBoopsiQueryMessage.FieldSize, out _)) return false;
+		if (fieldIndex > 7 && !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, MuiBoopsiQueryMessage.FieldSize, out _)) return false;
+		if (fieldIndex > 8 && !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, MuiBoopsiQueryMessage.FieldSize, out _)) return false;
+		return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiBoopsiQueryMessage.FieldSize, out address);
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -115,11 +124,13 @@ internal static class MuiBoopsiQueryMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset, out var size) ||
-			message.IsNull || message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(message, size)) return false;
-		address = APTR.FromPointer(message.Raw + offset);
-		return platform.IsMapped(address, MuiBoopsiQueryMessage.FieldSize);
+		var size = field == MuiBoopsiQueryPacketField.MethodId
+			? MuiBoopsiQueryMethodMessage.Size
+			: MuiBoopsiQueryMessage.Size;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message, size,
+			out var cursor) || !TryTakeField(ref platform, ref cursor, field,
+				out address)) return false;
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

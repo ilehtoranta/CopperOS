@@ -13,6 +13,8 @@ internal struct MuiStoreIterationCounter
 {
 	internal const uint Size = 4;
 	internal const uint FieldSize = 4;
+	// Compatibility metadata for callers that still name the wire position;
+	// live address publication uses MuiGuestStructCursor below.
 	internal const uint OrdinalOffset = 0;
 	internal uint Ordinal;
 }
@@ -38,12 +40,12 @@ internal static class MuiStoreIterationCounterMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (field != MuiStoreIterationCounterField.Ordinal || record.IsNull ||
-			!platform.IsMapped(record,
-				MuiStoreIterationCounter.Size)) return false;
-		address = APTR.FromPointer(record.Raw +
-			MuiStoreIterationCounter.OrdinalOffset);
-		return platform.IsMapped(address, MuiStoreIterationCounter.FieldSize);
+		if (field != MuiStoreIterationCounterField.Ordinal ||
+			!MuiGuestStructCursor.TryCreate(ref platform, record,
+				MuiStoreIterationCounter.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiStoreIterationCounter.FieldSize, out address)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -313,7 +315,7 @@ public static class MuiStoreCore
 	{
 		if (length < 0 || length > 65536) return false;
 		var owner = MuiHeadlessObjectCore.FindObject(ref platform, state, obj);
-		if (owner.IsNull) return false;
+		if (!CanMutateOwnedStore(ref platform, owner)) return false;
 		var pool = ResolveAnyStorePool(ref platform, state, owner);
 		var item = Find(ref platform, owner, id, APTR.Null, DataspaceKind);
 		var created = item.IsNull;
@@ -567,7 +569,7 @@ public static class MuiStoreCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		var owner = MuiHeadlessObjectCore.FindObject(ref platform, state, obj);
-		if (owner.IsNull || key.IsNull) return false;
+		if (!CanMutateOwnedStore(ref platform, owner) || key.IsNull) return false;
 		var pool = ResolveStorePool(ref platform, state, owner, ObjectmapKind);
 		var item = Find(ref platform, owner, 0, key, ObjectmapKind);
 		if (item.IsNull)
@@ -668,7 +670,7 @@ public static class MuiStoreCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		var owner = MuiHeadlessObjectCore.FindObject(ref platform, state, obj);
-		if (owner.IsNull) return APTR.Null;
+		if (!CanMutateOwnedStore(ref platform, owner)) return APTR.Null;
 		var item = Find(ref platform, owner, 0, key, ObjectmapKind);
 		if (item.IsNull || !MuiStoreRecordCodec.TryRead(ref platform, item,
 			out var itemRecord) ||
@@ -720,7 +722,7 @@ public static class MuiStoreCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		var owner = MuiHeadlessObjectCore.FindObject(ref platform, state, obj);
-		if (owner.IsNull) return false;
+		if (!CanMutateOwnedStore(ref platform, owner)) return false;
 		var item = Find(ref platform, owner, numericKey, pointerKey, kind);
 		if (item.IsNull || !MuiStoreRecordCodec.TryRead(ref platform, item,
 			out var itemRecord) ||
@@ -991,6 +993,7 @@ public static class MuiStoreCore
 		if (owner.IsNull) return 0;
 		if (!MuiHeadlessObjectCodec.TryRead(ref platform, owner,
 			out var ownerValue)) return 0;
+		if ((ownerValue.Flags & MuiHeadlessObjectCore.ObjectProviderBusy) != 0) return 0;
 		if (!ClearIterationStates(ref platform, state, owner, kind)) return 0;
 		var pool = ResolveStorePool(ref platform, state, owner, kind, false);
 		uint removed = 0;
@@ -1037,6 +1040,7 @@ public static class MuiStoreCore
 	{
 		if (!MuiHeadlessObjectCodec.TryRead(ref platform, owner,
 			out var ownerValue)) return;
+		if ((ownerValue.Flags & MuiHeadlessObjectCore.ObjectProviderBusy) != 0) return;
 		if (!ClearIterationStates(ref platform, state, owner, 0)) return;
 		var current = ownerValue.Stores;
 		ownerValue.Stores = APTR.Null;
@@ -1060,13 +1064,18 @@ public static class MuiStoreCore
 		ReleaseOwnedStorePool(ref platform, state, owner, policy);
 	}
 
+	private static bool CanMutateOwnedStore<TPlatform>(ref TPlatform platform, APTR owner)
+		where TPlatform : struct, IMuiGuestMemory =>
+		owner.IsNotNull && MuiHeadlessObjectCodec.TryRead(ref platform, owner, out var value) &&
+		(value.Flags & MuiHeadlessObjectCore.ObjectProviderBusy) == 0;
+
 	private static bool SetBlob<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj, uint numericKey, APTR pointerKey, APTR data, int length,
 		uint kind, bool copyKey) where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (length < 0 || (length != 0 && data.IsNull)) return false;
 		var owner = MuiHeadlessObjectCore.FindObject(ref platform, state, obj);
-		if (owner.IsNull || (kind == DatamapKind && pointerKey.IsNull)) return false;
+		if (!CanMutateOwnedStore(ref platform, owner) || (kind == DatamapKind && pointerKey.IsNull)) return false;
 		var pool = ResolveStorePool(ref platform, state, owner, kind);
 		var item = Find(ref platform, owner, numericKey, pointerKey, kind);
 		var created = item.IsNull;

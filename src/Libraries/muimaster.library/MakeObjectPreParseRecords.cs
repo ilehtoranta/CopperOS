@@ -16,6 +16,8 @@ internal struct MuiMakeObjectPreParseRecord
 {
 	internal const uint Size = 4;
 	internal const uint FieldSize = 1;
+	// ABI/documentation aliases only. Field access advances the named byte
+	// record with MuiGuestStructCursor below.
 	internal const uint EscapeOffset = 0;
 	internal const uint CommandOffset = 1;
 	internal const uint TerminatorOffset = 2;
@@ -44,23 +46,41 @@ internal struct MuiMakeObjectPreParseFieldCursor
 
 internal static class MuiMakeObjectPreParseRecordMemoryCodec
 {
-	private static bool TryResolve(MuiMakeObjectPreParseField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiMakeObjectPreParseField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (field == MuiMakeObjectPreParseField.Escape)
-			offset = MuiMakeObjectPreParseRecord.EscapeOffset;
-		else if (field == MuiMakeObjectPreParseField.Command)
-			offset = MuiMakeObjectPreParseRecord.CommandOffset;
-		else if (field == MuiMakeObjectPreParseField.Terminator)
-			offset = MuiMakeObjectPreParseRecord.TerminatorOffset;
-		else if (field == MuiMakeObjectPreParseField.Reserved)
-			offset = MuiMakeObjectPreParseRecord.ReservedOffset;
-		else
+		address = APTR.Null;
+		switch (field)
 		{
-			offset = 0;
-			return false;
+			case MuiMakeObjectPreParseField.Escape:
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiMakeObjectPreParseRecord.FieldSize, out address);
+			case MuiMakeObjectPreParseField.Command:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiMakeObjectPreParseRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiMakeObjectPreParseRecord.FieldSize, out address);
+			case MuiMakeObjectPreParseField.Terminator:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiMakeObjectPreParseRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiMakeObjectPreParseRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiMakeObjectPreParseRecord.FieldSize, out address);
+			case MuiMakeObjectPreParseField.Reserved:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiMakeObjectPreParseRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiMakeObjectPreParseRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiMakeObjectPreParseRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiMakeObjectPreParseRecord.FieldSize, out address);
+			default:
+				return false;
 		}
-		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -68,12 +88,11 @@ internal static class MuiMakeObjectPreParseRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiMakeObjectPreParseRecord.Size))
-			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, MuiMakeObjectPreParseRecord.FieldSize);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+			MuiMakeObjectPreParseRecord.Size, out var structCursor) ||
+			!TryTakeField(ref platform, ref structCursor, cursor.Field,
+				out address)) return false;
+		return true;
 	}
 
 	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,

@@ -52,14 +52,12 @@ internal static class MuiApplicationUsedClassesVectorEntryMemoryCodec
 	{
 		address = APTR.Null;
 		if (field != MuiApplicationUsedClassesVectorEntryField.Name ||
-			record.IsNull || record.Raw > uint.MaxValue -
-			MuiApplicationUsedClassesVectorEntry.NameOffset ||
-			!platform.IsMapped(record, MuiApplicationUsedClassesVectorEntry.Size))
+			!MuiGuestStructCursor.TryCreate(ref platform, record,
+				MuiApplicationUsedClassesVectorEntry.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiApplicationUsedClassesVectorEntry.FieldSize, out address))
 			return false;
-		address = APTR.FromPointer(record.Raw +
-			MuiApplicationUsedClassesVectorEntry.NameOffset);
-		return platform.IsMapped(address,
-			MuiApplicationUsedClassesVectorEntry.FieldSize);
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

@@ -46,41 +46,63 @@ internal struct MuiAreaResizeMessageFieldCursor
 }
 
 // The fixed initResize/exitResize records own their packed positions in this
-// bounded adapter. Live packet consumers use it directly; the typed cursor
-// below remains only for compatibility callers.
+// bounded adapter. The typed cursor is the canonical field-address path;
+// scalar overloads remain as compatibility adapters for existing callers.
 internal static class MuiAreaResizeMessageMemoryCodec
 {
-	private static bool TryResolve(MuiAreaResizeMessageField field,
-		out uint offset, out uint size)
+	private static bool TryResolveFieldIndex(MuiAreaResizeMessageField field,
+		out uint index, out uint recordSize)
 	{
-		switch (field)
+		if (field == MuiAreaResizeMessageField.MethodId)
 		{
-			case MuiAreaResizeMessageField.MethodId:
-				offset = MuiAreaExitResizeMessage.MethodIdOffset;
-				size = MuiAreaExitResizeMessage.Size;
-				return true;
-			case MuiAreaResizeMessageField.Flags:
-				offset = MuiAreaInitResizeMessage.FlagsOffset;
-				size = MuiAreaInitResizeMessage.Size;
-				return true;
-			default:
-				offset = 0;
-				size = 0;
-				return false;
+			index = 0;
+			recordSize = MuiAreaExitResizeMessage.Size;
+			return true;
 		}
+		if (field == MuiAreaResizeMessageField.Flags)
+		{
+			index = 1;
+			recordSize = MuiAreaInitResizeMessage.Size;
+			return true;
+		}
+		index = uint.MaxValue;
+		recordSize = 0;
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR message, MuiAreaResizeMessageField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiAreaResizeMessageFieldCursor);
+		cursor.Message = message;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaResizeMessageFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset, out var size) || message.IsNull ||
-			message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(message, size))
-			return false;
-		address = APTR.FromPointer(message.Raw + offset);
-		return platform.IsMapped(address, MuiAreaInitResizeMessage.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index,
+			out var recordSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Message, recordSize,
+				out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiAreaInitResizeMessage.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiAreaInitResizeMessage.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -119,8 +141,14 @@ internal static class MuiAreaResizeMessageFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaResizeMessageFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiAreaResizeMessageMemoryCodec.TryGetAddress(ref platform,
-			cursor.Message, cursor.Field, out address);
+		TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaResizeMessageFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAreaResizeMessageMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR message, MuiAreaResizeMessageField field, out uint value)
@@ -350,44 +378,57 @@ internal struct MuiAreaResizeStateFieldCursor
 }
 
 // The fixed resize lifecycle record owns its packed positions in this bounded
-// adapter. Live lifecycle code uses it directly; the typed cursor remains only
-// for compatibility callers and adapter-focused tests.
+// adapter. The typed cursor is the canonical field-address path; scalar
+// overloads remain compatibility adapters for existing callers.
 internal static class MuiAreaResizeStateMemoryCodec
 {
-	private static bool TryResolve(MuiAreaResizeStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiAreaResizeStateField field,
+		out uint index)
 	{
-		switch (field)
+		if (field == MuiAreaResizeStateField.Magic) index = 0;
+		else if (field == MuiAreaResizeStateField.Active) index = 1;
+		else if (field == MuiAreaResizeStateField.Flags) index = 2;
+		else if (field == MuiAreaResizeStateField.Generation) index = 3;
+		else
 		{
-			case MuiAreaResizeStateField.Magic:
-				offset = MuiAreaResizeStateRecord.MagicOffset;
-				return true;
-			case MuiAreaResizeStateField.Active:
-				offset = MuiAreaResizeStateRecord.ActiveOffset;
-				return true;
-			case MuiAreaResizeStateField.Flags:
-				offset = MuiAreaResizeStateRecord.FlagsOffset;
-				return true;
-			case MuiAreaResizeStateField.Generation:
-				offset = MuiAreaResizeStateRecord.GenerationOffset;
-				return true;
-			default:
-				offset = 0;
-				return false;
+			index = uint.MaxValue;
+			return false;
 		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiAreaResizeStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiAreaResizeStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaResizeStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiAreaResizeStateRecord.Size))
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiAreaResizeStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiAreaResizeStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiAreaResizeStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiAreaResizeStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -434,8 +475,14 @@ internal static class MuiAreaResizeStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaResizeStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiAreaResizeStateMemoryCodec.TryGetAddress(ref platform, cursor.Record,
-			cursor.Field, out address);
+		TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaResizeStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAreaResizeStateMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiAreaResizeStateField field, out uint value)

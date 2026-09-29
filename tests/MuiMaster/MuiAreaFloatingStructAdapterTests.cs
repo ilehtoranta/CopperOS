@@ -24,6 +24,19 @@ public sealed class MuiAreaFloatingStructAdapterTests
 			ref platform, address, MuiAreaFloatingStateField.Enabled,
 			out var enabledAddress));
 		Assert.Equal(0x3904u, enabledAddress.Raw);
+		var cursor = new MuiAreaFloatingStateFieldCursor
+		{
+			Record = address,
+			Field = MuiAreaFloatingStateField.Enabled,
+		};
+		Assert.True(MuiAreaFloatingStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedEnabledAddress, out var typedEnabledSize));
+		Assert.Equal(enabledAddress, typedEnabledAddress);
+		Assert.Equal(MuiAreaFloatingStateRecord.FieldSize, typedEnabledSize);
+		Assert.True(MuiAreaFloatingStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryEnabledAddress, out var memoryEnabledSize));
+		Assert.Equal(typedEnabledAddress, memoryEnabledAddress);
+		Assert.Equal(typedEnabledSize, memoryEnabledSize);
 		Assert.True(MuiAreaFloatingStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiAreaFloatingStateField.Enabled, 0));
 		Assert.True(MuiAreaFloatingStateRecordCodec.TryReadStructural(ref platform,
@@ -33,6 +46,13 @@ public sealed class MuiAreaFloatingStructAdapterTests
 			ref platform, address, (MuiAreaFloatingStateField)255, out _));
 		Assert.False(MuiAreaFloatingStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiAreaFloatingStateField.Magic, out _));
+		cursor.Field = (MuiAreaFloatingStateField)255;
+		Assert.False(MuiAreaFloatingStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiAreaFloatingStateField.Magic;
+		Assert.False(MuiAreaFloatingStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 		Assert.False(MuiAreaFloatingStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

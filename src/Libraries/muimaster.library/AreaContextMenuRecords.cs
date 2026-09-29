@@ -23,10 +23,6 @@ internal struct MuiAreaContextMenuStateRecord
 {
 	internal const uint Size = 16;
 	internal const uint FieldSize = 4;
-	internal const uint MagicOffset = 0;
-	internal const uint MenuStripOffset = 4;
-	internal const uint TriggerOffset = 8;
-	internal const uint GenerationOffset = 12;
 	internal const uint Cookie = 0x41434D50u; // 'ACMP'
 
 	internal uint Magic;
@@ -72,10 +68,14 @@ internal static class MuiAreaContextMenuStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaContextMenuStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiAreaContextMenuStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaContextMenuStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiAreaContextMenuStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiAreaContextMenuStateField field, out uint value)
@@ -94,26 +94,22 @@ internal static class MuiAreaContextMenuStateFieldCursorCodec
 	}
 }
 
-// Fixed Area ContextMenu state is transferred as a named record. Numeric
-// guest positions are confined to this ABI adapter; the compatibility cursor
-// above remains available only to legacy callers and malformed-state
-// diagnostics.
+// Fixed Area ContextMenu state is transferred as a named record. The bounded
+// cursor walks the complete packed struct before selecting a field; the
+// compatibility cursor above remains available only to legacy callers and
+// malformed-state diagnostics.
 internal static class MuiAreaContextMenuStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiAreaContextMenuStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiAreaContextMenuStateField field,
+		out uint index)
 	{
-		if (field == MuiAreaContextMenuStateField.Magic)
-			offset = MuiAreaContextMenuStateRecord.MagicOffset;
-		else if (field == MuiAreaContextMenuStateField.MenuStrip)
-			offset = MuiAreaContextMenuStateRecord.MenuStripOffset;
-		else if (field == MuiAreaContextMenuStateField.Trigger)
-			offset = MuiAreaContextMenuStateRecord.TriggerOffset;
-		else if (field == MuiAreaContextMenuStateField.Generation)
-			offset = MuiAreaContextMenuStateRecord.GenerationOffset;
+		if (field == MuiAreaContextMenuStateField.Magic) index = 0;
+		else if (field == MuiAreaContextMenuStateField.MenuStrip) index = 1;
+		else if (field == MuiAreaContextMenuStateField.Trigger) index = 2;
+		else if (field == MuiAreaContextMenuStateField.Generation) index = 3;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -123,13 +119,34 @@ internal static class MuiAreaContextMenuStateRecordMemoryCodec
 		APTR record, MuiAreaContextMenuStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiAreaContextMenuStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaContextMenuStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiAreaContextMenuStateRecord.Size) &&
-			platform.IsMapped(address, MuiAreaContextMenuStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiAreaContextMenuStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiAreaContextMenuStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiAreaContextMenuStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

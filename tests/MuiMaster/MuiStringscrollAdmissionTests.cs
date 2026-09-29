@@ -94,6 +94,40 @@ public sealed class MuiStringscrollAdmissionTests
 
 		Assert.True(MuiStringscrollStateRecordCodec.Write(ref platform, address,
 			state));
+		var fieldCursor = new MuiStringscrollStateFieldCursor
+		{
+			Record = address,
+			Field = MuiStringscrollStateField.String,
+		};
+		Assert.True(MuiStringscrollStateFieldCursorCodec.TryGetAddress(
+			ref platform, fieldCursor, out var cursorStringAddress));
+		Assert.Equal(address.Raw + MuiStringscrollStateRecord.StringOffset,
+			cursorStringAddress.Raw);
+		Assert.True(MuiStringscrollStateFieldCursorCodec.TryGetAddress(
+			ref platform, fieldCursor, out var typedCursorStringAddress,
+			out var typedCursorFieldSize));
+		Assert.Equal(cursorStringAddress, typedCursorStringAddress);
+		Assert.Equal(MuiStringscrollStateRecord.FieldSize, typedCursorFieldSize);
+		Assert.True(MuiStringscrollStateMemoryCodec.TryGetAddress(ref platform,
+			fieldCursor, out var memoryCursorStringAddress, out var memoryCursorFieldSize));
+		Assert.Equal(typedCursorStringAddress, memoryCursorStringAddress);
+		Assert.Equal(typedCursorFieldSize, memoryCursorFieldSize);
+		fieldCursor.Field = MuiStringscrollStateField.ScrollY;
+		Assert.True(MuiStringscrollStateFieldCursorCodec.TryGetAddress(
+			ref platform, fieldCursor, out var cursorScrollYAddress));
+		Assert.Equal(address.Raw + MuiStringscrollStateRecord.ScrollYOffset,
+			cursorScrollYAddress.Raw);
+		Assert.True(MuiStringscrollStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			address, MuiStringscrollStateField.ScrollX, 0));
+		Assert.True(MuiStringscrollStateFieldCursorCodec.TryReadUInt32(ref platform,
+			address, MuiStringscrollStateField.ContentHeight, out var cursorHeight));
+		Assert.Equal(state.ContentHeight, cursorHeight);
+		Assert.False(MuiStringscrollStateFieldCursorCodec.TryGetAddress(ref platform,
+			new MuiStringscrollStateFieldCursor
+			{
+				Record = address,
+				Field = (MuiStringscrollStateField)0xFF,
+			}, out _));
 		Assert.True(MuiStringscrollStateMemoryCodec.TryGetAddress(ref platform,
 			address, MuiStringscrollStateField.ScrollY, out var scrollYAddress));
 		Assert.Equal(address.Raw + MuiStringscrollStateRecord.ScrollYOffset,
@@ -110,6 +144,13 @@ public sealed class MuiStringscrollAdmissionTests
 			APTR.Null, MuiStringscrollStateField.Magic, out _));
 		Assert.False(MuiStringscrollStateMemoryCodec.TryGetAddress(ref platform,
 			address, (MuiStringscrollStateField)0xFF, out _));
+		fieldCursor.Field = (MuiStringscrollStateField)0xFF;
+		Assert.False(MuiStringscrollStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
+		fieldCursor.Record = APTR.Null;
+		fieldCursor.Field = MuiStringscrollStateField.String;
+		Assert.False(MuiStringscrollStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
 	}
 
 	[Fact]
@@ -132,6 +173,39 @@ public sealed class MuiStringscrollAdmissionTests
 
 		Assert.True(MuiStringscrollPolicyRecordCodec.Write(ref platform, address,
 			policy));
+		var fieldCursor = new MuiStringscrollPolicyFieldCursor
+		{
+			Record = address,
+			Field = MuiStringscrollPolicyField.UseWinBorder,
+		};
+		Assert.True(MuiStringscrollPolicyFieldCursorCodec.TryGetAddress(
+			ref platform, fieldCursor, out var cursorBorderAddress));
+		Assert.Equal(address.Raw + MuiStringscrollPolicyRecord.UseWinBorderOffset,
+			cursorBorderAddress.Raw);
+		Assert.True(MuiStringscrollPolicyFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out var typedCursorBorderAddress, out var typedCursorFieldSize));
+		Assert.Equal(cursorBorderAddress, typedCursorBorderAddress);
+		Assert.Equal(MuiStringscrollPolicyRecord.FieldSize, typedCursorFieldSize);
+		Assert.True(MuiStringscrollPolicyMemoryCodec.TryGetAddress(ref platform,
+			fieldCursor, out var memoryCursorBorderAddress, out var memoryCursorFieldSize));
+		Assert.Equal(typedCursorBorderAddress, memoryCursorBorderAddress);
+		Assert.Equal(typedCursorFieldSize, memoryCursorFieldSize);
+		fieldCursor.Field = MuiStringscrollPolicyField.VertScrollerOnly;
+		Assert.True(MuiStringscrollPolicyFieldCursorCodec.TryGetAddress(
+			ref platform, fieldCursor, out var cursorScrollerAddress));
+		Assert.Equal(address.Raw + MuiStringscrollPolicyRecord.VertScrollerOnlyOffset,
+			cursorScrollerAddress.Raw);
+		Assert.True(MuiStringscrollPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
+			address, MuiStringscrollPolicyField.NoInput, 1));
+		Assert.True(MuiStringscrollPolicyFieldCursorCodec.TryReadUInt32(ref platform,
+			address, MuiStringscrollPolicyField.SetMin, out var cursorSetMin));
+		Assert.Equal(policy.SetMin, cursorSetMin);
+		Assert.False(MuiStringscrollPolicyFieldCursorCodec.TryGetAddress(
+			ref platform, new MuiStringscrollPolicyFieldCursor
+			{
+				Record = address,
+				Field = (MuiStringscrollPolicyField)0xFF,
+			}, out _));
 		Assert.True(MuiStringscrollPolicyMemoryCodec.TryGetAddress(ref platform,
 			address, MuiStringscrollPolicyField.VertScrollerOnly,
 			out var scrollerOnlyAddress));
@@ -149,6 +223,13 @@ public sealed class MuiStringscrollAdmissionTests
 			APTR.Null, MuiStringscrollPolicyField.Magic, out _));
 		Assert.False(MuiStringscrollPolicyMemoryCodec.TryGetAddress(ref platform,
 			address, (MuiStringscrollPolicyField)0xFF, out _));
+		fieldCursor.Field = (MuiStringscrollPolicyField)0xFF;
+		Assert.False(MuiStringscrollPolicyFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
+		fieldCursor.Record = APTR.Null;
+		fieldCursor.Field = MuiStringscrollPolicyField.UseWinBorder;
+		Assert.False(MuiStringscrollPolicyFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
 	}
 
 	[Fact]
@@ -166,6 +247,43 @@ public sealed class MuiStringscrollAdmissionTests
 
 		Assert.True(MuiStringscrollScrollbarRecordCodec.Write(ref platform,
 			address, scrollbar));
+		var fieldCursor = new MuiStringscrollScrollbarFieldCursor
+		{
+			Record = address,
+			Field = MuiStringscrollScrollbarField.HorizBar,
+		};
+		Assert.True(MuiStringscrollScrollbarFieldCursorCodec.TryGetAddress(
+			ref platform, fieldCursor, out var cursorHorizBarAddress));
+		Assert.Equal(address.Raw + MuiStringscrollScrollbarRecord.HorizBarOffset,
+			cursorHorizBarAddress.Raw);
+		Assert.True(MuiStringscrollScrollbarFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out var typedCursorHorizBarAddress, out var typedCursorFieldSize));
+		Assert.Equal(cursorHorizBarAddress, typedCursorHorizBarAddress);
+		Assert.Equal(MuiStringscrollScrollbarRecord.FieldSize, typedCursorFieldSize);
+		Assert.True(MuiStringscrollScrollbarMemoryCodec.TryGetAddress(ref platform,
+			fieldCursor, out var memoryCursorHorizBarAddress, out var memoryCursorFieldSize));
+		Assert.Equal(typedCursorHorizBarAddress, memoryCursorHorizBarAddress);
+		Assert.Equal(typedCursorFieldSize, memoryCursorFieldSize);
+		fieldCursor.Field = MuiStringscrollScrollbarField.VertBar;
+		Assert.True(MuiStringscrollScrollbarFieldCursorCodec.TryGetAddress(
+			ref platform, fieldCursor, out var cursorVertBarAddress));
+		Assert.Equal(address.Raw + MuiStringscrollScrollbarRecord.VertBarOffset,
+			cursorVertBarAddress.Raw);
+		Assert.True(MuiStringscrollScrollbarFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiStringscrollScrollbarField.HorizBar, 0));
+		Assert.True(MuiStringscrollScrollbarFieldCursorCodec.TryReadUInt32(
+				ref platform, address, MuiStringscrollScrollbarField.VertBar,
+			out var cursorVertBar));
+		Assert.Equal(scrollbar.VertBar.Raw, cursorVertBar);
+		Assert.True(MuiStringscrollScrollbarFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiStringscrollScrollbarField.HorizBar,
+			scrollbar.HorizBar.Raw));
+		Assert.False(MuiStringscrollScrollbarFieldCursorCodec.TryGetAddress(
+			ref platform, new MuiStringscrollScrollbarFieldCursor
+			{
+				Record = address,
+				Field = (MuiStringscrollScrollbarField)0xFF,
+			}, out _));
 		Assert.True(MuiStringscrollScrollbarMemoryCodec.TryGetAddress(
 			ref platform, address, MuiStringscrollScrollbarField.VertBar,
 			out var vertBarAddress));
@@ -185,6 +303,13 @@ public sealed class MuiStringscrollAdmissionTests
 			ref platform, APTR.Null, MuiStringscrollScrollbarField.Magic, out _));
 		Assert.False(MuiStringscrollScrollbarMemoryCodec.TryGetAddress(
 			ref platform, address, (MuiStringscrollScrollbarField)0xFF, out _));
+		fieldCursor.Field = (MuiStringscrollScrollbarField)0xFF;
+		Assert.False(MuiStringscrollScrollbarFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
+		fieldCursor.Record = APTR.Null;
+		fieldCursor.Field = MuiStringscrollScrollbarField.VertBar;
+		Assert.False(MuiStringscrollScrollbarFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
 	}
 
 	[Fact]
@@ -205,6 +330,44 @@ public sealed class MuiStringscrollAdmissionTests
 
 		Assert.True(MuiStringscrollCompositionRecordCodec.Write(ref platform,
 			address, composition));
+		var fieldCursor = new MuiStringscrollCompositionFieldCursor
+		{
+			Record = address,
+			Field = MuiStringscrollCompositionField.Horizontal,
+		};
+		Assert.True(MuiStringscrollCompositionFieldCursorCodec.TryGetAddress(
+			ref platform, fieldCursor, out var cursorHorizontalAddress));
+		Assert.Equal(address.Raw + MuiStringscrollCompositionRecord.HorizontalOffset,
+			cursorHorizontalAddress.Raw);
+		Assert.True(MuiStringscrollCompositionFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out var typedCursorHorizontalAddress, out var typedCursorFieldSize));
+		Assert.Equal(cursorHorizontalAddress, typedCursorHorizontalAddress);
+		Assert.Equal(MuiStringscrollCompositionRecord.FieldSize, typedCursorFieldSize);
+		Assert.True(MuiStringscrollCompositionMemoryCodec.TryGetAddress(ref platform,
+			fieldCursor, out var memoryCursorHorizontalAddress, out var memoryCursorFieldSize));
+		Assert.Equal(typedCursorHorizontalAddress, memoryCursorHorizontalAddress);
+		Assert.Equal(typedCursorFieldSize, memoryCursorFieldSize);
+		fieldCursor.Field = MuiStringscrollCompositionField.LastVerticalFirst;
+		Assert.True(MuiStringscrollCompositionFieldCursorCodec.TryGetAddress(
+			ref platform, fieldCursor, out var cursorLastAddress));
+		Assert.Equal(address.Raw +
+			MuiStringscrollCompositionRecord.LastVerticalFirstOffset,
+			cursorLastAddress.Raw);
+		Assert.True(MuiStringscrollCompositionFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiStringscrollCompositionField.OwnedMask, 0));
+		Assert.True(MuiStringscrollCompositionFieldCursorCodec.TryReadUInt32(
+			ref platform, address,
+			MuiStringscrollCompositionField.LastHorizontalFirst, out var cursorFirst));
+		Assert.Equal(composition.LastHorizontalFirst, cursorFirst);
+		Assert.True(MuiStringscrollCompositionFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiStringscrollCompositionField.OwnedMask,
+			composition.OwnedMask));
+		Assert.False(MuiStringscrollCompositionFieldCursorCodec.TryGetAddress(
+			ref platform, new MuiStringscrollCompositionFieldCursor
+			{
+				Record = address,
+				Field = (MuiStringscrollCompositionField)0xFF,
+			}, out _));
 		Assert.True(MuiStringscrollCompositionMemoryCodec.TryGetAddress(
 			ref platform, address, MuiStringscrollCompositionField.OwnedMask,
 			out var ownedMaskAddress));
@@ -224,6 +387,13 @@ public sealed class MuiStringscrollAdmissionTests
 			ref platform, APTR.Null, MuiStringscrollCompositionField.Magic, out _));
 		Assert.False(MuiStringscrollCompositionMemoryCodec.TryGetAddress(
 			ref platform, address, (MuiStringscrollCompositionField)0xFF, out _));
+		fieldCursor.Field = (MuiStringscrollCompositionField)0xFF;
+		Assert.False(MuiStringscrollCompositionFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
+		fieldCursor.Record = APTR.Null;
+		fieldCursor.Field = MuiStringscrollCompositionField.Horizontal;
+		Assert.False(MuiStringscrollCompositionFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
 	}
 
 	[Fact]
@@ -243,6 +413,42 @@ public sealed class MuiStringscrollAdmissionTests
 
 		Assert.True(MuiStringscrollLayoutStateRecordCodec.Write(ref platform,
 			address, layout));
+		var fieldCursor = new MuiStringscrollLayoutStateFieldCursor
+		{
+			Record = address,
+			Field = MuiStringscrollLayoutStateField.Left,
+		};
+		Assert.True(MuiStringscrollLayoutStateFieldCursorCodec.TryGetAddress(
+			ref platform, fieldCursor, out var cursorLeftAddress));
+		Assert.Equal(address.Raw + MuiStringscrollLayoutStateRecord.LeftOffset,
+			cursorLeftAddress.Raw);
+		Assert.True(MuiStringscrollLayoutStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out var typedCursorLeftAddress, out var typedCursorFieldSize));
+		Assert.Equal(cursorLeftAddress, typedCursorLeftAddress);
+		Assert.Equal(MuiStringscrollLayoutStateRecord.FieldSize, typedCursorFieldSize);
+		Assert.True(MuiStringscrollLayoutStateMemoryCodec.TryGetAddress(ref platform,
+			fieldCursor, out var memoryCursorLeftAddress, out var memoryCursorFieldSize));
+		Assert.Equal(typedCursorLeftAddress, memoryCursorLeftAddress);
+		Assert.Equal(typedCursorFieldSize, memoryCursorFieldSize);
+		fieldCursor.Field = MuiStringscrollLayoutStateField.Height;
+		Assert.True(MuiStringscrollLayoutStateFieldCursorCodec.TryGetAddress(
+			ref platform, fieldCursor, out var cursorHeightAddress));
+		Assert.Equal(address.Raw + MuiStringscrollLayoutStateRecord.HeightOffset,
+			cursorHeightAddress.Raw);
+		Assert.True(MuiStringscrollLayoutStateFieldCursorCodec.TryWriteInt32(
+			ref platform, address, MuiStringscrollLayoutStateField.Top, -19));
+		Assert.True(MuiStringscrollLayoutStateFieldCursorCodec.TryReadInt32(
+			ref platform, address, MuiStringscrollLayoutStateField.Width,
+			out var cursorWidth));
+		Assert.Equal(layout.Width, cursorWidth);
+		Assert.True(MuiStringscrollLayoutStateFieldCursorCodec.TryWriteInt32(
+			ref platform, address, MuiStringscrollLayoutStateField.Top, layout.Top));
+		Assert.False(MuiStringscrollLayoutStateFieldCursorCodec.TryGetAddress(
+			ref platform, new MuiStringscrollLayoutStateFieldCursor
+			{
+				Record = address,
+				Field = (MuiStringscrollLayoutStateField)0xFF,
+			}, out _));
 		Assert.True(MuiStringscrollLayoutStateMemoryCodec.TryGetAddress(
 			ref platform, address, MuiStringscrollLayoutStateField.Left,
 			out var leftAddress));
@@ -261,6 +467,13 @@ public sealed class MuiStringscrollAdmissionTests
 			ref platform, APTR.Null, MuiStringscrollLayoutStateField.Magic, out _));
 		Assert.False(MuiStringscrollLayoutStateMemoryCodec.TryGetAddress(
 			ref platform, address, (MuiStringscrollLayoutStateField)0xFF, out _));
+		fieldCursor.Field = (MuiStringscrollLayoutStateField)0xFF;
+		Assert.False(MuiStringscrollLayoutStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
+		fieldCursor.Record = APTR.Null;
+		fieldCursor.Field = MuiStringscrollLayoutStateField.Left;
+		Assert.False(MuiStringscrollLayoutStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
 	}
 
 	[Fact]
@@ -279,6 +492,43 @@ public sealed class MuiStringscrollAdmissionTests
 
 		Assert.True(MuiStringscrollRenderStateRecordCodec.Write(ref platform,
 			address, render));
+		var fieldCursor = new MuiStringscrollRenderStateFieldCursor
+		{
+			Record = address,
+			Field = MuiStringscrollRenderStateField.RenderInfo,
+		};
+		Assert.True(MuiStringscrollRenderStateFieldCursorCodec.TryGetAddress(
+			ref platform, fieldCursor, out var cursorRenderInfoAddress));
+		Assert.Equal(address.Raw + MuiStringscrollRenderStateRecord.RenderInfoOffset,
+			cursorRenderInfoAddress.Raw);
+		Assert.True(MuiStringscrollRenderStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out var typedCursorRenderInfoAddress, out var typedCursorFieldSize));
+		Assert.Equal(cursorRenderInfoAddress, typedCursorRenderInfoAddress);
+		Assert.Equal(MuiStringscrollRenderStateRecord.FieldSize, typedCursorFieldSize);
+		Assert.True(MuiStringscrollRenderStateMemoryCodec.TryGetAddress(ref platform,
+			fieldCursor, out var memoryCursorRenderInfoAddress, out var memoryCursorFieldSize));
+		Assert.Equal(typedCursorRenderInfoAddress, memoryCursorRenderInfoAddress);
+		Assert.Equal(typedCursorFieldSize, memoryCursorFieldSize);
+		fieldCursor.Field = MuiStringscrollRenderStateField.Font;
+		Assert.True(MuiStringscrollRenderStateFieldCursorCodec.TryGetAddress(
+			ref platform, fieldCursor, out var cursorFontAddress));
+		Assert.Equal(address.Raw + MuiStringscrollRenderStateRecord.FontOffset,
+			cursorFontAddress.Raw);
+		Assert.True(MuiStringscrollRenderStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiStringscrollRenderStateField.Font, 0));
+		Assert.True(MuiStringscrollRenderStateFieldCursorCodec.TryReadUInt32(
+			ref platform, address, MuiStringscrollRenderStateField.RastPort,
+			out var cursorRastPort));
+		Assert.Equal(render.RastPort.Raw, cursorRastPort);
+		Assert.True(MuiStringscrollRenderStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiStringscrollRenderStateField.Font,
+			render.Font.Raw));
+		Assert.False(MuiStringscrollRenderStateFieldCursorCodec.TryGetAddress(
+			ref platform, new MuiStringscrollRenderStateFieldCursor
+			{
+				Record = address,
+				Field = (MuiStringscrollRenderStateField)0xFF,
+			}, out _));
 		Assert.True(MuiStringscrollRenderStateMemoryCodec.TryGetAddress(
 			ref platform, address, MuiStringscrollRenderStateField.Font,
 			out var fontAddress));
@@ -298,6 +548,13 @@ public sealed class MuiStringscrollAdmissionTests
 			ref platform, APTR.Null, MuiStringscrollRenderStateField.Magic, out _));
 		Assert.False(MuiStringscrollRenderStateMemoryCodec.TryGetAddress(
 			ref platform, address, (MuiStringscrollRenderStateField)0xFF, out _));
+		fieldCursor.Field = (MuiStringscrollRenderStateField)0xFF;
+		Assert.False(MuiStringscrollRenderStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
+		fieldCursor.Record = APTR.Null;
+		fieldCursor.Field = MuiStringscrollRenderStateField.Font;
+		Assert.False(MuiStringscrollRenderStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
 	}
 
 	[Fact]
@@ -319,6 +576,27 @@ public sealed class MuiStringscrollAdmissionTests
 
 		Assert.True(MuiStringscrollViewportStateRecordCodec.Write(ref platform,
 			address, viewport));
+		var fieldCursor = new MuiStringscrollViewportStateFieldCursor
+		{
+			Record = address,
+			Field = MuiStringscrollViewportStateField.Magic,
+		};
+		Assert.True(MuiStringscrollViewportStateFieldCursorCodec.TryGetAddress(
+			ref platform, fieldCursor, out var cursorMagicAddress));
+		Assert.Equal(address.Raw, cursorMagicAddress.Raw);
+		Assert.True(MuiStringscrollViewportStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out var typedCursorMagicAddress, out var typedCursorFieldSize));
+		Assert.Equal(cursorMagicAddress, typedCursorMagicAddress);
+		Assert.Equal(MuiStringscrollViewportStateRecord.FieldSize, typedCursorFieldSize);
+		Assert.True(MuiStringscrollViewportStateMemoryCodec.TryGetAddress(ref platform,
+			fieldCursor, out var memoryCursorMagicAddress, out var memoryCursorFieldSize));
+		Assert.Equal(typedCursorMagicAddress, memoryCursorMagicAddress);
+		Assert.Equal(typedCursorFieldSize, memoryCursorFieldSize);
+		fieldCursor.Field = MuiStringscrollViewportStateField.MaxScrollY;
+		Assert.True(MuiStringscrollViewportStateFieldCursorCodec.TryGetAddress(
+			ref platform, fieldCursor, out var cursorMaxScrollYAddress));
+		Assert.Equal(address.Raw + MuiStringscrollViewportStateRecord.MaxScrollYOffset,
+			cursorMaxScrollYAddress.Raw);
 		Assert.True(MuiStringscrollViewportStateMemoryCodec.TryGetAddress(
 			ref platform, address, MuiStringscrollViewportStateField.MaxScrollY,
 			out var maxScrollYAddress));
@@ -331,6 +609,10 @@ public sealed class MuiStringscrollAdmissionTests
 		Assert.True(MuiStringscrollViewportStateMemoryCodec.TryWriteUInt32(
 			ref platform, address,
 			MuiStringscrollViewportStateField.MaxScrollX, 300));
+		Assert.True(MuiStringscrollViewportStateFieldCursorCodec.TryReadUInt32(
+			ref platform, address, MuiStringscrollViewportStateField.MaxScrollX,
+			out var cursorMaxScrollX));
+		Assert.Equal(300u, cursorMaxScrollX);
 		Assert.True(MuiStringscrollViewportStateRecordCodec.TryReadStructural(
 			ref platform, address, out var decoded));
 		Assert.Equal(300u, decoded.MaxScrollX);
@@ -340,6 +622,13 @@ public sealed class MuiStringscrollAdmissionTests
 		Assert.False(MuiStringscrollViewportStateMemoryCodec.TryGetAddress(
 			ref platform, address, (MuiStringscrollViewportStateField)0xFF,
 			out _));
+		fieldCursor.Field = (MuiStringscrollViewportStateField)0xFF;
+		Assert.False(MuiStringscrollViewportStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
+		fieldCursor.Record = APTR.Null;
+		fieldCursor.Field = MuiStringscrollViewportStateField.MaxScrollY;
+		Assert.False(MuiStringscrollViewportStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
 	}
 
 	[Fact]
@@ -424,6 +713,39 @@ public sealed class MuiStringscrollAdmissionTests
 		};
 		Assert.True(MuiStringscrollPointerStateCodec.Write(ref platform,
 			recordAddress, value));
+		var fieldCursor = new MuiStringscrollPointerStateFieldCursor
+		{
+			Address = recordAddress,
+			Field = MuiStringscrollPointerStateField.LastPointer,
+		};
+		Assert.True(MuiStringscrollPointerStateFieldCursorCodec.TryGetAddress(
+			ref platform, fieldCursor, out var cursorPointerAddress));
+		Assert.Equal(0x1D38u, cursorPointerAddress.Raw);
+		Assert.True(MuiStringscrollPointerStateFieldCursorCodec.TryGetAddress(
+			ref platform, fieldCursor, out var typedCursorPointerAddress,
+			out var typedCursorFieldSize));
+		Assert.Equal(cursorPointerAddress, typedCursorPointerAddress);
+		Assert.Equal(MuiStringscrollPointerState.FieldSize, typedCursorFieldSize);
+		Assert.True(MuiStringscrollPointerStateRecordMemoryCodec.TryGetAddress(ref platform,
+			fieldCursor, out var memoryCursorPointerAddress, out var memoryCursorFieldSize));
+		Assert.Equal(typedCursorPointerAddress, memoryCursorPointerAddress);
+		Assert.Equal(typedCursorFieldSize, memoryCursorFieldSize);
+		fieldCursor.Field = MuiStringscrollPointerStateField.GrabOffset;
+		Assert.True(MuiStringscrollPointerStateFieldCursorCodec.TryGetAddress(
+			ref platform, fieldCursor, out var cursorGrabAddress));
+		Assert.Equal(0x1D28u, cursorGrabAddress.Raw);
+		Assert.True(MuiStringscrollPointerStateFieldCursorCodec.TryWrite(ref platform,
+			recordAddress, MuiStringscrollPointerStateField.LastPointer, 0));
+		Assert.True(MuiStringscrollPointerStateFieldCursorCodec.TryRead(ref platform,
+			recordAddress, MuiStringscrollPointerStateField.GrabOffset,
+			out var cursorGrabRaw));
+		Assert.Equal(unchecked((uint)-3), cursorGrabRaw);
+		Assert.False(MuiStringscrollPointerStateFieldCursorCodec.TryGetAddress(
+			ref platform, new MuiStringscrollPointerStateFieldCursor
+			{
+				Address = recordAddress,
+				Field = (MuiStringscrollPointerStateField)255,
+			}, out _));
 		Assert.True(MuiStringscrollPointerStateRecordMemoryCodec.TryGetAddress(
 			ref platform, recordAddress, MuiStringscrollPointerStateField.LastPointer,
 			out var typedPointerAddress));

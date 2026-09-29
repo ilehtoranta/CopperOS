@@ -21,9 +21,6 @@ internal struct MuiAreaCycleChainStateRecord
 {
 	internal const uint Size = 12;
 	internal const uint FieldSize = 4;
-	internal const uint MagicOffset = 0;
-	internal const uint ValueOffset = 4;
-	internal const uint GenerationOffset = 8;
 	internal const uint Cookie = 0x41434359u; // 'ACCY'
 
 	internal uint Magic;
@@ -67,10 +64,14 @@ internal static class MuiAreaCycleChainStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaCycleChainStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiAreaCycleChainStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaCycleChainStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiAreaCycleChainStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiAreaCycleChainStateField field, out uint value)
@@ -89,23 +90,24 @@ internal static class MuiAreaCycleChainStateFieldCursorCodec
 	}
 }
 
-// Fixed Area CycleChain state is transferred as a named record. Numeric guest
-// positions are confined to this ABI adapter; the compatibility cursor above
-// remains available only to legacy callers and malformed-state diagnostics.
+// Fixed Area CycleChain state is transferred as a named record. The bounded
+// cursor walks the complete packed struct before selecting a field; the
+// compatibility cursor above remains available only to legacy callers and
+// malformed-state diagnostics.
 internal static class MuiAreaCycleChainStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiAreaCycleChainStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiAreaCycleChainStateField field,
+		out uint index)
 	{
 		if (field == MuiAreaCycleChainStateField.Magic)
-			offset = MuiAreaCycleChainStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiAreaCycleChainStateField.Value)
-			offset = MuiAreaCycleChainStateRecord.ValueOffset;
+			index = 1;
 		else if (field == MuiAreaCycleChainStateField.Generation)
-			offset = MuiAreaCycleChainStateRecord.GenerationOffset;
+			index = 2;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -115,13 +117,34 @@ internal static class MuiAreaCycleChainStateRecordMemoryCodec
 		APTR record, MuiAreaCycleChainStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiAreaCycleChainStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaCycleChainStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiAreaCycleChainStateRecord.Size) &&
-			platform.IsMapped(address, MuiAreaCycleChainStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiAreaCycleChainStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiAreaCycleChainStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiAreaCycleChainStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

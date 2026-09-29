@@ -80,6 +80,22 @@ public sealed class MuiTextUnicodeAdmissionTests
 		};
 		Assert.True(MuiTextUnicodeStateRecordCodec.Write(ref platform, address,
 			record));
+		var fieldCursor = new MuiTextUnicodeStateFieldCursor
+		{
+			Record = address,
+			Field = MuiTextUnicodeStateField.Unicode,
+		};
+		Assert.True(MuiTextUnicodeStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out var cursorUnicodeAddress));
+		Assert.Equal(0x1B04u, cursorUnicodeAddress.Raw);
+		Assert.True(MuiTextUnicodeStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out var typedCursorUnicodeAddress, out var typedCursorFieldSize));
+		Assert.Equal(cursorUnicodeAddress, typedCursorUnicodeAddress);
+		Assert.Equal(MuiTextUnicodeStateRecord.FieldSize, typedCursorFieldSize);
+		Assert.True(MuiTextUnicodeStateRecordMemoryCodec.TryGetAddress(ref platform,
+			fieldCursor, out var memoryCursorUnicodeAddress, out var memoryCursorFieldSize));
+		Assert.Equal(typedCursorUnicodeAddress, memoryCursorUnicodeAddress);
+		Assert.Equal(typedCursorFieldSize, memoryCursorFieldSize);
 		Assert.True(MuiTextUnicodeStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiTextUnicodeStateField.Unicode,
 			out var unicodeAddress));
@@ -100,6 +116,13 @@ public sealed class MuiTextUnicodeAdmissionTests
 		Assert.Equal(MuiTextUnicodeStateRecord.Cookie, magic);
 		Assert.False(MuiTextUnicodeStateRecordMemoryCodec.TryReadUInt32(
 			ref platform, address, (MuiTextUnicodeStateField)255, out _));
+		fieldCursor.Field = (MuiTextUnicodeStateField)255;
+		Assert.False(MuiTextUnicodeStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
+		fieldCursor.Record = APTR.Null;
+		fieldCursor.Field = MuiTextUnicodeStateField.Unicode;
+		Assert.False(MuiTextUnicodeStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
 		Assert.False(MuiTextUnicodeStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiTextUnicodeStateRecord.Size, out _));
 		Assert.False(MuiTextUnicodeStateRecordMemoryCodec.TryGetAddress(

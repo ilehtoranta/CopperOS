@@ -77,6 +77,19 @@ public sealed class MuiRegisterPolicyAdmissionTests
 		Assert.True(MuiRegisterPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, MuiRegisterPolicyStateField.Titles, out var typedTitlesAddress));
 		Assert.Equal(0x1A68u, typedTitlesAddress.Raw);
+		var titlesCursor = new MuiRegisterPolicyStateFieldCursor
+		{
+			Record = address,
+			Field = MuiRegisterPolicyStateField.Titles,
+		};
+		Assert.True(MuiRegisterPolicyStateFieldCursorCodec.TryGetAddress(ref platform,
+			titlesCursor, out var cursorTitlesAddress, out var cursorFieldSize));
+		Assert.Equal(typedTitlesAddress, cursorTitlesAddress);
+		Assert.Equal(MuiRegisterPolicyStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiRegisterPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			titlesCursor, out var memoryTitlesAddress, out var memoryFieldSize));
+		Assert.Equal(cursorTitlesAddress, memoryTitlesAddress);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiRegisterPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
 			address, MuiRegisterPolicyStateField.Frame, out var typedFrame));
 		Assert.Equal(1u, typedFrame);
@@ -107,6 +120,13 @@ public sealed class MuiRegisterPolicyAdmissionTests
 			APTR.Null, (uint)0, out _));
 		Assert.False(MuiRegisterPolicyStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
+		titlesCursor.Field = (MuiRegisterPolicyStateField)255;
+		Assert.False(MuiRegisterPolicyStateFieldCursorCodec.TryGetAddress(ref platform,
+			titlesCursor, out _, out _));
+		titlesCursor.Record = APTR.Null;
+		titlesCursor.Field = MuiRegisterPolicyStateField.Titles;
+		Assert.False(MuiRegisterPolicyStateFieldCursorCodec.TryGetAddress(ref platform,
+			titlesCursor, out _, out _));
 	}
 
 	private static MuiHeadlessTestPlatform CreateRegister(out APTR register,

@@ -108,44 +108,27 @@ internal struct MuiListviewHorizontalScrollerFieldCursor
 
 internal static class MuiListviewHorizontalScrollerMemoryCodec
 {
-	private static bool TryResolve(
-		MuiListviewHorizontalScrollerField field, out uint offset,
-		out uint recordSize)
+	private static bool TryResolveFieldIndex(
+		MuiListviewHorizontalScrollerField field, out uint index)
 	{
-		recordSize = MuiListviewHorizontalScrollerState.Size;
-		if (field == MuiListviewHorizontalScrollerField.Magic)
-			offset = MuiListviewHorizontalScrollerState.MagicOffset;
-		else if (field == MuiListviewHorizontalScrollerField.TrackLeft)
-			offset = MuiListviewHorizontalScrollerState.TrackLeftOffset;
-		else if (field == MuiListviewHorizontalScrollerField.TrackTop)
-			offset = MuiListviewHorizontalScrollerState.TrackTopOffset;
-		else if (field == MuiListviewHorizontalScrollerField.TrackRight)
-			offset = MuiListviewHorizontalScrollerState.TrackRightOffset;
-		else if (field == MuiListviewHorizontalScrollerField.TrackBottom)
-			offset = MuiListviewHorizontalScrollerState.TrackBottomOffset;
-		else if (field == MuiListviewHorizontalScrollerField.ThumbLeft)
-			offset = MuiListviewHorizontalScrollerState.ThumbLeftOffset;
-		else if (field == MuiListviewHorizontalScrollerField.ThumbTop)
-			offset = MuiListviewHorizontalScrollerState.ThumbTopOffset;
-		else if (field == MuiListviewHorizontalScrollerField.ThumbRight)
-			offset = MuiListviewHorizontalScrollerState.ThumbRightOffset;
-		else if (field == MuiListviewHorizontalScrollerField.ThumbBottom)
-			offset = MuiListviewHorizontalScrollerState.ThumbBottomOffset;
-		else if (field == MuiListviewHorizontalScrollerField.ContentWidth)
-			offset = MuiListviewHorizontalScrollerState.ContentWidthOffset;
-		else if (field == MuiListviewHorizontalScrollerField.ViewWidth)
-			offset = MuiListviewHorizontalScrollerState.ViewWidthOffset;
-		else if (field == MuiListviewHorizontalScrollerField.ScrollX)
-			offset = MuiListviewHorizontalScrollerState.ScrollXOffset;
-		else if (field == MuiListviewHorizontalScrollerField.MaxScrollX)
-			offset = MuiListviewHorizontalScrollerState.MaxScrollXOffset;
-		else
+		index = field switch
 		{
-			offset = 0;
-				recordSize = 0;
-				return false;
-			}
-		return true;
+			MuiListviewHorizontalScrollerField.Magic => 0,
+			MuiListviewHorizontalScrollerField.TrackLeft => 1,
+			MuiListviewHorizontalScrollerField.TrackTop => 2,
+			MuiListviewHorizontalScrollerField.TrackRight => 3,
+			MuiListviewHorizontalScrollerField.TrackBottom => 4,
+			MuiListviewHorizontalScrollerField.ThumbLeft => 5,
+			MuiListviewHorizontalScrollerField.ThumbTop => 6,
+			MuiListviewHorizontalScrollerField.ThumbRight => 7,
+			MuiListviewHorizontalScrollerField.ThumbBottom => 8,
+			MuiListviewHorizontalScrollerField.ContentWidth => 9,
+			MuiListviewHorizontalScrollerField.ViewWidth => 10,
+			MuiListviewHorizontalScrollerField.ScrollX => 11,
+			MuiListviewHorizontalScrollerField.MaxScrollX => 12,
+			_ => uint.MaxValue,
+		};
+		return index != uint.MaxValue;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -153,12 +136,32 @@ internal static class MuiListviewHorizontalScrollerMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset, out var recordSize) ||
-			record.IsNull || record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, recordSize)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address,
-			MuiListviewHorizontalScrollerState.FieldSize);
+		return TryGetAddress(ref platform, record, field, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiListviewHorizontalScrollerField field,
+		out APTR address, out uint size)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		size = 0;
+		if (!TryResolveFieldIndex(field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, record,
+				MuiListviewHorizontalScrollerState.Size, out var cursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiListviewHorizontalScrollerState.FieldSize, out var candidate))
+				return false;
+			if (current == index)
+			{
+				address = candidate;
+				size = MuiListviewHorizontalScrollerState.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -166,9 +169,35 @@ internal static class MuiListviewHorizontalScrollerMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiListviewHorizontalScrollerStateCodec.TryReadStructural(
+			ref platform, record, out var state)) return false;
+		if (field == MuiListviewHorizontalScrollerField.Magic)
+			value = state.Magic;
+		else if (field == MuiListviewHorizontalScrollerField.TrackLeft)
+			value = unchecked((uint)state.TrackLeft);
+		else if (field == MuiListviewHorizontalScrollerField.TrackTop)
+			value = unchecked((uint)state.TrackTop);
+		else if (field == MuiListviewHorizontalScrollerField.TrackRight)
+			value = unchecked((uint)state.TrackRight);
+		else if (field == MuiListviewHorizontalScrollerField.TrackBottom)
+			value = unchecked((uint)state.TrackBottom);
+		else if (field == MuiListviewHorizontalScrollerField.ThumbLeft)
+			value = unchecked((uint)state.ThumbLeft);
+		else if (field == MuiListviewHorizontalScrollerField.ThumbTop)
+			value = unchecked((uint)state.ThumbTop);
+		else if (field == MuiListviewHorizontalScrollerField.ThumbRight)
+			value = unchecked((uint)state.ThumbRight);
+		else if (field == MuiListviewHorizontalScrollerField.ThumbBottom)
+			value = unchecked((uint)state.ThumbBottom);
+		else if (field == MuiListviewHorizontalScrollerField.ContentWidth)
+			value = state.ContentWidth;
+		else if (field == MuiListviewHorizontalScrollerField.ViewWidth)
+			value = state.ViewWidth;
+		else if (field == MuiListviewHorizontalScrollerField.ScrollX)
+			value = state.ScrollX;
+		else if (field == MuiListviewHorizontalScrollerField.MaxScrollX)
+			value = state.MaxScrollX;
+		else return false;
 		return true;
 	}
 
@@ -176,10 +205,37 @@ internal static class MuiListviewHorizontalScrollerMemoryCodec
 		APTR record, MuiListviewHorizontalScrollerField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiListviewHorizontalScrollerStateCodec.TryReadStructural(
+			ref platform, record, out var state)) return false;
+		if (field == MuiListviewHorizontalScrollerField.Magic)
+			state.Magic = value;
+		else if (field == MuiListviewHorizontalScrollerField.TrackLeft)
+			state.TrackLeft = unchecked((int)value);
+		else if (field == MuiListviewHorizontalScrollerField.TrackTop)
+			state.TrackTop = unchecked((int)value);
+		else if (field == MuiListviewHorizontalScrollerField.TrackRight)
+			state.TrackRight = unchecked((int)value);
+		else if (field == MuiListviewHorizontalScrollerField.TrackBottom)
+			state.TrackBottom = unchecked((int)value);
+		else if (field == MuiListviewHorizontalScrollerField.ThumbLeft)
+			state.ThumbLeft = unchecked((int)value);
+		else if (field == MuiListviewHorizontalScrollerField.ThumbTop)
+			state.ThumbTop = unchecked((int)value);
+		else if (field == MuiListviewHorizontalScrollerField.ThumbRight)
+			state.ThumbRight = unchecked((int)value);
+		else if (field == MuiListviewHorizontalScrollerField.ThumbBottom)
+			state.ThumbBottom = unchecked((int)value);
+		else if (field == MuiListviewHorizontalScrollerField.ContentWidth)
+			state.ContentWidth = value;
+		else if (field == MuiListviewHorizontalScrollerField.ViewWidth)
+			state.ViewWidth = value;
+		else if (field == MuiListviewHorizontalScrollerField.ScrollX)
+			state.ScrollX = value;
+		else if (field == MuiListviewHorizontalScrollerField.MaxScrollX)
+			state.MaxScrollX = value;
+		else return false;
+		return MuiListviewHorizontalScrollerStateCodec.WriteRecord(ref platform,
+			record, state);
 	}
 
 	internal static bool TryReadInt32<TPlatform>(ref TPlatform platform,
@@ -206,9 +262,16 @@ internal static class MuiListviewHorizontalScrollerFieldCursorCodec
 {
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiListviewHorizontalScrollerFieldCursor cursor, out APTR address)
-		where TPlatform : struct, IMuiGuestMemory =>
+	where TPlatform : struct, IMuiGuestMemory =>
 		MuiListviewHorizontalScrollerMemoryCodec.TryGetAddress(ref platform,
 			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiListviewHorizontalScrollerFieldCursor cursor, out APTR address,
+		out uint size)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiListviewHorizontalScrollerMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address, out size);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiListviewHorizontalScrollerField field, out uint value)
@@ -379,28 +442,19 @@ internal struct MuiListviewHorizontalScrollerDragStateFieldCursor
 
 internal static class MuiListviewHorizontalScrollerDragStateMemoryCodec
 {
-	private static bool TryResolve(
-		MuiListviewHorizontalScrollerDragStateField field, out uint offset,
-		out uint recordSize)
+	private static bool TryResolveFieldIndex(
+		MuiListviewHorizontalScrollerDragStateField field, out uint index)
 	{
-		recordSize = MuiListviewHorizontalScrollerDragState.Size;
-		if (field == MuiListviewHorizontalScrollerDragStateField.Magic)
-			offset = MuiListviewHorizontalScrollerDragState.MagicOffset;
-		else if (field == MuiListviewHorizontalScrollerDragStateField.GrabOffset)
-			offset = MuiListviewHorizontalScrollerDragState.GrabOffsetOffset;
-		else if (field == MuiListviewHorizontalScrollerDragStateField.StartScroll)
-			offset = MuiListviewHorizontalScrollerDragState.StartScrollOffset;
-		else if (field == MuiListviewHorizontalScrollerDragStateField.LastPointer)
-			offset = MuiListviewHorizontalScrollerDragState.LastPointerOffset;
-		else if (field == MuiListviewHorizontalScrollerDragStateField.Flags)
-			offset = MuiListviewHorizontalScrollerDragState.FlagsOffset;
-		else
+		index = field switch
 		{
-			offset = 0;
-			recordSize = 0;
-			return false;
-		}
-		return true;
+			MuiListviewHorizontalScrollerDragStateField.Magic => 0,
+			MuiListviewHorizontalScrollerDragStateField.GrabOffset => 1,
+			MuiListviewHorizontalScrollerDragStateField.StartScroll => 2,
+			MuiListviewHorizontalScrollerDragStateField.LastPointer => 3,
+			MuiListviewHorizontalScrollerDragStateField.Flags => 4,
+			_ => uint.MaxValue,
+		};
+		return index != uint.MaxValue;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -409,13 +463,34 @@ internal static class MuiListviewHorizontalScrollerDragStateMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		fieldAddress = APTR.Null;
-		if (!TryResolve(field, out var offset, out var recordSize) ||
-			record.IsNull || record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, recordSize))
+		return TryGetAddress(ref platform, record, field, out fieldAddress,
+			out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiListviewHorizontalScrollerDragStateField field,
+		out APTR fieldAddress, out uint size)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		fieldAddress = APTR.Null;
+		size = 0;
+		if (!TryResolveFieldIndex(field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, record,
+				MuiListviewHorizontalScrollerDragState.Size, out var cursor))
 			return false;
-		fieldAddress = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(fieldAddress,
-			MuiListviewHorizontalScrollerDragState.FieldSize);
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiListviewHorizontalScrollerDragState.FieldSize,
+				out var candidate)) return false;
+			if (current == index)
+			{
+				fieldAddress = candidate;
+				size = MuiListviewHorizontalScrollerDragState.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -423,9 +498,19 @@ internal static class MuiListviewHorizontalScrollerDragStateMemoryCodec
 		out uint value) where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
-			return false;
-		value = platform.ReadUInt32(fieldAddress, 0);
+		if (!MuiListviewHorizontalScrollerDragStateCodec.TryReadStructural(
+			ref platform, address, out var state)) return false;
+		if (field == MuiListviewHorizontalScrollerDragStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiListviewHorizontalScrollerDragStateField.GrabOffset)
+			value = unchecked((uint)state.GrabOffset);
+		else if (field == MuiListviewHorizontalScrollerDragStateField.StartScroll)
+			value = state.StartScroll;
+		else if (field == MuiListviewHorizontalScrollerDragStateField.LastPointer)
+			value = unchecked((uint)state.LastPointer);
+		else if (field == MuiListviewHorizontalScrollerDragStateField.Flags)
+			value = state.Flags;
+		else return false;
 		return true;
 	}
 
@@ -433,37 +518,28 @@ internal static class MuiListviewHorizontalScrollerDragStateMemoryCodec
 		APTR address, MuiListviewHorizontalScrollerDragStateField field,
 		uint value) where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
-			return false;
-		platform.WriteUInt32(fieldAddress, 0, value);
-		return true;
+		if (!MuiListviewHorizontalScrollerDragStateCodec.TryReadStructural(
+			ref platform, address, out var state)) return false;
+		if (field == MuiListviewHorizontalScrollerDragStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiListviewHorizontalScrollerDragStateField.GrabOffset)
+			state.GrabOffset = unchecked((int)value);
+		else if (field == MuiListviewHorizontalScrollerDragStateField.StartScroll)
+			state.StartScroll = value;
+		else if (field == MuiListviewHorizontalScrollerDragStateField.LastPointer)
+			state.LastPointer = unchecked((int)value);
+		else if (field == MuiListviewHorizontalScrollerDragStateField.Flags)
+			state.Flags = value;
+		else return false;
+		return MuiListviewHorizontalScrollerDragStateCodec.WriteRecord(ref platform,
+			address, state);
 	}
 
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiListviewHorizontalScrollerDragState value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiListviewHorizontalScrollerDragState.Size) ||
-			!TryReadUInt32(ref platform, address,
-				MuiListviewHorizontalScrollerDragStateField.Magic, out value.Magic) ||
-			!TryReadUInt32(ref platform, address,
-				MuiListviewHorizontalScrollerDragStateField.GrabOffset,
-				out var grabOffset) ||
-			!TryReadUInt32(ref platform, address,
-				MuiListviewHorizontalScrollerDragStateField.StartScroll,
-				out value.StartScroll) ||
-			!TryReadUInt32(ref platform, address,
-				MuiListviewHorizontalScrollerDragStateField.LastPointer,
-				out var lastPointer) ||
-			!TryReadUInt32(ref platform, address,
-				MuiListviewHorizontalScrollerDragStateField.Flags, out value.Flags))
-			return false;
-		value.GrabOffset = unchecked((int)grabOffset);
-		value.LastPointer = unchecked((int)lastPointer);
-		return true;
-	}
+		=> MuiListviewHorizontalScrollerDragStateCodec.TryReadRecord(ref platform,
+			address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiListviewHorizontalScrollerDragState value)
@@ -474,23 +550,8 @@ internal static class MuiListviewHorizontalScrollerDragStateMemoryCodec
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiListviewHorizontalScrollerDragState value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiListviewHorizontalScrollerDragState.Size)) return false;
-		return TryWriteUInt32(ref platform, address,
-			MuiListviewHorizontalScrollerDragStateField.Magic, value.Magic) &&
-			TryWriteUInt32(ref platform, address,
-				MuiListviewHorizontalScrollerDragStateField.GrabOffset,
-				unchecked((uint)value.GrabOffset)) &&
-			TryWriteUInt32(ref platform, address,
-				MuiListviewHorizontalScrollerDragStateField.StartScroll,
-				value.StartScroll) &&
-			TryWriteUInt32(ref platform, address,
-				MuiListviewHorizontalScrollerDragStateField.LastPointer,
-				unchecked((uint)value.LastPointer)) &&
-			TryWriteUInt32(ref platform, address,
-				MuiListviewHorizontalScrollerDragStateField.Flags, value.Flags);
-	}
+		=> MuiListviewHorizontalScrollerDragStateCodec.WriteRecord(ref platform,
+			address, value);
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR address, MuiListviewHorizontalScrollerDragStateField field,
@@ -576,6 +637,13 @@ internal static class MuiListviewHorizontalScrollerDragStateFieldCursorCodec
 		MuiListviewHorizontalScrollerDragStateMemoryCodec.TryGetAddress(
 			ref platform, cursor.Address, cursor.Field, out address);
 
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiListviewHorizontalScrollerDragStateFieldCursor cursor,
+		out APTR address, out uint size)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiListviewHorizontalScrollerDragStateMemoryCodec.TryGetAddress(
+			ref platform, cursor.Address, cursor.Field, out address, out size);
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR address, MuiListviewHorizontalScrollerDragStateField field,
 		out uint value) where TPlatform : struct, IMuiGuestMemory =>
@@ -631,27 +699,19 @@ internal struct MuiListviewScrollerDragStateFieldCursor
 
 internal static class MuiListviewScrollerDragStateMemoryCodec
 {
-	private static bool TryResolve(MuiListviewScrollerDragStateField field,
-		out uint offset, out uint recordSize)
+	private static bool TryResolveFieldIndex(MuiListviewScrollerDragStateField field,
+		out uint index)
 	{
-		recordSize = MuiListviewScrollerDragState.Size;
-		if (field == MuiListviewScrollerDragStateField.Magic)
-			offset = MuiListviewScrollerDragState.MagicOffset;
-		else if (field == MuiListviewScrollerDragStateField.GrabOffset)
-			offset = MuiListviewScrollerDragState.GrabOffsetOffset;
-		else if (field == MuiListviewScrollerDragStateField.StartFirst)
-			offset = MuiListviewScrollerDragState.StartFirstOffset;
-		else if (field == MuiListviewScrollerDragStateField.LastPointer)
-			offset = MuiListviewScrollerDragState.LastPointerOffset;
-		else if (field == MuiListviewScrollerDragStateField.Flags)
-			offset = MuiListviewScrollerDragState.FlagsOffset;
-		else
+		index = field switch
 		{
-			offset = 0;
-			recordSize = 0;
-			return false;
-		}
-		return true;
+			MuiListviewScrollerDragStateField.Magic => 0,
+			MuiListviewScrollerDragStateField.GrabOffset => 1,
+			MuiListviewScrollerDragStateField.StartFirst => 2,
+			MuiListviewScrollerDragStateField.LastPointer => 3,
+			MuiListviewScrollerDragStateField.Flags => 4,
+			_ => uint.MaxValue,
+		};
+		return index != uint.MaxValue;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -659,12 +719,32 @@ internal static class MuiListviewScrollerDragStateMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset, out var recordSize) ||
-			record.IsNull || record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, recordSize)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address,
-			MuiListviewScrollerDragState.FieldSize);
+		return TryGetAddress(ref platform, record, field, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiListviewScrollerDragStateField field,
+		out APTR address, out uint size)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		size = 0;
+		if (!TryResolveFieldIndex(field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, record,
+				MuiListviewScrollerDragState.Size, out var cursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiListviewScrollerDragState.FieldSize, out var candidate))
+				return false;
+			if (current == index)
+			{
+				address = candidate;
+				size = MuiListviewScrollerDragState.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR record,
@@ -672,9 +752,19 @@ internal static class MuiListviewScrollerDragStateMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiListviewScrollerDragStateCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiListviewScrollerDragStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiListviewScrollerDragStateField.GrabOffset)
+			value = unchecked((uint)state.GrabOffset);
+		else if (field == MuiListviewScrollerDragStateField.StartFirst)
+			value = unchecked((uint)state.StartFirst);
+		else if (field == MuiListviewScrollerDragStateField.LastPointer)
+			value = unchecked((uint)state.LastPointer);
+		else if (field == MuiListviewScrollerDragStateField.Flags)
+			value = state.Flags;
+		else return false;
 		return true;
 	}
 
@@ -682,10 +772,21 @@ internal static class MuiListviewScrollerDragStateMemoryCodec
 		MuiListviewScrollerDragStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiListviewScrollerDragStateCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiListviewScrollerDragStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiListviewScrollerDragStateField.GrabOffset)
+			state.GrabOffset = unchecked((int)value);
+		else if (field == MuiListviewScrollerDragStateField.StartFirst)
+			state.StartFirst = unchecked((int)value);
+		else if (field == MuiListviewScrollerDragStateField.LastPointer)
+			state.LastPointer = unchecked((int)value);
+		else if (field == MuiListviewScrollerDragStateField.Flags)
+			state.Flags = value;
+		else return false;
+		return MuiListviewScrollerDragStateCodec.WriteRecord(ref platform,
+			record, state);
 	}
 }
 
@@ -699,6 +800,13 @@ internal static class MuiListviewScrollerDragStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiListviewScrollerDragStateMemoryCodec.TryGetAddress(ref platform,
 			cursor.Address, cursor.Field, out address);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiListviewScrollerDragStateFieldCursor cursor,
+		out APTR address, out uint size)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiListviewScrollerDragStateMemoryCodec.TryGetAddress(ref platform,
+			cursor.Address, cursor.Field, out address, out size);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		MuiListviewScrollerDragStateField field, out uint value)

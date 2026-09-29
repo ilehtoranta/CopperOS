@@ -84,25 +84,28 @@ internal static class MuiApplicationUsedClassesStateFieldCursorCodec
 	}
 }
 
-// Fixed application UsedClasses state is transferred as a named record.
-// Numeric guest positions are confined to this ABI adapter; the compatibility
-// cursor above remains available only to legacy callers and malformed-state
-// diagnostics.
+// Fixed application UsedClasses state is transferred as a named record. The
+// bounded cursor walks the complete packed struct before selecting a field;
+// offset constants remain ABI documentation/compatibility aliases only.
 internal static class MuiApplicationUsedClassesStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiApplicationUsedClassesStateField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiApplicationUsedClassesStateField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
+		address = APTR.Null;
 		if (field == MuiApplicationUsedClassesStateField.Magic)
-			offset = MuiApplicationUsedClassesStateRecord.MagicOffset;
-		else if (field == MuiApplicationUsedClassesStateField.Vector)
-			offset = MuiApplicationUsedClassesStateRecord.VectorOffset;
-		else
+			return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiApplicationUsedClassesStateRecord.FieldSize, out address);
+		if (field == MuiApplicationUsedClassesStateField.Vector)
 		{
-			offset = 0;
-			return false;
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiApplicationUsedClassesStateRecord.FieldSize, out _)) return false;
+			return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiApplicationUsedClassesStateRecord.FieldSize, out address);
 		}
-		return true;
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -110,12 +113,11 @@ internal static class MuiApplicationUsedClassesStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiApplicationUsedClassesStateRecord.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address))
 			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiApplicationUsedClassesStateRecord.Size) &&
-			platform.IsMapped(address, MuiApplicationUsedClassesStateRecord.FieldSize);
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

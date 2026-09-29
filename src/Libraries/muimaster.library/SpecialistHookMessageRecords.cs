@@ -49,40 +49,57 @@ internal struct MuiSpecialistHookMessageFieldCursor
 // on MuiSpecialistHookMessage fields and never issue packet-relative writes.
 internal static class MuiSpecialistHookMessageRecordMemoryCodec
 {
-	private static bool TryResolve(MuiSpecialistHookMessageField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiSpecialistHookMessageField field,
+		out uint index)
 	{
-		switch (field)
+		if (field == MuiSpecialistHookMessageField.MethodId)
+			index = 0;
+		else if (field == MuiSpecialistHookMessageField.Param1)
+			index = 1;
+		else if (field == MuiSpecialistHookMessageField.Param2)
+			index = 2;
+		else if (field == MuiSpecialistHookMessageField.Reserved)
+			index = 3;
+		else
 		{
-			case MuiSpecialistHookMessageField.MethodId:
-				offset = MuiSpecialistHookMessage.MethodIdOffset;
-				return true;
-			case MuiSpecialistHookMessageField.Param1:
-				offset = MuiSpecialistHookMessage.Param1Offset;
-				return true;
-			case MuiSpecialistHookMessageField.Param2:
-				offset = MuiSpecialistHookMessage.Param2Offset;
-				return true;
-			case MuiSpecialistHookMessageField.Reserved:
-				offset = MuiSpecialistHookMessage.ReservedOffset;
-				return true;
-			default:
-				offset = 0;
-				return false;
+			index = uint.MaxValue;
+			return false;
 		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiSpecialistHookMessageField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiSpecialistHookMessageFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiSpecialistHookMessageFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiSpecialistHookMessage.Size))
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiSpecialistHookMessage.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiSpecialistHookMessage.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiSpecialistHookMessage.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiSpecialistHookMessage.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -128,9 +145,17 @@ internal static class MuiSpecialistHookMessageFieldCursorCodec
 {
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiSpecialistHookMessageFieldCursor cursor, out APTR address)
-	where TPlatform : struct, IMuiGuestMemory =>
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiSpecialistHookMessageFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
 		MuiSpecialistHookMessageRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiSpecialistHookMessageField field, out uint value)

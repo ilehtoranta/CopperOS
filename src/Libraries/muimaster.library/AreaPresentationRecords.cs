@@ -63,10 +63,14 @@ internal static class MuiAreaPresentationStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaPresentationStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiAreaPresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaPresentationStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiAreaPresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiAreaPresentationStateField field, out uint value)
@@ -90,24 +94,18 @@ internal static class MuiAreaPresentationStateFieldCursorCodec
 // fields through the fixed MorphOS record layout and bounded guest memory.
 internal static class MuiAreaPresentationStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiAreaPresentationStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiAreaPresentationStateField field,
+		out uint index)
 	{
-		if (field == MuiAreaPresentationStateField.Magic)
-			offset = MuiAreaPresentationStateRecord.MagicOffset;
-		else if (field == MuiAreaPresentationStateField.Disabled)
-			offset = MuiAreaPresentationStateRecord.DisabledOffset;
-		else if (field == MuiAreaPresentationStateField.ShowMe)
-			offset = MuiAreaPresentationStateRecord.ShowMeOffset;
-		else if (field == MuiAreaPresentationStateField.Background)
-			offset = MuiAreaPresentationStateRecord.BackgroundOffset;
-		else if (field == MuiAreaPresentationStateField.Frame)
-			offset = MuiAreaPresentationStateRecord.FrameOffset;
-		else if (field == MuiAreaPresentationStateField.CustomBackfill)
-			offset = MuiAreaPresentationStateRecord.CustomBackfillOffset;
+		if (field == MuiAreaPresentationStateField.Magic) index = 0;
+		else if (field == MuiAreaPresentationStateField.Disabled) index = 1;
+		else if (field == MuiAreaPresentationStateField.ShowMe) index = 2;
+		else if (field == MuiAreaPresentationStateField.Background) index = 3;
+		else if (field == MuiAreaPresentationStateField.Frame) index = 4;
+		else if (field == MuiAreaPresentationStateField.CustomBackfill) index = 5;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -117,12 +115,34 @@ internal static class MuiAreaPresentationStateRecordMemoryCodec
 		APTR record, MuiAreaPresentationStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiAreaPresentationStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaPresentationStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
-			MuiAreaPresentationStateRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiAreaPresentationStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiAreaPresentationStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiAreaPresentationStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiAreaPresentationStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

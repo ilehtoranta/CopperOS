@@ -25,12 +25,6 @@ internal struct MuiNumericStateRecord
 {
 	internal const uint Size = 24;
 	internal const uint FieldSize = 4;
-	internal const uint MagicOffset = 0;
-	internal const uint MinimumOffset = 4;
-	internal const uint MaximumOffset = 8;
-	internal const uint ValueOffset = 12;
-	internal const uint DefaultOffset = 16;
-	internal const uint ReverseOffset = 20;
 	internal const uint Cookie = 0x4D4E5354u; // 'MNST'
 
 	internal uint Magic;
@@ -63,27 +57,25 @@ internal static class MuiNumericStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiNumericStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiNumericStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiNumericStateFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiNumericStateRecordMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiNumericStateField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = 0;
-		return MuiNumericStateRecordMemoryCodec.TryReadUInt32(ref platform,
+		=> MuiNumericStateRecordMemoryCodec.TryReadUInt32(ref platform,
 			record, field, out value);
-	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiNumericStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiNumericStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+		=> MuiNumericStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 			record, field, value);
-	}
 }
 
 // Struct-first guest-memory adapter. Numeric consumers use the complete
@@ -92,44 +84,60 @@ internal static class MuiNumericStateFieldCursorCodec
 // available for compatibility and malformed-state diagnostics.
 internal static class MuiNumericStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiNumericStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiNumericStateField field,
+		out uint index)
 	{
-		switch (field)
+		if (field == MuiNumericStateField.Magic)
+			index = 0;
+		else if (field == MuiNumericStateField.Minimum)
+			index = 1;
+		else if (field == MuiNumericStateField.Maximum)
+			index = 2;
+		else if (field == MuiNumericStateField.Value)
+			index = 3;
+		else if (field == MuiNumericStateField.Default)
+			index = 4;
+		else if (field == MuiNumericStateField.Reverse)
+			index = 5;
+		else
 		{
-			case MuiNumericStateField.Magic:
-				offset = MuiNumericStateRecord.MagicOffset;
-				return true;
-			case MuiNumericStateField.Minimum:
-				offset = MuiNumericStateRecord.MinimumOffset;
-				return true;
-			case MuiNumericStateField.Maximum:
-				offset = MuiNumericStateRecord.MaximumOffset;
-				return true;
-			case MuiNumericStateField.Value:
-				offset = MuiNumericStateRecord.ValueOffset;
-				return true;
-			case MuiNumericStateField.Default:
-				offset = MuiNumericStateRecord.DefaultOffset;
-				return true;
-			case MuiNumericStateField.Reverse:
-				offset = MuiNumericStateRecord.ReverseOffset;
-				return true;
+			index = uint.MaxValue;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiNumericStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiNumericStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiNumericStateFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
-			MuiNumericStateRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiNumericStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiNumericStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiNumericStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiNumericStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -137,8 +145,21 @@ internal static class MuiNumericStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiNumericStateRecordCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiNumericStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiNumericStateField.Minimum)
+			value = state.Minimum;
+		else if (field == MuiNumericStateField.Maximum)
+			value = state.Maximum;
+		else if (field == MuiNumericStateField.Value)
+			value = state.Value;
+		else if (field == MuiNumericStateField.Default)
+			value = state.Default;
+		else if (field == MuiNumericStateField.Reverse)
+			value = state.Reverse;
+		else return false;
 		return true;
 	}
 
@@ -146,9 +167,22 @@ internal static class MuiNumericStateRecordMemoryCodec
 		APTR record, MuiNumericStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiNumericStateRecordCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiNumericStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiNumericStateField.Minimum)
+			state.Minimum = value;
+		else if (field == MuiNumericStateField.Maximum)
+			state.Maximum = value;
+		else if (field == MuiNumericStateField.Value)
+			state.Value = value;
+		else if (field == MuiNumericStateField.Default)
+			state.Default = value;
+		else if (field == MuiNumericStateField.Reverse)
+			state.Reverse = value;
+		else return false;
+		return MuiNumericStateRecordCodec.WriteRecord(ref platform, record, state);
 	}
 }
 

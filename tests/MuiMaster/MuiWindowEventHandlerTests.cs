@@ -369,7 +369,7 @@ public sealed class MuiWindowEventHandlerTests
 	}
 
 	[Fact]
-	public void EventHandlerNodeCallbackHonorsGuiModeAndEventMask()
+	public void EventHandlerNodeCallbackTreatsGuiModeAsOptionalAndHonorsEventMask()
 	{
 		var platform = CreatePlatform(out var cl);
 		var target = Object(ref platform, cl);
@@ -385,8 +385,9 @@ public sealed class MuiWindowEventHandlerTests
 		Assert.Equal(0u, MuiApplicationWindowCore.DispatchEventHandlerNode(
 			ref platform, handler, eventMessage, 8));
 		platform.WriteUInt16(handler, 10, 0);
-		Assert.Equal(0u, MuiApplicationWindowCore.DispatchEventHandlerNode(
+		Assert.Equal(1u, MuiApplicationWindowCore.DispatchEventHandlerNode(
 			ref platform, handler, eventMessage, 4));
+		Assert.Equal(target, platform.LastDispatchObject);
 		Assert.Equal(0u, MuiApplicationWindowCore.DispatchEventHandlerNode(
 			ref platform, APTR.FromPointer(0x20FFCu), eventMessage, 4));
 	}

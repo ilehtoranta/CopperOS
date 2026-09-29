@@ -26,6 +26,22 @@ public sealed class MuiAreaTimerEventStructAdapterTests
 			ref platform, address, MuiAreaTimerEventStateField.LastTick,
 			out var tickAddress));
 		Assert.Equal(0x3E10u, tickAddress.Raw);
+		var cursor = new MuiAreaTimerEventStateFieldCursor
+		{
+			Record = address,
+			Field = MuiAreaTimerEventStateField.LastTick,
+		};
+		Assert.True(MuiAreaTimerEventStateFieldCursorCodec.TryGetAddress(
+			ref platform, cursor, out var cursorTickAddress));
+		Assert.Equal(tickAddress.Raw, cursorTickAddress.Raw);
+		Assert.True(MuiAreaTimerEventStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedTickAddress, out var typedTickSize));
+		Assert.Equal(cursorTickAddress, typedTickAddress);
+		Assert.Equal(MuiAreaTimerEventStateRecord.FieldSize, typedTickSize);
+		Assert.True(MuiAreaTimerEventStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryTickAddress, out var memoryTickSize));
+		Assert.Equal(typedTickAddress, memoryTickAddress);
+		Assert.Equal(typedTickSize, memoryTickSize);
 		Assert.True(MuiAreaTimerEventStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiAreaTimerEventStateField.LastTick,
 			0x12345678));
@@ -37,6 +53,13 @@ public sealed class MuiAreaTimerEventStructAdapterTests
 			ref platform, address, (MuiAreaTimerEventStateField)255, out _));
 		Assert.False(MuiAreaTimerEventStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiAreaTimerEventStateField.Magic, out _));
+		cursor.Field = (MuiAreaTimerEventStateField)255;
+		Assert.False(MuiAreaTimerEventStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiAreaTimerEventStateField.Magic;
+		Assert.False(MuiAreaTimerEventStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 		Assert.False(MuiAreaTimerEventStateCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

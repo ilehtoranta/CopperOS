@@ -5,6 +5,8 @@ namespace CopperOS.MuiMaster.Tests;
 
 public sealed class MuiErrorServiceTests
 {
+	// These cover only the retired private record model. Exported MUI error
+	// vectors now forward to DOS and are tested in MuiErrorVectorCoreTests.
 	private static readonly APTR State = APTR.FromPointer(0x1000);
 
 	[Fact]

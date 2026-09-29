@@ -48,6 +48,15 @@ public struct MuiMasterPrivateRoot
 	public uint ActiveCallbackDepth;
 	public uint Flags;
 	public uint Reserved;
+	// The formerly reserved private-root word now anchors constructor receipts.
+	// Keep its physical field/name for existing layout codecs and compatibility;
+	// lifecycle code uses this named pointer view. Nonzero already forbids native
+	// owner/provider teardown through the established quiescence checks.
+	internal APTR PendingConstructionHead
+	{
+		get => APTR.FromPointer(Reserved);
+		set => Reserved = value.Raw;
+	}
 }
 
 internal enum MuiMasterPrivateRootField : byte
@@ -78,55 +87,67 @@ internal struct MuiMasterPrivateRootFieldCursor
 // named MuiMasterPrivateRoot value instead of addressing a scalar offset.
 internal static class MuiMasterPrivateRootRecordMemoryCodec
 {
-	private static bool TryResolve(MuiMasterPrivateRootField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiMasterPrivateRootField field,
+		out uint index)
 	{
-		offset = field switch
+		if (field == MuiMasterPrivateRootField.ClassRegistry) index = 0;
+		else if (field == MuiMasterPrivateRootField.AllocationPolicy) index = 1;
+		else if (field == MuiMasterPrivateRootField.ErrorState) index = 2;
+		else if (field == MuiMasterPrivateRootField.ApplicationHead) index = 3;
+		else if (field == MuiMasterPrivateRootField.ExternalClassHead) index = 4;
+		else if (field == MuiMasterPrivateRootField.CallbackState) index = 5;
+		else if (field == MuiMasterPrivateRootField.LoaderState) index = 6;
+		else if (field == MuiMasterPrivateRootField.RegistryGeneration) index = 7;
+		else if (field == MuiMasterPrivateRootField.ActiveDispatchDepth) index = 8;
+		else if (field == MuiMasterPrivateRootField.ActiveCallbackDepth) index = 9;
+		else if (field == MuiMasterPrivateRootField.Flags) index = 10;
+		else if (field == MuiMasterPrivateRootField.Reserved) index = 11;
+		else
 		{
-			MuiMasterPrivateRootField.ClassRegistry =>
-				MuiMasterPrivateRoot.ClassRegistryOffset,
-			MuiMasterPrivateRootField.AllocationPolicy =>
-				MuiMasterPrivateRoot.AllocationPolicyOffset,
-			MuiMasterPrivateRootField.ErrorState =>
-				MuiMasterPrivateRoot.ErrorStateOffset,
-			MuiMasterPrivateRootField.ApplicationHead =>
-				MuiMasterPrivateRoot.ApplicationHeadOffset,
-			MuiMasterPrivateRootField.ExternalClassHead =>
-				MuiMasterPrivateRoot.ExternalClassHeadOffset,
-			MuiMasterPrivateRootField.CallbackState =>
-				MuiMasterPrivateRoot.CallbackStateOffset,
-			MuiMasterPrivateRootField.LoaderState =>
-				MuiMasterPrivateRoot.LoaderStateOffset,
-			MuiMasterPrivateRootField.RegistryGeneration =>
-				MuiMasterPrivateRoot.RegistryGenerationOffset,
-			MuiMasterPrivateRootField.ActiveDispatchDepth =>
-				MuiMasterPrivateRoot.ActiveDispatchDepthOffset,
-			MuiMasterPrivateRootField.ActiveCallbackDepth =>
-				MuiMasterPrivateRoot.ActiveCallbackDepthOffset,
-			MuiMasterPrivateRootField.Flags => MuiMasterPrivateRoot.FlagsOffset,
-			MuiMasterPrivateRootField.Reserved =>
-				MuiMasterPrivateRoot.ReservedOffset,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			index = uint.MaxValue;
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiMasterPrivateRootField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiMasterPrivateRootFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMasterPrivateRootFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiMasterPrivateRoot.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiMasterPrivateRoot.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiMasterPrivateRoot.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiMasterPrivateRoot.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiMasterPrivateRoot.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiMasterPrivateRootFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory =>
-		TryGetAddress(ref platform, cursor.Record, cursor.Field, out address);
+		TryGetAddress(ref platform, cursor, out address, out _);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiMasterPrivateRootField field, out uint value)
@@ -155,6 +176,13 @@ internal static class MuiMasterPrivateRootFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiMasterPrivateRootRecordMemoryCodec.TryGetAddress(ref platform, cursor,
 			out address);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMasterPrivateRootFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiMasterPrivateRootRecordMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiMasterPrivateRootField field, out uint value)

@@ -78,6 +78,20 @@ public sealed class MuiAreaContextMenuTests
 			MuiAreaContextMenuMessageField.MouseYPointer, out var pointer));
 		Assert.Equal(add.Raw + MuiAreaContextMenuAddMessage.MouseYPointerOffset,
 			pointer.Raw);
+		var cursor = new MuiAreaContextMenuMessageFieldCursor
+		{
+			Message = add,
+			Packet = MuiAreaContextMenuPacketKind.Add,
+			Field = MuiAreaContextMenuMessageField.MouseYPointer,
+		};
+		Assert.True(MuiAreaContextMenuMessageFieldCursorCodec.TryGetAddress(
+			ref platform, cursor, out var typedPointer, out var typedSize));
+		Assert.Equal(pointer, typedPointer);
+		Assert.Equal(MuiAreaContextMenuAddMessage.FieldSize, typedSize);
+		Assert.True(MuiAreaContextMenuMessageMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryPointer, out var memorySize));
+		Assert.Equal(typedPointer, memoryPointer);
+		Assert.Equal(typedSize, memorySize);
 
 		var choice = APTR.FromPointer(0x2240);
 		Assert.True(MuiAreaContextMenuMessageMemoryCodec.TryWriteUInt32(
@@ -98,6 +112,13 @@ public sealed class MuiAreaContextMenuTests
 		Assert.False(MuiAreaContextMenuMessageMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiAreaContextMenuPacketKind.Build,
 			MuiAreaContextMenuMessageField.MouseX, out _));
+		cursor.Field = (MuiAreaContextMenuMessageField)255;
+		Assert.False(MuiAreaContextMenuMessageFieldCursorCodec.TryGetAddress(
+			ref platform, cursor, out _, out _));
+		cursor.Message = APTR.Null;
+		cursor.Field = MuiAreaContextMenuMessageField.MouseYPointer;
+		Assert.False(MuiAreaContextMenuMessageFieldCursorCodec.TryGetAddress(
+			ref platform, cursor, out _, out _));
 	}
 
 	[Fact]

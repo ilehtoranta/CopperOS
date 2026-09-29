@@ -49,7 +49,9 @@ internal static class MuiAreaDoubleBufferCore
 		var published = false;
 		if (request.TargetRenderInfo.IsNotNull)
 		{
-			if (!platform.IsMapped(request.TargetRenderInfo, 28) ||
+			if (!MuiDrawingRenderInfoCodec.TryRead(ref platform,
+				request.TargetRenderInfo, out var targetRenderInfo) ||
+				targetRenderInfo.RastPort != request.TargetRastPort ||
 				!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 					RenderInfoAttribute, request.TargetRenderInfo.Raw, false))
 			{

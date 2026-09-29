@@ -106,6 +106,11 @@ public sealed class MuiListInputRecordsTests
 			out var rawKeyFieldAddress, out var rawKeyFieldSize));
 		Assert.Equal(APTR.FromPointer(0x3218), rawKeyFieldAddress);
 		Assert.Equal(2u, rawKeyFieldSize);
+		Assert.True(MuiIntuiRawKeyMessageMemoryCodec.TryWriteUInt16(ref platform,
+			messageAddress, MuiIntuiRawKeyMessageField.Code, (ushort)'M'));
+		Assert.True(MuiIntuiRawKeyMessageMemoryCodec.TryReadUInt16(ref platform,
+			messageAddress, MuiIntuiRawKeyMessageField.Code, out var fieldCode));
+		Assert.Equal((ushort)'M', fieldCode);
 
 		Assert.False(MuiIntuiMessageCodec.TryReadRawKey(ref platform,
 			messageAddress, out _));

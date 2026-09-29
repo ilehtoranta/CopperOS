@@ -23,6 +23,21 @@ public sealed class MuiGadgetGadgetStructAdapterTests
 			ref platform, address, MuiGadgetGadgetStateField.Gadget,
 			out var gadgetAddress));
 		Assert.Equal(0x3504u, gadgetAddress.Raw);
+		var gadgetCursor = new MuiGadgetGadgetStateFieldCursor
+		{
+			Record = address,
+			Field = MuiGadgetGadgetStateField.Gadget,
+		};
+		Assert.True(MuiGadgetGadgetStateFieldCursorCodec.TryGetAddress(
+			ref platform, gadgetCursor, out var cursorGadgetAddress,
+			out var fieldSize));
+		Assert.Equal(gadgetAddress, cursorGadgetAddress);
+		Assert.Equal(MuiGadgetGadgetStateRecord.FieldSize, fieldSize);
+		Assert.True(MuiGadgetGadgetStateRecordMemoryCodec.TryGetAddress(
+			ref platform, gadgetCursor, out var memoryCursorAddress,
+			out var memoryFieldSize));
+		Assert.Equal(cursorGadgetAddress, memoryCursorAddress);
+		Assert.Equal(fieldSize, memoryFieldSize);
 		Assert.True(MuiGadgetGadgetStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiGadgetGadgetStateField.Gadget,
 			0x12345678));
@@ -34,6 +49,9 @@ public sealed class MuiGadgetGadgetStructAdapterTests
 			MuiGadgetGadgetStateField.Magic, out _));
 		Assert.False(MuiGadgetGadgetStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiGadgetGadgetStateField.Magic, out _));
+		gadgetCursor.Record = APTR.Null;
+		Assert.False(MuiGadgetGadgetStateFieldCursorCodec.TryGetAddress(
+			ref platform, gadgetCursor, out _, out _));
 	}
 
 	[Fact]
