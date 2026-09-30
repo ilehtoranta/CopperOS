@@ -51,7 +51,8 @@ def run(command: list, cwd: Path, log: Path) -> None:
 
 def source_snapshot(repo: Path, sharp: Path) -> list[dict]:
     """Bind observed relevant source/project trees, not a hermetic MSBuild claim."""
-    groups = [repo / "src/Commands/Native", repo / "tests/Commands.AddBuffersNativeRoot"]
+    # src/Commands/Native is now an aggregate compiled from every command folder.
+    groups = [repo / "src/Commands", repo / "tests/Commands.AddBuffersNativeRoot"]
     groups += [sharp / name for name in ("Compiler", "Compiler.Cli", "Sdk.Amiga", "Targets.Amiga", "Runtime.Managed")]
     files = set()
     for group in groups:
@@ -136,7 +137,7 @@ def build_pass(dotnet: Path, repo: Path, sharp: Path, output: Path) -> dict:
                         "bytes": transform["output_bytes"], "raw": bound(raw), "version_id": VERSION,
                         "output_format": "hunk", "entry": ENTRY, "fpu": "disabled",
                         "runtime_profile": "resident", "declared_stack_bytes": 4096,
-                        "minimum_stack_qualified": False, "source": bound(repo / "src/Commands/Native/Workbench31MakeLinkCommand.cs"),
+                        "minimum_stack_qualified": False, "source": bound(repo / "src/Commands/MakeLink/Native/Workbench31MakeLinkCommand.cs"),
                         "compiler": bound(compiler), "sdk": bound(sdk),
                         "native_static": bound(static), "version_append": bound(tag_receipt)})
     if closure_before != [bound(path) for path in closure]:

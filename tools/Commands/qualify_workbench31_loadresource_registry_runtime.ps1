@@ -72,7 +72,7 @@ catch { $failure = $_.ToString() }
     failure = $failure
     runtime = 'resident'
     scope = 'Generated HUNK opened-resource registry with supplied public Exec/Utility/Graphics/Locale vectors on 68000/68020/68040. Does not prove worker/resource integration, original guest behavior, cross-invocation code lifetime, PURE or shipping readiness.'
-    sourceSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $repo 'src\Commands\Native\NativeWorkbench31LoadResourceRegistry.cs')).Hash.ToLowerInvariant()
+    sourceSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $repo 'src\Commands\LoadResource\Native\NativeWorkbench31LoadResourceRegistry.cs')).Hash.ToLowerInvariant()
     artifacts = $artifacts
 } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $run 'qualification.json') -Encoding utf8
 Write-Output (Join-Path $run 'qualification.json')

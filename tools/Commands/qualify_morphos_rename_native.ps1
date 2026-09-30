@@ -35,7 +35,7 @@ foreach ($cpu in '68000','68020','68040') {
         reportSha256 = (Get-FileHash -LiteralPath $runtime -Algorithm SHA256).Hash.ToLowerInvariant(); invocations = 112 }
 }
 $sources = @()
-foreach ($relative in 'src/Commands/Native/NativeMorphOSRenameCommand.cs', 'src/Commands/Native/NativeCommandStartup.cs', 'tests/Commands.AddBuffersNativeRoot/NativeMorphOSRenameEntry.cs', 'tests/Commands.NativeExecution/MorphOSRenameSuite.cs', 'tests/Commands.NativeExecution/Program.cs') {
+foreach ($relative in 'src/Commands/Rename/Native/NativeMorphOSRenameCommand.cs', 'src/Commands/Common/NativeCommandStartup.cs', 'tests/Commands.AddBuffersNativeRoot/NativeMorphOSRenameEntry.cs', 'tests/Commands.NativeExecution/MorphOSRenameSuite.cs', 'tests/Commands.NativeExecution/Program.cs') {
     $sources += [ordered]@{ path = $relative; sha256 = (Get-FileHash -LiteralPath (Join-Path $repo $relative) -Algorithm SHA256).Hash.ToLowerInvariant() }
 }
 [ordered]@{ status = 'passed'; suite = $suite; invocations = 336; sourceEvidence = $sources;

@@ -146,10 +146,11 @@ function Get-SourcePaths {
         foreach ($file in Get-ChildItem -LiteralPath $scope.path -File -Recurse) {
             $relative = [IO.Path]::GetRelativePath($scope.path, $file.FullName).Replace('\', '/')
             if ($relative -match '(^|/)(bin|obj|\.git)/') { continue }
-            # Commands.csproj removes the independent Native project. It is not
-            # a source/build dependency of the numeric component.
+            # Commands.csproj excludes native bodies, entries, Common and the
+            # Native aggregate. None is a source/build dependency of the numeric component.
             if ($Component -eq 'EvalNumeric' -and $scope.name -eq 'CopperOS-src-Commands' -and
-                $relative -like 'Native/*') { continue }
+                ($relative -like 'Native/*' -or $relative -like 'Common/*' -or
+                 $relative -like '*/Native/*' -or $relative -like '*/Entry/*')) { continue }
             if ($file.Extension -notin @('.cs', '.csproj', '.props', '.targets', '.json', '.ruleset') -and
                 $file.Name -ne '.editorconfig') { continue }
             # The SDK includes only these two example programs in its ABI assembly.
@@ -567,7 +568,8 @@ try {
     $commandSourceFolders = if ($Component -eq 'EvalNumeric') {
         @('src\Commands', 'src\System\Shell', 'tests\Commands.EvalNativeRoot', 'tests\Commands.EvalNativeExecution')
     } else {
-        @('src\Commands\Native', 'tests\Commands.NativeRoot', "tests\$executorFolder")
+        # The Native aggregate compiles Common/ and every <Command>/Native/.
+        @('src\Commands', 'tests\Commands.NativeRoot', "tests\$executorFolder")
     }
     foreach ($name in $commandSourceFolders) {
         $sourceScopes += [ordered]@{ name = "CopperOS-$($name.Replace('\', '-'))"; path = Join-Path $repo $name }

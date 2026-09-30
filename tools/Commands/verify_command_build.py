@@ -65,7 +65,7 @@ def verify_versioned_build(report: dict, record: dict, root: Path) -> dict:
         require((root / "tools/Commands" / name).resolve() in sources,
                 "known producer/tool missing from current source snapshot")
     source = file(record["source"], "selected source")
-    require(source == (root / "src/Commands/Native/Workbench31MakeLinkCommand.cs").resolve()
+    require(source == (root / "src/Commands/MakeLink/Native/Workbench31MakeLinkCommand.cs").resolve()
             and source in sources, "selected source not captured by producer")
     require((root / "tests/Commands.AddBuffersNativeRoot/Workbench31MakeLinkEntry.cs").resolve()
             in sources, "startup source not captured")

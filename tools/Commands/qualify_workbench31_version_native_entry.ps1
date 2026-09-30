@@ -19,10 +19,10 @@ $run = if ($OutputDirectory) { [IO.Path]::GetFullPath($OutputDirectory) } else {
 if (Test-Path -LiteralPath $run) { throw 'Use a fresh output directory; do not overwrite historical evidence.' }
 New-Item -ItemType Directory -Path $run | Out-Null
 $sourcePaths = @(
-    'src\Commands\Native\NativeWorkbench31VersionCommand.cs',
-    'src\Commands\Native\NativeWorkbench31VersionFull.cs',
-    'src\Commands\Native\NativeCommandArguments.cs',
-    'src\Commands\Native\NativeCommandStartup.cs',
+    'src\Commands\Version\Native\NativeWorkbench31VersionCommand.cs',
+    'src\Commands\Version\Native\NativeWorkbench31VersionFull.cs',
+    'src\Commands\Common\NativeCommandArguments.cs',
+    'src\Commands\Common\NativeCommandStartup.cs',
     'tests\Commands.AddBuffersNativeRoot\Workbench31VersionEntry.cs',
     'tests\Commands.AddBuffersNativeRoot\CopperOS.Commands.AddBuffersNativeRoot.csproj',
     'tests\Commands.NativeExecution\VersionEntrySuite.cs',

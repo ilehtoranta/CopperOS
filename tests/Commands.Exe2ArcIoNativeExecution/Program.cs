@@ -121,11 +121,11 @@ internal static class Program
             .Append(Path.Combine(executor, "CopperOS.Commands.Exe2ArcIoNativeExecution.csproj"))
             .Append(Path.Combine(probe, "CopperOS.Commands.Exe2ArcIoNativeRoot.csproj"))
             .Append(Path.Combine(root, "tests", "Commands.NativeExecution", "HunkImage.cs"))
-            .Append(Path.Combine(root, "src", "Commands", "Exe2ArcHeaderProbe.cs"))
-            .Append(Path.Combine(root, "src", "Commands", "Exe2ArcIo.cs"))
-            .Append(Path.Combine(root, "src", "Commands", "Exe2ArcForwardScanner.cs"))
-            .Append(Path.Combine(root, "src", "Commands", "Exe2ArcPayloadCopy.cs"))
-            .Append(Path.Combine(root, "src", "Commands", "Native", "NativeExe2ArcIo.cs"))
+            .Append(Path.Combine(root, "src", "Commands", "Exe2Arc", "Exe2ArcHeaderProbe.cs"))
+            .Append(Path.Combine(root, "src", "Commands", "Exe2Arc", "Exe2ArcIo.cs"))
+            .Append(Path.Combine(root, "src", "Commands", "Exe2Arc", "Exe2ArcForwardScanner.cs"))
+            .Append(Path.Combine(root, "src", "Commands", "Exe2Arc", "Exe2ArcPayloadCopy.cs"))
+            .Append(Path.Combine(root, "src", "Commands", "Exe2Arc", "Native", "NativeExe2ArcIo.cs"))
             .Append(Path.Combine(root, "CopperOS.Portable.props"));
         return files.Order(StringComparer.Ordinal).Select(p => new AuditFile(Path.GetFullPath(p), Hash(p))).ToArray();
     }

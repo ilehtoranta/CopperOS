@@ -1,5 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <Import Project="..\..\CopperOS.Portable.props" />
+  <!--
+    Host-side model of the commands, run by the Shell engine through
+    IShellPlatform and exercised by tests/Commands. It is not a C: binary.
+    It compiles each command folder's portable algorithms (<Command>/*.cs) and
+    Shell-hosted cores (<Command>/Host/*.cs); native bodies, entries and
+    Common/ are excluded. CopperOS.Portable.props comes from Directory.Build.props.
+  -->
   <PropertyGroup>
     <AssemblyName>CopperOS.Commands</AssemblyName>
     <RootNamespace>CopperOS.Commands</RootNamespace>
@@ -7,9 +13,10 @@
     <IsPackable>true</IsPackable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>1591</NoWarn>
+    <EnableDefaultItems>false</EnableDefaultItems>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\System\Shell\CopperOS.Shell.csproj" />
-    <Compile Remove="Native\**\*.cs" />
+    <Compile Include="*\*.cs;*\Host\**\*.cs" Exclude="Common\**;bin\**;obj\**" />
   </ItemGroup>
 </Project>

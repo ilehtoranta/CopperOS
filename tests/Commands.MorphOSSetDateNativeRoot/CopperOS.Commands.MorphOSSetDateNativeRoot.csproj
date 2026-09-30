@@ -4,15 +4,15 @@
   </PropertyGroup>
   <Import Project="..\..\CopperOS.Portable.props" />
   <PropertyGroup>
+    <CopperOSReferenceSdkAmigaSupport>true</CopperOSReferenceSdkAmigaSupport>
     <AssemblyName>CopperOS.Commands.MorphOSSetDateNativeRoot</AssemblyName>
     <RootNamespace>CopperOS.Commands.MorphOSSetDateNativeRoot</RootNamespace>
     <ImplicitUsings>false</ImplicitUsings>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CopperSharp.Sdk.Amiga.Support" Version="$(CopperSharpSdkAmigaVersion)" />
-    <Compile Include="..\..\src\Commands\Native\NativeCommandArguments.cs" Link="NativeCommandArguments.cs" />
-    <Compile Include="..\..\src\Commands\Native\NativeCommandStartup.cs" Link="NativeCommandStartup.cs" />
-    <Compile Include="..\..\src\Commands\Native\NativeMorphOSSetDateCommand.cs" Link="NativeMorphOSSetDateCommand.cs" />
+    <Compile Include="..\..\src\Commands\Common\NativeCommandArguments.cs" Link="NativeCommandArguments.cs" />
+    <Compile Include="..\..\src\Commands\Common\NativeCommandStartup.cs" Link="NativeCommandStartup.cs" />
+    <Compile Include="..\..\src\Commands\SetDate\Native\NativeMorphOSSetDateCommand.cs" Link="NativeMorphOSSetDateCommand.cs" />
   </ItemGroup>
 </Project>

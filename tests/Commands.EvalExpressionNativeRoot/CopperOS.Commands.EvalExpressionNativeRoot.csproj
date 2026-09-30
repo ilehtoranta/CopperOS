@@ -4,13 +4,13 @@
   </PropertyGroup>
   <Import Project="..\..\CopperOS.Portable.props" />
   <PropertyGroup>
+    <CopperOSReferenceSdkAmigaSupport>true</CopperOSReferenceSdkAmigaSupport>
     <AssemblyName>CopperOS.Commands.EvalExpressionNativeRoot</AssemblyName>
     <RootNamespace>CopperOS.Commands.EvalExpressionNativeRoot</RootNamespace>
     <ImplicitUsings>false</ImplicitUsings>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CopperSharp.Sdk.Amiga.Support" Version="$(CopperSharpSdkAmigaVersion)" />
-    <Compile Include="..\..\src\Commands\EvalExpressionEvaluator.cs" Link="EvalExpressionEvaluator.cs" />
+    <Compile Include="..\..\src\Commands\Eval\EvalExpressionEvaluator.cs" Link="EvalExpressionEvaluator.cs" />
   </ItemGroup>
 </Project>

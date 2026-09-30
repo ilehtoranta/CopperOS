@@ -23,9 +23,9 @@ $status = 'failed'
 $failure = $null
 $artifacts = @()
 $sourcePaths = @(
-    'src\Commands\Native\NativeWorkbench31LoadResourceLaunch.cs',
-    'src\Commands\Native\NativeWorkbench31LoadResourceProtocol.cs',
-    'src\Commands\Native\NativeCommandArguments.cs',
+    'src\Commands\LoadResource\Native\NativeWorkbench31LoadResourceLaunch.cs',
+    'src\Commands\LoadResource\Native\NativeWorkbench31LoadResourceProtocol.cs',
+    'src\Commands\Common\NativeCommandArguments.cs',
     'tests\Commands.LoadResourceNativeRoot\NativeWorkbench31LoadResourceLaunchProbe.cs',
     'tests\Commands.LoadResourceNativeRoot\CopperOS.Commands.LoadResourceNativeRoot.csproj',
     'tests\Commands.NativeExecution\LoadResourceLaunchRuntimeSuite.cs',

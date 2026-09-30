@@ -4,20 +4,20 @@
   </PropertyGroup>
   <Import Project="..\..\CopperOS.Portable.props" />
   <PropertyGroup>
+    <CopperOSReferenceSdkAmigaSupport>true</CopperOSReferenceSdkAmigaSupport>
     <AssemblyName>CopperOS.Commands.LoadResourceNativeRoot</AssemblyName>
     <RootNamespace>CopperOS.Commands.LoadResourceNativeRoot</RootNamespace>
     <ImplicitUsings>false</ImplicitUsings>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CopperSharp.Sdk.Amiga.Support" Version="$(CopperSharpSdkAmigaVersion)" />
-    <Compile Include="..\..\src\Commands\Native\NativeCommandArguments.cs" Link="NativeCommandArguments.cs" />
-    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31LoadResourceLoadSeg.cs" Link="NativeWorkbench31LoadResourceLoadSeg.cs" />
-    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31LoadResourceProtocol.cs" Link="NativeWorkbench31LoadResourceProtocol.cs" />
-    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31LoadResourceRegistry.cs" Link="NativeWorkbench31LoadResourceRegistry.cs" />
-    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31LoadResourceActions.cs" Link="NativeWorkbench31LoadResourceActions.cs" />
-    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31LoadResourceMessages.cs" Link="NativeWorkbench31LoadResourceMessages.cs" />
-    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31LoadResourceWorker.cs" Link="NativeWorkbench31LoadResourceWorker.cs" />
-    <Compile Include="..\..\src\Commands\Native\NativeWorkbench31LoadResourceLaunch.cs" Link="NativeWorkbench31LoadResourceLaunch.cs" />
+    <Compile Include="..\..\src\Commands\Common\NativeCommandArguments.cs" Link="NativeCommandArguments.cs" />
+    <Compile Include="..\..\src\Commands\LoadResource\Native\NativeWorkbench31LoadResourceLoadSeg.cs" Link="NativeWorkbench31LoadResourceLoadSeg.cs" />
+    <Compile Include="..\..\src\Commands\LoadResource\Native\NativeWorkbench31LoadResourceProtocol.cs" Link="NativeWorkbench31LoadResourceProtocol.cs" />
+    <Compile Include="..\..\src\Commands\LoadResource\Native\NativeWorkbench31LoadResourceRegistry.cs" Link="NativeWorkbench31LoadResourceRegistry.cs" />
+    <Compile Include="..\..\src\Commands\LoadResource\Native\NativeWorkbench31LoadResourceActions.cs" Link="NativeWorkbench31LoadResourceActions.cs" />
+    <Compile Include="..\..\src\Commands\LoadResource\Native\NativeWorkbench31LoadResourceMessages.cs" Link="NativeWorkbench31LoadResourceMessages.cs" />
+    <Compile Include="..\..\src\Commands\LoadResource\Native\NativeWorkbench31LoadResourceWorker.cs" Link="NativeWorkbench31LoadResourceWorker.cs" />
+    <Compile Include="..\..\src\Commands\LoadResource\Native\NativeWorkbench31LoadResourceLaunch.cs" Link="NativeWorkbench31LoadResourceLaunch.cs" />
   </ItemGroup>
 </Project>

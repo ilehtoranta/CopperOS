@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- No shipping [M68kEntryPoint] in Entry/ yet, so this is a plain library and
+       publish emits no C: file. Add Entry/DeleteEntry.cs plus RuntimeIdentifier,
+       CopperOSCommandName and CopperSharpEntry (see MakeDir) to ship it. -->
+  <PropertyGroup>
+    <AssemblyName>CopperOS.Commands.Delete</AssemblyName>
+    <RootNamespace>CopperOS.Commands</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Common\CopperOS.Commands.Common.csproj" />
+    <ProjectReference Include="..\Copy\CopperOS.Commands.Copy.csproj" />
+  </ItemGroup>
+</Project>

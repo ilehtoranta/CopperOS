@@ -82,8 +82,8 @@ foreach ($cpu in '68000', '68020', '68040') {
     entry = 'CopperOS.Commands.AddBuffersNativeRoot.NativeWorkbench31AddDataTypesEntry::Main'
     evidence = 'Static fields and call order captured from hash-bound Workbench 3.1 M10 AddDataTypes HUNK. Named-object user space and tag meanings checked against the public utility.library contract.'
     scope = 'Three-CPU resident HUNK qualification plus fourteen supplied-vector invocations per CPU. Covers classic DOS39/Utility39/Intuition39/IFFParse37/Locale38 open floors and reverse cleanup, optional sys/c.catalog failure, existing-list reuse, ANO_USERSPACE(140) list creation and publication, semaphore initialization, cleanup of an allocated named object with missing user space, the three-result FILES/M,QUIET/S,REFRESH/S ReadArgs template, single and multiple Workbench FILES patterns, DTHD registration, option-slot mapping and REFRESH precedence, REFRESH date comparison and stamp update, the DEVS:DataTypes/#? scan gate, missing/unchanged/empty directory cases, parser failure and owned-result cleanup. This remains a fixture, not original Workbench guest parity, live utility/DOS semantics, PURE/reuse lifecycle, complete classic datatype ABI proof, licensing, or shipping/package approval.'
-    commandSourceSha256 = (Get-FileHash (Join-Path $repo 'src\Commands\Native\NativeWorkbench31AddDataTypesCommand.cs') -Algorithm SHA256).Hash.ToLowerInvariant()
-    coreSourceSha256 = (Get-FileHash (Join-Path $repo 'src\Commands\Native\NativeMorphOSAddDataTypesCommand.cs') -Algorithm SHA256).Hash.ToLowerInvariant()
+    commandSourceSha256 = (Get-FileHash (Join-Path $repo 'src\Commands\AddDataTypes\Native\NativeWorkbench31AddDataTypesCommand.cs') -Algorithm SHA256).Hash.ToLowerInvariant()
+    coreSourceSha256 = (Get-FileHash (Join-Path $repo 'src\Commands\AddDataTypes\Native\NativeMorphOSAddDataTypesCommand.cs') -Algorithm SHA256).Hash.ToLowerInvariant()
     rootAssemblySha256 = (Get-FileHash $rootDll -Algorithm SHA256).Hash.ToLowerInvariant()
     testRunnerSha256 = (Get-FileHash $runner -Algorithm SHA256).Hash.ToLowerInvariant()
     artifacts = $artifacts

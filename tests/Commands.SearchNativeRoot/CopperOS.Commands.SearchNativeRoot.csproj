@@ -4,15 +4,15 @@
   </PropertyGroup>
   <Import Project="..\..\CopperOS.Portable.props" />
   <PropertyGroup>
+    <CopperOSReferenceSdkAmigaSupport>true</CopperOSReferenceSdkAmigaSupport>
     <AssemblyName>CopperOS.Commands.SearchNativeRoot</AssemblyName>
     <RootNamespace>CopperOS.Commands.SearchNativeRoot</RootNamespace>
     <ImplicitUsings>false</ImplicitUsings>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CopperSharp.Sdk.Amiga.Support" Version="$(CopperSharpSdkAmigaVersion)" />
-    <Compile Include="..\..\src\Commands\SearchLiteralMatcher.cs" Link="SearchLiteralMatcher.cs" />
-    <Compile Include="..\..\src\Commands\SearchLineFormatter.cs" Link="SearchLineFormatter.cs" />
-    <Compile Include="..\..\src\Commands\Native\NativeDosListTraversal.cs" Link="NativeDosListTraversal.cs" />
+    <Compile Include="..\..\src\Commands\Search\SearchLiteralMatcher.cs" Link="SearchLiteralMatcher.cs" />
+    <Compile Include="..\..\src\Commands\Search\SearchLineFormatter.cs" Link="SearchLineFormatter.cs" />
+    <Compile Include="..\..\src\Commands\Common\NativeDosListTraversal.cs" Link="NativeDosListTraversal.cs" />
   </ItemGroup>
 </Project>
