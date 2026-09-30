@@ -25,7 +25,7 @@ $sourcePaths = @(
     'tools\Commands\Workbench31GuestProbe\native\NativeGuestCommandProbe.cs',
     'tools\Commands\Workbench31GuestProbe\native\CopperOS.Workbench31GuestProbe.csproj',
     'tools\Commands\Workbench31GuestProbe\native\build_probe.ps1',
-    'src\Commands\Native\NativeCommandArguments.cs',
+    'src\Commands\Common\NativeCommandArguments.cs',
     'CopperOS.Portable.props'
 )
 $sources = @($sourcePaths | ForEach-Object {

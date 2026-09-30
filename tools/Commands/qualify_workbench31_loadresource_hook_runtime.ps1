@@ -72,7 +72,7 @@ catch { $failure = $_.ToString() }
     failure = $failure
     runtime = 'resident'
     scope = 'Generated HUNK hook lifecycle in supplied public Exec/DOS vectors on 68000/68020/68040. Includes newer patch retention, duplicate install rejection, filesystem Lock outside the registry semaphore, and nonblocking busy teardown retention/retry. Does not prove shared worker scheduling, cross-invocation code lifetime, original guest behavior, PURE or shipping readiness.'
-    sourceSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $repo 'src\Commands\Native\NativeWorkbench31LoadResourceLoadSeg.cs')).Hash.ToLowerInvariant()
+    sourceSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $repo 'src\Commands\LoadResource\Native\NativeWorkbench31LoadResourceLoadSeg.cs')).Hash.ToLowerInvariant()
     artifacts = $artifacts
 } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $run 'qualification.json') -Encoding utf8
 Write-Output (Join-Path $run 'qualification.json')

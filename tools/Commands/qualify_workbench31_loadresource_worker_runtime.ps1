@@ -23,7 +23,7 @@ $status = 'failed'
 $failure = $null
 $artifacts = @()
 $sourcePaths = @('Worker', 'Actions', 'Messages', 'Registry', 'LoadSeg') | ForEach-Object {
-    'src\Commands\Native\NativeWorkbench31LoadResource' + $_ + '.cs'
+    'src\Commands\LoadResource\Native\NativeWorkbench31LoadResource' + $_ + '.cs'
 }
 $sourcePaths += @(
     'tests\Commands.LoadResourceNativeRoot\NativeWorkbench31LoadResourceWorkerProbe.cs',

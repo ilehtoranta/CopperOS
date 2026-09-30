@@ -13,7 +13,7 @@ $root = Join-Path $repo 'tests\Commands.LoadResourceNativeRoot\bin\Release\net10
 $rootDll = Join-Path $root 'CopperOS.Commands.LoadResourceNativeRoot.dll'
 $runner = Join-Path $repo 'tests\Commands.NativeExecution\bin\Release\net10.0\CopperOS.Commands.NativeExecution.dll'
 $cli = Join-Path $CopperSharpRoot 'Compiler.Cli\bin\Release\net10.0\CopperSharp.Compiler.Cli.dll'
-$source = Join-Path $repo 'src\Commands\Native\NativeWorkbench31LoadResourceProtocol.cs'
+$source = Join-Path $repo 'src\Commands\LoadResource\Native\NativeWorkbench31LoadResourceProtocol.cs'
 $sourceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $source).Hash.ToLowerInvariant()
 $run = if ($OutputDirectory) { [IO.Path]::GetFullPath($OutputDirectory) } else {
     Join-Path $repo ('artifacts\workbench31-loadresource-protocol-runtime-' + [guid]::NewGuid().ToString('N'))

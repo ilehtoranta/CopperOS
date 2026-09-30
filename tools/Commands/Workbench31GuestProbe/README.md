@@ -36,7 +36,7 @@ python -B tools/Commands/Workbench31GuestProbe/capture_probe.py `
   --source tools/Commands/Workbench31PassiveRunner `
   --source "$probeRunnerRoot/current-source" `
   --source "$probeBuild/build-receipt.json" `
-  --source src/Commands/Native/NativeCommandArguments.cs `
+  --source src/Commands/Common/NativeCommandArguments.cs `
   --source CopperOS.Portable.props
 
 python -B tools/Commands/Workbench31GuestProbe/analyze_probe.py `

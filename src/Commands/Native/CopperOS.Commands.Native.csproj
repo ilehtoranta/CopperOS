@@ -1,42 +1,26 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <CopperOSUseLocalCopperSharp>true</CopperOSUseLocalCopperSharp>
-  </PropertyGroup>
-  <Import Project="..\..\..\CopperOS.Portable.props" />
+  <!--
+    Compatibility aggregate. Produces the same CopperOS.Commands.Native assembly
+    the pre-restructure Native project did, from the new per-command folders:
+    Common/, every <Command>/Native/ body, and the portable algorithm files the
+    old project linked. The private closure roots and qualifiers
+    (tests/Commands.NativeRoot, tests/Commands.NativeExecution,
+    tools/Commands/qualify_*.ps1 and the *NativeRoot entry projects) keep
+    referencing this project and assembly name unchanged.
+
+    Shipping C: binaries do NOT come from here: each src/Commands/<Command>
+    project publishes its own. <Command>/Entry/ is deliberately excluded.
+  -->
   <PropertyGroup>
     <AssemblyName>CopperOS.Commands.Native</AssemblyName>
     <RootNamespace>CopperOS.Commands.Native</RootNamespace>
-    <ImplicitUsings>false</ImplicitUsings>
-    <IsPackable>false</IsPackable>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <NoWarn>1591</NoWarn>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CopperSharp.Sdk.Amiga.Support" Version="$(CopperSharpSdkAmigaVersion)" />
-    <Compile Include="..\EvalExpressionEvaluator.cs" Link="EvalExpressionEvaluator.cs" />
-    <Compile Include="..\EvalNumericFormatter.cs" Link="EvalNumericFormatter.cs" />
-    <Compile Include="..\EvalLFormatFormatter.cs" Link="EvalLFormatFormatter.cs" />
-    <Compile Include="..\EvalClassicLFormatFormatter.cs" Link="EvalClassicLFormatFormatter.cs" />
-    <Compile Include="..\QuoteReadItemFormatter.cs" Link="QuoteReadItemFormatter.cs" />
-    <Compile Include="..\QuoteHexFormatter.cs" Link="QuoteHexFormatter.cs" />
-    <Compile Include="..\QuoteUriFormatter.cs" Link="QuoteUriFormatter.cs" />
-    <Compile Include="..\QuoteBase64Formatter.cs" Link="QuoteBase64Formatter.cs" />
-    <Compile Include="..\QuoteForwardPipeline.cs" Link="QuoteForwardPipeline.cs" />
-    <Compile Include="..\QuoteReversePipeline.cs" Link="QuoteReversePipeline.cs" />
-    <Compile Include="..\QuoteRuleParser.cs" Link="QuoteRuleParser.cs" />
-    <Compile Include="..\TypeTextFormatter.cs" Link="TypeTextFormatter.cs" />
-    <Compile Include="..\Exe2ArcIo.cs" Link="Exe2ArcIo.cs" />
-    <Compile Include="..\Exe2ArcPayloadCopy.cs" Link="Exe2ArcPayloadCopy.cs" />
-    <Compile Include="..\Exe2ArcHeaderProbe.cs" Link="Exe2ArcHeaderProbe.cs" />
-    <Compile Include="..\Exe2ArcForwardScanner.cs" Link="Exe2ArcForwardScanner.cs" />
-    <Compile Include="..\Exe2ArcOutputName.cs" Link="Exe2ArcOutputName.cs" />
-    <Compile Include="..\Exe2ArcOutputSelection.cs" Link="Exe2ArcOutputSelection.cs" />
-    <Compile Include="..\Exe2ArcTypeSelection.cs" Link="Exe2ArcTypeSelection.cs" />
-    <Compile Include="..\Exe2ArcScannerSelection.cs" Link="Exe2ArcScannerSelection.cs" />
-    <Compile Include="..\Exe2ArcResultPolicy.cs" Link="Exe2ArcResultPolicy.cs" />
-    <Compile Include="..\Exe2ArcLhaScanner.cs" Link="Exe2ArcLhaScanner.cs" />
-    <Compile Include="..\Exe2ArcZipScanner.cs" Link="Exe2ArcZipScanner.cs" />
-    <Compile Include="..\Exe2ArcZipRecordRewriter.cs" Link="Exe2ArcZipRecordRewriter.cs" />
-    <Compile Include="..\Exe2ArcZipRecordExtractor.cs" Link="Exe2ArcZipRecordExtractor.cs" />
+    <Compile Include="..\Common\*.cs;..\*\Native\*.cs" />
+    <Compile Include="..\Eval\EvalExpressionEvaluator.cs;..\Eval\EvalNumericFormatter.cs;..\Eval\EvalLFormatFormatter.cs;..\Eval\EvalClassicLFormatFormatter.cs" />
+    <Compile Include="..\Quote\QuoteReadItemFormatter.cs;..\Quote\QuoteHexFormatter.cs;..\Quote\QuoteUriFormatter.cs;..\Quote\QuoteBase64Formatter.cs;..\Quote\QuoteForwardPipeline.cs;..\Quote\QuoteReversePipeline.cs;..\Quote\QuoteRuleParser.cs" />
+    <Compile Include="..\Type\TypeTextFormatter.cs" />
+    <Compile Include="..\Exe2Arc\Exe2ArcIo.cs;..\Exe2Arc\Exe2ArcPayloadCopy.cs;..\Exe2Arc\Exe2ArcHeaderProbe.cs;..\Exe2Arc\Exe2ArcForwardScanner.cs;..\Exe2Arc\Exe2ArcOutputName.cs;..\Exe2Arc\Exe2ArcOutputSelection.cs;..\Exe2Arc\Exe2ArcTypeSelection.cs;..\Exe2Arc\Exe2ArcScannerSelection.cs;..\Exe2Arc\Exe2ArcResultPolicy.cs;..\Exe2Arc\Exe2ArcLhaScanner.cs;..\Exe2Arc\Exe2ArcZipScanner.cs;..\Exe2Arc\Exe2ArcZipRecordRewriter.cs;..\Exe2Arc\Exe2ArcZipRecordExtractor.cs" />
   </ItemGroup>
 </Project>

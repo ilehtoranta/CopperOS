@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <Import Project="..\..\CopperOS.Portable.props" />
   <PropertyGroup>
+    <CopperOSReferenceSdkAmigaSupport>true</CopperOSReferenceSdkAmigaSupport>
     <AssemblyName>CopperOS.Commands.Exe2ArcIoNativeRoot</AssemblyName>
     <RootNamespace>CopperOS.Commands.Exe2ArcIoNativeRoot</RootNamespace>
     <ImplicitUsings>false</ImplicitUsings>
@@ -8,11 +9,10 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CopperSharp.Sdk.Amiga.Support" Version="$(CopperSharpSdkAmigaVersion)" />
-    <Compile Include="..\..\src\Commands\Exe2ArcHeaderProbe.cs" Link="Exe2ArcHeaderProbe.cs" />
-    <Compile Include="..\..\src\Commands\Exe2ArcIo.cs" Link="Exe2ArcIo.cs" />
-    <Compile Include="..\..\src\Commands\Exe2ArcForwardScanner.cs" Link="Exe2ArcForwardScanner.cs" />
-    <Compile Include="..\..\src\Commands\Exe2ArcPayloadCopy.cs" Link="Exe2ArcPayloadCopy.cs" />
-    <Compile Include="..\..\src\Commands\Native\NativeExe2ArcIo.cs" Link="NativeExe2ArcIo.cs" />
+    <Compile Include="..\..\src\Commands\Exe2Arc\Exe2ArcHeaderProbe.cs" Link="Exe2ArcHeaderProbe.cs" />
+    <Compile Include="..\..\src\Commands\Exe2Arc\Exe2ArcIo.cs" Link="Exe2ArcIo.cs" />
+    <Compile Include="..\..\src\Commands\Exe2Arc\Exe2ArcForwardScanner.cs" Link="Exe2ArcForwardScanner.cs" />
+    <Compile Include="..\..\src\Commands\Exe2Arc\Exe2ArcPayloadCopy.cs" Link="Exe2ArcPayloadCopy.cs" />
+    <Compile Include="..\..\src\Commands\Exe2Arc\Native\NativeExe2ArcIo.cs" Link="NativeExe2ArcIo.cs" />
   </ItemGroup>
 </Project>
