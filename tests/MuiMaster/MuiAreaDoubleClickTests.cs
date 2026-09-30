@@ -31,6 +31,21 @@ public sealed class MuiAreaDoubleClickTests
 		Assert.True(MuiAreaDoubleClickStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out var valueAddress));
 		Assert.Equal(address.Raw + 4, valueAddress.Raw);
+		Assert.True(MuiAreaDoubleClickStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedValueAddress, out var typedValueSize));
+		Assert.Equal(valueAddress, typedValueAddress);
+		Assert.Equal(MuiAreaDoubleClickStateRecord.FieldSize, typedValueSize);
+		Assert.True(MuiAreaDoubleClickStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryValueAddress, out var memoryValueSize));
+		Assert.Equal(typedValueAddress, memoryValueAddress);
+		Assert.Equal(typedValueSize, memoryValueSize);
+		cursor.Field = (MuiAreaDoubleClickStateField)255;
+		Assert.False(MuiAreaDoubleClickStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiAreaDoubleClickStateField.Value;
+		Assert.False(MuiAreaDoubleClickStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 		Assert.False(MuiAreaDoubleClickStateRecordCodec.TryRead(ref platform,
 			APTR.FromPointer(0x21000u), out _));
 	}

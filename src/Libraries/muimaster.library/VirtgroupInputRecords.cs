@@ -142,7 +142,15 @@ internal static class MuiVirtgroupInputFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		return MuiVirtgroupInputRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Address, cursor.Record, cursor.Field, out address);
+			cursor.Address, cursor.Record, cursor.Field, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiVirtgroupInputFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiVirtgroupInputRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Address, cursor.Record, cursor.Field, out address, out fieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -169,49 +177,85 @@ internal static class MuiVirtgroupInputFieldCursorCodec
 // translation shared by the two input paths.
 internal static class MuiVirtgroupInputRecordMemoryCodec
 {
-	private static bool TryResolve(MuiVirtgroupInputRecordKind record,
-		MuiVirtgroupInputField field, out uint offset, out uint size)
+	private static bool TryResolveFieldIndex(MuiVirtgroupInputRecordKind record,
+		MuiVirtgroupInputField field, out uint index, out uint recordSize)
 	{
-		offset = 0;
-		size = 0;
+		index = uint.MaxValue;
+		recordSize = 0;
 		if (record == MuiVirtgroupInputRecordKind.Display)
 		{
-			size = MuiVirtgroupDisplayStateRecord.Size;
 			if (field == MuiVirtgroupInputField.Magic)
-				offset = MuiVirtgroupDisplayStateRecord.MagicOffset;
+			{
+				index = 0; recordSize = MuiVirtgroupDisplayStateRecord.Size;
+				return true;
+			}
 			else if (field == MuiVirtgroupInputField.Left)
-				offset = MuiVirtgroupDisplayStateRecord.LeftOffset;
+			{
+				index = 1; recordSize = MuiVirtgroupDisplayStateRecord.Size;
+				return true;
+			}
 			else if (field == MuiVirtgroupInputField.Top)
-				offset = MuiVirtgroupDisplayStateRecord.TopOffset;
+			{
+				index = 2; recordSize = MuiVirtgroupDisplayStateRecord.Size;
+				return true;
+			}
 			else if (field == MuiVirtgroupInputField.Width)
-				offset = MuiVirtgroupDisplayStateRecord.WidthOffset;
+			{
+				index = 3; recordSize = MuiVirtgroupDisplayStateRecord.Size;
+				return true;
+			}
 			else if (field == MuiVirtgroupInputField.Height)
-				offset = MuiVirtgroupDisplayStateRecord.HeightOffset;
+			{
+				index = 4; recordSize = MuiVirtgroupDisplayStateRecord.Size;
+				return true;
+			}
 			else return false;
 		}
 		else if (record == MuiVirtgroupInputRecordKind.Pointer)
 		{
-			size = MuiVirtgroupPointerStateRecord.Size;
 			if (field == MuiVirtgroupInputField.Magic)
-				offset = MuiVirtgroupPointerStateRecord.MagicOffset;
+			{
+				index = 0; recordSize = MuiVirtgroupPointerStateRecord.Size;
+				return true;
+			}
 			else if (field == MuiVirtgroupInputField.Flags)
-				offset = MuiVirtgroupPointerStateRecord.FlagsOffset;
+			{
+				index = 1; recordSize = MuiVirtgroupPointerStateRecord.Size;
+				return true;
+			}
 			else if (field == MuiVirtgroupInputField.StartX)
-				offset = MuiVirtgroupPointerStateRecord.StartXOffset;
+			{
+				index = 2; recordSize = MuiVirtgroupPointerStateRecord.Size;
+				return true;
+			}
 			else if (field == MuiVirtgroupInputField.StartY)
-				offset = MuiVirtgroupPointerStateRecord.StartYOffset;
+			{
+				index = 3; recordSize = MuiVirtgroupPointerStateRecord.Size;
+				return true;
+			}
 			else if (field == MuiVirtgroupInputField.StartLeft)
-				offset = MuiVirtgroupPointerStateRecord.StartLeftOffset;
+			{
+				index = 4; recordSize = MuiVirtgroupPointerStateRecord.Size;
+				return true;
+			}
 			else if (field == MuiVirtgroupInputField.StartTop)
-				offset = MuiVirtgroupPointerStateRecord.StartTopOffset;
+			{
+				index = 5; recordSize = MuiVirtgroupPointerStateRecord.Size;
+				return true;
+			}
 			else if (field == MuiVirtgroupInputField.LastX)
-				offset = MuiVirtgroupPointerStateRecord.LastXOffset;
+			{
+				index = 6; recordSize = MuiVirtgroupPointerStateRecord.Size;
+				return true;
+			}
 			else if (field == MuiVirtgroupInputField.LastY)
-				offset = MuiVirtgroupPointerStateRecord.LastYOffset;
+			{
+				index = 7; recordSize = MuiVirtgroupPointerStateRecord.Size;
+				return true;
+			}
 			else return false;
 		}
 		else return false;
-		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -220,16 +264,34 @@ internal static class MuiVirtgroupInputRecordMemoryCodec
 		out APTR fieldAddress)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		return TryGetAddress(ref platform, address, record, field,
+			out fieldAddress, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR address, MuiVirtgroupInputRecordKind record,
+		MuiVirtgroupInputField field,
+		out APTR fieldAddress, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		fieldAddress = APTR.Null;
-		if (!TryResolve(record, field, out var offset, out var size) ||
-			address.IsNull || offset > size - 4 ||
-			address.Raw > uint.MaxValue - offset || !platform.IsMapped(address,
-			size)) return false;
-		fieldAddress = APTR.FromPointer(address.Raw + offset);
-		var fieldSize = record == MuiVirtgroupInputRecordKind.Display
-			? MuiVirtgroupDisplayStateRecord.FieldSize
-			: MuiVirtgroupPointerStateRecord.FieldSize;
-		return platform.IsMapped(fieldAddress, fieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(record, field, out var index,
+			out var recordSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address, recordSize,
+				out var cursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 4,
+				out var candidate)) return false;
+			if (current == index)
+			{
+				fieldAddress = candidate;
+				fieldSize = 4;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

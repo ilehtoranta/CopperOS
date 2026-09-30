@@ -23,6 +23,21 @@ public sealed class MuiChoiceEntriesStructAdapterTests
 			ref platform, address, MuiChoiceEntriesStateField.Entries,
 			out var entriesAddress));
 		Assert.Equal(0x3504u, entriesAddress.Raw);
+		var entriesCursor = new MuiChoiceEntriesStateFieldCursor
+		{
+			Record = address,
+			Field = MuiChoiceEntriesStateField.Entries,
+		};
+		Assert.True(MuiChoiceEntriesStateFieldCursorCodec.TryGetAddress(
+			ref platform, entriesCursor, out var cursorEntriesAddress,
+			out var fieldSize));
+		Assert.Equal(entriesAddress, cursorEntriesAddress);
+		Assert.Equal(MuiChoiceEntriesStateRecord.FieldSize, fieldSize);
+		Assert.True(MuiChoiceEntriesStateRecordMemoryCodec.TryGetAddress(
+			ref platform, entriesCursor, out var memoryCursorAddress,
+			out var memoryFieldSize));
+		Assert.Equal(cursorEntriesAddress, memoryCursorAddress);
+		Assert.Equal(fieldSize, memoryFieldSize);
 		Assert.True(MuiChoiceEntriesStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiChoiceEntriesStateField.Entries,
 			0x12345678u));
@@ -34,6 +49,9 @@ public sealed class MuiChoiceEntriesStructAdapterTests
 			MuiChoiceEntriesStateField.Magic, out _));
 		Assert.False(MuiChoiceEntriesStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiChoiceEntriesStateField.Magic, out _));
+		entriesCursor.Record = APTR.Null;
+		Assert.False(MuiChoiceEntriesStateFieldCursorCodec.TryGetAddress(
+			ref platform, entriesCursor, out _, out _));
 	}
 
 	[Fact]

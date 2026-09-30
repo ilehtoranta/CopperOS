@@ -18,12 +18,17 @@ public enum MuiVectorId : byte
 
 public static class MuiResidentMetadata
 {
-	public static CString DevelopmentName => CString.FromLiteral("copperos-muimaster.library");
+	public const string DevelopmentNameText = "copperos-muimaster.library";
+	public static CString DevelopmentName => CString.FromLiteral(DevelopmentNameText);
 	public const ushort DevelopmentVersion = 0;
 	public const ushort DevelopmentRevision = 1;
 	public const int FirstLvo = -30;
 	public const int LastLvo = -756;
 	public const int VectorStride = 6;
+	public const int ManagementVectorCount = 4;
+	public const int PublicVectorCount = ((FirstLvo - LastLvo) / VectorStride) + 1;
+	public const int FunctionTableEntryCount = ManagementVectorCount + PublicVectorCount;
+	public const ushort NegativeBytes = checked((ushort)(FunctionTableEntryCount * VectorStride));
 }
 
 public static class MuiVectorRouter

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <CopperOSUseLocalCopperSharp>true</CopperOSUseLocalCopperSharp>
+  </PropertyGroup>
+  <Import Project="..\..\CopperOS.Portable.props" />
+  <PropertyGroup>
+    <CopperOSReferenceSdkAmigaSupport>true</CopperOSReferenceSdkAmigaSupport>
+    <AssemblyName>CopperOS.Commands.SetDateNativeRoot</AssemblyName>
+    <RootNamespace>CopperOS.Commands.SetDateNativeRoot</RootNamespace>
+    <ImplicitUsings>false</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\src\Commands\Common\NativeCommandArguments.cs" Link="NativeCommandArguments.cs" />
+    <Compile Include="..\..\src\Commands\Common\NativeCommandStartup.cs" Link="NativeCommandStartup.cs" />
+    <Compile Include="..\..\src\Commands\SetDate\Native\NativeWorkbench31SetDateCommand.cs" Link="NativeWorkbench31SetDateCommand.cs" />
+  </ItemGroup>
+</Project>

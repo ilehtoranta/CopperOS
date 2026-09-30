@@ -7,7 +7,8 @@ using CopperOS.MuiMaster;
 namespace CopperOS.MuiMaster.Tests;
 
 internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
-	IMuiServicePlatform, IMuiIffCapability
+	IMuiServicePlatform, IMuiIffCapability,
+	IMuiNativeApplicationLoopPlatform, IMuiNativeRawKeyMapCapability
 {
 	private readonly uint _baseAddress;
 	private readonly byte[] _memory;
@@ -16,6 +17,23 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 	public uint CurrentTask;
 	public uint AllocationCount;
 	public uint FreeCount;
+	public uint NativeObjectDisposalCount;
+	internal APTR ConstructorAttachmentClass;
+	internal uint ConstructorCalls;
+	private HashSet<uint>? _liveCustomFonts;
+	internal uint InvalidCustomFontCloses;
+	internal bool RefuseCustomFontClose;
+	internal APTR ReenterCustomFontCloseObject;
+	internal bool RecursiveCustomFontCloseResult;
+	internal APTR DisposeDuringCustomFontClose;
+	internal bool DisposeDuringCustomFontCloseResult;
+	internal APTR MutateStoreDuringCustomFontClose;
+	internal bool StoreMutationDuringCloseSucceeded;
+	internal APTR MutateFamilyDuringCustomFontClose;
+	internal APTR MutateFamilyChildDuringCustomFontClose;
+	internal uint FamilyMutationCallbackCount;
+	internal bool FamilyMutationDuringCloseSucceeded;
+	internal Func<APTR, uint, bool>? MappingAdmission;
 	public uint PoolCreateCount;
 	public uint PoolDeleteCount;
 	public uint PooledAllocationCount;
@@ -30,6 +48,9 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 	public uint LastDispatchArgument;
 	public uint DispatchResult;
 	public bool RouteHandleEventToCore;
+	public byte RawKeyMapCharacter;
+	public uint RawKeyMapCalls;
+	public APTR LastRawKeyMapInputEvent;
 	public APTR ObservedHandler;
 	public bool CallingFlagObserved;
 	public APTR MutationSource;
@@ -86,6 +107,9 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 	public uint PendingSignals;
 	public uint SignaledMask;
 	public uint WaitMuiSignalsCount;
+	public uint LastWaitMuiSignalsMask;
+	public bool NativeApplicationLoopTestMode;
+	public uint NativeApplicationLoopSignalMask;
 	public uint WindowOpenCount;
 	public uint WindowCloseCount;
 	public uint WindowEventMask;
@@ -260,9 +284,9 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 	public APTR LoadableLibraryName;
 	// The library base OpenLibrary returns for that name.
 	public APTR LoadableLibraryBase;
-	// The classid ResolvePublicClass accepts (case-sensitive).
+	// The classid ResolveExternalClass accepts (case-sensitive).
 	public APTR LoadablePublicClassId;
-	// The struct IClass* ResolvePublicClass returns for that classid.
+	// The extracted struct IClass* ResolveExternalClass returns for that classid.
 	public APTR LoadablePublicClass;
 	// Next synthetic custom-class pointer handed out by MakeCustomClass.
 	public uint NextCustomClass;
@@ -287,8 +311,10 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 	// ---- MG09 synchronous requester capability ------------------------------
 	public uint RequestCallCount;
 	public uint RequestObjectCallCount;
+	public bool RequestObjectConsumesReference;
 	public int RequestResult;
 	public int RequestObjectResult;
+	public uint LastRequestFlags;
 	public APTR LastRequestApplication;
 	public APTR LastRequestWindow;
 	public APTR LastRequestTitle;
@@ -442,6 +468,7 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		CurrentTask = 1;
 		AllocationCount = 0;
 		FreeCount = 0;
+		NativeObjectDisposalCount = 0;
 		PoolCreateCount = 0;
 		PoolDeleteCount = 0;
 		PooledAllocationCount = 0;
@@ -492,6 +519,9 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		PendingSignals = 0;
 		SignaledMask = 0;
 		WaitMuiSignalsCount = 0;
+		LastWaitMuiSignalsMask = 0;
+		NativeApplicationLoopTestMode = false;
+		NativeApplicationLoopSignalMask = 0;
 		WindowOpenCount = 0;
 		WindowCloseCount = 0;
 		WindowEventMask = 0;
@@ -640,8 +670,10 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		LastAslRequester = APTR.Null;
 		RequestCallCount = 0;
 		RequestObjectCallCount = 0;
+		RequestObjectConsumesReference = true;
 		RequestResult = 1;
 		RequestObjectResult = 1;
+		LastRequestFlags = 0;
 		LastRequestApplication = APTR.Null;
 		LastRequestWindow = APTR.Null;
 		LastRequestTitle = APTR.Null;
@@ -753,8 +785,12 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		LastDrawnPictureWidth = 0;
 		LastDrawnPictureHeight = 0;
 	}
+	public Func<uint, uint, bool>? AllocationAdmission { get; set; }
+
 	public APTR Allocate(uint byteSize, uint flags)
 	{
+		if (AllocationAdmission is not null && !AllocationAdmission(byteSize, flags))
+			return APTR.Null;
 		if (byteSize == 0) return APTR.Null;
 		var result = APTR.FromPointer(_next);
 		_next = checked((_next + byteSize + 3) & ~3u);
@@ -764,10 +800,13 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		return result;
 	}
 
+	public Action<APTR, uint>? AllocationFreed { get; set; }
+
 	public void Free(APTR address, uint byteSize)
 	{
 		Assert.True(IsMapped(address, byteSize));
 		FreeCount++;
+		AllocationFreed?.Invoke(address, byteSize);
 	}
 
 	public APTR CreatePool(uint requirements, uint puddleSize, uint threshold)
@@ -825,13 +864,21 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		return true;
 	}
 
+	public APTR ConstructorExistingResult { get; set; }
+
 	public APTR NewObject(APTR classPointer, APTR tagList)
 	{
+		ConstructorCalls++;
 		if (classPointer.IsNull || NewObjectFailure) return APTR.Null;
+		if (ConstructorExistingResult.IsNotNull) return ConstructorExistingResult;
 		var result = Allocate(16, 0);
 		if (result.IsNull) return result;
 		WriteUInt32(result, 0, classPointer.Raw);
 		WriteUInt32(result, 4, 1);
+		// Optional host constructor callback, not a native Intuition substitute.
+		if (ConstructorAttachmentClass.IsNotNull)
+			return MuiHeadlessObjectCore.AttachConstructedObject(ref this, State,
+				ConstructorAttachmentClass, result, tagList);
 		return result;
 	}
 
@@ -842,6 +889,18 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		LastDispatchObject = obj;
 		LastDispatchMethod = ReadUInt32(message, 0);
 		LastDispatchArgument = IsMapped(message, 8) ? ReadUInt32(message, 4) : 0;
+		if (NativeApplicationLoopTestMode &&
+			LastDispatchMethod ==
+				MuiApplicationDispatcher.ApplicationNewInputMethod &&
+			MuiApplicationInputMessageCodec.TryRead(ref this, message,
+				out var inputMessage) && inputMessage.MethodId ==
+				MuiApplicationDispatcher.ApplicationNewInputMethod)
+			MuiApplicationWindowSignalStorageCodec.Write(ref this,
+				inputMessage.SignalStorage,
+				new MuiApplicationWindowSignalStorage
+				{
+					Signals = NativeApplicationLoopSignalMask,
+				});
 		if (RouteHandleEventToCore && State.IsNotNull &&
 			LastDispatchMethod == MuiCommonControlPacketCore.HandleEvent)
 			return MuiCommonControlDispatcher.Dispatch(ref this, State, obj,
@@ -884,13 +943,34 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 	}
 
 
-	public uint DoSuperMethod(APTR classPointer, APTR obj, APTR message) =>
-		DoMethod(obj, message);
+	internal uint SuperMethodCalls;
+	internal APTR LastSuperClass;
+	internal bool SuperDisposeNative;
+	internal Action<APTR, APTR, APTR>? BeforeSuperMethod;
+
+	public uint DoSuperMethod(APTR classPointer, APTR obj, APTR message)
+	{
+		SuperMethodCalls++;
+		LastSuperClass = classPointer;
+		var before = BeforeSuperMethod;
+		BeforeSuperMethod = null;
+		before?.Invoke(classPointer, obj, message);
+		if (SuperDisposeNative && BOOPSIGuestCodec.ReadMethodId(ref this, message) == BOOPSI.OM_DISPOSE)
+			DisposeObject(obj);
+		return DoMethod(obj, message);
+	}
 
 	public APTR InstanceData(APTR classPointer, APTR obj) => obj;
 
+	public bool RefuseObjectRetain { get; set; }
+	public Action<APTR>? BeforeObjectRetain { get; set; }
+
 	public bool RetainObject(APTR obj)
 	{
+		var before = BeforeObjectRetain;
+		BeforeObjectRetain = null;
+		before?.Invoke(obj);
+		if (RefuseObjectRetain) return false;
 		if (obj.IsNull || !IsMapped(obj, 8)) return false;
 		var count = ReadUInt32(obj, 4);
 		if (count == uint.MaxValue) return false;
@@ -915,6 +995,7 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 	{
 		if (obj.IsNotNull && IsMapped(obj, 16))
 		{
+			NativeObjectDisposalCount++;
 			Clear(obj, 16);
 			Free(obj, 16);
 		}
@@ -1421,6 +1502,7 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		LastCustomFontMetrics = MuiCustomFontMetricsCore.FromSpec(request.Spec);
 		LastCustomFontHandle = APTR.FromPointer(0x1F000u +
 			CustomFontOpenCount * 0x10u);
+		(_liveCustomFonts ??= new HashSet<uint>()).Add(LastCustomFontHandle.Raw);
 		ActiveCustomFontHandle = LastCustomFontHandle;
 		ActiveCustomFontMetrics = LastCustomFontMetrics;
 		CustomFontMetricsActive = true;
@@ -1431,6 +1513,48 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 	{
 		CustomFontCloseCount++;
 		LastClosedCustomFont = font;
+		if (MutateFamilyDuringCustomFontClose.IsNotNull)
+		{
+			var family = MutateFamilyDuringCustomFontClose;
+			var child = MutateFamilyChildDuringCustomFontClose;
+			MutateFamilyDuringCustomFontClose = APTR.Null;
+			FamilyMutationCallbackCount++;
+			FamilyMutationDuringCloseSucceeded |= MuiFamilyCore.Remove(ref this, State, family, child);
+			FamilyMutationDuringCloseSucceeded |= MuiFamilyCore.AddTail(ref this, State, family, child);
+			FamilyMutationDuringCloseSucceeded |= MuiFamilyCore.MoveAfter(ref this, State, family, child, APTR.Null);
+		}
+		if (MutateStoreDuringCustomFontClose.IsNotNull)
+		{
+			var obj = MutateStoreDuringCustomFontClose;
+			MutateStoreDuringCustomFontClose = APTR.Null;
+			StoreMutationDuringCloseSucceeded = MuiStoreCore.DataspaceRemove(ref this,
+				State, obj, MuiAreaCustomFontCore.RuntimeStateKey);
+			StoreMutationDuringCloseSucceeded |= MuiStoreCore.DataspaceClear(ref this, State, obj) != 0;
+			StoreMutationDuringCloseSucceeded |= MuiStoreCore.DataspaceAdd(ref this,
+				State, obj, MuiAreaCustomFontCore.RuntimeStateKey, APTR.Null, 0);
+			StoreMutationDuringCloseSucceeded |= MuiStoreCore.DataspaceResize(ref this,
+				State, obj, MuiAreaCustomFontCore.RuntimeStateKey, 0);
+			StoreMutationDuringCloseSucceeded |= MuiStoreCore.DataspaceResize(ref this,
+				State, obj, MuiAreaCustomFontCore.RuntimeStateKey, 40);
+		}
+		if (DisposeDuringCustomFontClose.IsNotNull)
+		{
+			var obj = DisposeDuringCustomFontClose;
+			DisposeDuringCustomFontClose = APTR.Null;
+			DisposeDuringCustomFontCloseResult = MuiHeadlessObjectCore.DisposeObject(ref this, State, obj);
+		}
+		if (ReenterCustomFontCloseObject.IsNotNull)
+		{
+			var obj = ReenterCustomFontCloseObject;
+			ReenterCustomFontCloseObject = APTR.Null;
+			RecursiveCustomFontCloseResult = MuiAreaCustomFontCore.CloseRuntime(ref this, State, obj);
+		}
+		if (RefuseCustomFontClose) return false;
+		if (_liveCustomFonts is null || !_liveCustomFonts.Remove(font.Raw))
+		{
+			InvalidCustomFontCloses++;
+			return false;
+		}
 		if (font.Raw == ActiveCustomFontHandle.Raw)
 			CustomFontMetricsActive = false;
 		return font.IsNotNull;
@@ -1847,7 +1971,15 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 	public uint WaitMuiSignals(uint signalMask)
 	{
 		WaitMuiSignalsCount++;
+		LastWaitMuiSignalsMask = signalMask;
 		return PendingSignals & signalMask;
+	}
+	public bool TryMapRawKey(APTR inputEvent, out byte character)
+	{
+		RawKeyMapCalls++;
+		LastRawKeyMapInputEvent = inputEvent;
+		character = RawKeyMapCharacter;
+		return inputEvent.IsNotNull;
 	}
 	public void SignalTask(uint taskToken, uint signalMask)
 	{
@@ -1880,6 +2012,7 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 				_memory.AsSpan(Index(destination, 0, checked((int)byteSize)),
 					checked((int)byteSize)));
 	public bool IsMapped(APTR address, uint byteSize) =>
+		(MappingAdmission is null || MappingAdmission(address, byteSize)) &&
 		address.Raw >= _baseAddress && address.Raw - _baseAddress <=
 			(uint)_memory.Length && byteSize <= (uint)_memory.Length -
 			(address.Raw - _baseAddress);
@@ -2114,30 +2247,32 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		LastAslRequester = requester;
 	}
 
-	public int Request(APTR application, APTR window, uint flags, APTR title,
-		APTR gadgets, APTR format, APTR parameters)
+	public int Request(MuiRequesterCallRecord request)
 	{
 		RequestCallCount++;
-		LastRequestApplication = application;
-		LastRequestWindow = window;
-		LastRequestTitle = title;
-		LastRequestGadgets = gadgets;
-		LastRequestFormat = format;
-		LastRequestParameters = parameters;
+		LastRequestFlags = request.Flags;
+		LastRequestApplication = request.Application;
+		LastRequestWindow = request.Window;
+		LastRequestTitle = request.Title;
+		LastRequestGadgets = request.Gadgets;
+		LastRequestFormat = request.Format;
+		LastRequestParameters = request.Parameters;
 		return RequestResult;
 	}
 
-	public int RequestObject(APTR application, APTR window, uint flags,
-		APTR title, APTR gadgets, APTR obj, APTR format, APTR parameters)
+	public int RequestObject(MuiRequesterCallRecord request,
+		out bool consumeReference)
 	{
+		consumeReference = RequestObjectConsumesReference;
 		RequestObjectCallCount++;
-		LastRequestApplication = application;
-		LastRequestWindow = window;
-		LastRequestTitle = title;
-		LastRequestGadgets = gadgets;
-		LastRequestObject = obj;
-		LastRequestFormat = format;
-		LastRequestParameters = parameters;
+		LastRequestFlags = request.Flags;
+		LastRequestApplication = request.Application;
+		LastRequestWindow = request.Window;
+		LastRequestTitle = request.Title;
+		LastRequestGadgets = request.Gadgets;
+		LastRequestObject = request.Object;
+		LastRequestFormat = request.Format;
+		LastRequestParameters = request.Parameters;
 		return RequestObjectResult;
 	}
 
@@ -2181,10 +2316,11 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		return true;
 	}
 
-	public APTR ResolvePublicClass(APTR classId)
+	public APTR ResolveExternalClass(APTR library, APTR classId)
 	{
 		ResolvePublicClassCount++;
-		if (classId.IsNull || LoadablePublicClassId.IsNull) return APTR.Null;
+		if (library.IsNull || library != LoadableLibraryBase ||
+			classId.IsNull || LoadablePublicClassId.IsNull) return APTR.Null;
 		return CStringEquals(classId, LoadablePublicClassId) ? LoadablePublicClass :
 			APTR.Null;
 	}

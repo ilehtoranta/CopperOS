@@ -128,53 +128,88 @@ internal struct MuiFloattextPolicyFieldCursor
 }
 
 // The fixed Floattext policy record owns its packed positions in this bounded
-// adapter. Live policy paths use it directly; the typed field cursor below is
-// retained only for compatibility callers and adapter-focused tests.
+// adapter. Typed field addresses and scalar updates walk the complete named
+// record; no caller supplies a numeric offset.
 internal static class MuiFloattextPolicyStateMemoryCodec
 {
-	private static bool TryResolve(MuiFloattextPolicyField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiFloattextPolicyField field,
+		out uint index)
 	{
-		switch (field)
+		index = 0;
+		if (field == MuiFloattextPolicyField.Magic) return true;
+		if (field == MuiFloattextPolicyField.Text)
 		{
-			case MuiFloattextPolicyField.Magic:
-				offset = MuiFloattextPolicyState.MagicOffset; return true;
-			case MuiFloattextPolicyField.Text:
-				offset = MuiFloattextPolicyState.TextOffset; return true;
-			case MuiFloattextPolicyField.SkipChars:
-				offset = MuiFloattextPolicyState.SkipCharsOffset; return true;
-			case MuiFloattextPolicyField.TabSize:
-				offset = MuiFloattextPolicyState.TabSizeOffset; return true;
-			case MuiFloattextPolicyField.Justify:
-				offset = MuiFloattextPolicyState.JustifyOffset; return true;
-			case MuiFloattextPolicyField.Width:
-				offset = MuiFloattextPolicyState.WidthOffset; return true;
+			index = 1;
+			return true;
 		}
-		offset = 0;
+		if (field == MuiFloattextPolicyField.SkipChars)
+		{
+			index = 2;
+			return true;
+		}
+		if (field == MuiFloattextPolicyField.TabSize)
+		{
+			index = 3;
+			return true;
+		}
+		if (field == MuiFloattextPolicyField.Justify)
+		{
+			index = 4;
+			return true;
+		}
+		if (field == MuiFloattextPolicyField.Width)
+		{
+			index = 5;
+			return true;
+		}
+		return false;
+	}
+
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiFloattextPolicyField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolveFieldIndex(field, out var index)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiFloattextPolicyState.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				return true;
+			}
+		}
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiFloattextPolicyField field, out APTR address)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiFloattextPolicyState.Size))
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiFloattextPolicyState.FieldSize);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiFloattextPolicyState.Size, out var cursor)) return false;
+		return TryTakeField(ref platform, ref cursor, field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiFloattextPolicyField field, out uint value)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiFloattextPolicyStateCodec.TryReadRecord(ref platform, record,
+			out var state)) return false;
+		if (field == MuiFloattextPolicyField.Magic) value = state.Magic;
+		else if (field == MuiFloattextPolicyField.Text) value = state.Text.Raw;
+		else if (field == MuiFloattextPolicyField.SkipChars)
+			value = state.SkipChars.Raw;
+		else if (field == MuiFloattextPolicyField.TabSize) value = state.TabSize;
+		else if (field == MuiFloattextPolicyField.Justify) value = state.Justify;
+		else if (field == MuiFloattextPolicyField.Width) value = state.Width;
+		else return false;
 		return true;
 	}
 
@@ -182,10 +217,18 @@ internal static class MuiFloattextPolicyStateMemoryCodec
 		APTR record, MuiFloattextPolicyField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiFloattextPolicyStateCodec.TryReadRecord(ref platform, record,
+			out var state)) return false;
+		if (field == MuiFloattextPolicyField.Magic) state.Magic = value;
+		else if (field == MuiFloattextPolicyField.Text)
+			state.Text = APTR.FromPointer(value);
+		else if (field == MuiFloattextPolicyField.SkipChars)
+			state.SkipChars = APTR.FromPointer(value);
+		else if (field == MuiFloattextPolicyField.TabSize) state.TabSize = value;
+		else if (field == MuiFloattextPolicyField.Justify) state.Justify = value;
+		else if (field == MuiFloattextPolicyField.Width) state.Width = value;
+		else return false;
+		return MuiFloattextPolicyStateCodec.WriteRecord(ref platform, record, state);
 	}
 }
 

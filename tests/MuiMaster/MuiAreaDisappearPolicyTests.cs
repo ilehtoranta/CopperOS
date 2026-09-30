@@ -95,6 +95,22 @@ public sealed class MuiAreaDisappearPolicyTests
 
 		Assert.True(MuiAreaDisappearPolicyStateRecordCodec.Write(ref platform,
 			address, value));
+		var fieldCursor = new MuiAreaDisappearPolicyStateFieldCursor
+		{
+			Record = address,
+			Field = MuiAreaDisappearPolicyStateField.VertDisappear,
+		};
+		Assert.True(MuiAreaDisappearPolicyStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out var cursorVerticalAddress));
+		Assert.Equal(address.Raw + 8, cursorVerticalAddress.Raw);
+		Assert.True(MuiAreaDisappearPolicyStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out var typedCursorVerticalAddress, out var typedCursorFieldSize));
+		Assert.Equal(cursorVerticalAddress, typedCursorVerticalAddress);
+		Assert.Equal(MuiAreaDisappearPolicyStateRecord.FieldSize, typedCursorFieldSize);
+		Assert.True(MuiAreaDisappearPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			fieldCursor, out var memoryCursorVerticalAddress, out var memoryCursorFieldSize));
+		Assert.Equal(typedCursorVerticalAddress, memoryCursorVerticalAddress);
+		Assert.Equal(typedCursorFieldSize, memoryCursorFieldSize);
 		Assert.True(MuiAreaDisappearPolicyStateRecordCodec.TryReadStructural(
 			ref platform, address, out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
@@ -104,6 +120,13 @@ public sealed class MuiAreaDisappearPolicyTests
 			address, out decoded));
 		Assert.False(MuiAreaDisappearPolicyStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
+		fieldCursor.Field = (MuiAreaDisappearPolicyStateField)255;
+		Assert.False(MuiAreaDisappearPolicyStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
+		fieldCursor.Record = APTR.Null;
+		fieldCursor.Field = MuiAreaDisappearPolicyStateField.VertDisappear;
+		Assert.False(MuiAreaDisappearPolicyStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
 	}
 
 	[Fact]

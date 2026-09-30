@@ -12,6 +12,11 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\src\Commands\Type\TypeTextFormatter.cs" Link="TypeTextFormatter.cs" />
+    <Compile Include="..\..\src\Commands\Common\NativeCommandArguments.cs" Link="NativeCommandArguments.cs" />
+    <Compile Include="..\..\src\Commands\Common\NativeCommandStartup.cs" Link="NativeCommandStartup.cs" />
+    <Compile Include="..\..\src\Commands\Type\Native\NativeMorphOSTypeCommand.cs" Link="NativeMorphOSTypeCommand.cs" />
+    <Compile Include="..\..\src\Commands\Type\Native\NativeWorkbench31TypeCommand.cs" Link="NativeWorkbench31TypeCommand.cs" />
+    <Compile Include="..\..\src\Commands\Type\Native\NativeMorphOSTypeHexIo.cs" Link="NativeMorphOSTypeHexIo.cs" />
+    <Compile Include="..\..\src\Commands\Type\Native\NativeMorphOSTypeTextIo.cs" Link="NativeMorphOSTypeTextIo.cs" />
   </ItemGroup>
 </Project>
-

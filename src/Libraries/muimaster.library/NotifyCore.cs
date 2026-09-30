@@ -965,51 +965,45 @@ internal struct MuiNotifyPacketFieldCursor
 
 internal static class MuiNotifyPacketFieldMemoryCodec
 {
-	private static bool TryResolve(MuiNotifyPacketKind packet,
-		MuiNotifyPacketField field, out uint offset, out uint size)
+	private static bool TryResolveFieldIndex(MuiNotifyPacketKind packet,
+		MuiNotifyPacketField field, out uint index, out uint recordSize)
 	{
+		index = uint.MaxValue;
+		recordSize = 0;
 		switch (packet)
 		{
 			case MuiNotifyPacketKind.Notify:
-				size = MuiNotifyMessage.Size;
-				if (field == MuiNotifyPacketField.MethodId) { offset = MuiNotifyMessage.MethodIdOffset; return true; }
-				if (field == MuiNotifyPacketField.TriggerAttribute) { offset = MuiNotifyMessage.TriggerAttributeOffset; return true; }
-				if (field == MuiNotifyPacketField.TriggerValue) { offset = MuiNotifyMessage.TriggerValueOffset; return true; }
-				if (field == MuiNotifyPacketField.Destination) { offset = MuiNotifyMessage.DestinationOffset; return true; }
-				if (field == MuiNotifyPacketField.FollowCount) { offset = MuiNotifyMessage.FollowCountOffset; return true; }
+				if (field == MuiNotifyPacketField.MethodId) { index = 0; recordSize = MuiNotifyMessage.Size; return true; }
+				if (field == MuiNotifyPacketField.TriggerAttribute) { index = 1; recordSize = MuiNotifyMessage.Size; return true; }
+				if (field == MuiNotifyPacketField.TriggerValue) { index = 2; recordSize = MuiNotifyMessage.Size; return true; }
+				if (field == MuiNotifyPacketField.Destination) { index = 3; recordSize = MuiNotifyMessage.Size; return true; }
+				if (field == MuiNotifyPacketField.FollowCount) { index = 4; recordSize = MuiNotifyMessage.Size; return true; }
 				break;
 			case MuiNotifyPacketKind.KillNotify:
-				size = MuiKillNotifyMessage.Size;
-				if (field == MuiNotifyPacketField.MethodId) { offset = MuiKillNotifyMessage.MethodIdOffset; return true; }
-				if (field == MuiNotifyPacketField.TriggerAttribute) { offset = MuiKillNotifyMessage.TriggerAttributeOffset; return true; }
+				if (field == MuiNotifyPacketField.MethodId) { index = 0; recordSize = MuiKillNotifyMessage.Size; return true; }
+				if (field == MuiNotifyPacketField.TriggerAttribute) { index = 1; recordSize = MuiKillNotifyMessage.Size; return true; }
 				break;
 			case MuiNotifyPacketKind.KillNotifyObject:
-				size = MuiKillNotifyObjectMessage.Size;
-				if (field == MuiNotifyPacketField.MethodId) { offset = MuiKillNotifyObjectMessage.MethodIdOffset; return true; }
-				if (field == MuiNotifyPacketField.TriggerAttribute) { offset = MuiKillNotifyObjectMessage.TriggerAttributeOffset; return true; }
-				if (field == MuiNotifyPacketField.Destination) { offset = MuiKillNotifyObjectMessage.DestinationOffset; return true; }
+				if (field == MuiNotifyPacketField.MethodId) { index = 0; recordSize = MuiKillNotifyObjectMessage.Size; return true; }
+				if (field == MuiNotifyPacketField.TriggerAttribute) { index = 1; recordSize = MuiKillNotifyObjectMessage.Size; return true; }
+				if (field == MuiNotifyPacketField.Destination) { index = 2; recordSize = MuiKillNotifyObjectMessage.Size; return true; }
 				break;
 			case MuiNotifyPacketKind.Set:
-				size = MuiSetAttributeMessage.Size;
-				if (field == MuiNotifyPacketField.MethodId) { offset = MuiSetAttributeMessage.MethodIdOffset; return true; }
-				if (field == MuiNotifyPacketField.Attribute) { offset = MuiSetAttributeMessage.AttributeOffset; return true; }
-				if (field == MuiNotifyPacketField.Value) { offset = MuiSetAttributeMessage.ValueOffset; return true; }
+				if (field == MuiNotifyPacketField.MethodId) { index = 0; recordSize = MuiSetAttributeMessage.Size; return true; }
+				if (field == MuiNotifyPacketField.Attribute) { index = 1; recordSize = MuiSetAttributeMessage.Size; return true; }
+				if (field == MuiNotifyPacketField.Value) { index = 2; recordSize = MuiSetAttributeMessage.Size; return true; }
 				break;
 			case MuiNotifyPacketKind.MultiSet:
-				size = MuiMultiSetMessage.Size;
-				if (field == MuiNotifyPacketField.MethodId) { offset = MuiMultiSetMessage.MethodIdOffset; return true; }
-				if (field == MuiNotifyPacketField.Attribute) { offset = MuiMultiSetMessage.AttributeOffset; return true; }
-				if (field == MuiNotifyPacketField.Value) { offset = MuiMultiSetMessage.ValueOffset; return true; }
-				if (field == MuiNotifyPacketField.FirstObject) { offset = MuiMultiSetMessage.FirstObjectOffset; return true; }
+				if (field == MuiNotifyPacketField.MethodId) { index = 0; recordSize = MuiMultiSetMessage.Size; return true; }
+				if (field == MuiNotifyPacketField.Attribute) { index = 1; recordSize = MuiMultiSetMessage.Size; return true; }
+				if (field == MuiNotifyPacketField.Value) { index = 2; recordSize = MuiMultiSetMessage.Size; return true; }
+				if (field == MuiNotifyPacketField.FirstObject) { index = 3; recordSize = MuiMultiSetMessage.Size; return true; }
 				break;
 			case MuiNotifyPacketKind.FindObject:
-				size = MuiFindObjectMessage.Size;
-				if (field == MuiNotifyPacketField.MethodId) { offset = MuiFindObjectMessage.MethodIdOffset; return true; }
-				if (field == MuiNotifyPacketField.FindObject) { offset = MuiFindObjectMessage.FindObjectOffset; return true; }
+				if (field == MuiNotifyPacketField.MethodId) { index = 0; recordSize = MuiFindObjectMessage.Size; return true; }
+				if (field == MuiNotifyPacketField.FindObject) { index = 1; recordSize = MuiFindObjectMessage.Size; return true; }
 				break;
 		}
-		offset = 0;
-		size = 0;
 		return false;
 	}
 
@@ -1018,13 +1012,33 @@ internal static class MuiNotifyPacketFieldMemoryCodec
 		out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		return TryGetAddress(ref platform, message, packet, field,
+			out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR message, MuiNotifyPacketKind packet, MuiNotifyPacketField field,
+		out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(packet, field, out var offset, out var size) || message.IsNull ||
-			message.Raw > uint.MaxValue - offset)
-			return false;
-		if (!platform.IsMapped(message, size)) return false;
-		address = APTR.FromPointer(message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(packet, field, out var index,
+			out var recordSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, message, recordSize,
+				out var cursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 4,
+				out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = 4;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -1033,10 +1047,118 @@ internal static class MuiNotifyPacketFieldMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, message, packet, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		if (!TryResolveFieldIndex(packet, field, out _, out var size) ||
+			message.IsNull || !platform.IsMapped(message, size)) return false;
+		switch (packet)
+		{
+			case MuiNotifyPacketKind.Notify:
+				if (!MuiNotifyMessageCodec.TryRead(ref platform, message,
+					out var notify)) return false;
+				switch (field)
+				{
+					case MuiNotifyPacketField.MethodId:
+						value = notify.MethodId;
+						return true;
+					case MuiNotifyPacketField.TriggerAttribute:
+						value = notify.TriggerAttribute;
+						return true;
+					case MuiNotifyPacketField.TriggerValue:
+						value = notify.TriggerValue;
+						return true;
+					case MuiNotifyPacketField.Destination:
+						value = notify.Destination;
+						return true;
+					case MuiNotifyPacketField.FollowCount:
+						value = notify.FollowCount;
+						return true;
+					default:
+						return false;
+				}
+			case MuiNotifyPacketKind.KillNotify:
+				if (!MuiKillNotifyMessageCodec.TryRead(ref platform, message,
+					out var kill)) return false;
+				switch (field)
+				{
+					case MuiNotifyPacketField.MethodId:
+						value = kill.MethodId;
+						return true;
+					case MuiNotifyPacketField.TriggerAttribute:
+						value = kill.TriggerAttribute;
+						return true;
+					default:
+						return false;
+				}
+			case MuiNotifyPacketKind.KillNotifyObject:
+				if (!MuiKillNotifyObjectMessageCodec.TryRead(ref platform, message,
+					out var killObject)) return false;
+				switch (field)
+				{
+					case MuiNotifyPacketField.MethodId:
+						value = killObject.MethodId;
+						return true;
+					case MuiNotifyPacketField.TriggerAttribute:
+						value = killObject.TriggerAttribute;
+						return true;
+					case MuiNotifyPacketField.Destination:
+						value = killObject.Destination;
+						return true;
+					default:
+						return false;
+				}
+			case MuiNotifyPacketKind.Set:
+				if (!MuiSetAttributeMessageCodec.TryRead(ref platform, message,
+					out var set)) return false;
+				switch (field)
+				{
+					case MuiNotifyPacketField.MethodId:
+						value = set.MethodId;
+						return true;
+					case MuiNotifyPacketField.Attribute:
+						value = set.Attribute;
+						return true;
+					case MuiNotifyPacketField.Value:
+						value = set.Value;
+						return true;
+					default:
+						return false;
+				}
+			case MuiNotifyPacketKind.MultiSet:
+				if (!MuiMultiSetMessageCodec.TryRead(ref platform, message,
+					out var multiSet)) return false;
+				switch (field)
+				{
+					case MuiNotifyPacketField.MethodId:
+						value = multiSet.MethodId;
+						return true;
+					case MuiNotifyPacketField.Attribute:
+						value = multiSet.Attribute;
+						return true;
+					case MuiNotifyPacketField.Value:
+						value = multiSet.Value;
+						return true;
+					case MuiNotifyPacketField.FirstObject:
+						value = multiSet.FirstObject;
+						return true;
+					default:
+						return false;
+				}
+			case MuiNotifyPacketKind.FindObject:
+				if (!MuiFindObjectMessageCodec.TryRead(ref platform, message,
+					out var findObject)) return false;
+				switch (field)
+				{
+					case MuiNotifyPacketField.MethodId:
+						value = findObject.MethodId;
+						return true;
+					case MuiNotifyPacketField.FindObject:
+						value = findObject.FindObject;
+						return true;
+					default:
+						return false;
+				}
+			default:
+				return false;
+		}
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -1044,10 +1166,126 @@ internal static class MuiNotifyPacketFieldMemoryCodec
 		uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, message, packet, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!TryResolveFieldIndex(packet, field, out _, out var size) ||
+			message.IsNull || !platform.IsMapped(message, size)) return false;
+		switch (packet)
+		{
+			case MuiNotifyPacketKind.Notify:
+				if (!MuiNotifyMessageCodec.TryRead(ref platform, message,
+					out var notify)) return false;
+				switch (field)
+				{
+					case MuiNotifyPacketField.MethodId:
+						notify.MethodId = value;
+						break;
+					case MuiNotifyPacketField.TriggerAttribute:
+						notify.TriggerAttribute = value;
+						break;
+					case MuiNotifyPacketField.TriggerValue:
+						notify.TriggerValue = value;
+						break;
+					case MuiNotifyPacketField.Destination:
+						notify.Destination = value;
+						break;
+					case MuiNotifyPacketField.FollowCount:
+						notify.FollowCount = value;
+						break;
+					default:
+						return false;
+				}
+				return MuiNotifyMessageCodec.Write(ref platform, message, notify);
+			case MuiNotifyPacketKind.KillNotify:
+				if (!MuiKillNotifyMessageCodec.TryRead(ref platform, message,
+					out var kill)) return false;
+				switch (field)
+				{
+					case MuiNotifyPacketField.MethodId:
+						kill.MethodId = value;
+						break;
+					case MuiNotifyPacketField.TriggerAttribute:
+						kill.TriggerAttribute = value;
+						break;
+					default:
+						return false;
+				}
+				return MuiKillNotifyMessageCodec.Write(ref platform, message, kill);
+			case MuiNotifyPacketKind.KillNotifyObject:
+				if (!MuiKillNotifyObjectMessageCodec.TryRead(ref platform, message,
+					out var killObject)) return false;
+				switch (field)
+				{
+					case MuiNotifyPacketField.MethodId:
+						killObject.MethodId = value;
+						break;
+					case MuiNotifyPacketField.TriggerAttribute:
+						killObject.TriggerAttribute = value;
+						break;
+					case MuiNotifyPacketField.Destination:
+						killObject.Destination = value;
+						break;
+					default:
+						return false;
+				}
+				return MuiKillNotifyObjectMessageCodec.Write(ref platform, message,
+					killObject);
+			case MuiNotifyPacketKind.Set:
+				if (!MuiSetAttributeMessageCodec.TryRead(ref platform, message,
+					out var set)) return false;
+				switch (field)
+				{
+					case MuiNotifyPacketField.MethodId:
+						set.MethodId = value;
+						break;
+					case MuiNotifyPacketField.Attribute:
+						set.Attribute = value;
+						break;
+					case MuiNotifyPacketField.Value:
+						set.Value = value;
+						break;
+					default:
+						return false;
+				}
+				return MuiSetAttributeMessageCodec.Write(ref platform, message, set);
+			case MuiNotifyPacketKind.MultiSet:
+				if (!MuiMultiSetMessageCodec.TryRead(ref platform, message,
+					out var multiSet)) return false;
+				switch (field)
+				{
+					case MuiNotifyPacketField.MethodId:
+						multiSet.MethodId = value;
+						break;
+					case MuiNotifyPacketField.Attribute:
+						multiSet.Attribute = value;
+						break;
+					case MuiNotifyPacketField.Value:
+						multiSet.Value = value;
+						break;
+					case MuiNotifyPacketField.FirstObject:
+						multiSet.FirstObject = value;
+						break;
+					default:
+						return false;
+				}
+				return MuiMultiSetMessageCodec.Write(ref platform, message, multiSet);
+			case MuiNotifyPacketKind.FindObject:
+				if (!MuiFindObjectMessageCodec.TryRead(ref platform, message,
+					out var findObject)) return false;
+				switch (field)
+				{
+					case MuiNotifyPacketField.MethodId:
+						findObject.MethodId = value;
+						break;
+					case MuiNotifyPacketField.FindObject:
+						findObject.FindObject = value;
+						break;
+					default:
+						return false;
+				}
+				return MuiFindObjectMessageCodec.Write(ref platform, message,
+					findObject);
+			default:
+				return false;
+		}
 	}
 }
 
@@ -1061,6 +1299,12 @@ internal static class MuiNotifyPacketFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiNotifyPacketFieldMemoryCodec.TryGetAddress(ref platform,
 			cursor.Message, cursor.Packet, cursor.Field, out address);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiNotifyPacketFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiNotifyPacketFieldMemoryCodec.TryGetAddress(ref platform,
+			cursor.Message, cursor.Packet, cursor.Field, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR message, MuiNotifyPacketKind packet, MuiNotifyPacketField field,
@@ -1232,7 +1476,7 @@ public static class MuiNotifyCore
 	private const uint TriggerValue = 1233727793;
 	private const uint NotTriggerValue = 1233727795;
 	private const uint ConfigPublicScreen = 0x24;
-	private const uint MaximumMultiSetTargets = 256;
+	internal const uint MaximumMultiSetTargets = 256;
 
 	public const uint NotifyMethod = 0x8042C9CB;
 	public const uint GetConfigItemMethod = 0x80423EDB;

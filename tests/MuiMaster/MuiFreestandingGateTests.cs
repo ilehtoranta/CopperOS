@@ -18,6 +18,15 @@ public sealed class MuiFreestandingGateTests
 		.Select(field => (OpCode)field.GetValue(null)!)
 		.ToDictionary(code => unchecked((ushort)code.Value));
 
+	// NodeType.Task is the SDK's native node-kind enum, not a managed task.
+	// Keep the exception exact; Task.Run and other managed task uses still fail.
+	private static readonly Regex ForbiddenSource = new(
+		@"\b(throw|try|catch|async|await|yield|lock)\b|\b(System\.Collections|System\.Linq|Dictionary|List<)\b|(?<!\bNodeType\.)\bTask\b|\[\]",
+		RegexOptions.CultureInvariant);
+	private static readonly Regex NonCodeSource = new(
+		@"//[^\r\n]*|/\*[\s\S]*?\*/|@""(?:""""|[^""])*""|""(?:\\.|[^""\\])*""|'(?:\\.|[^'\\])*'",
+		RegexOptions.CultureInvariant);
+
 	[Fact]
 	public void ProductionSourcesUseOnlyTheConstrainedSubset()
 	{
@@ -25,15 +34,41 @@ public sealed class MuiFreestandingGateTests
 			"..", "..", "..", "..", ".."));
 		var sourceRoot = Path.Combine(root, "src", "Libraries", "muimaster.library");
 		Assert.True(Directory.Exists(sourceRoot), sourceRoot);
-		var forbidden = new Regex(
-			@"\b(throw|try|catch|async|await|yield|lock)\b|\bnew\s+|\b(System\.Collections|System\.Linq|Task|Dictionary|List<)\b|\[\]",
-			RegexOptions.CultureInvariant);
 		foreach (var path in Directory.EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories))
 		{
-			var source = File.ReadAllText(path);
-			Assert.False(forbidden.IsMatch(source), $"Forbidden production syntax in {path}");
+			var source = RemoveCommentsAndLiterals(File.ReadAllText(path));
+			Assert.False(ForbiddenSource.IsMatch(source), $"Forbidden production syntax in {path}");
 		}
 	}
+
+	[Fact]
+	public void SourceGateIgnoresCommentsAndAllowsValueTypeConstruction()
+	{
+		var source = RemoveCommentsAndLiterals(
+			"// try lock new ManagedThing()\n" +
+			"var timer = new MuiInputHandlerTimerValueRecord { Current = 1 };\n");
+		Assert.DoesNotMatch(ForbiddenSource, source);
+	}
+
+	[Theory]
+	[InlineData("type == NodeType.Task", false)]
+	[InlineData("type == Amiga.NodeType.Task", false)]
+	[InlineData("Task.Run(callback)", true)]
+	[InlineData("System.Threading.Tasks.Task.Run(callback)", true)]
+	[InlineData("Task value;", true)]
+	[InlineData("OtherNodeType.Task", true)]
+	[InlineData("NodeType.Task; Task.Run(callback)", true)]
+	public void SourceGateDistinguishesSdkNodeKindFromManagedTasks(string source, bool rejected) =>
+		Assert.Equal(rejected, ForbiddenSource.IsMatch(source));
+
+	private static string RemoveCommentsAndLiterals(string source) =>
+		NonCodeSource.Replace(source, match =>
+		{
+			var value = match.Value.ToCharArray();
+			for (var index = 0; index < value.Length; index++)
+				if (value[index] != '\r' && value[index] != '\n') value[index] = ' ';
+			return new string(value);
+		});
 
 	[Fact]
 	public void CompiledProductionAssemblyHasNoManagedRuntimeFeatures()

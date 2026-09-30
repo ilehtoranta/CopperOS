@@ -95,6 +95,21 @@ public sealed class MuiMenuItemTriggerStructAdapterTests
 		Assert.True(MuiMenuItemRecordMemoryCodec.TryGetAddress(ref platform,
 			address, MuiMenuItemField.SubItem, out var subItem) && subItem.Raw ==
 			0x281Cu);
+		var cursor = new MuiMenuItemFieldCursor
+		{
+			Record = address,
+			Field = MuiMenuItemField.SubItem,
+		};
+		Assert.True(MuiMenuItemFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedSubItem, out var typedSubItemSize));
+		Assert.Equal(subItem, typedSubItem);
+		Assert.Equal(4u, typedSubItemSize);
+		cursor.Field = MuiMenuItemField.Command;
+		Assert.True(MuiMenuItemFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var commandAddress, out var commandSize));
+		Assert.Equal(address.Raw + MuiMenuItemRecord.CommandOffset,
+			commandAddress.Raw);
+		Assert.Equal(1u, commandSize);
 		Assert.True(MuiMenuItemRecordCodec.TryReadStructural(ref platform, address,
 			out var decoded) && decoded.LeftEdge == -22 && decoded.TopEdge ==
 			record.TopEdge && decoded.ItemFill == record.ItemFill &&
@@ -103,6 +118,13 @@ public sealed class MuiMenuItemTriggerStructAdapterTests
 			address, MuiMenuItemField.Width, out _));
 		Assert.False(MuiMenuItemRecordMemoryCodec.TryGetAddress(ref platform,
 			APTR.Null, MuiMenuItemField.NextItem, out _));
+		cursor.Field = (MuiMenuItemField)255;
+		Assert.False(MuiMenuItemFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiMenuItemField.NextItem;
+		Assert.False(MuiMenuItemFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 	}
 
 	[Fact]
@@ -116,8 +138,11 @@ public sealed class MuiMenuItemTriggerStructAdapterTests
 		Assert.True(MuiMenuItemTriggerStorageCodec.IsMapped(ref platform, address));
 		Assert.True(MuiMenuItemTriggerStorageCodec.TryGetTextAddress(ref platform,
 			address, out var textAddress));
+		Assert.Equal(address.Raw + MuiMenuItemRecord.Size, textAddress.Raw);
 		Assert.True(MuiMenuItemTriggerStorageCodec.TryGetStringAddress(ref platform,
 			address, out var stringAddress));
+		Assert.Equal(address.Raw + MuiMenuItemTriggerStoragePrefix.Size,
+			stringAddress.Raw);
 		var menu = default(MenuItem);
 		menu.ItemFill = textAddress;
 		menu.SelectFill = textAddress;
@@ -154,6 +179,21 @@ public sealed class MuiMenuItemTriggerStructAdapterTests
 		Assert.True(MuiIntuiTextRecordMemoryCodec.TryGetAddress(ref platform,
 			address, MuiIntuiTextField.NextText, out var nextText) && nextText.Raw ==
 			0x2A10u);
+		var cursor = new MuiIntuiTextFieldCursor
+		{
+			Record = address,
+			Field = MuiIntuiTextField.NextText,
+		};
+		Assert.True(MuiIntuiTextFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedNextText, out var typedNextTextSize));
+		Assert.Equal(nextText, typedNextText);
+		Assert.Equal(4u, typedNextTextSize);
+		cursor.Field = MuiIntuiTextField.LeftEdge;
+		Assert.True(MuiIntuiTextFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var leftEdgeAddress, out var leftEdgeSize));
+		Assert.Equal(address.Raw + MuiIntuiTextRecord.LeftEdgeOffset,
+			leftEdgeAddress.Raw);
+		Assert.Equal(2u, leftEdgeSize);
 		Assert.True(MuiIntuiTextRecordCodec.TryReadStructural(ref platform, address,
 			out var decoded) && decoded.LeftEdge == -12 && decoded.TopEdge ==
 			record.TopEdge && decoded.Font == record.Font && decoded.NextText ==
@@ -162,5 +202,12 @@ public sealed class MuiMenuItemTriggerStructAdapterTests
 			address, MuiIntuiTextField.LeftEdge, out _));
 		Assert.False(MuiIntuiTextRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
+		cursor.Field = (MuiIntuiTextField)255;
+		Assert.False(MuiIntuiTextFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiIntuiTextField.FrontPen;
+		Assert.False(MuiIntuiTextFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 	}
 }

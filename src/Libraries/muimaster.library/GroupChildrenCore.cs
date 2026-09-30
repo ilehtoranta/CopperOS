@@ -451,25 +451,24 @@ internal struct MuiGroupRecordFieldCursor
 
 internal static class MuiGroupRecordMemoryCodec
 {
-	private static bool TryResolve(MuiGroupRecordKind record,
-		MuiGroupRecordField field, out uint offset, out uint size,
+	// Struct-first field selector for the caller-owned Group records. Each
+	// index names a declaration-order field in a packed record; byte fields in
+	// the Exec list retain their one-byte width explicitly.
+	private static bool TryResolveFieldIndex(MuiGroupRecordKind record,
+		MuiGroupRecordField field, out uint index, out uint size,
 		out uint fieldSize)
 	{
-		offset = 0;
+		index = uint.MaxValue;
 		size = 0;
 		fieldSize = 0;
 		if (record == MuiGroupRecordKind.Forward)
 		{
 			size = MuiGroupForwardState.Size;
 			fieldSize = MuiGroupForwardState.FieldSize;
-			if (field == MuiGroupRecordField.Cookie)
-				offset = MuiGroupForwardState.CookieOffset;
-			else if (field == MuiGroupRecordField.Forward)
-				offset = MuiGroupForwardState.ForwardOffset;
-			else if (field == MuiGroupRecordField.ForwardDepth)
-				offset = MuiGroupForwardState.ForwardDepthOffset;
-			else if (field == MuiGroupRecordField.ForwardCount)
-				offset = MuiGroupForwardState.ForwardCountOffset;
+			if (field == MuiGroupRecordField.Cookie) index = 0;
+			else if (field == MuiGroupRecordField.Forward) index = 1;
+			else if (field == MuiGroupRecordField.ForwardDepth) index = 2;
+			else if (field == MuiGroupRecordField.ForwardCount) index = 3;
 			else return false;
 			return true;
 		}
@@ -477,22 +476,14 @@ internal static class MuiGroupRecordMemoryCodec
 		{
 			size = MuiGroupChildListState.Size;
 			fieldSize = MuiGroupChildListState.FieldSize;
-			if (field == MuiGroupRecordField.Cookie)
-				offset = MuiGroupChildListState.CookieOffset;
-			else if (field == MuiGroupRecordField.Group)
-				offset = MuiGroupChildListState.GroupOffset;
-			else if (field == MuiGroupRecordField.List)
-				offset = MuiGroupChildListState.ListOffset;
-			else if (field == MuiGroupRecordField.Entries)
-				offset = MuiGroupChildListState.EntriesOffset;
-			else if (field == MuiGroupRecordField.Count)
-				offset = MuiGroupChildListState.CountOffset;
-			else if (field == MuiGroupRecordField.Capacity)
-				offset = MuiGroupChildListState.CapacityOffset;
-			else if (field == MuiGroupRecordField.Mutation)
-				offset = MuiGroupChildListState.MutationOffset;
-			else if (field == MuiGroupRecordField.Generation)
-				offset = MuiGroupChildListState.GenerationOffset;
+			if (field == MuiGroupRecordField.Cookie) index = 0;
+			else if (field == MuiGroupRecordField.Group) index = 1;
+			else if (field == MuiGroupRecordField.List) index = 2;
+			else if (field == MuiGroupRecordField.Entries) index = 3;
+			else if (field == MuiGroupRecordField.Count) index = 4;
+			else if (field == MuiGroupRecordField.Capacity) index = 5;
+			else if (field == MuiGroupRecordField.Mutation) index = 6;
+			else if (field == MuiGroupRecordField.Generation) index = 7;
 			else return false;
 			return true;
 		}
@@ -500,50 +491,34 @@ internal static class MuiGroupRecordMemoryCodec
 		{
 			size = MuiGroupChildListEntry.Size;
 			fieldSize = MuiGroupChildListEntry.FieldSize;
-			if (field == MuiGroupRecordField.Next)
-				offset = MuiGroupChildListEntry.NextOffset;
-			else if (field == MuiGroupRecordField.Previous)
-				offset = MuiGroupChildListEntry.PreviousOffset;
-			else if (field == MuiGroupRecordField.Object)
-				offset = MuiGroupChildListEntry.ObjectOffset;
-			else if (field == MuiGroupRecordField.Reserved)
-				offset = MuiGroupChildListEntry.ReservedOffset;
+			if (field == MuiGroupRecordField.Next) index = 0;
+			else if (field == MuiGroupRecordField.Previous) index = 1;
+			else if (field == MuiGroupRecordField.Object) index = 2;
+			else if (field == MuiGroupRecordField.Reserved) index = 3;
 			else return false;
 			return true;
 		}
 		if (record == MuiGroupRecordKind.ExecList)
 		{
 			size = MuiGroupExecListRecord.Size;
-			if (field == MuiGroupRecordField.Head)
-			{
-				offset = MuiGroupExecListRecord.HeadOffset;
-				fieldSize = MuiGroupExecListRecord.LongFieldSize;
-			}
-			else if (field == MuiGroupRecordField.Tail)
-			{
-				offset = MuiGroupExecListRecord.TailOffset;
-				fieldSize = MuiGroupExecListRecord.LongFieldSize;
-			}
-			else if (field == MuiGroupRecordField.TailPred)
-			{
-				offset = MuiGroupExecListRecord.TailPredOffset;
-				fieldSize = MuiGroupExecListRecord.LongFieldSize;
-			}
+			fieldSize = MuiGroupExecListRecord.LongFieldSize;
+			if (field == MuiGroupRecordField.Head) index = 0;
+			else if (field == MuiGroupRecordField.Tail) index = 1;
+			else if (field == MuiGroupRecordField.TailPred) index = 2;
 			else if (field == MuiGroupRecordField.Type)
 			{
-				offset = MuiGroupExecListRecord.TypeOffset;
-				fieldSize = MuiGroupExecListRecord.ByteFieldSize;
+				index = 3; fieldSize = MuiGroupExecListRecord.ByteFieldSize;
 			}
 			else if (field == MuiGroupRecordField.Padding)
 			{
-				offset = MuiGroupExecListRecord.PaddingOffset;
-				fieldSize = MuiGroupExecListRecord.ByteFieldSize;
+				index = 4; fieldSize = MuiGroupExecListRecord.ByteFieldSize;
 			}
 			else return false;
 			return true;
 		}
 		return false;
 	}
+
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiGroupRecordKind recordKind,
@@ -552,12 +527,46 @@ internal static class MuiGroupRecordMemoryCodec
 	{
 		address = APTR.Null;
 		fieldSize = 0;
-		if (!TryResolve(recordKind, field, out var offset, out var size,
-			out fieldSize) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, fieldSize);
+		if (!TryResolveFieldIndex(recordKind, field, out var index,
+			out var size, out fieldSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, record, size,
+				out var cursor)) return false;
+		if (recordKind == MuiGroupRecordKind.ExecList)
+		{
+			for (var current = 0u; current < 3; current++)
+			{
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 4,
+					out var candidate)) return false;
+				if (current == index)
+				{
+					address = candidate;
+					return true;
+				}
+			}
+			if (index < 3) return false;
+			for (var current = 3u; current <= index; current++)
+			{
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
+					out var candidate)) return false;
+				if (current == index)
+				{
+					address = candidate;
+					return true;
+				}
+			}
+			return false;
+		}
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				fieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -613,6 +622,13 @@ internal static class MuiGroupRecordFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiGroupRecordMemoryCodec.TryGetAddress(ref platform, cursor.Address,
 			cursor.Record, cursor.Field, out address, out fieldSize);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR address, MuiGroupRecordKind record, MuiGroupRecordField field,
+		out APTR fieldAddress, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGroupRecordMemoryCodec.TryGetAddress(ref platform, address, record,
+			field, out fieldAddress, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiGroupRecordKind record, MuiGroupRecordField field,

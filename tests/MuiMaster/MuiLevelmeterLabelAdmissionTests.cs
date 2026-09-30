@@ -28,6 +28,19 @@ public sealed class MuiLevelmeterLabelAdmissionTests
 			out var labelField));
 		Assert.Equal(block.Raw + MuiLevelmeterLabelStateRecord.LabelOffset,
 			labelField.Raw);
+		var labelCursor = new MuiLevelmeterLabelStateFieldCursor
+		{
+			Record = block,
+			Field = MuiLevelmeterLabelStateField.Label,
+		};
+		Assert.True(MuiLevelmeterLabelStateFieldCursorCodec.TryGetAddress(
+			ref platform, labelCursor, out var cursorLabel, out var cursorFieldSize));
+		Assert.Equal(labelField, cursorLabel);
+		Assert.Equal(MuiLevelmeterLabelStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiLevelmeterLabelStateRecordMemoryCodec.TryGetAddress(
+			ref platform, labelCursor, out var memoryLabel, out var memoryFieldSize));
+		Assert.Equal(cursorLabel, memoryLabel);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiLevelmeterLabelStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, block, MuiLevelmeterLabelStateField.Label, source.Raw));
 		Assert.True(MuiLevelmeterLabelStateRecordMemoryCodec.TryReadUInt32(
@@ -35,6 +48,13 @@ public sealed class MuiLevelmeterLabelAdmissionTests
 		Assert.Equal(MuiLevelmeterLabelStateRecord.Cookie, magic);
 		Assert.False(MuiLevelmeterLabelStateRecordMemoryCodec.TryReadUInt32(
 			ref platform, block, (MuiLevelmeterLabelStateField)0xFF, out _));
+		labelCursor.Field = (MuiLevelmeterLabelStateField)255;
+		Assert.False(MuiLevelmeterLabelStateFieldCursorCodec.TryGetAddress(
+			ref platform, labelCursor, out _, out _));
+		labelCursor.Record = APTR.Null;
+		labelCursor.Field = MuiLevelmeterLabelStateField.Label;
+		Assert.False(MuiLevelmeterLabelStateFieldCursorCodec.TryGetAddress(
+			ref platform, labelCursor, out _, out _));
 
 		var malformed = valid;
 		malformed.Label = APTR.FromPointer(0x30000);

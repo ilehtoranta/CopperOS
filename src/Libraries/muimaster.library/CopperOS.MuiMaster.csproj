@@ -13,7 +13,10 @@
   <PropertyGroup Condition="'$(CopperSharpSdkHasMuiLayoutPackets)' == 'true' or ('$(CopperOSUseLocalCopperSharp)' == 'true' and Exists('$(CopperSharp68kRoot)\Sdk.Amiga\CopperSharp.Sdk.Amiga.csproj'))">
     <DefineConstants>$(DefineConstants);COPPEROS_SDK_MUI_LAYOUT</DefineConstants>
   </PropertyGroup>
-  <ItemGroup>
-    <Compile Include="..\..\..\..\CopperSharp68k\Sdk.Amiga\GuestMemory\IAmigaGuestMemory.cs" Link="GuestMemory\IAmigaGuestMemory.cs" />
+  <ItemGroup Condition="'$(CopperOSUseLocalCopperSharp)' == 'true'">
+    <ProjectReference Include="$(CopperSharp68kRoot)\Sdk.Amiga.Support\CopperSharp.Sdk.Amiga.Support.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(CopperOSUseLocalCopperSharp)' != 'true'">
+    <PackageReference Include="CopperSharp.Sdk.Amiga.Support" Version="$(CopperSharpSdkAmigaVersion)" />
   </ItemGroup>
 </Project>

@@ -111,10 +111,14 @@ internal static class MuiScrollgroupPolicyStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiScrollgroupPolicyStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiScrollgroupPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiScrollgroupPolicyStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiScrollgroupPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiScrollgroupPolicyStateField field, out uint value)
@@ -134,35 +138,36 @@ internal static class MuiScrollgroupPolicyStateFieldCursorCodec
 }
 
 // Struct-first guest-memory adapter. Pointer and BOOL policy values remain
-// named semantic fields; bounded fixed guest-layout translation lives here.
+// named semantic fields; typed field selection walks the packed struct. The
+// numeric offset bridge is intentionally not exposed by this adapter.
 internal static class MuiScrollgroupPolicyStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiScrollgroupPolicyStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiScrollgroupPolicyStateField field,
+		out uint index)
 	{
 		if (field == MuiScrollgroupPolicyStateField.Magic)
-			offset = MuiScrollgroupPolicyStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiScrollgroupPolicyStateField.Contents)
-			offset = MuiScrollgroupPolicyStateRecord.ContentsOffset;
+			index = 1;
 		else if (field == MuiScrollgroupPolicyStateField.FreeHorizontal)
-			offset = MuiScrollgroupPolicyStateRecord.FreeHorizontalOffset;
+			index = 2;
 		else if (field == MuiScrollgroupPolicyStateField.FreeVertical)
-			offset = MuiScrollgroupPolicyStateRecord.FreeVerticalOffset;
+			index = 3;
 		else if (field == MuiScrollgroupPolicyStateField.HorizontalBar)
-			offset = MuiScrollgroupPolicyStateRecord.HorizontalBarOffset;
+			index = 4;
 		else if (field == MuiScrollgroupPolicyStateField.VerticalBar)
-			offset = MuiScrollgroupPolicyStateRecord.VerticalBarOffset;
+			index = 5;
 		else if (field == MuiScrollgroupPolicyStateField.NoHorizontalBar)
-			offset = MuiScrollgroupPolicyStateRecord.NoHorizontalBarOffset;
+			index = 6;
 		else if (field == MuiScrollgroupPolicyStateField.NoVerticalBar)
-			offset = MuiScrollgroupPolicyStateRecord.NoVerticalBarOffset;
+			index = 7;
 		else if (field == MuiScrollgroupPolicyStateField.AutoBars)
-			offset = MuiScrollgroupPolicyStateRecord.AutoBarsOffset;
+			index = 8;
 		else if (field == MuiScrollgroupPolicyStateField.UseWindowBorder)
-			offset = MuiScrollgroupPolicyStateRecord.UseWindowBorderOffset;
+			index = 9;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -172,12 +177,34 @@ internal static class MuiScrollgroupPolicyStateRecordMemoryCodec
 		APTR record, MuiScrollgroupPolicyStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiScrollgroupPolicyStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiScrollgroupPolicyStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiScrollgroupPolicyStateRecord.Size) &&
-			platform.IsMapped(address, MuiScrollgroupPolicyStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiScrollgroupPolicyStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiScrollgroupPolicyStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiScrollgroupPolicyStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

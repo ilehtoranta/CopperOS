@@ -40,12 +40,12 @@ public sealed class MuiApplicationInputTests
 			new MuiApplicationInputMessage
 			{
 				MethodId = MuiApplicationDispatcher.ApplicationInputMethod,
-				SignalStorage = 0x2000,
+				SignalStorage = APTR.FromPointer(0x2000),
 			}));
 		Assert.True(MuiApplicationInputPacketCodec.TryReadInput(ref platform,
 			packet, MuiApplicationDispatcher.ApplicationInputMethod,
 			out var input));
-		Assert.Equal(0x2000u, input.SignalStorage);
+		Assert.Equal(APTR.FromPointer(0x2000), input.SignalStorage);
 		Assert.True(MuiApplicationInputHandlerMessageCodec.Write(ref platform,
 			packet, new MuiApplicationInputHandlerMessage
 			{

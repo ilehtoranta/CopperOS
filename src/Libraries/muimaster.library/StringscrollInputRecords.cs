@@ -64,15 +64,14 @@ internal static class MuiStringscrollPointerStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiStringscrollPointerStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (!MuiStringscrollPointerStateRecordMemoryCodec.TryResolve(cursor.Field,
-			out var offset) || cursor.Address.IsNull || cursor.Address.Raw >
-			uint.MaxValue - offset || !platform.IsMapped(cursor.Address,
-			MuiStringscrollPointerState.Size)) return false;
-		address = APTR.FromPointer(cursor.Address.Raw + offset);
-		return platform.IsMapped(address, MuiStringscrollPointerState.FieldSize);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringscrollPointerStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStringscrollPointerStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		MuiStringscrollPointerStateField field, out uint value)
@@ -112,28 +111,28 @@ internal static class MuiStringscrollPointerStateFieldCursorCodec
 // semantic record; this bounded adapter owns fixed guest-layout translation.
 internal static class MuiStringscrollPointerStateRecordMemoryCodec
 {
-	internal static bool TryResolve(MuiStringscrollPointerStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiStringscrollPointerStateField field,
+		out uint index)
 	{
 		if (field == MuiStringscrollPointerStateField.Magic)
-			offset = MuiStringscrollPointerState.MagicOffset;
+			index = 0;
 		else if (field == MuiStringscrollPointerStateField.Axis)
-			offset = MuiStringscrollPointerState.AxisOffset;
+			index = 1;
 		else if (field == MuiStringscrollPointerStateField.GrabOffset)
-			offset = MuiStringscrollPointerState.GrabOffsetOffset;
+			index = 2;
 		else if (field == MuiStringscrollPointerStateField.StartScroll)
-			offset = MuiStringscrollPointerState.StartScrollOffset;
+			index = 3;
 		else if (field == MuiStringscrollPointerStateField.StartX)
-			offset = MuiStringscrollPointerState.StartXOffset;
+			index = 4;
 		else if (field == MuiStringscrollPointerStateField.StartY)
-			offset = MuiStringscrollPointerState.StartYOffset;
+			index = 5;
 		else if (field == MuiStringscrollPointerStateField.LastPointer)
-			offset = MuiStringscrollPointerState.LastPointerOffset;
+			index = 6;
 		else if (field == MuiStringscrollPointerStateField.Flags)
-			offset = MuiStringscrollPointerState.FlagsOffset;
+			index = 7;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -143,9 +142,34 @@ internal static class MuiStringscrollPointerStateRecordMemoryCodec
 		APTR record, MuiStringscrollPointerStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiStringscrollPointerStateFieldCursor);
+		cursor.Address = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringscrollPointerStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		return TryResolve(field, out var offset) &&
-			TryGetAddress(ref platform, record, offset, out address);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Address,
+				MuiStringscrollPointerState.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiStringscrollPointerState.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiStringscrollPointerState.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

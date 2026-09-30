@@ -60,6 +60,21 @@ public sealed class MuiBodychunkFormatAdmissionTests
 			out var typedMaskingAddress));
 		Assert.Equal(address.Raw + MuiBodychunkFormatStateRecord.MaskingOffset,
 			typedMaskingAddress.Raw);
+		var maskingCursor = new MuiBodychunkFormatStateFieldCursor
+		{
+			Record = address,
+			Field = MuiBodychunkFormatStateField.Masking,
+		};
+		Assert.True(MuiBodychunkFormatStateFieldCursorCodec.TryGetAddress(
+			ref platform, maskingCursor, out var cursorMaskingAddress,
+			out var fieldSize));
+		Assert.Equal(typedMaskingAddress, cursorMaskingAddress);
+		Assert.Equal(MuiBodychunkFormatStateRecord.FieldSize, fieldSize);
+		Assert.True(MuiBodychunkFormatStateRecordMemoryCodec.TryGetAddress(
+			ref platform, maskingCursor, out var memoryCursorAddress,
+			out var memoryFieldSize));
+		Assert.Equal(cursorMaskingAddress, memoryCursorAddress);
+		Assert.Equal(fieldSize, memoryFieldSize);
 		Assert.True(MuiBodychunkFormatStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiBodychunkFormatStateField.Depth,
 			0x12345678u));
@@ -79,6 +94,9 @@ public sealed class MuiBodychunkFormatAdmissionTests
 			ref platform, address, MuiBodychunkFormatStateRecord.Size, out _));
 		Assert.False(MuiBodychunkFormatStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, 0u, out _));
+		maskingCursor.Record = APTR.Null;
+		Assert.False(MuiBodychunkFormatStateFieldCursorCodec.TryGetAddress(
+			ref platform, maskingCursor, out _, out _));
 		Assert.False(MuiBodychunkFormatStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}
@@ -110,6 +128,40 @@ public sealed class MuiBodychunkFormatAdmissionTests
 			crossingEnd, value));
 		Assert.False(MuiBodychunkFormatStateRecordCodec.TryReadRecord(ref platform,
 			crossingEnd, out _));
+	}
+
+	[Fact]
+	public void BodychunkFormatOffsetBridgeUsesNamedUlongCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1D40);
+		var initial = new MuiBodychunkFormatStateRecord
+		{
+			Magic = MuiBodychunkFormatStateRecord.Cookie,
+			Compression = 1,
+			Depth = 2,
+			Masking = 3,
+		};
+
+		Assert.True(MuiBodychunkFormatStateRecordCodec.WriteRecord(ref platform,
+			address, initial));
+		Assert.True(MuiBodychunkFormatStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiBodychunkFormatStateRecord.DepthOffset,
+			0xF1020304u));
+		Assert.True(MuiBodychunkFormatStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiBodychunkFormatStateRecord.DepthOffset,
+			out var depth));
+		Assert.Equal(0xF1020304u, depth);
+		Assert.True(MuiBodychunkFormatStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.Equal(initial.Magic, decoded.Magic);
+		Assert.Equal(initial.Compression, decoded.Compression);
+		Assert.Equal(0xF1020304u, decoded.Depth);
+		Assert.Equal(initial.Masking, decoded.Masking);
+		Assert.False(MuiBodychunkFormatStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiBodychunkFormatStateRecord.Size, out _));
+		Assert.False(MuiBodychunkFormatStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.Null, MuiBodychunkFormatStateRecord.MaskingOffset, 1));
 	}
 
 	[Fact]

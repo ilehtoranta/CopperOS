@@ -66,77 +66,47 @@ internal struct MuiRectangleBarTitleStateFieldCursor
 
 internal static class MuiRectangleBarTitleStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiRectangleBarTitleStateField field,
-		out uint offset)
-	{
-		if (field == MuiRectangleBarTitleStateField.Magic)
-			offset = MuiRectangleBarTitleStateRecord.MagicOffset;
-		else if (field == MuiRectangleBarTitleStateField.Present)
-			offset = MuiRectangleBarTitleStateRecord.PresentOffset;
-		else if (field == MuiRectangleBarTitleStateField.Title)
-			offset = MuiRectangleBarTitleStateRecord.TitleOffset;
-		else
-		{
-			offset = 0;
-			return false;
-		}
-		return true;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiRectangleBarTitleStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
-			cursor.Record, MuiRectangleBarTitleStateRecord.Size)) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, MuiRectangleBarTitleStateRecord.FieldSize);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiRectangleBarTitleStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiRectangleBarTitleStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiRectangleBarTitleStateField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = 0;
-		var cursor = default(MuiRectangleBarTitleStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
-	}
+		=> MuiRectangleBarTitleStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiRectangleBarTitleStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		var cursor = default(MuiRectangleBarTitleStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
-	}
+		=> MuiRectangleBarTitleStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
 }
 
 // Struct-first guest-memory adapter. Presence and title remain named
 // semantic fields; fixed guest-layout translation is bounded here.
 internal static class MuiRectangleBarTitleStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiRectangleBarTitleStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiRectangleBarTitleStateField field,
+		out uint index)
 	{
 		if (field == MuiRectangleBarTitleStateField.Magic)
-			offset = MuiRectangleBarTitleStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiRectangleBarTitleStateField.Present)
-			offset = MuiRectangleBarTitleStateRecord.PresentOffset;
+			index = 1;
 		else if (field == MuiRectangleBarTitleStateField.Title)
-			offset = MuiRectangleBarTitleStateRecord.TitleOffset;
+			index = 2;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -146,9 +116,34 @@ internal static class MuiRectangleBarTitleStateRecordMemoryCodec
 		APTR record, MuiRectangleBarTitleStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiRectangleBarTitleStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiRectangleBarTitleStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		return TryResolve(field, out var offset) &&
-			TryGetAddress(ref platform, record, offset, out address);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiRectangleBarTitleStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiRectangleBarTitleStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiRectangleBarTitleStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

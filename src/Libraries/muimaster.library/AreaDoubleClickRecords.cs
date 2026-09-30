@@ -21,9 +21,6 @@ internal struct MuiAreaDoubleClickStateRecord
 {
 	internal const uint Size = 12;
 	internal const uint FieldSize = 4;
-	internal const uint MagicOffset = 0;
-	internal const uint ValueOffset = 4;
-	internal const uint GenerationOffset = 8;
 	internal const uint Cookie = 0x4144434Cu; // 'ADCL'
 
 	internal uint Magic;
@@ -66,10 +63,14 @@ internal static class MuiAreaDoubleClickStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaDoubleClickStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiAreaDoubleClickStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaDoubleClickStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiAreaDoubleClickStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiAreaDoubleClickStateField field, out uint value)
@@ -88,23 +89,24 @@ internal static class MuiAreaDoubleClickStateFieldCursorCodec
 	}
 }
 
-// Fixed Area DoubleClick state is transferred as a named record. Numeric guest
-// positions are confined to this ABI adapter; the compatibility cursor above
-// remains available only to legacy callers and malformed-state diagnostics.
+// Fixed Area DoubleClick state is transferred as a named record. The bounded
+// cursor walks the complete packed struct before selecting a field; the
+// compatibility cursor above remains available only to legacy callers and
+// malformed-state diagnostics.
 internal static class MuiAreaDoubleClickStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiAreaDoubleClickStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiAreaDoubleClickStateField field,
+		out uint index)
 	{
 		if (field == MuiAreaDoubleClickStateField.Magic)
-			offset = MuiAreaDoubleClickStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiAreaDoubleClickStateField.Value)
-			offset = MuiAreaDoubleClickStateRecord.ValueOffset;
+			index = 1;
 		else if (field == MuiAreaDoubleClickStateField.Generation)
-			offset = MuiAreaDoubleClickStateRecord.GenerationOffset;
+			index = 2;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -114,13 +116,34 @@ internal static class MuiAreaDoubleClickStateRecordMemoryCodec
 		APTR record, MuiAreaDoubleClickStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiAreaDoubleClickStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaDoubleClickStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiAreaDoubleClickStateRecord.Size) &&
-			platform.IsMapped(address, MuiAreaDoubleClickStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiAreaDoubleClickStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiAreaDoubleClickStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiAreaDoubleClickStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

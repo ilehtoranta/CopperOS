@@ -16,6 +16,8 @@ internal struct MuiApplicationPersistenceFrameState
 {
 	internal const uint Size = 12;
 	internal const uint FieldSize = 4;
+	// ABI/documentation aliases retained for diagnostics; production access is
+	// declaration-ordered cursor traversal below.
 	internal const uint ObjectOffset = 0;
 	internal const uint NextChildOffset = 4;
 	internal const uint VisitMarkerOffset = 8;
@@ -49,27 +51,38 @@ internal static class MuiApplicationPersistenceFrameMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		uint offset;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, frame,
+			MuiApplicationPersistenceFrameState.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address)) return false;
+		return true;
+	}
+
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiApplicationPersistenceFrameField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
 		switch (field)
 		{
 			case MuiApplicationPersistenceFrameField.Object:
-				offset = MuiApplicationPersistenceFrameState.ObjectOffset;
-				break;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationPersistenceFrameState.FieldSize, out address);
 			case MuiApplicationPersistenceFrameField.NextChild:
-				offset = MuiApplicationPersistenceFrameState.NextChildOffset;
-				break;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationPersistenceFrameState.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationPersistenceFrameState.FieldSize, out address);
 			case MuiApplicationPersistenceFrameField.VisitMarker:
-				offset = MuiApplicationPersistenceFrameState.VisitMarkerOffset;
-				break;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationPersistenceFrameState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationPersistenceFrameState.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationPersistenceFrameState.FieldSize, out address);
 			default:
 				return false;
 		}
-		if (frame.IsNull || frame.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(frame, MuiApplicationPersistenceFrameState.Size))
-			return false;
-		address = APTR.FromPointer(frame.Raw + offset);
-		return platform.IsMapped(address,
-			MuiApplicationPersistenceFrameState.FieldSize);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,

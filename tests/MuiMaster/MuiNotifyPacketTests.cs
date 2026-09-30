@@ -391,8 +391,9 @@ public sealed class MuiNotifyPacketTests
 		cursor.Packet = MuiNotifyPacketKind.Notify;
 		cursor.Field = MuiNotifyPacketField.TriggerAttribute;
 		Assert.True(MuiNotifyPacketFieldCursorCodec.TryGetAddress(ref platform,
-			cursor, out var address));
+			cursor, out var address, out var fieldSize));
 		Assert.Equal(packet.Raw + 4, address.Raw);
+		Assert.Equal(4u, fieldSize);
 		cursor.Field = MuiNotifyPacketField.FollowCount;
 		Assert.True(MuiNotifyPacketFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out address));

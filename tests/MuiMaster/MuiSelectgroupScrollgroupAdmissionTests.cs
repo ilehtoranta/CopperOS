@@ -219,6 +219,52 @@ public sealed class MuiSelectgroupScrollgroupAdmissionTests
 			policyAddress, policy));
 		Assert.True(MuiScrollgroupViewportStateRecordCodec.Write(ref platform,
 			viewportAddress, viewport));
+		var borderCursor = new MuiScrollgroupBorderScrollerStateFieldCursor
+		{
+			Record = borderAddress,
+			Field = MuiScrollgroupBorderScrollerStateField.Applied,
+		};
+		Assert.True(MuiScrollgroupBorderScrollerStateFieldCursorCodec.TryGetAddress(
+			ref platform, borderCursor, out var cursorAppliedAddress,
+			out var borderFieldSize));
+		Assert.Equal(borderAddress.Raw + MuiScrollgroupBorderScrollerStateRecord.AppliedOffset,
+			cursorAppliedAddress.Raw);
+		Assert.Equal(MuiScrollgroupBorderScrollerStateRecord.FieldSize, borderFieldSize);
+		Assert.True(MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryGetAddress(
+			ref platform, borderCursor, out var memoryAppliedAddress,
+			out var memoryBorderFieldSize));
+		Assert.Equal(cursorAppliedAddress, memoryAppliedAddress);
+		Assert.Equal(borderFieldSize, memoryBorderFieldSize);
+		var viewportCursor = new MuiScrollgroupViewportFieldCursor
+		{
+			Address = viewportAddress,
+			Field = MuiScrollgroupViewportField.Magic,
+		};
+		Assert.True(MuiScrollgroupViewportFieldCursorCodec.TryGetAddress(
+			ref platform, viewportCursor, out var viewportMagicAddress,
+			out var viewportFieldSize));
+		Assert.Equal(viewportAddress.Raw, viewportMagicAddress.Raw);
+		Assert.Equal(MuiScrollgroupViewportStateRecord.FieldSize, viewportFieldSize);
+		viewportCursor.Field = MuiScrollgroupViewportField.ScrollTop;
+		Assert.True(MuiScrollgroupViewportFieldCursorCodec.TryGetAddress(
+			ref platform, viewportCursor, out var cursorScrollTopAddress,
+			out var scrollTopFieldSize));
+		Assert.Equal(viewportAddress.Raw + MuiScrollgroupViewportStateRecord.ScrollTopOffset,
+			cursorScrollTopAddress.Raw);
+		Assert.Equal(MuiScrollgroupViewportStateRecord.FieldSize, scrollTopFieldSize);
+		var policyCursor = new MuiScrollgroupPolicyStateFieldCursor
+		{
+			Record = policyAddress,
+			Field = MuiScrollgroupPolicyStateField.VerticalBar,
+		};
+		Assert.True(MuiScrollgroupPolicyStateFieldCursorCodec.TryGetAddress(ref platform,
+			policyCursor, out var cursorVerticalBarAddress, out var policyFieldSize));
+		Assert.Equal(0x1A54u, cursorVerticalBarAddress.Raw);
+		Assert.Equal(MuiScrollgroupPolicyStateRecord.FieldSize, policyFieldSize);
+		Assert.True(MuiScrollgroupPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			policyCursor, out var memoryVerticalBarAddress, out var memoryPolicyFieldSize));
+		Assert.Equal(cursorVerticalBarAddress, memoryVerticalBarAddress);
+		Assert.Equal(policyFieldSize, memoryPolicyFieldSize);
 		Assert.True(MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryGetAddress(
 			ref platform, borderAddress,
 			MuiScrollgroupBorderScrollerStateField.Applied, out var appliedAddress));
@@ -261,6 +307,27 @@ public sealed class MuiSelectgroupScrollgroupAdmissionTests
 			(MuiScrollgroupViewportField)255, out _));
 		Assert.False(MuiScrollgroupViewportStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
+		borderCursor.Field = (MuiScrollgroupBorderScrollerStateField)255;
+		Assert.False(MuiScrollgroupBorderScrollerStateFieldCursorCodec.TryGetAddress(
+			ref platform, borderCursor, out _, out _));
+		borderCursor.Record = APTR.Null;
+		borderCursor.Field = MuiScrollgroupBorderScrollerStateField.Applied;
+		Assert.False(MuiScrollgroupBorderScrollerStateFieldCursorCodec.TryGetAddress(
+			ref platform, borderCursor, out _, out _));
+		policyCursor.Field = (MuiScrollgroupPolicyStateField)255;
+		Assert.False(MuiScrollgroupPolicyStateFieldCursorCodec.TryGetAddress(ref platform,
+			policyCursor, out _, out _));
+		policyCursor.Record = APTR.Null;
+		policyCursor.Field = MuiScrollgroupPolicyStateField.VerticalBar;
+		Assert.False(MuiScrollgroupPolicyStateFieldCursorCodec.TryGetAddress(ref platform,
+			policyCursor, out _, out _));
+		viewportCursor.Field = (MuiScrollgroupViewportField)255;
+		Assert.False(MuiScrollgroupViewportFieldCursorCodec.TryGetAddress(ref platform,
+			viewportCursor, out _, out _));
+		viewportCursor.Address = APTR.Null;
+		viewportCursor.Field = MuiScrollgroupViewportField.ScrollTop;
+		Assert.False(MuiScrollgroupViewportFieldCursorCodec.TryGetAddress(ref platform,
+			viewportCursor, out _, out _));
 	}
 
 	private static MuiHeadlessTestPlatform CreatePlatform() =>

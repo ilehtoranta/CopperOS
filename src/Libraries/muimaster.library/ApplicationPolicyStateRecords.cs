@@ -86,29 +86,46 @@ internal static class MuiApplicationPolicyStateFieldCursorCodec
 	}
 }
 
-// Fixed initializer-policy state is transferred as a named record. Numeric
-// guest positions are confined to the bounded ABI adapter; production
-// consumers exchange the declaration-order struct through the sequential
-// cursor below.
+// Fixed initializer-policy state is transferred as a named record. The bounded
+// cursor walks the complete packed struct before selecting a field; offset
+// constants remain ABI documentation/compatibility aliases only.
 internal static class MuiApplicationPolicyStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiApplicationPolicyStateField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiApplicationPolicyStateField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (field == MuiApplicationPolicyStateField.Magic)
-			offset = MuiApplicationPolicyStateRecord.MagicOffset;
-		else if (field == MuiApplicationPolicyStateField.UseRexx)
-			offset = MuiApplicationPolicyStateRecord.UseRexxOffset;
-		else if (field == MuiApplicationPolicyStateField.UseCommodities)
-			offset = MuiApplicationPolicyStateRecord.UseCommoditiesOffset;
-		else if (field == MuiApplicationPolicyStateField.UseScreenNotify)
-			offset = MuiApplicationPolicyStateRecord.UseScreenNotifyOffset;
-		else
+		address = APTR.Null;
+		switch (field)
 		{
-			offset = 0;
-			return false;
+			case MuiApplicationPolicyStateField.Magic:
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationPolicyStateRecord.FieldSize, out address);
+			case MuiApplicationPolicyStateField.UseRexx:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationPolicyStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationPolicyStateRecord.FieldSize, out address);
+			case MuiApplicationPolicyStateField.UseCommodities:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationPolicyStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationPolicyStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationPolicyStateRecord.FieldSize, out address);
+			case MuiApplicationPolicyStateField.UseScreenNotify:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationPolicyStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationPolicyStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationPolicyStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationPolicyStateRecord.FieldSize, out address);
+			default:
+				return false;
 		}
-		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -116,12 +133,11 @@ internal static class MuiApplicationPolicyStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiApplicationPolicyStateRecord.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address))
 			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiApplicationPolicyStateRecord.Size) &&
-			platform.IsMapped(address, MuiApplicationPolicyStateRecord.FieldSize);
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

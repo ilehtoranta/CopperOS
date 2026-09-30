@@ -63,10 +63,14 @@ internal static class MuiControlFontStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiControlFontStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiControlFontStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiControlFontStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiControlFontStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiControlFontStateField field, out uint value)
@@ -92,18 +96,18 @@ internal static class MuiControlFontStateFieldCursorCodec
 // malformed-state diagnostics.
 internal static class MuiControlFontStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiControlFontStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiControlFontStateField field,
+		out uint index)
 	{
 		if (field == MuiControlFontStateField.Magic)
-			offset = MuiControlFontStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiControlFontStateField.Present)
-			offset = MuiControlFontStateRecord.PresentOffset;
+			index = 1;
 		else if (field == MuiControlFontStateField.Font)
-			offset = MuiControlFontStateRecord.FontOffset;
+			index = 2;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -113,13 +117,34 @@ internal static class MuiControlFontStateRecordMemoryCodec
 		APTR record, MuiControlFontStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiControlFontStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiControlFontStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiControlFontStateRecord.Size) &&
-			platform.IsMapped(address, MuiControlFontStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiControlFontStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiControlFontStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiControlFontStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -177,8 +202,8 @@ internal static class MuiControlFontStateRecordMemoryCodec
 	{
 		value = 0;
 		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+			out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -186,7 +211,7 @@ internal static class MuiControlFontStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
+		MuiGuestUlongStorageCodec.WriteValue(ref platform, address, value);
 		return true;
 	}
 }

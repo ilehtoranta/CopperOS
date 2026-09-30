@@ -91,6 +91,19 @@ public sealed class MuiServiceRecordCursorTests
 		Assert.True(MuiGroupPageStateMemoryCodec.TryGetAddress(ref platform,
 			record, MuiGroupPageStateField.LastSelector, out var address));
 		Assert.Equal(APTR.FromPointer(0x310C), address);
+		var pageCursor = new MuiGroupPageStateFieldCursor
+		{
+			Record = record,
+			Field = MuiGroupPageStateField.LastSelector,
+		};
+		Assert.True(MuiGroupPageStateFieldCursorCodec.TryGetAddress(ref platform,
+			pageCursor, out var cursorAddress, out var fieldSize));
+		Assert.Equal(address, cursorAddress);
+		Assert.Equal(MuiGroupPageState.FieldSize, fieldSize);
+		Assert.True(MuiGroupPageStateMemoryCodec.TryGetAddress(ref platform,
+			pageCursor, out var memoryAddress, out var memoryFieldSize));
+		Assert.Equal(cursorAddress, memoryAddress);
+		Assert.Equal(fieldSize, memoryFieldSize);
 		Assert.True(MuiGroupPageStateMemoryCodec.TryWriteUInt32(ref platform,
 			record, MuiGroupPageStateField.Active, 2));
 		Assert.True(MuiGroupPageStateMemoryCodec.TryReadUInt32(ref platform,
@@ -98,6 +111,13 @@ public sealed class MuiServiceRecordCursorTests
 		Assert.Equal(2u, active);
 		Assert.False(MuiGroupPageStateMemoryCodec.TryReadUInt32(ref platform,
 			APTR.FromPointer(0xFFFFFFF0u), MuiGroupPageStateField.Changes, out _));
+		pageCursor.Field = (MuiGroupPageStateField)255;
+		Assert.False(MuiGroupPageStateFieldCursorCodec.TryGetAddress(ref platform,
+			pageCursor, out _, out _));
+		pageCursor.Record = APTR.Null;
+		pageCursor.Field = MuiGroupPageStateField.LastSelector;
+		Assert.False(MuiGroupPageStateFieldCursorCodec.TryGetAddress(ref platform,
+			pageCursor, out _, out _));
 	}
 
 	[Fact]
@@ -113,6 +133,10 @@ public sealed class MuiServiceRecordCursorTests
 		Assert.True(MuiStringInteger64FieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out var address));
 		Assert.Equal(APTR.FromPointer(0x3204), address);
+		Assert.True(MuiStringInteger64FieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var sizedAddress, out var fieldSize));
+		Assert.Equal(address, sizedAddress);
+		Assert.Equal(MuiStringInteger64Value.FieldSize, fieldSize);
 		Assert.True(MuiStringInteger64FieldCursorCodec.TryWriteUInt32(ref platform,
 			record, MuiStringInteger64Field.High, 0x7FFFFFFFu));
 		Assert.True(MuiStringInteger64FieldCursorCodec.TryReadUInt32(ref platform,

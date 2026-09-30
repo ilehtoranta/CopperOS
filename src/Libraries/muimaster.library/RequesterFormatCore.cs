@@ -101,6 +101,8 @@ internal struct MuiRequesterParameterSlot
 {
 	internal const uint Size = 4;
 	internal const uint FieldSize = 4;
+	// Compatibility metadata for the historical wire position; live address
+	// publication uses MuiGuestStructCursor below.
 	internal const uint ValueOffset = 0;
 	internal uint Value;
 }
@@ -149,11 +151,12 @@ internal static class MuiRequesterParameterSlotMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (field != MuiRequesterParameterSlotField.Value || record.IsNull ||
-			!platform.IsMapped(record, MuiRequesterParameterSlot.Size)) return false;
-		address = APTR.FromPointer(record.Raw +
-			MuiRequesterParameterSlot.ValueOffset);
-		return platform.IsMapped(address, MuiRequesterParameterSlot.FieldSize);
+		if (field != MuiRequesterParameterSlotField.Value ||
+			!MuiGuestStructCursor.TryCreate(ref platform, record,
+				MuiRequesterParameterSlot.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiRequesterParameterSlot.FieldSize, out address)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -161,20 +164,18 @@ internal static class MuiRequesterParameterSlotMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		if (field != MuiRequesterParameterSlotField.Value) return false;
+		return MuiRequesterParameterSlotStructCodec.TryReadValue(ref platform,
+			record, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiRequesterParameterSlotField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (field != MuiRequesterParameterSlotField.Value) return false;
+		return MuiRequesterParameterSlotStructCodec.TryWriteValue(ref platform,
+			record, value);
 	}
 }
 
@@ -195,14 +196,23 @@ internal static class MuiRequesterParameterSlotCodec
 // Sequential codec for one caller-owned ULONG parameter slot. The slot is a
 // named vector element; the legacy field adapter is retained only for
 // diagnostics while formatting consumes the complete value record here.
+// Scalar entry points are the freestanding ABI boundary: the current native
+// lowering cannot safely return a one-field value struct through an out
+// parameter, while host callers may still use the typed compatibility wrapper.
 internal static class MuiRequesterParameterSlotStructCodec
 {
 	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
 		APTR address, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
-		=> MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
-			out value);
+	{
+		value = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiRequesterParameterSlot.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiRequesterParameterSlot slot)
@@ -219,7 +229,13 @@ internal static class MuiRequesterParameterSlotStructCodec
 	internal static bool TryWriteValue<TPlatform>(ref TPlatform platform,
 		APTR address, uint value)
 		where TPlatform : struct, IMuiGuestMemory
-		=> MuiGuestUlongStorageCodec.WriteValue(ref platform, address, value);
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiRequesterParameterSlot.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiRequesterParameterSlot slot)
@@ -369,10 +385,11 @@ public static class MuiRequesterFormatCore
 	private const uint FlagSpace = 4;
 	private const uint FlagZero = 8;
 	private const uint FlagQuote = 16;
+	private const uint FlagAlternate = 32;
 
 	public static bool TryMaterialize<TPlatform>(ref TPlatform platform,
 		APTR format, APTR parameters, out APTR materialized,
-		out uint allocationSize) where TPlatform : struct, IMuiHeadlessPlatform
+		out uint allocationSize) where TPlatform : struct, IMuiAllocationPlatform
 	{
 		materialized = format;
 		allocationSize = 0;
@@ -399,7 +416,7 @@ public static class MuiRequesterFormatCore
 	}
 
 	private static bool ContainsConversion<TPlatform>(ref TPlatform platform,
-		APTR format, uint length) where TPlatform : struct, IMuiHeadlessPlatform
+		APTR format, uint length) where TPlatform : struct, IMuiAllocationPlatform
 	{
 		var index = 0u;
 		while (index < length)
@@ -418,7 +435,7 @@ public static class MuiRequesterFormatCore
 
 	private static bool FormatInto<TPlatform>(ref TPlatform platform, APTR format,
 		uint length, APTR parameters, ref uint parameterIndex, APTR output,
-		ref uint outputLength) where TPlatform : struct, IMuiHeadlessPlatform
+		ref uint outputLength) where TPlatform : struct, IMuiAllocationPlatform
 	{
 		var index = 0u;
 		while (index < length)
@@ -445,6 +462,7 @@ public static class MuiRequesterFormatCore
 				var bit = flag == (byte)'-' ? FlagLeft :
 					flag == (byte)'+' ? FlagPlus :
 					flag == (byte)' ' ? FlagSpace :
+					flag == (byte)'#' ? FlagAlternate :
 					flag == (byte)'0' ? FlagZero :
 					flag == (byte)'\'' ? FlagQuote : 0u;
 				if (bit == 0) break;
@@ -535,24 +553,45 @@ public static class MuiRequesterFormatCore
 
 			var radix = conversion == (byte)'x' || conversion == (byte)'X' ||
 				conversion == (byte)'p' ? 16u :
+				conversion == (byte)'o' ? 8u :
 				conversion == (byte)'b' ? 2u : 10u;
 			var upper = conversion == (byte)'X';
 			var signed = conversion == (byte)'d' || conversion == (byte)'i';
 			var negative = signed && (raw & 0x80000000u) != 0;
 			var magnitude = negative ? 0u - raw : raw;
-			var digits = DigitCount(magnitude, radix);
+			var valueDigits = DigitCount(magnitude, radix);
+			var suppressZeroDigits = conversion != (byte)'p' && hasPrecision &&
+				precision == 0 && magnitude == 0;
+			var digits = suppressZeroDigits ? 0u : valueDigits;
 			if (hasPrecision && precision > digits) digits = precision;
 			var prefix = negative || (signed && (flags & FlagPlus) != 0) ||
 				(signed && (flags & FlagSpace) != 0) ? 1u : 0u;
+			// MorphOS 3.16 fixed Exec RawDoFmt's %p conversion to include its
+			// 0x address prefix. MUI_RequestA formats through RawDoFmt, so keep
+			// that prefix independent of the optional '#' flag.
+			var alternatePrefix = conversion == (byte)'p' ? 2u : 0u;
+			if (conversion != (byte)'p' && (flags & FlagAlternate) != 0)
+			{
+				if (magnitude != 0 &&
+					(conversion == (byte)'x' || conversion == (byte)'X'))
+					alternatePrefix = 2;
+				else if (conversion == (byte)'o' && magnitude == 0 &&
+					suppressZeroDigits)
+					alternatePrefix = 1;
+				else if (conversion == (byte)'o' && magnitude != 0 &&
+					(!hasPrecision || precision <= valueDigits))
+					alternatePrefix = 1;
+			}
 			if (!AppendNumeric(ref platform, output, ref outputLength, magnitude,
-				radix, upper, digits, width, prefix, flags, negative)) return false;
+				radix, upper, digits, width, prefix, alternatePrefix,
+				hasPrecision, flags, negative)) return false;
 		}
 		return Append(ref platform, output, ref outputLength, 0);
 	}
 
 	private static bool ReadDigits<TPlatform>(ref TPlatform platform, APTR format,
 		uint length, ref uint index, out uint value)
-		where TPlatform : struct, IMuiHeadlessPlatform
+		where TPlatform : struct, IMuiAllocationPlatform
 	{
 		value = 0;
 		while (index < length)
@@ -569,7 +608,7 @@ public static class MuiRequesterFormatCore
 
 	private static bool ReadParameter<TPlatform>(ref TPlatform platform,
 		APTR parameters, ref uint index, out uint value)
-		where TPlatform : struct, IMuiHeadlessPlatform
+		where TPlatform : struct, IMuiAllocationPlatform
 	{
 		value = 0;
 		if (parameters.IsNull || index >= MuiRequesterPayloadCore.MaximumFormatParameters)
@@ -585,7 +624,7 @@ public static class MuiRequesterFormatCore
 
 	private static bool AppendString<TPlatform>(ref TPlatform platform, APTR source,
 		uint length, APTR output, ref uint outputLength, uint width, bool left)
-		where TPlatform : struct, IMuiHeadlessPlatform
+		where TPlatform : struct, IMuiAllocationPlatform
 	{
 		if (!AppendPadding(ref platform, output, ref outputLength, width, length,
 			left)) return false;
@@ -605,11 +644,13 @@ public static class MuiRequesterFormatCore
 
 	private static bool AppendNumeric<TPlatform>(ref TPlatform platform, APTR output,
 		ref uint outputLength, uint value, uint radix, bool upper, uint digits,
-		uint width, uint prefix, uint flags, bool negative)
-		where TPlatform : struct, IMuiHeadlessPlatform
+		uint width, uint prefix, uint alternatePrefix, bool hasPrecision,
+		uint flags, bool negative)
+		where TPlatform : struct, IMuiAllocationPlatform
 	{
-		var zeroPad = (flags & FlagZero) != 0 && (flags & FlagLeft) == 0;
-		var total = digits + prefix;
+		var zeroPad = (flags & FlagZero) != 0 && (flags & FlagLeft) == 0 &&
+			!hasPrecision;
+		var total = digits + prefix + alternatePrefix;
 		if (total > MaximumOutputLength || width > MaximumOutputLength) return false;
 		if (!zeroPad && (flags & FlagLeft) == 0 && width > total &&
 			!AppendSpaces(ref platform, output, ref outputLength, width - total)) return false;
@@ -619,6 +660,12 @@ public static class MuiRequesterFormatCore
 				(byte)' ';
 			if (!Append(ref platform, output, ref outputLength, sign)) return false;
 		}
+		if (alternatePrefix == 1 &&
+			!Append(ref platform, output, ref outputLength, (byte)'0')) return false;
+		if (alternatePrefix == 2 &&
+			(!Append(ref platform, output, ref outputLength, (byte)'0') ||
+				!Append(ref platform, output, ref outputLength,
+					upper ? (byte)'X' : (byte)'x'))) return false;
 		if (zeroPad && width > total &&
 			!AppendZeros(ref platform, output, ref outputLength, width - total)) return false;
 		var divisor = 1u;
@@ -658,23 +705,23 @@ public static class MuiRequesterFormatCore
 
 	private static bool AppendPadding<TPlatform>(ref TPlatform platform, APTR output,
 		ref uint outputLength, uint width, uint content,
-		bool left) where TPlatform : struct, IMuiHeadlessPlatform =>
+		bool left) where TPlatform : struct, IMuiAllocationPlatform =>
 		left || width <= content || AppendSpaces(ref platform, output,
 			ref outputLength, width - content);
 
 	private static bool AppendSpaces<TPlatform>(ref TPlatform platform, APTR output,
 		ref uint outputLength, uint count)
-		where TPlatform : struct, IMuiHeadlessPlatform =>
+		where TPlatform : struct, IMuiAllocationPlatform =>
 		AppendRepeated(ref platform, output, ref outputLength, count, (byte)' ');
 
 	private static bool AppendZeros<TPlatform>(ref TPlatform platform, APTR output,
 		ref uint outputLength, uint count)
-		where TPlatform : struct, IMuiHeadlessPlatform =>
+		where TPlatform : struct, IMuiAllocationPlatform =>
 		AppendRepeated(ref platform, output, ref outputLength, count, (byte)'0');
 
 	private static bool AppendRepeated<TPlatform>(ref TPlatform platform, APTR output,
 		ref uint outputLength, uint count, byte value)
-		where TPlatform : struct, IMuiHeadlessPlatform
+		where TPlatform : struct, IMuiAllocationPlatform
 	{
 		var remaining = count;
 		while (remaining != 0)
@@ -687,7 +734,7 @@ public static class MuiRequesterFormatCore
 
 	private static bool Append<TPlatform>(ref TPlatform platform, APTR output,
 		ref uint outputLength, byte value)
-		where TPlatform : struct, IMuiHeadlessPlatform
+		where TPlatform : struct, IMuiAllocationPlatform
 	{
 		if (outputLength >= MaximumOutputLength) return false;
 		var cursor = default(MuiRequesterOutputByteCursor);
@@ -701,7 +748,7 @@ public static class MuiRequesterFormatCore
 	}
 
 	private static byte Read<TPlatform>(ref TPlatform platform, APTR format,
-		uint index) where TPlatform : struct, IMuiHeadlessPlatform
+		uint index) where TPlatform : struct, IMuiAllocationPlatform
 	{
 		var cursor = default(MuiRequesterFormatByteCursor);
 		cursor.Base = format;
@@ -717,6 +764,7 @@ public static class MuiRequesterFormatCore
 
 	private static bool IsSupported(byte value) => value == (byte)'b' ||
 		value == (byte)'c' || value == (byte)'d' || value == (byte)'i' ||
-		value == (byte)'p' || value == (byte)'s' || value == (byte)'u' ||
+		value == (byte)'o' || value == (byte)'p' || value == (byte)'s' ||
+		value == (byte)'u' ||
 		value == (byte)'x' || value == (byte)'X';
 }

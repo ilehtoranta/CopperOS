@@ -46,70 +46,50 @@ internal struct MuiMenuSpecialistFieldCursor
 // members without exposing numeric positions to dispatch code.
 internal static class MuiMenuSpecialistMessageMemoryCodec
 {
-	private static bool TryResolve(MuiMenuSpecialistPacketKind packet,
-		MuiMenuSpecialistField field, out uint offset, out uint size)
+	private static bool TryResolveFieldIndex(MuiMenuSpecialistPacketKind packet,
+		MuiMenuSpecialistField field, out uint index, out uint recordSize)
 	{
+		index = 0;
+		recordSize = 0;
 		switch (packet)
 		{
 			case MuiMenuSpecialistPacketKind.Method:
-				size = MuiMenuSpecialistMethodMessage.Size;
-				if (field == MuiMenuSpecialistField.MethodId)
-					offset = MuiMenuSpecialistMethodMessage.MethodIdOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
+				recordSize = MuiMenuSpecialistMethodMessage.Size;
+				if (field == MuiMenuSpecialistField.MethodId) { index = 0; return true; }
+				break;
 			case MuiMenuSpecialistPacketKind.Get:
-				size = MuiMenuSpecialistGetMessage.Size;
-				if (field == MuiMenuSpecialistField.MethodId)
-					offset = MuiMenuSpecialistGetMessage.MethodIdOffset;
-				else if (field == MuiMenuSpecialistField.Attribute)
-					offset = MuiMenuSpecialistGetMessage.AttributeOffset;
-				else if (field == MuiMenuSpecialistField.Storage)
-					offset = MuiMenuSpecialistGetMessage.StorageOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
+				recordSize = MuiMenuSpecialistGetMessage.Size;
+				if (field == MuiMenuSpecialistField.MethodId) { index = 0; return true; }
+				if (field == MuiMenuSpecialistField.Attribute) { index = 1; return true; }
+				if (field == MuiMenuSpecialistField.Storage) { index = 2; return true; }
+				break;
 			case MuiMenuSpecialistPacketKind.Set:
-				size = MuiMenuSpecialistSetMessage.Size;
-				if (field == MuiMenuSpecialistField.MethodId)
-					offset = MuiMenuSpecialistSetMessage.MethodIdOffset;
-				else if (field == MuiMenuSpecialistField.Attribute)
-					offset = MuiMenuSpecialistSetMessage.AttributeOffset;
-				else if (field == MuiMenuSpecialistField.Value)
-					offset = MuiMenuSpecialistSetMessage.ValueOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
+				recordSize = MuiMenuSpecialistSetMessage.Size;
+				if (field == MuiMenuSpecialistField.MethodId) { index = 0; return true; }
+				if (field == MuiMenuSpecialistField.Attribute) { index = 1; return true; }
+				if (field == MuiMenuSpecialistField.Value) { index = 2; return true; }
+				break;
 			case MuiMenuSpecialistPacketKind.Pointer:
-				size = MuiMenuSpecialistPointerMessage.Size;
-				if (field == MuiMenuSpecialistField.MethodId)
-					offset = MuiMenuSpecialistPointerMessage.MethodIdOffset;
-				else if (field == MuiMenuSpecialistField.ObjectPointer)
-					offset = MuiMenuSpecialistPointerMessage.ObjectPointerOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
+				recordSize = MuiMenuSpecialistPointerMessage.Size;
+				if (field == MuiMenuSpecialistField.MethodId) { index = 0; return true; }
+				if (field == MuiMenuSpecialistField.ObjectPointer) { index = 1; return true; }
+				break;
 			case MuiMenuSpecialistPacketKind.Pair:
-				size = MuiMenuSpecialistPairMessage.Size;
-				if (field == MuiMenuSpecialistField.MethodId)
-					offset = MuiMenuSpecialistPairMessage.MethodIdOffset;
-				else if (field == MuiMenuSpecialistField.First)
-					offset = MuiMenuSpecialistPairMessage.FirstOffset;
-				else if (field == MuiMenuSpecialistField.Second)
-					offset = MuiMenuSpecialistPairMessage.SecondOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
+				recordSize = MuiMenuSpecialistPairMessage.Size;
+				if (field == MuiMenuSpecialistField.MethodId) { index = 0; return true; }
+				if (field == MuiMenuSpecialistField.First) { index = 1; return true; }
+				if (field == MuiMenuSpecialistField.Second) { index = 2; return true; }
+				break;
 			case MuiMenuSpecialistPacketKind.Popup:
-				size = MuiMenuSpecialistPopupMessage.Size;
-				if (field == MuiMenuSpecialistField.MethodId)
-					offset = MuiMenuSpecialistPopupMessage.MethodIdOffset;
-				else if (field == MuiMenuSpecialistField.Window)
-					offset = MuiMenuSpecialistPopupMessage.WindowOffset;
-				else if (field == MuiMenuSpecialistField.X)
-					offset = MuiMenuSpecialistPopupMessage.XOffset;
-				else if (field == MuiMenuSpecialistField.Y)
-					offset = MuiMenuSpecialistPopupMessage.YOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
+				recordSize = MuiMenuSpecialistPopupMessage.Size;
+				if (field == MuiMenuSpecialistField.MethodId) { index = 0; return true; }
+				if (field == MuiMenuSpecialistField.Window) { index = 1; return true; }
+				if (field == MuiMenuSpecialistField.X) { index = 2; return true; }
+				if (field == MuiMenuSpecialistField.Y) { index = 3; return true; }
+				break;
 		}
-		offset = 0;
-		size = 0;
+		index = uint.MaxValue;
+		recordSize = 0;
 		return false;
 	}
 
@@ -118,12 +98,53 @@ internal static class MuiMenuSpecialistMessageMemoryCodec
 		MuiMenuSpecialistField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiMenuSpecialistFieldCursor);
+		cursor.Message = message;
+		cursor.Packet = packet;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMenuSpecialistFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(packet, field, out var offset, out var size) ||
-			message.IsNull || message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(message, size)) return false;
-		address = APTR.FromPointer(message.Raw + offset);
-		return platform.IsMapped(address, MuiMenuSpecialistMethodMessage.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Packet, cursor.Field, out var index,
+			out var recordSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Message,
+				recordSize, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiMenuSpecialistMethodMessage.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiMenuSpecialistMethodMessage.FieldSize;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMenuSpecialistFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR message, MuiMenuSpecialistPacketKind packet,
+		MuiMenuSpecialistField field, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiMenuSpecialistFieldCursor);
+		cursor.Message = message;
+		cursor.Packet = packet;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out fieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -157,8 +178,15 @@ internal static class MuiMenuSpecialistFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiMenuSpecialistFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiMenuSpecialistMessageMemoryCodec.TryGetAddress(ref platform,
-			cursor.Message, cursor.Packet, cursor.Field, out address);
+		MuiMenuSpecialistMessageMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMenuSpecialistFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiMenuSpecialistMessageMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR message, MuiMenuSpecialistPacketKind packet,

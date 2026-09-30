@@ -18,6 +18,15 @@ public sealed class MuiCollectionEditMessageStructAdapterTests
 		Assert.Equal(-2, create.Row);
 		Assert.Equal(3, create.Column);
 		Assert.Equal(0x3500u, create.Entry);
+		Assert.True(MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
+			createAddress, MuiCollectionEditPacketKind.CreateEditObject,
+			MuiCollectionEditField.Row, unchecked((uint)-5)));
+		Assert.True(MuiCollectionEditMessageCodec.TryReadCreateEditObject(
+			ref platform, createAddress, out create));
+		Assert.Equal(MuiCollectionEditMessageCodec.CreateEditObject, create.MethodId);
+		Assert.Equal(-5, create.Row);
+		Assert.Equal(3, create.Column);
+		Assert.Equal(0x3500u, create.Entry);
 		Assert.True(MuiCollectionEditMessageMemoryCodec.TryGetAddress(
 			ref platform, createAddress, MuiCollectionEditPacketKind.CreateEditObject,
 			MuiCollectionEditField.Entry, out var entryAddress));
@@ -30,6 +39,14 @@ public sealed class MuiCollectionEditMessageStructAdapterTests
 			editAddress, out var edit));
 		Assert.Equal(-4, edit.Row);
 		Assert.Equal(5, edit.Column);
+		Assert.True(MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
+			editAddress, MuiCollectionEditPacketKind.Edit,
+			MuiCollectionEditField.Column, unchecked((uint)-6)));
+		Assert.True(MuiCollectionEditMessageCodec.TryReadEdit(ref platform,
+			editAddress, out edit));
+		Assert.Equal(MuiCollectionEditMessageCodec.Edit, edit.MethodId);
+		Assert.Equal(-4, edit.Row);
+		Assert.Equal(-6, edit.Column);
 
 		var doneAddress = APTR.FromPointer(0x3060);
 		Assert.True(MuiCollectionEditMessageCodec.WriteEditDone(ref platform,
@@ -39,6 +56,16 @@ public sealed class MuiCollectionEditMessageStructAdapterTests
 		Assert.Equal(6, done.Row);
 		Assert.Equal(-7, done.Column);
 		Assert.Equal(0x3700u, done.EditObject);
+		Assert.True(MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
+			doneAddress, MuiCollectionEditPacketKind.EditDone,
+			MuiCollectionEditField.Entry, 0x3610));
+		Assert.True(MuiCollectionEditMessageCodec.TryReadEditDone(ref platform,
+			doneAddress, out done));
+		Assert.Equal(MuiCollectionEditMessageCodec.EditDone, done.MethodId);
+		Assert.Equal(6, done.Row);
+		Assert.Equal(-7, done.Column);
+		Assert.Equal(0x3610u, done.Entry);
+		Assert.Equal(0x3700u, done.EditObject);
 
 		var endAddress = APTR.FromPointer(0x3090);
 		Assert.True(MuiCollectionEditMessageCodec.WriteEndEdit(ref platform,
@@ -46,6 +73,19 @@ public sealed class MuiCollectionEditMessageStructAdapterTests
 		Assert.True(MuiCollectionEditMessageCodec.TryReadEndEdit(ref platform,
 			endAddress, out var end));
 		Assert.Equal(2u, end.Mode);
+		Assert.True(MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
+			endAddress, MuiCollectionEditPacketKind.EndEdit,
+			MuiCollectionEditField.Mode, 3));
+		Assert.True(MuiCollectionEditMessageCodec.TryReadEndEdit(ref platform,
+			endAddress, out end));
+		Assert.Equal(MuiCollectionEditMessageCodec.EndEdit, end.MethodId);
+		Assert.Equal(3u, end.Mode);
+		Assert.False(MuiCollectionEditMessageMemoryCodec.TryReadUInt32(ref platform,
+			endAddress, MuiCollectionEditPacketKind.Edit,
+			MuiCollectionEditField.Mode, out _));
+		Assert.False(MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
+			endAddress, MuiCollectionEditPacketKind.EndEdit,
+			(MuiCollectionEditField)255, 1));
 
 		Assert.False(MuiCollectionEditMessageMemoryCodec.TryGetAddress(
 			ref platform, APTR.FromPointer(0x20FED),

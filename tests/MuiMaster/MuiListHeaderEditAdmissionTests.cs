@@ -46,6 +46,62 @@ public sealed class MuiListHeaderEditAdmissionTests
 	}
 
 	[Fact]
+	public void ListHeaderFieldAdapterPreservesCompleteRecordSiblings()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x2B80);
+		var original = new MuiListHeaderState
+		{
+			Magic = 0x4C495354u,
+			Index = APTR.FromPointer(0x2C00),
+			Capacity = 24,
+			Count = 7,
+			Images = APTR.FromPointer(0x2C40),
+		};
+
+		Assert.True(MuiListHeaderCodec.WriteRecord(ref platform, address,
+			original));
+		Assert.True(MuiListHeaderFieldCursorCodec.TryWriteUInt32(ref platform,
+			address, MuiListHeaderField.Count, 11));
+		Assert.True(MuiListHeaderCodec.TryReadStructural(ref platform, address,
+			out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(original.Index, actual.Index);
+		Assert.Equal(original.Capacity, actual.Capacity);
+		Assert.Equal(11u, actual.Count);
+		Assert.Equal(original.Images, actual.Images);
+		Assert.True(MuiListHeaderFieldCursorCodec.TryReadUInt32(ref platform,
+			address, MuiListHeaderField.Images, out var images));
+		Assert.Equal(original.Images.Raw, images);
+	}
+
+	[Fact]
+	public void ListviewOwnerFieldAdapterPreservesCookieAndOwner()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x2BC0);
+		var original = new MuiListviewOwnerState
+		{
+			Magic = MuiListviewOwnerState.Cookie,
+			Owner = APTR.FromPointer(0x2C00),
+		};
+
+		Assert.True(MuiListviewOwnerStateCodec.WriteRecord(ref platform, address,
+			original));
+		Assert.True(MuiListviewOwnerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiListviewOwnerStateField.Owner, 0x2C40u));
+		Assert.True(MuiListviewOwnerStateCodec.TryReadStructural(ref platform,
+			address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(APTR.FromPointer(0x2C40), actual.Owner);
+		Assert.True(MuiListviewOwnerStateFieldCursorCodec.TryReadUInt32(
+			ref platform, address, MuiListviewOwnerStateField.Magic, out var magic));
+		Assert.Equal(original.Magic, magic);
+	}
+
+	[Fact]
 	public void MalformedListHeaderAndEditMagicRemainStructuralButFailClosed()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,

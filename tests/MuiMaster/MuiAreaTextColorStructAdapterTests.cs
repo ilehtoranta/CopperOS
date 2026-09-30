@@ -25,6 +25,19 @@ public sealed class MuiAreaTextColorStructAdapterTests
 			ref platform, address, MuiAreaTextColorStateField.Color,
 			out var colorAddress));
 		Assert.Equal(0x3504u, colorAddress.Raw);
+		var cursor = new MuiAreaTextColorStateFieldCursor
+		{
+			Record = address,
+			Field = MuiAreaTextColorStateField.Color,
+		};
+		Assert.True(MuiAreaTextColorStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedColorAddress, out var typedColorSize));
+		Assert.Equal(colorAddress, typedColorAddress);
+		Assert.Equal(MuiAreaTextColorStateRecord.FieldSize, typedColorSize);
+		Assert.True(MuiAreaTextColorStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryColorAddress, out var memoryColorSize));
+		Assert.Equal(typedColorAddress, memoryColorAddress);
+		Assert.Equal(typedColorSize, memoryColorSize);
 		Assert.True(MuiAreaTextColorStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiAreaTextColorStateField.Color, 0x00112233));
 		Assert.True(MuiAreaTextColorStateRecordCodec.TryReadStructural(ref platform,
@@ -34,6 +47,13 @@ public sealed class MuiAreaTextColorStructAdapterTests
 			ref platform, address, (MuiAreaTextColorStateField)255, out _));
 		Assert.False(MuiAreaTextColorStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiAreaTextColorStateField.Magic, out _));
+		cursor.Field = (MuiAreaTextColorStateField)255;
+		Assert.False(MuiAreaTextColorStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiAreaTextColorStateField.Magic;
+		Assert.False(MuiAreaTextColorStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 		Assert.False(MuiAreaTextColorStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

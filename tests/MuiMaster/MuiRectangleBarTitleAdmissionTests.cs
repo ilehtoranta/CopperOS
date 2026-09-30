@@ -97,6 +97,19 @@ public sealed class MuiRectangleBarTitleAdmissionTests
 			ref platform, address, MuiRectangleBarTitleStateField.Title,
 			out var typedTitleAddress));
 		Assert.Equal(0x1A28u, typedTitleAddress.Raw);
+		var titleCursor = new MuiRectangleBarTitleStateFieldCursor
+		{
+			Record = address,
+			Field = MuiRectangleBarTitleStateField.Title,
+		};
+		Assert.True(MuiRectangleBarTitleStateFieldCursorCodec.TryGetAddress(
+			ref platform, titleCursor, out var cursorTitleAddress, out var cursorFieldSize));
+		Assert.Equal(typedTitleAddress, cursorTitleAddress);
+		Assert.Equal(MuiRectangleBarTitleStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiRectangleBarTitleStateRecordMemoryCodec.TryGetAddress(
+			ref platform, titleCursor, out var memoryTitleAddress, out var memoryFieldSize));
+		Assert.Equal(cursorTitleAddress, memoryTitleAddress);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiRectangleBarTitleStateRecordMemoryCodec.TryReadUInt32(
 			ref platform, address, MuiRectangleBarTitleStateField.Present,
 			out var typedPresent));
@@ -128,6 +141,13 @@ public sealed class MuiRectangleBarTitleAdmissionTests
 			ref platform, APTR.Null, (uint)0, out _));
 		Assert.False(MuiRectangleBarTitleStateRecordCodec.TryReadRecord(ref platform,
 			APTR.Null, out _));
+		titleCursor.Field = (MuiRectangleBarTitleStateField)0xFF;
+		Assert.False(MuiRectangleBarTitleStateFieldCursorCodec.TryGetAddress(
+			ref platform, titleCursor, out _, out _));
+		titleCursor.Record = APTR.Null;
+		titleCursor.Field = MuiRectangleBarTitleStateField.Title;
+		Assert.False(MuiRectangleBarTitleStateFieldCursorCodec.TryGetAddress(
+			ref platform, titleCursor, out _, out _));
 	}
 
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR rectangleClass,

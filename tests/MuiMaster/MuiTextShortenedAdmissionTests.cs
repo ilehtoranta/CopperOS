@@ -84,6 +84,21 @@ public sealed class MuiTextShortenedAdmissionTests
 			ref platform, address, MuiTextShortenedStateField.Shortened,
 			out var typedShortenedAddress));
 		Assert.Equal(0x1B24u, typedShortenedAddress.Raw);
+		var shortenedCursor = new MuiTextShortenedStateFieldCursor
+		{
+			Record = address,
+			Field = MuiTextShortenedStateField.Shortened,
+		};
+		Assert.True(MuiTextShortenedStateFieldCursorCodec.TryGetAddress(
+			ref platform, shortenedCursor, out var cursorShortenedAddress,
+			out var fieldSize));
+		Assert.Equal(typedShortenedAddress, cursorShortenedAddress);
+		Assert.Equal(MuiTextShortenedStateRecord.FieldSize, fieldSize);
+		Assert.True(MuiTextShortenedStateRecordMemoryCodec.TryGetAddress(
+			ref platform, shortenedCursor, out var memoryCursorAddress,
+			out var memoryFieldSize));
+		Assert.Equal(cursorShortenedAddress, memoryCursorAddress);
+		Assert.Equal(fieldSize, memoryFieldSize);
 		Assert.True(MuiTextShortenedStateRecordMemoryCodec.TryReadUInt32(
 			ref platform, address, MuiTextShortenedStateField.Shortened,
 			out var typedShortened));
@@ -111,6 +126,9 @@ public sealed class MuiTextShortenedAdmissionTests
 			ref platform, address, MuiTextShortenedStateRecord.Size, out _));
 		Assert.False(MuiTextShortenedStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, (uint)0, out _));
+		shortenedCursor.Record = APTR.Null;
+		Assert.False(MuiTextShortenedStateFieldCursorCodec.TryGetAddress(
+			ref platform, shortenedCursor, out _, out _));
 		Assert.False(MuiTextShortenedStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

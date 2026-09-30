@@ -57,6 +57,20 @@ public sealed class MuiAreaBubbleTests
 			MuiAreaBubbleMessageField.Text, out var textAddress));
 		Assert.Equal(create.Raw + MuiAreaCreateBubbleMessage.TextOffset,
 			textAddress.Raw);
+		var cursor = new MuiAreaBubbleMessageFieldCursor
+		{
+			Message = create,
+			Packet = MuiAreaBubblePacketKind.Create,
+			Field = MuiAreaBubbleMessageField.Text,
+		};
+		Assert.True(MuiAreaBubbleMessageFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedTextAddress, out var typedTextSize));
+		Assert.Equal(textAddress, typedTextAddress);
+		Assert.Equal(MuiAreaCreateBubbleMessage.FieldSize, typedTextSize);
+		Assert.True(MuiAreaBubbleMessageMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryTextAddress, out var memoryTextSize));
+		Assert.Equal(typedTextAddress, memoryTextAddress);
+		Assert.Equal(typedTextSize, memoryTextSize);
 
 		Assert.False(MuiAreaBubbleMessageMemoryCodec.TryGetAddress(ref platform,
 			APTR.FromPointer(0x20FF0), MuiAreaBubblePacketKind.Create,
@@ -67,6 +81,13 @@ public sealed class MuiAreaBubbleTests
 		Assert.False(MuiAreaBubbleMessageMemoryCodec.TryGetAddress(ref platform,
 			APTR.Null, MuiAreaBubblePacketKind.Delete,
 			MuiAreaBubbleMessageField.Bubble, out _));
+		cursor.Field = (MuiAreaBubbleMessageField)255;
+		Assert.False(MuiAreaBubbleMessageFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
+		cursor.Message = APTR.Null;
+		cursor.Field = MuiAreaBubbleMessageField.Text;
+		Assert.False(MuiAreaBubbleMessageFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 	}
 
 	[Fact]

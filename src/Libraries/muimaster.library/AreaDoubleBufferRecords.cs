@@ -26,9 +26,6 @@ internal struct MuiAreaDoubleBufferStateRecord
 {
 	internal const uint Size = 12;
 	internal const uint FieldSize = 4;
-	internal const uint MagicOffset = 0;
-	internal const uint EnabledOffset = 4;
-	internal const uint GenerationOffset = 8;
 	internal const uint Cookie = 0x41444252u; // 'ADBR'
 
 	internal uint Magic;
@@ -71,10 +68,14 @@ internal static class MuiAreaDoubleBufferStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaDoubleBufferStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiAreaDoubleBufferStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaDoubleBufferStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiAreaDoubleBufferStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiAreaDoubleBufferStateField field, out uint value)
@@ -93,24 +94,24 @@ internal static class MuiAreaDoubleBufferStateFieldCursorCodec
 	}
 }
 
-// Fixed Area double-buffer state is transferred as a named record. Numeric
-// guest positions are confined to this ABI adapter; the compatibility cursor
-// above remains available only to legacy callers and malformed-state
-// diagnostics.
+// Fixed Area double-buffer state is transferred as a named record. The bounded
+// cursor walks the complete packed struct before selecting a field; the
+// compatibility cursor above remains available only to legacy callers and
+// malformed-state diagnostics.
 internal static class MuiAreaDoubleBufferStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiAreaDoubleBufferStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiAreaDoubleBufferStateField field,
+		out uint index)
 	{
 		if (field == MuiAreaDoubleBufferStateField.Magic)
-			offset = MuiAreaDoubleBufferStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiAreaDoubleBufferStateField.Enabled)
-			offset = MuiAreaDoubleBufferStateRecord.EnabledOffset;
+			index = 1;
 		else if (field == MuiAreaDoubleBufferStateField.Generation)
-			offset = MuiAreaDoubleBufferStateRecord.GenerationOffset;
+			index = 2;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -120,13 +121,34 @@ internal static class MuiAreaDoubleBufferStateRecordMemoryCodec
 		APTR record, MuiAreaDoubleBufferStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiAreaDoubleBufferStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaDoubleBufferStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiAreaDoubleBufferStateRecord.Size) &&
-			platform.IsMapped(address, MuiAreaDoubleBufferStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiAreaDoubleBufferStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiAreaDoubleBufferStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiAreaDoubleBufferStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

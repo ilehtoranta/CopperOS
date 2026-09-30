@@ -38,6 +38,7 @@ internal struct MuiStorePoolPolicyRecord
 internal struct MuiStorePoolStateRecord
 {
 	internal const uint Size = 16;
+	internal const uint FieldSize = 4;
 	internal const uint PoolOffset = 0;
 	internal const uint PolicyOffset = 4;
 	internal const uint OwnsPoolOffset = 8;
@@ -57,26 +58,61 @@ internal enum MuiStorePoolStateField : byte
 	Magic,
 }
 
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiStorePoolStateFieldCursor
+{
+	internal APTR Record;
+	internal MuiStorePoolStateField Field;
+}
+
 internal static class MuiStorePoolStateCodec
 {
+	private static bool TryResolveFieldIndex(MuiStorePoolStateField field,
+		out uint index)
+	{
+		index = field switch
+		{
+			MuiStorePoolStateField.Pool => 0,
+			MuiStorePoolStateField.Policy => 1,
+			MuiStorePoolStateField.OwnsPool => 2,
+			MuiStorePoolStateField.Magic => 3,
+			_ => uint.MaxValue,
+		};
+		return index != uint.MaxValue;
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR address, MuiStorePoolStateField field, out APTR fieldAddress)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiStorePoolStateFieldCursor);
+		cursor.Record = address;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out fieldAddress, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStorePoolStateFieldCursor cursor, out APTR fieldAddress,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		fieldAddress = APTR.Null;
-		var offset = field switch
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiStorePoolStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
 		{
-			MuiStorePoolStateField.Pool => MuiStorePoolStateRecord.PoolOffset,
-			MuiStorePoolStateField.Policy => MuiStorePoolStateRecord.PolicyOffset,
-			MuiStorePoolStateField.OwnsPool => MuiStorePoolStateRecord.OwnsPoolOffset,
-			MuiStorePoolStateField.Magic => MuiStorePoolStateRecord.MagicOffset,
-			_ => uint.MaxValue,
-		};
-		if (offset == uint.MaxValue || address.IsNull || address.Raw >
-			uint.MaxValue - offset || !platform.IsMapped(address,
-			MuiStorePoolStateRecord.Size)) return false;
-		fieldAddress = APTR.FromPointer(address.Raw + offset);
-		return platform.IsMapped(fieldAddress, 4);
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiStorePoolStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				fieldAddress = candidate;
+				fieldSize = MuiStorePoolStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -170,6 +206,7 @@ internal static class MuiStorePoolStateCodec
 internal struct MuiStoreIterationStateRecord
 {
 	internal const uint Size = 24;
+	internal const uint FieldSize = 4;
 	internal const uint NextOffset = 0;
 	internal const uint CounterOffset = 4;
 	internal const uint CurrentOffset = 8;
@@ -195,28 +232,63 @@ internal enum MuiStoreIterationStateField : byte
 	Magic,
 }
 
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiStoreIterationStateFieldCursor
+{
+	internal APTR Record;
+	internal MuiStoreIterationStateField Field;
+}
+
 internal static class MuiStoreIterationStateCodec
 {
+	private static bool TryResolveFieldIndex(MuiStoreIterationStateField field,
+		out uint index)
+	{
+		index = field switch
+		{
+			MuiStoreIterationStateField.Next => 0,
+			MuiStoreIterationStateField.Counter => 1,
+			MuiStoreIterationStateField.Current => 2,
+			MuiStoreIterationStateField.NextRecord => 3,
+			MuiStoreIterationStateField.Kind => 4,
+			MuiStoreIterationStateField.Magic => 5,
+			_ => uint.MaxValue,
+		};
+		return index != uint.MaxValue;
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR address, MuiStoreIterationStateField field, out APTR fieldAddress)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiStoreIterationStateFieldCursor);
+		cursor.Record = address;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out fieldAddress, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStoreIterationStateFieldCursor cursor, out APTR fieldAddress,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		fieldAddress = APTR.Null;
-		var offset = field switch
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiStoreIterationStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
 		{
-			MuiStoreIterationStateField.Next => MuiStoreIterationStateRecord.NextOffset,
-			MuiStoreIterationStateField.Counter => MuiStoreIterationStateRecord.CounterOffset,
-			MuiStoreIterationStateField.Current => MuiStoreIterationStateRecord.CurrentOffset,
-			MuiStoreIterationStateField.NextRecord => MuiStoreIterationStateRecord.NextRecordOffset,
-			MuiStoreIterationStateField.Kind => MuiStoreIterationStateRecord.KindOffset,
-			MuiStoreIterationStateField.Magic => MuiStoreIterationStateRecord.MagicOffset,
-			_ => uint.MaxValue,
-		};
-		if (offset == uint.MaxValue || address.IsNull || address.Raw >
-			uint.MaxValue - offset || !platform.IsMapped(address,
-			MuiStoreIterationStateRecord.Size)) return false;
-		fieldAddress = APTR.FromPointer(address.Raw + offset);
-		return platform.IsMapped(fieldAddress, 4);
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiStoreIterationStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				fieldAddress = candidate;
+				fieldSize = MuiStoreIterationStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

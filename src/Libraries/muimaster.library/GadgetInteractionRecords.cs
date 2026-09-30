@@ -59,10 +59,14 @@ internal static class MuiGadgetInteractionStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiGadgetInteractionStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiGadgetInteractionStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiGadgetInteractionStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGadgetInteractionStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiGadgetInteractionStateField field, out uint value)
@@ -88,22 +92,22 @@ internal static class MuiGadgetInteractionStateFieldCursorCodec
 // malformed-state diagnostics.
 internal static class MuiGadgetInteractionStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiGadgetInteractionStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiGadgetInteractionStateField field,
+		out uint index)
 	{
 		if (field == MuiGadgetInteractionStateField.Magic)
-			offset = MuiGadgetInteractionStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiGadgetInteractionStateField.InputMode)
-			offset = MuiGadgetInteractionStateRecord.InputModeOffset;
+			index = 1;
 		else if (field == MuiGadgetInteractionStateField.Selected)
-			offset = MuiGadgetInteractionStateRecord.SelectedOffset;
+			index = 2;
 		else if (field == MuiGadgetInteractionStateField.Pressed)
-			offset = MuiGadgetInteractionStateRecord.PressedOffset;
+			index = 3;
 		else if (field == MuiGadgetInteractionStateField.ShowSelState)
-			offset = MuiGadgetInteractionStateRecord.ShowSelStateOffset;
+			index = 4;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -113,13 +117,34 @@ internal static class MuiGadgetInteractionStateRecordMemoryCodec
 		APTR record, MuiGadgetInteractionStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiGadgetInteractionStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiGadgetInteractionStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiGadgetInteractionStateRecord.Size) &&
-			platform.IsMapped(address, MuiGadgetInteractionStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiGadgetInteractionStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiGadgetInteractionStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiGadgetInteractionStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

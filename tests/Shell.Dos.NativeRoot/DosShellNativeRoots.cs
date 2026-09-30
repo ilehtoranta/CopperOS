@@ -1,4 +1,6 @@
+using System.Runtime.CompilerServices;
 using Amiga;
+using CopperSharp.Compiler;
 using CopperOS.Shell;
 using CopperOS.Shell.Dos;
 using CopperStart.Dos;
@@ -15,10 +17,25 @@ namespace CopperOS.Shell.Dos.NativeRoot;
 /// </summary>
 public static class DosShellNativeRoots
 {
+	// Park-only qualification roots the actual scheduler boundary via its export.
+	// It needs no process-launch or child-Shell capability roots.
+	public static uint ParkCapabilityRoot() => 0;
+
+	// A standalone Shell qualification HUNK must own the DOS task-return export
+	// referenced by the production process publisher. In the installed system,
+	// CopperStart's ROM root provides this ABI entry instead.
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	[M68kExport("copperstart.dos.process-return")]
+	[return: M68kRegister(M68kRegister.D0)]
+	public static uint DosProcessReturn(
+		[M68kRegister(M68kRegister.D0)] uint returnCode) =>
+		DosNativeProcessReturn.Entry(returnCode);
+
 	public static uint CapabilityRoot()
 	{
-		// Keep this callable root side-effect free; the Execute exports are added
-		// explicitly by the native qualification script.
+		// Compile-time reachability probe, not a guest startup entry: the calls
+		// below deliberately retain DOS capabilities using placeholder addresses.
+		// The Execute exports are added explicitly by the qualification script.
 		var dos = default(CopperSharpRomDosPlatform);
 		var state = APTR.FromPointer(0x0003_2000);
 		var wait = DosShellForegroundWaitCore.Allocate(ref dos, state,

@@ -117,36 +117,88 @@ internal static class MuiAppMessageNodeFieldCursorCodec
 // record boundary; message consumers use the semantic node struct.
 internal static class MuiAppMessageNodeMemoryCodec
 {
-	private static bool TryResolve(MuiAppMessageNodeField field,
-		out uint offset, out uint fieldSize)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiAppMessageNodeField field,
+		out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
 	{
+		address = APTR.Null;
+		fieldSize = 0;
 		switch (field)
 		{
 			case MuiAppMessageNodeField.Successor:
-				offset = MuiAppMessageNodeState.SuccessorOffset;
-				fieldSize = MuiAppMessageNodeState.FieldSize32; return true;
+				fieldSize = MuiAppMessageNodeState.FieldSize32;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					fieldSize, out address);
 			case MuiAppMessageNodeField.Predecessor:
-				offset = MuiAppMessageNodeState.PredecessorOffset;
-				fieldSize = MuiAppMessageNodeState.FieldSize32; return true;
+				fieldSize = MuiAppMessageNodeState.FieldSize32;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiAppMessageNodeState.FieldSize32, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					fieldSize, out address);
 			case MuiAppMessageNodeField.Type:
-				offset = MuiAppMessageNodeState.TypeOffset;
-				fieldSize = MuiAppMessageNodeState.FieldSize8; return true;
+				fieldSize = MuiAppMessageNodeState.FieldSize8;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiAppMessageNodeState.FieldSize32, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiAppMessageNodeState.FieldSize32, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					fieldSize, out address);
 			case MuiAppMessageNodeField.Priority:
-				offset = MuiAppMessageNodeState.PriorityOffset;
-				fieldSize = MuiAppMessageNodeState.FieldSize8; return true;
+				fieldSize = MuiAppMessageNodeState.FieldSize8;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiAppMessageNodeState.FieldSize32, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiAppMessageNodeState.FieldSize32, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiAppMessageNodeState.FieldSize8, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					fieldSize, out address);
 			case MuiAppMessageNodeField.Name:
-				offset = MuiAppMessageNodeState.NameOffset;
-				fieldSize = MuiAppMessageNodeState.FieldSize32; return true;
+				fieldSize = MuiAppMessageNodeState.FieldSize32;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiAppMessageNodeState.FieldSize32, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiAppMessageNodeState.FieldSize32, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiAppMessageNodeState.FieldSize8, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiAppMessageNodeState.FieldSize8, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					fieldSize, out address);
 			case MuiAppMessageNodeField.ReplyPort:
-				offset = MuiAppMessageNodeState.ReplyPortOffset;
-				fieldSize = MuiAppMessageNodeState.FieldSize32; return true;
+				fieldSize = MuiAppMessageNodeState.FieldSize32;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiAppMessageNodeState.FieldSize32, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiAppMessageNodeState.FieldSize32, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiAppMessageNodeState.FieldSize8, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiAppMessageNodeState.FieldSize8, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiAppMessageNodeState.FieldSize32, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					fieldSize, out address);
 			case MuiAppMessageNodeField.Length:
-				offset = MuiAppMessageNodeState.LengthOffset;
-				fieldSize = MuiAppMessageNodeState.FieldSize16; return true;
+				fieldSize = MuiAppMessageNodeState.FieldSize16;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiAppMessageNodeState.FieldSize32, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiAppMessageNodeState.FieldSize32, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiAppMessageNodeState.FieldSize8, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiAppMessageNodeState.FieldSize8, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiAppMessageNodeState.FieldSize32, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiAppMessageNodeState.FieldSize32, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					fieldSize, out address);
+			default:
+				return false;
 		}
-		offset = 0;
-		fieldSize = 0;
-		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -155,11 +207,11 @@ internal static class MuiAppMessageNodeMemoryCodec
 	{
 		address = APTR.Null;
 		fieldSize = 0;
-		if (!TryResolve(field, out var offset, out fieldSize) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiAppMessageNodeState.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, fieldSize);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiAppMessageNodeState.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address,
+				out fieldSize)) return false;
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -370,72 +422,255 @@ internal static class MuiAppMessageFieldCursorCodec
 // only this bounded guest-memory layer knows those MorphOS slots.
 internal static class MuiAppMessageRecordMemoryCodec
 {
-	private static bool TryResolve(MuiAppMessageField field,
-		out uint offset, out uint fieldSize)
+	private static bool TryTakeNodePrefix<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiAppMessageNodeState.FieldSize32, out _) &&
+		MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiAppMessageNodeState.FieldSize32, out _) &&
+		MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiAppMessageNodeState.FieldSize8, out _) &&
+		MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiAppMessageNodeState.FieldSize8, out _) &&
+		MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiAppMessageNodeState.FieldSize32, out _) &&
+		MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiAppMessageNodeState.FieldSize32, out _) &&
+		MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiAppMessageNodeState.FieldSize16, out _);
+
+	private static bool TryTakeVersionPrefix<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryTakeNodePrefix(ref platform, ref cursor) &&
+		MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiAppMessageNodeState.FieldSize16, out _) &&
+		MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiAppMessageNodeState.FieldSize32, out _) &&
+		MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiAppMessageNodeState.FieldSize32, out _) &&
+		MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiAppMessageNodeState.FieldSize32, out _) &&
+		MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiAppMessageNodeState.FieldSize32, out _);
+
+	private static bool TryTakeMouseXPrefix<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryTakeVersionPrefix(ref platform, ref cursor) &&
+		MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiAppMessageNodeState.FieldSize16, out _) &&
+		MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiAppMessageNodeState.FieldSize16, out _);
+
+	private static bool TryTakeSecondsPrefix<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryTakeMouseXPrefix(ref platform, ref cursor) &&
+		MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiAppMessageNodeState.FieldSize16, out _) &&
+		MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiAppMessageNodeState.FieldSize16, out _);
+
+	private static bool TryTakeReservedPrefix<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryTakeSecondsPrefix(ref platform, ref cursor) &&
+		MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiAppMessageNodeState.FieldSize32, out _) &&
+		MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiAppMessageNodeState.FieldSize32, out _);
+
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiAppMessageField field,
+		out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
 	{
+		address = APTR.Null;
+		fieldSize = 0;
 		switch (field)
 		{
 			case MuiAppMessageField.Type:
-				offset = MuiAppMessageRecord.TypeOffset;
-				fieldSize = MuiAppMessageRecord.FieldSize16; return true;
+				fieldSize = MuiAppMessageRecord.FieldSize16;
+				return TryTakeNodePrefix(ref platform, ref cursor) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out address);
 			case MuiAppMessageField.UserData:
-				offset = MuiAppMessageRecord.UserDataOffset;
-				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+				fieldSize = MuiAppMessageRecord.FieldSize32;
+				return TryTakeNodePrefix(ref platform, ref cursor) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiAppMessageRecord.FieldSize16, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out address);
 			case MuiAppMessageField.Id:
-				offset = MuiAppMessageRecord.IdOffset;
-				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+				fieldSize = MuiAppMessageRecord.FieldSize32;
+				return TryTakeNodePrefix(ref platform, ref cursor) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiAppMessageRecord.FieldSize16, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out address);
 			case MuiAppMessageField.NumberOfArguments:
-				offset = MuiAppMessageRecord.NumberOfArgumentsOffset;
-				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+				fieldSize = MuiAppMessageRecord.FieldSize32;
+				return TryTakeNodePrefix(ref platform, ref cursor) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiAppMessageRecord.FieldSize16, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out address);
 			case MuiAppMessageField.ArgumentList:
-				offset = MuiAppMessageRecord.ArgumentListOffset;
-				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+				fieldSize = MuiAppMessageRecord.FieldSize32;
+				return TryTakeNodePrefix(ref platform, ref cursor) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiAppMessageRecord.FieldSize16, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out address);
 			case MuiAppMessageField.Version:
-				offset = MuiAppMessageRecord.VersionOffset;
-				fieldSize = MuiAppMessageRecord.FieldSize16; return true;
+				fieldSize = MuiAppMessageRecord.FieldSize16;
+				return TryTakeVersionPrefix(ref platform, ref cursor) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out address);
 			case MuiAppMessageField.Class:
-				offset = MuiAppMessageRecord.ClassOffset;
-				fieldSize = MuiAppMessageRecord.FieldSize16; return true;
+				fieldSize = MuiAppMessageRecord.FieldSize16;
+				return TryTakeVersionPrefix(ref platform, ref cursor) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out address);
 			case MuiAppMessageField.MouseX:
-				offset = MuiAppMessageRecord.MouseXOffset;
-				fieldSize = MuiAppMessageRecord.FieldSize16; return true;
+				fieldSize = MuiAppMessageRecord.FieldSize16;
+				return TryTakeMouseXPrefix(ref platform, ref cursor) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out address);
 			case MuiAppMessageField.MouseY:
-				offset = MuiAppMessageRecord.MouseYOffset;
-				fieldSize = MuiAppMessageRecord.FieldSize16; return true;
+				fieldSize = MuiAppMessageRecord.FieldSize16;
+				return TryTakeMouseXPrefix(ref platform, ref cursor) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out address);
 			case MuiAppMessageField.Seconds:
-				offset = MuiAppMessageRecord.SecondsOffset;
-				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+				fieldSize = MuiAppMessageRecord.FieldSize32;
+				return TryTakeSecondsPrefix(ref platform, ref cursor) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out address);
 			case MuiAppMessageField.Micros:
-				offset = MuiAppMessageRecord.MicrosOffset;
-				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+				fieldSize = MuiAppMessageRecord.FieldSize32;
+				return TryTakeSecondsPrefix(ref platform, ref cursor) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out address);
 			case MuiAppMessageField.Reserved0:
-				offset = MuiAppMessageRecord.Reserved0Offset;
-				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+				fieldSize = MuiAppMessageRecord.FieldSize32;
+				return TryTakeReservedPrefix(ref platform, ref cursor) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out address);
 			case MuiAppMessageField.Reserved1:
-				offset = MuiAppMessageRecord.Reserved1Offset;
-				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+				fieldSize = MuiAppMessageRecord.FieldSize32;
+				return TryTakeReservedPrefix(ref platform, ref cursor) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out address);
 			case MuiAppMessageField.Reserved2:
-				offset = MuiAppMessageRecord.Reserved2Offset;
-				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+				fieldSize = MuiAppMessageRecord.FieldSize32;
+				return TryTakeReservedPrefix(ref platform, ref cursor) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out address);
 			case MuiAppMessageField.Reserved3:
-				offset = MuiAppMessageRecord.Reserved3Offset;
-				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+				fieldSize = MuiAppMessageRecord.FieldSize32;
+				return TryTakeReservedPrefix(ref platform, ref cursor) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out address);
 			case MuiAppMessageField.Reserved4:
-				offset = MuiAppMessageRecord.Reserved4Offset;
-				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+				fieldSize = MuiAppMessageRecord.FieldSize32;
+				return TryTakeReservedPrefix(ref platform, ref cursor) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out address);
 			case MuiAppMessageField.Reserved5:
-				offset = MuiAppMessageRecord.Reserved5Offset;
-				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+				fieldSize = MuiAppMessageRecord.FieldSize32;
+				return TryTakeReservedPrefix(ref platform, ref cursor) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out address);
 			case MuiAppMessageField.Reserved6:
-				offset = MuiAppMessageRecord.Reserved6Offset;
-				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+				fieldSize = MuiAppMessageRecord.FieldSize32;
+				return TryTakeReservedPrefix(ref platform, ref cursor) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out address);
 			case MuiAppMessageField.Reserved7:
-				offset = MuiAppMessageRecord.Reserved7Offset;
-				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+				fieldSize = MuiAppMessageRecord.FieldSize32;
+				return TryTakeReservedPrefix(ref platform, ref cursor) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) &&
+					MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out address);
+			default:
+				return false;
 		}
-		offset = 0;
-		fieldSize = 0;
-		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -444,11 +679,11 @@ internal static class MuiAppMessageRecordMemoryCodec
 	{
 		address = APTR.Null;
 		fieldSize = 0;
-		if (!TryResolve(field, out var offset, out fieldSize) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiAppMessageRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, fieldSize);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiAppMessageRecord.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address,
+				out fieldSize)) return false;
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -671,22 +906,29 @@ internal static class MuiWorkbenchArgumentFieldCursorCodec
 }
 
 // Fixed Workbench argument records are exposed as named BPTR/STRPTR fields.
-// Only this bounded adapter translates their two MorphOS guest LONG slots;
-// vector and message consumers use the semantic record.
+// The bounded cursor walks the complete two-slot struct; vector and message
+// consumers use the semantic record rather than selecting numeric offsets.
 internal static class MuiWorkbenchArgumentRecordMemoryCodec
 {
-	private static bool TryResolve(MuiWorkbenchArgumentField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiWorkbenchArgumentField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
+		address = APTR.Null;
 		switch (field)
 		{
 			case MuiWorkbenchArgumentField.Lock:
-				offset = MuiWorkbenchArgumentRecord.LockOffset; return true;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiWorkbenchArgumentRecord.FieldSize, out address);
 			case MuiWorkbenchArgumentField.Name:
-				offset = MuiWorkbenchArgumentRecord.NameOffset; return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiWorkbenchArgumentRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiWorkbenchArgumentRecord.FieldSize, out address);
+			default:
+				return false;
 		}
-		offset = 0;
-		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -694,11 +936,10 @@ internal static class MuiWorkbenchArgumentRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiWorkbenchArgumentRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiWorkbenchArgumentRecord.FieldSize);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiWorkbenchArgumentRecord.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address)) return false;
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

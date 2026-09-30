@@ -93,10 +93,14 @@ internal static class MuiBitmapPolicyStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiBitmapPolicyStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiBitmapPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiBitmapPolicyStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiBitmapPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiBitmapPolicyStateField field, out uint value)
@@ -121,26 +125,26 @@ internal static class MuiBitmapPolicyStateFieldCursorCodec
 // malformed-state diagnostics.
 internal static class MuiBitmapPolicyStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiBitmapPolicyStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiBitmapPolicyStateField field,
+		out uint index)
 	{
 		if (field == MuiBitmapPolicyStateField.Magic)
-			offset = MuiBitmapPolicyStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiBitmapPolicyStateField.Alpha)
-			offset = MuiBitmapPolicyStateRecord.AlphaOffset;
+			index = 1;
 		else if (field == MuiBitmapPolicyStateField.MappingTable)
-			offset = MuiBitmapPolicyStateRecord.MappingTableOffset;
+			index = 2;
 		else if (field == MuiBitmapPolicyStateField.Precision)
-			offset = MuiBitmapPolicyStateRecord.PrecisionOffset;
+			index = 3;
 		else if (field == MuiBitmapPolicyStateField.SourceColors)
-			offset = MuiBitmapPolicyStateRecord.SourceColorsOffset;
+			index = 4;
 		else if (field == MuiBitmapPolicyStateField.Transparent)
-			offset = MuiBitmapPolicyStateRecord.TransparentOffset;
+			index = 5;
 		else if (field == MuiBitmapPolicyStateField.UseFriend)
-			offset = MuiBitmapPolicyStateRecord.UseFriendOffset;
+			index = 6;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -150,12 +154,34 @@ internal static class MuiBitmapPolicyStateRecordMemoryCodec
 		APTR record, MuiBitmapPolicyStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiBitmapPolicyStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiBitmapPolicyStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
-			MuiBitmapPolicyStateRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiBitmapPolicyStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiBitmapPolicyStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiBitmapPolicyStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiBitmapPolicyStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

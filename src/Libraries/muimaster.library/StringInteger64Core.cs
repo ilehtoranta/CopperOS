@@ -106,29 +106,50 @@ internal struct MuiStringInteger64FieldCursor
 // packed guest translation and rejects incomplete records.
 internal static class MuiStringInteger64ValueMemoryCodec
 {
-	private static bool TryResolve(MuiStringInteger64Field field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiStringInteger64Field field,
+		out uint index)
 	{
-		offset = field switch
+		index = field switch
 		{
-			MuiStringInteger64Field.High => MuiStringInteger64Value.HighOffset,
-			MuiStringInteger64Field.Low => MuiStringInteger64Value.LowOffset,
+			MuiStringInteger64Field.High => 0,
+			MuiStringInteger64Field.Low => 1,
 			_ => uint.MaxValue,
 		};
-		return offset != uint.MaxValue;
+		return index != uint.MaxValue;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiStringInteger64Field field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiStringInteger64FieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringInteger64FieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiStringInteger64Value.Size))
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiStringInteger64Value.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiStringInteger64Value.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiStringInteger64Value.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiStringInteger64Value.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -168,6 +189,12 @@ internal static class MuiStringInteger64FieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiStringInteger64ValueMemoryCodec.TryGetAddress(ref platform,
 			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringInteger64FieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringInteger64ValueMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiStringInteger64Field field, out uint value)

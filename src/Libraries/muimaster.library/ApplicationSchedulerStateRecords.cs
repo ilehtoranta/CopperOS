@@ -85,7 +85,7 @@ internal static class MuiApplicationSchedulerStateAdmission
 			if (kind == InputHandlerQueue)
 			{
 				if (node.Value.IsNull || !MuiInputHandlerCodec.TryRead(ref platform,
-					node.Value, out var handler) || node.Packet != handler.Packet)
+					node.Value, out var handler) || node.Packet != handler.Method)
 					return false;
 			}
 			else if (kind == PushQueue)
@@ -173,42 +173,91 @@ internal static class MuiApplicationSchedulerStateFieldCursorCodec
 // translation is isolated here while queue validation stays in admission.
 internal static class MuiApplicationSchedulerStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiApplicationSchedulerStateField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiApplicationSchedulerStateField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (field == MuiApplicationSchedulerStateField.Magic)
-			offset = MuiApplicationSchedulerStateRecord.MagicOffset;
-		else if (field == MuiApplicationSchedulerStateField.ReturnHead)
-			offset = MuiApplicationSchedulerStateRecord.ReturnHeadOffset;
-		else if (field == MuiApplicationSchedulerStateField.ReturnTail)
-			offset = MuiApplicationSchedulerStateRecord.ReturnTailOffset;
-		else if (field == MuiApplicationSchedulerStateField.InputHandlers)
-			offset = MuiApplicationSchedulerStateRecord.InputHandlersOffset;
-		else if (field == MuiApplicationSchedulerStateField.SignalMask)
-			offset = MuiApplicationSchedulerStateRecord.SignalMaskOffset;
-		else if (field == MuiApplicationSchedulerStateField.PushHead)
-			offset = MuiApplicationSchedulerStateRecord.PushHeadOffset;
-		else if (field == MuiApplicationSchedulerStateField.PushTail)
-			offset = MuiApplicationSchedulerStateRecord.PushTailOffset;
-		else
+		address = APTR.Null;
+		switch (field)
 		{
-			offset = 0;
-			return false;
+			case MuiApplicationSchedulerStateField.Magic:
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSchedulerStateRecord.FieldSize, out address);
+			case MuiApplicationSchedulerStateField.ReturnHead:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSchedulerStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSchedulerStateRecord.FieldSize, out address);
+			case MuiApplicationSchedulerStateField.ReturnTail:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSchedulerStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSchedulerStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSchedulerStateRecord.FieldSize, out address);
+			case MuiApplicationSchedulerStateField.InputHandlers:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSchedulerStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSchedulerStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSchedulerStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSchedulerStateRecord.FieldSize, out address);
+			case MuiApplicationSchedulerStateField.SignalMask:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSchedulerStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSchedulerStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSchedulerStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSchedulerStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSchedulerStateRecord.FieldSize, out address);
+			case MuiApplicationSchedulerStateField.PushHead:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSchedulerStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSchedulerStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSchedulerStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSchedulerStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSchedulerStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSchedulerStateRecord.FieldSize, out address);
+			case MuiApplicationSchedulerStateField.PushTail:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSchedulerStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSchedulerStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSchedulerStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSchedulerStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSchedulerStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSchedulerStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSchedulerStateRecord.FieldSize, out address);
+			default:
+				return false;
 		}
-		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiApplicationSchedulerStateField field, out APTR address)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
-			MuiApplicationSchedulerStateRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address,
-			MuiApplicationSchedulerStateRecord.FieldSize);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiApplicationSchedulerStateRecord.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address)) return false;
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

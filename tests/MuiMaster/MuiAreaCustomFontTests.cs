@@ -7,6 +7,353 @@ public sealed class MuiAreaCustomFontTests
 {
 	private static readonly APTR State = APTR.FromPointer(0x1000);
 
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public void PendingChildCannotBeAcquiredByAnotherOwner(bool reservedSlot)
+	{
+		var platform = CreatePlatform(out var cl);
+		var parent = MuiCommonControlCore.CreateControl(ref platform, State, cl, APTR.Null);
+		var destination = MuiCommonControlCore.CreateControl(ref platform, State, cl, APTR.Null);
+		var child = MuiCommonControlCore.CreateControl(ref platform, State, cl, APTR.Null);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, parent, child));
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, State, child);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, record, out var value));
+		value.Flags |= MuiHeadlessObjectCore.ObjectProviderBusy;
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, record, value));
+		Assert.False(MuiHeadlessObjectCore.DisposeObject(ref platform, State, parent));
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, record, out value));
+		Assert.True(value.Parent.IsNull);
+		value.Flags &= ~MuiHeadlessObjectCore.ObjectProviderBusy;
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, record, value));
+		var retains = platform.ObjectRetainCount;
+		if (reservedSlot)
+		{
+			var owner = MuiHeadlessObjectCore.FindObject(ref platform, State, destination);
+			Assert.True(MuiConstructionChildSlotsCore.Reserve(ref platform, owner, out var slots));
+			Assert.False(MuiConstructionChildSlotsCore.Bind(ref platform, State, owner, slots.First, child));
+		}
+		else Assert.False(MuiFamilyCore.AddTail(ref platform, State, destination, child));
+		Assert.Equal(retains, platform.ObjectRetainCount);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, parent));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, destination));
+		Assert.Equal(3u, platform.NativeObjectDisposalCount);
+	}
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public void RootTeardownRetriesParentBeforeItsPendingChild(bool nested)
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var root = APTR.FromPointer(0x1200);
+		Assert.True(MuiMasterPrivateRootCodec.Write(ref platform, root,
+			new MuiMasterPrivateRoot { ClassRegistry = State.Raw }));
+		var parent = MuiCommonControlCore.CreateControl(ref platform, State, areaClass, APTR.Null);
+		if (nested)
+		{
+			// Create the ancestor later: ownership must override either registry order.
+			var ancestor = MuiCommonControlCore.CreateControl(ref platform, State, areaClass, APTR.Null);
+			Assert.True(MuiFamilyCore.AddTail(ref platform, State, ancestor, parent));
+		}
+		var child = MuiCommonControlCore.CreateControl(ref platform, State, areaClass, APTR.Null);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, parent, child));
+		var childRecord = MuiHeadlessObjectCore.FindObject(ref platform, State, child);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, childRecord, out var value));
+		value.Flags |= MuiHeadlessObjectCore.ObjectProviderBusy;
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, childRecord, value));
+		Assert.False(MuiHeadlessObjectCore.DisposeObject(ref platform, State, parent));
+		Assert.Equal(0u, platform.NativeObjectDisposalCount);
+		Assert.False(MuiMasterLifecycleCore.Dispose(ref platform, root));
+		Assert.Equal(0u, platform.NativeObjectDisposalCount);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, childRecord, out value));
+		value.Flags &= ~MuiHeadlessObjectCore.ObjectProviderBusy;
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, childRecord, value));
+		// Only the retaining owner's retry may finish this child's disposal.
+		Assert.False(MuiHeadlessObjectCore.DisposeObject(ref platform, State, child));
+		Assert.Equal(0u, platform.NativeObjectDisposalCount);
+		var childRecordFreed = false;
+		platform.AllocationFreed = (address, size) =>
+		{
+			if (address.Raw == childRecord.Raw) childRecordFreed = true;
+		};
+		platform.MappingAdmission = (address, size) =>
+			!childRecordFreed || address.Raw < childRecord.Raw ||
+			address.Raw >= childRecord.Raw + MuiHeadlessObjectRecord.Size;
+		Assert.True(MuiMasterLifecycleCore.Dispose(ref platform, root));
+		Assert.Equal(nested ? 3u : 2u, platform.NativeObjectDisposalCount);
+	}
+
+	[Theory]
+	[InlineData(MuiHeadlessObjectCore.ObjectDisposing)]
+	[InlineData(MuiHeadlessObjectCore.ObjectProviderBusy)]
+	public void TransferToUnavailableFamilyDoesNotDetachSourceChild(uint unavailable)
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var source = MuiCommonControlCore.CreateControl(ref platform, State, areaClass, APTR.Null);
+		var destination = MuiCommonControlCore.CreateControl(ref platform, State, areaClass, APTR.Null);
+		var child = MuiCommonControlCore.CreateControl(ref platform, State, areaClass, APTR.Null);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, source, child));
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, State, destination);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, record, out var saved));
+		var busy = saved;
+		busy.Flags |= unavailable;
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, record, busy));
+		Assert.False(MuiFamilyCore.Transfer(ref platform, State, destination, source));
+		Assert.Equal(child.Raw, MuiFamilyCore.GetChild(ref platform, State, source, 0, APTR.Null).Raw);
+		Assert.True(MuiFamilyCore.GetChild(ref platform, State, destination, 0, APTR.Null).IsNull);
+		Assert.True(MuiHeadlessObjectCodec.Write(ref platform, record, saved));
+		Assert.True(MuiFamilyCore.Transfer(ref platform, State, destination, source));
+		Assert.Equal(child.Raw, MuiFamilyCore.GetChild(ref platform, State, destination, 0, APTR.Null).Raw);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, source));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, destination));
+		Assert.Equal(3u, platform.NativeObjectDisposalCount);
+	}
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public void ParentRetryUnlinksCompletedChildWithoutDisposingAgain(bool followingSibling)
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var parent = MuiCommonControlCore.CreateControl(ref platform, State, areaClass, APTR.Null);
+		var child = MuiCommonControlCore.CreateControl(ref platform, State, areaClass, APTR.Null);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, parent, child));
+		if (followingSibling)
+		{
+			var sibling = MuiCommonControlCore.CreateControl(ref platform, State, areaClass, APTR.Null);
+			Assert.True(MuiFamilyCore.AddTail(ref platform, State, parent, sibling));
+		}
+		var parentRecord = MuiHeadlessObjectCore.FindObject(ref platform, State, parent);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, parentRecord, out var before));
+		Assert.True(MuiHeadlessObjectMemoryCodec.TryGetAddress(ref platform, parentRecord,
+			MuiHeadlessObjectField.ChildrenHead, out var headField));
+		var refused = false;
+		platform.MappingAdmission = (address, size) =>
+		{
+			if (refused || platform.NativeObjectDisposalCount != 1 || address.Raw != headField.Raw)
+				return true;
+			refused = true;
+			return false;
+		};
+		Assert.False(MuiHeadlessObjectCore.DisposeObject(ref platform, State, parent));
+		Assert.True(refused);
+		platform.MappingAdmission = null;
+		Assert.Equal(1u, platform.NativeObjectDisposalCount);
+		Assert.True(MuiHeadlessChildCodec.TryRead(ref platform, before.ChildrenHead, out var pending));
+		Assert.True(pending.Object.IsNull);
+		Assert.True(MuiHeadlessObjectCore.FindObject(ref platform, State, child).IsNull);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, parent));
+		Assert.Equal(followingSibling ? 3u : 2u, platform.NativeObjectDisposalCount);
+		Assert.True(MuiHeadlessClassCodec.TryRead(ref platform, areaClass, out var released));
+		Assert.Equal(0u, released.ObjectCount);
+		Assert.True(MuiHeadlessObjectCore.FindObject(ref platform, State, parent).IsNull);
+	}
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public void ParentDisposalMustRetainOwnershipWhenChildFontCloseIsRefused(bool completedSibling)
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var parent = MuiCommonControlCore.CreateControl(ref platform, State, areaClass, APTR.Null);
+		if (completedSibling)
+		{
+			var sibling = MuiCommonControlCore.CreateControl(ref platform, State, areaClass, APTR.Null);
+			Assert.True(MuiFamilyCore.AddTail(ref platform, State, parent, sibling));
+		}
+		var child = MuiCommonControlCore.CreateControl(ref platform, State, areaClass, APTR.Null);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, parent, child));
+		var spec = APTR.FromPointer(0x2200);
+		platform.WriteCString(spec, "/+10");
+		Assert.True(MuiAreaCustomFontPacketCore.Set(ref platform, State, child, spec, false));
+		var renderInfo = APTR.FromPointer(0x2400);
+		platform.WriteUInt32(renderInfo, 20, 0x2500);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, child, renderInfo));
+		platform.RefuseCustomFontClose = true;
+		platform.MutateFamilyDuringCustomFontClose = parent;
+		platform.MutateFamilyChildDuringCustomFontClose = child;
+		Assert.False(MuiHeadlessObjectCore.DisposeObject(ref platform, State, parent));
+		Assert.Equal(1u, platform.FamilyMutationCallbackCount);
+		Assert.False(platform.FamilyMutationDuringCloseSucceeded);
+		Assert.Equal(completedSibling ? 1u : 0u, platform.NativeObjectDisposalCount);
+		Assert.True(MuiHeadlessObjectCore.FindObject(ref platform, State, parent).IsNotNull);
+		Assert.True(MuiHeadlessObjectCore.FindObject(ref platform, State, child).IsNotNull);
+		Assert.False(MuiFamilyCore.Remove(ref platform, State, parent, child));
+		Assert.False(MuiFamilyCore.AddTail(ref platform, State, parent, child));
+		Assert.False(MuiFamilyCore.MoveAfter(ref platform, State, parent, child, APTR.Null));
+		platform.RefuseCustomFontClose = false;
+		platform.MutateFamilyDuringCustomFontClose = parent;
+		Assert.False(MuiHeadlessObjectCore.DisposeObject(ref platform, State, child));
+		Assert.False(MuiHeadlessObjectCore.DisposeObjectState(ref platform, State, child, false));
+		Assert.Equal(1u, platform.CustomFontCloseCount);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, parent));
+		Assert.Equal(2u, platform.FamilyMutationCallbackCount);
+		Assert.False(platform.FamilyMutationDuringCloseSucceeded);
+		Assert.True(MuiHeadlessObjectCore.FindObject(ref platform, State, parent).IsNull);
+		Assert.True(MuiHeadlessObjectCore.FindObject(ref platform, State, child).IsNull);
+		Assert.Equal(completedSibling ? 3u : 2u, platform.NativeObjectDisposalCount);
+		Assert.Equal(2u, platform.CustomFontCloseCount);
+		Assert.Equal(0u, platform.InvalidCustomFontCloses);
+	}
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public void ObjectDisposalResumesAfterFontProviderRefusal(bool disposeNative)
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var spec = APTR.FromPointer(0x2200);
+		platform.WriteCString(spec, "/+10");
+		var obj = MuiCommonControlCore.CreateControl(ref platform, State, areaClass, APTR.Null);
+		Assert.True(MuiAreaCustomFontPacketCore.Set(ref platform, State, obj, spec, false));
+		var renderInfo = APTR.FromPointer(0x2400);
+		platform.WriteUInt32(renderInfo, 20, 0x2500);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, obj, renderInfo));
+		platform.RefuseCustomFontClose = true;
+		platform.DisposeDuringCustomFontClose = obj;
+		Assert.False(MuiHeadlessObjectCore.DisposeObjectState(ref platform, State, obj, disposeNative));
+		Assert.False(platform.DisposeDuringCustomFontCloseResult);
+		Assert.Equal(0u, platform.NativeObjectDisposalCount);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform,
+			MuiHeadlessObjectCore.FindObject(ref platform, State, obj), out var pending));
+		Assert.NotEqual(0u, pending.Flags & MuiHeadlessObjectCore.ObjectDisposing);
+		Assert.False(MuiHeadlessObjectCore.DisposeObjectState(ref platform, State, obj, !disposeNative));
+		Assert.Equal(1u, platform.CustomFontCloseCount);
+		platform.RefuseCustomFontClose = false;
+		Assert.True(MuiHeadlessObjectCore.DisposeObjectState(ref platform, State, obj, disposeNative));
+		Assert.Equal(2u, platform.CustomFontCloseCount);
+		Assert.Equal(0u, platform.InvalidCustomFontCloses);
+		Assert.True(MuiHeadlessObjectCore.FindObject(ref platform, State, obj).IsNull);
+		Assert.Equal(disposeNative ? 1u : 0u, platform.NativeObjectDisposalCount);
+		if (!disposeNative) platform.DisposeObject(obj);
+	}
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public void ObjectDisposalResumesClosedFontRemovalWithoutSecondClose(bool disposeNative)
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var spec = APTR.FromPointer(0x2200);
+		platform.WriteCString(spec, "/+10");
+		var obj = MuiCommonControlCore.CreateControl(ref platform, State, areaClass, APTR.Null);
+		Assert.True(MuiAreaCustomFontPacketCore.Set(ref platform, State, obj, spec, false));
+		var renderInfo = APTR.FromPointer(0x2400);
+		platform.WriteUInt32(renderInfo, 20, 0x2500);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, obj, renderInfo));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, obj, MuiAreaCustomFontCore.RuntimeStateKey);
+		Assert.True(MuiAreaCustomFontRuntimeRecordMemoryCodec.TryGetAddress(ref platform,
+			block, MuiAreaCustomFontRuntimeField.Active, out var activeField));
+		var refused = false;
+		platform.DisposeDuringCustomFontClose = obj;
+		platform.MappingAdmission = (address, size) =>
+		{
+			if (platform.CustomFontCloseCount == 0 || refused ||
+				platform.ReadUInt32(activeField, 0) != 0) return true;
+			refused = true;
+			return false;
+		};
+		Assert.False(MuiHeadlessObjectCore.DisposeObjectState(ref platform, State, obj, disposeNative));
+		Assert.True(refused);
+		Assert.False(platform.DisposeDuringCustomFontCloseResult);
+		Assert.Equal(0u, platform.NativeObjectDisposalCount);
+		platform.MappingAdmission = null;
+		Assert.True(MuiAreaCustomFontRuntimeRecordCodec.TryReadStructural(ref platform, block, out var closed));
+		Assert.Equal(0u, closed.Active);
+		Assert.True(closed.Font.IsNull);
+		Assert.True(MuiHeadlessClassCodec.TryRead(ref platform, areaClass, out var retainedClass));
+		Assert.Equal(1u, retainedClass.ObjectCount);
+		Assert.True(MuiHeadlessObjectCore.DisposeObjectState(ref platform, State, obj, disposeNative));
+		Assert.Equal(1u, platform.CustomFontCloseCount);
+		Assert.Equal(0u, platform.InvalidCustomFontCloses);
+		Assert.Equal(disposeNative ? 1u : 0u, platform.NativeObjectDisposalCount);
+		Assert.True(MuiHeadlessClassCodec.TryRead(ref platform, areaClass, out var releasedClass));
+		Assert.Equal(0u, releasedClass.ObjectCount);
+		Assert.True(MuiHeadlessObjectCore.FindObject(ref platform, State, obj).IsNull);
+		if (!disposeNative) platform.DisposeObject(obj);
+	}
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public void ProviderCloseRefusalPreservesActiveRuntimeForRetry(bool recursive)
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var spec = APTR.FromPointer(0x2200);
+		platform.WriteCString(spec, "/+10");
+		var obj = MuiCommonControlCore.CreateControl(ref platform, State, areaClass, APTR.Null);
+		Assert.True(MuiAreaCustomFontPacketCore.Set(ref platform, State, obj, spec, false));
+		var renderInfo = APTR.FromPointer(0x2400);
+		platform.WriteUInt32(renderInfo, 20, 0x2500);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, obj, renderInfo));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, obj, MuiAreaCustomFontCore.RuntimeStateKey);
+		Assert.True(MuiAreaCustomFontRuntimeRecordCodec.TryReadStructural(ref platform, block, out var before));
+		platform.RefuseCustomFontClose = true;
+		platform.DisposeDuringCustomFontClose = obj;
+		platform.MutateStoreDuringCustomFontClose = obj;
+		if (recursive) platform.ReenterCustomFontCloseObject = obj;
+		Assert.False(MuiAreaCustomFontCore.CloseRuntime(ref platform, State, obj));
+		Assert.False(platform.RecursiveCustomFontCloseResult);
+		Assert.False(platform.DisposeDuringCustomFontCloseResult);
+		Assert.False(platform.StoreMutationDuringCloseSucceeded);
+		Assert.True(MuiAreaCustomFontRuntimeRecordCodec.TryReadStructural(ref platform, block, out var after));
+		Assert.Equal(before, after);
+		platform.RefuseCustomFontClose = false;
+		Assert.True(MuiAreaCustomFontCore.CloseRuntime(ref platform, State, obj));
+		Assert.Equal(2u, platform.CustomFontCloseCount);
+		Assert.Equal(0u, platform.InvalidCustomFontCloses);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+	}
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public void RemovalFailureAfterProviderCloseDoesNotCloseHandleAgainOnRetry(bool recursive)
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var spec = APTR.FromPointer(0x2200);
+		platform.WriteCString(spec, "/+10");
+		var obj = MuiCommonControlCore.CreateControl(ref platform, State, areaClass, APTR.Null);
+		Assert.True(MuiAreaCustomFontPacketCore.Set(ref platform, State, obj, spec, false));
+		var renderInfo = APTR.FromPointer(0x2400);
+		platform.WriteUInt32(renderInfo, 20, 0x2500);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, obj, renderInfo));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, obj, MuiAreaCustomFontCore.RuntimeStateKey);
+		Assert.True(MuiAreaCustomFontRuntimeRecordMemoryCodec.TryGetAddress(ref platform,
+			block, MuiAreaCustomFontRuntimeField.Active, out var activeField));
+		var refused = false;
+		platform.DisposeDuringCustomFontClose = obj;
+		platform.MutateStoreDuringCustomFontClose = obj;
+		if (recursive) platform.ReenterCustomFontCloseObject = obj;
+		platform.MappingAdmission = (address, size) =>
+		{
+			if (platform.CustomFontCloseCount == 0 || refused) return true;
+			// Do not inject into recursive admission: wait for the outer call's
+			// closed-state marker before refusing storage removal.
+			if (platform.ReadUInt32(activeField, 0) != 0) return true;
+			refused = true;
+			return false;
+		};
+		Assert.False(MuiAreaCustomFontCore.CloseRuntime(ref platform, State, obj));
+		Assert.True(refused);
+		Assert.False(platform.RecursiveCustomFontCloseResult);
+		Assert.False(platform.DisposeDuringCustomFontCloseResult);
+		Assert.False(platform.StoreMutationDuringCloseSucceeded);
+		platform.MappingAdmission = null;
+		var owner = MuiHeadlessObjectCore.FindObject(ref platform, State, obj);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, owner, out var ownerValue));
+		Assert.Equal(0u, ownerValue.Flags & MuiHeadlessObjectCore.ObjectProviderBusy);
+		Assert.True(MuiAreaCustomFontRuntimeRecordCodec.TryReadStructural(ref platform, block, out var closed));
+		Assert.Equal(0u, closed.Active);
+		Assert.True(closed.Font.IsNull);
+		Assert.True(closed.Spec.IsNull);
+		Assert.True(MuiAreaCustomFontCore.CloseRuntime(ref platform, State, obj));
+		Assert.Equal(1u, platform.CustomFontCloseCount);
+		Assert.Equal(0u, platform.InvalidCustomFontCloses);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+	}
+
 	[Fact]
 	public void CustomFontProjectsCallerOwnedSpecAndTracksRuntimeChanges()
 	{

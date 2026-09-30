@@ -89,6 +89,19 @@ public sealed class MuiStringIntegerAdmissionTests
 			ref platform, address, MuiStringIntegerStateField.Value,
 			out var valueAddress));
 		Assert.Equal(0x1A04u, valueAddress.Raw);
+		var valueCursor = new MuiStringIntegerStateFieldCursor
+		{
+			Record = address,
+			Field = MuiStringIntegerStateField.Value,
+		};
+		Assert.True(MuiStringIntegerStateFieldCursorCodec.TryGetAddress(ref platform,
+			valueCursor, out var cursorValueAddress, out var cursorFieldSize));
+		Assert.Equal(valueAddress, cursorValueAddress);
+		Assert.Equal(MuiStringIntegerStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiStringIntegerStateRecordMemoryCodec.TryGetAddress(ref platform,
+			valueCursor, out var memoryValueAddress, out var memoryFieldSize));
+		Assert.Equal(cursorValueAddress, memoryValueAddress);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiStringIntegerStateRecordMemoryCodec.TryReadUInt32(
 			ref platform, address, MuiStringIntegerStateField.Value,
 			out var raw));
@@ -105,6 +118,13 @@ public sealed class MuiStringIntegerAdmissionTests
 			ref platform, APTR.Null, MuiStringIntegerStateField.Magic, out _));
 		Assert.False(MuiStringIntegerStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
+		valueCursor.Field = (MuiStringIntegerStateField)255;
+		Assert.False(MuiStringIntegerStateFieldCursorCodec.TryGetAddress(ref platform,
+			valueCursor, out _, out _));
+		valueCursor.Record = APTR.Null;
+		valueCursor.Field = MuiStringIntegerStateField.Value;
+		Assert.False(MuiStringIntegerStateFieldCursorCodec.TryGetAddress(ref platform,
+			valueCursor, out _, out _));
 	}
 
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR stringClass)

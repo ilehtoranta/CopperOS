@@ -88,23 +88,26 @@ internal struct MuiWindowRelationshipStateFieldCursor
 
 internal static class MuiWindowRelationshipStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiWindowRelationshipStateField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiWindowRelationshipStateField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (field == MuiWindowRelationshipStateField.Magic)
-			offset = MuiWindowRelationshipStateRecord.MagicOffset;
-		else if (field == MuiWindowRelationshipStateField.RootObject)
-			offset = MuiWindowRelationshipStateRecord.RootObjectOffset;
-		else if (field == MuiWindowRelationshipStateField.Menustrip)
-			offset = MuiWindowRelationshipStateRecord.MenustripOffset;
-		else if (field == MuiWindowRelationshipStateField.RefWindow)
-			offset = MuiWindowRelationshipStateRecord.RefWindowOffset;
-		else
+		address = APTR.Null;
+		var skips = field switch
 		{
-			offset = 0;
-			return false;
-		}
-		return true;
+			MuiWindowRelationshipStateField.Magic => 0u,
+			MuiWindowRelationshipStateField.RootObject => 1u,
+			MuiWindowRelationshipStateField.Menustrip => 2u,
+			MuiWindowRelationshipStateField.RefWindow => 3u,
+			_ => uint.MaxValue,
+		};
+		if (skips == uint.MaxValue) return false;
+		for (var i = 0u; i < skips; i++)
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiWindowRelationshipStateRecord.FieldSize, out _)) return false;
+		return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiWindowRelationshipStateRecord.FieldSize, out address);
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -112,12 +115,11 @@ internal static class MuiWindowRelationshipStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiWindowRelationshipStateRecord.Size))
+		if (!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+			MuiWindowRelationshipStateRecord.Size, out var structCursor) ||
+			!TryTakeField(ref platform, ref structCursor, cursor.Field, out address))
 			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, MuiWindowRelationshipStateRecord.FieldSize);
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -147,26 +149,31 @@ internal static class MuiWindowRelationshipStateFieldCursorCodec
 }
 
 // Struct-first guest-memory adapter. Relationship capabilities remain named
-// APTR fields; only this bounded boundary translates their fixed guest slots.
+// APTR fields; typed selection walks the packed struct. The numeric overload
+// remains a compatibility bridge for older callers that already carry an ABI
+// offset.
 internal static class MuiWindowRelationshipStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiWindowRelationshipStateField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiWindowRelationshipStateField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (field == MuiWindowRelationshipStateField.Magic)
-			offset = MuiWindowRelationshipStateRecord.MagicOffset;
-		else if (field == MuiWindowRelationshipStateField.RootObject)
-			offset = MuiWindowRelationshipStateRecord.RootObjectOffset;
-		else if (field == MuiWindowRelationshipStateField.Menustrip)
-			offset = MuiWindowRelationshipStateRecord.MenustripOffset;
-		else if (field == MuiWindowRelationshipStateField.RefWindow)
-			offset = MuiWindowRelationshipStateRecord.RefWindowOffset;
-		else
+		address = APTR.Null;
+		var skips = field switch
 		{
-			offset = 0;
-			return false;
-		}
-		return true;
+			MuiWindowRelationshipStateField.Magic => 0u,
+			MuiWindowRelationshipStateField.RootObject => 1u,
+			MuiWindowRelationshipStateField.Menustrip => 2u,
+			MuiWindowRelationshipStateField.RefWindow => 3u,
+			_ => uint.MaxValue,
+		};
+		if (skips == uint.MaxValue) return false;
+		for (var i = 0u; i < skips; i++)
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiWindowRelationshipStateRecord.FieldSize, out _)) return false;
+		return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiWindowRelationshipStateRecord.FieldSize, out address);
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -174,8 +181,10 @@ internal static class MuiWindowRelationshipStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		return TryResolve(field, out var offset) &&
-			TryGetAddress(ref platform, record, offset, out address);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiWindowRelationshipStateRecord.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address)) return false;
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

@@ -88,6 +88,7 @@ internal struct MuiProcessSpecialistRecord
 internal struct MuiProcessDispatchPacketHeader
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
 	internal const uint ArgumentCountOffset = 0;
 	internal const uint MethodIdOffset = 4;
 	internal uint ArgumentCount;
@@ -101,6 +102,7 @@ internal struct MuiProcessDispatchPacketHeader
 internal struct MuiProcessMethodMessageHeader
 {
 	internal const uint Size = 4;
+	internal const uint FieldSize = 4;
 	internal const uint MethodIdOffset = 0;
 	internal uint MethodId;
 }
@@ -411,14 +413,28 @@ internal static class MuiProcessArgumentVectorMemoryCodec
 			default:
 				return false;
 		}
-		if (message.Raw > uint.MaxValue - headerSize) return false;
-		var vector = APTR.FromPointer(message.Raw + headerSize);
-		if (index > (uint.MaxValue - vector.Raw) /
-			MuiProcessDispatchArgumentSlot.Size) return false;
-		var offset = index * MuiProcessDispatchArgumentSlot.Size;
-		if (vector.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(vector.Raw + offset);
-		return platform.IsMapped(address, MuiProcessDispatchArgumentSlot.Size);
+		var totalBytes = headerSize + count * MuiProcessDispatchArgumentSlot.Size;
+		if (totalBytes < headerSize || message.Raw > uint.MaxValue - totalBytes ||
+			!platform.IsMapped(message, totalBytes) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, message, totalBytes,
+				out var cursor)) return false;
+		var headerFieldSize = kind == MuiProcessArgumentVectorKind.DispatchPacket ?
+			MuiProcessDispatchPacketHeader.FieldSize :
+			MuiProcessMethodMessageHeader.FieldSize;
+		var headerFieldCount = kind == MuiProcessArgumentVectorKind.DispatchPacket ?
+			2u : 1u;
+		for (var headerIndex = 0u; headerIndex < headerFieldCount; headerIndex++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				headerFieldSize, out _)) return false;
+		}
+		for (var current = 0u; current < count; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiProcessDispatchArgumentSlot.Size, out var candidate)) return false;
+			if (current == index) address = candidate;
+		}
+		return !address.IsNull && MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -506,59 +522,36 @@ internal struct MuiProcessRecordFieldCursor
 
 internal static class MuiProcessRecordFieldMemoryCodec
 {
-	private static bool TryResolve(MuiProcessRecordKind record,
-		MuiProcessRecordField field, out uint offset, out uint size)
+	private static bool TryResolveFieldIndex(MuiProcessRecordKind record,
+		MuiProcessRecordField field, out uint index, out uint recordSize)
 	{
-		offset = 0;
-		size = 0;
+		index = uint.MaxValue;
+		recordSize = 0;
 		switch (record)
 		{
 			case MuiProcessRecordKind.DispatchHeader:
-				size = MuiProcessDispatchPacketHeader.Size;
-				offset = field switch
+				if (field == MuiProcessRecordField.ArgumentCount)
 				{
-					MuiProcessRecordField.ArgumentCount =>
-						MuiProcessDispatchPacketHeader.ArgumentCountOffset,
-					MuiProcessRecordField.MethodId =>
-						MuiProcessDispatchPacketHeader.MethodIdOffset,
-					_ => uint.MaxValue,
-				};
+					index = 0; recordSize = MuiProcessDispatchPacketHeader.Size;
+					return true;
+				}
+				if (field == MuiProcessRecordField.MethodId)
+				{
+					index = 1; recordSize = MuiProcessDispatchPacketHeader.Size;
+					return true;
+				}
 				break;
 			case MuiProcessRecordKind.Specialist:
-				size = MuiProcessSpecialistRecord.Size;
-				offset = field switch
+				if (field >= MuiProcessRecordField.Magic &&
+					field <= MuiProcessRecordField.NotifyAttribute)
 				{
-					MuiProcessRecordField.Magic =>
-						MuiProcessSpecialistRecord.MagicOffset,
-					MuiProcessRecordField.Class =>
-						MuiProcessSpecialistRecord.ClassOffset,
-					MuiProcessRecordField.State =>
-						MuiProcessSpecialistRecord.StateOffset,
-					MuiProcessRecordField.TaskToken =>
-						MuiProcessSpecialistRecord.TaskTokenOffset,
-					MuiProcessRecordField.NameOwned =>
-						MuiProcessSpecialistRecord.NameOwnedOffset,
-					MuiProcessRecordField.NameOwnedSize =>
-						MuiProcessSpecialistRecord.NameOwnedSizeOffset,
-					MuiProcessRecordField.Error =>
-						MuiProcessSpecialistRecord.ErrorOffset,
-					MuiProcessRecordField.SignalsReceived =>
-						MuiProcessSpecialistRecord.SignalsReceivedOffset,
-					MuiProcessRecordField.Flags =>
-						MuiProcessSpecialistRecord.FlagsOffset,
-					MuiProcessRecordField.DispatchDepth =>
-						MuiProcessSpecialistRecord.DispatchDepthOffset,
-					MuiProcessRecordField.SetupState =>
-						MuiProcessSpecialistRecord.SetupStateOffset,
-					MuiProcessRecordField.NotifyCount =>
-						MuiProcessSpecialistRecord.NotifyCountOffset,
-					MuiProcessRecordField.NotifyAttribute =>
-						MuiProcessSpecialistRecord.NotifyAttributeOffset,
-					_ => uint.MaxValue,
-				};
+					index = (uint)field - (uint)MuiProcessRecordField.Magic;
+					recordSize = MuiProcessSpecialistRecord.Size;
+					return true;
+				}
 				break;
 		}
-		return offset != uint.MaxValue;
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -566,12 +559,33 @@ internal static class MuiProcessRecordFieldMemoryCodec
 		MuiProcessRecordField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		return TryGetAddress(ref platform, recordAddress, record, field,
+			out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR recordAddress, MuiProcessRecordKind record,
+		MuiProcessRecordField field, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(record, field, out var offset, out var size) ||
-			recordAddress.IsNull || recordAddress.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(recordAddress, size)) return false;
-		address = APTR.FromPointer(recordAddress.Raw + offset);
-		return platform.IsMapped(address, 4);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(record, field, out var index,
+			out var recordSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, recordAddress, recordSize,
+				out var cursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 4,
+				out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = 4;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -608,6 +622,12 @@ internal static class MuiProcessRecordFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiProcessRecordFieldMemoryCodec.TryGetAddress(ref platform,
 			cursor.Address, cursor.Record, cursor.Field, out address);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiProcessRecordFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiProcessRecordFieldMemoryCodec.TryGetAddress(ref platform,
+			cursor.Address, cursor.Record, cursor.Field, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiProcessRecordKind record, MuiProcessRecordField field,

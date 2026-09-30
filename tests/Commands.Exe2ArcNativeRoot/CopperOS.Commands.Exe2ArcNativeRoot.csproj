@@ -1,15 +1,37 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <CopperOSUseLocalCopperSharp>true</CopperOSUseLocalCopperSharp>
+  </PropertyGroup>
   <Import Project="..\..\CopperOS.Portable.props" />
   <PropertyGroup>
     <CopperOSReferenceSdkAmigaSupport>true</CopperOSReferenceSdkAmigaSupport>
     <AssemblyName>CopperOS.Commands.Exe2ArcNativeRoot</AssemblyName>
     <RootNamespace>CopperOS.Commands.Exe2ArcNativeRoot</RootNamespace>
     <ImplicitUsings>false</ImplicitUsings>
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Compile the exact production source without rebuilding Commands/Shell. -->
+    <Compile Include="..\..\src\Commands\Exe2Arc\Exe2ArcIo.cs" Link="Exe2ArcIo.cs" />
+    <Compile Include="..\..\src\Commands\Exe2Arc\Exe2ArcPayloadCopy.cs" Link="Exe2ArcPayloadCopy.cs" />
+    <Compile Include="..\..\src\Commands\Exe2Arc\Exe2ArcForwardScanner.cs" Link="Exe2ArcForwardScanner.cs" />
     <Compile Include="..\..\src\Commands\Exe2Arc\Exe2ArcHeaderProbe.cs" Link="Exe2ArcHeaderProbe.cs" />
+    <Compile Include="..\..\src\Commands\Exe2Arc\Exe2ArcLhaScanner.cs" Link="Exe2ArcLhaScanner.cs" />
+    <Compile Include="..\..\src\Commands\Exe2Arc\Exe2ArcOutputName.cs" Link="Exe2ArcOutputName.cs" />
+    <Compile Include="..\..\src\Commands\Exe2Arc\Exe2ArcOutputSelection.cs" Link="Exe2ArcOutputSelection.cs" />
+    <Compile Include="..\..\src\Commands\Exe2Arc\Exe2ArcResultPolicy.cs" Link="Exe2ArcResultPolicy.cs" />
+    <Compile Include="..\..\src\Commands\Exe2Arc\Exe2ArcScannerSelection.cs" Link="Exe2ArcScannerSelection.cs" />
+    <Compile Include="..\..\src\Commands\Exe2Arc\Exe2ArcTypeSelection.cs" Link="Exe2ArcTypeSelection.cs" />
+    <Compile Include="..\..\src\Commands\Exe2Arc\Exe2ArcZipRecordExtractor.cs" Link="Exe2ArcZipRecordExtractor.cs" />
+    <Compile Include="..\..\src\Commands\Exe2Arc\Exe2ArcZipRecordRewriter.cs" Link="Exe2ArcZipRecordRewriter.cs" />
+    <Compile Include="..\..\src\Commands\Exe2Arc\Exe2ArcZipScanner.cs" Link="Exe2ArcZipScanner.cs" />
+    <Compile Include="..\..\src\Commands\Common\NativeCommandArguments.cs" Link="NativeCommandArguments.cs" />
+    <Compile Include="..\..\src\Commands\Common\NativeCommandIo.cs" Link="NativeCommandIo.cs" />
+    <Compile Include="..\..\src\Commands\Common\NativeCommandStartup.cs" Link="NativeCommandStartup.cs" />
+    <Compile Include="..\..\src\Commands\Exe2Arc\Native\NativeExe2ArcArgumentGate.cs" Link="NativeExe2ArcArgumentGate.cs" />
+    <Compile Include="..\..\src\Commands\Exe2Arc\Native\NativeExe2ArcIo.cs" Link="NativeExe2ArcIo.cs" />
+    <Compile Include="..\..\src\Commands\Exe2Arc\Native\NativeExe2ArcOutputIo.cs" Link="NativeExe2ArcOutputIo.cs" />
+    <Compile Include="..\..\src\Commands\Exe2Arc\Native\NativeMorphOSExe2ArcCommand.cs" Link="NativeMorphOSExe2ArcCommand.cs" />
+    <Compile Include="Exe2ArcEntry.cs" />
   </ItemGroup>
 </Project>

@@ -63,6 +63,13 @@ internal enum MuiMenuItemField : byte
 	NextSelect,
 }
 
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+internal struct MuiMenuItemFieldCursor
+{
+	internal APTR Record;
+	internal MuiMenuItemField Field;
+}
+
 internal static class MuiMenuItemRecordCodec
 {
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
@@ -149,27 +156,27 @@ internal static class MuiMenuItemRecordCodec
 
 internal static class MuiMenuItemRecordMemoryCodec
 {
-	private static bool TryResolve(MuiMenuItemField field, out uint offset,
-		out uint size)
+	private static bool TryResolveFieldIndex(MuiMenuItemField field,
+		out uint index, out uint fieldSize)
 	{
 		switch (field)
 		{
-			case MuiMenuItemField.NextItem: offset = MuiMenuItemRecord.NextItemOffset; size = 4; return true;
-			case MuiMenuItemField.LeftEdge: offset = MuiMenuItemRecord.LeftEdgeOffset; size = 2; return true;
-			case MuiMenuItemField.TopEdge: offset = MuiMenuItemRecord.TopEdgeOffset; size = 2; return true;
-			case MuiMenuItemField.Width: offset = MuiMenuItemRecord.WidthOffset; size = 2; return true;
-			case MuiMenuItemField.Height: offset = MuiMenuItemRecord.HeightOffset; size = 2; return true;
-			case MuiMenuItemField.Flags: offset = MuiMenuItemRecord.FlagsOffset; size = 2; return true;
-			case MuiMenuItemField.MutualExclude: offset = MuiMenuItemRecord.MutualExcludeOffset; size = 4; return true;
-			case MuiMenuItemField.ItemFill: offset = MuiMenuItemRecord.ItemFillOffset; size = 4; return true;
-			case MuiMenuItemField.SelectFill: offset = MuiMenuItemRecord.SelectFillOffset; size = 4; return true;
-			case MuiMenuItemField.Command: offset = MuiMenuItemRecord.CommandOffset; size = 1; return true;
-			case MuiMenuItemField.Padding: offset = MuiMenuItemRecord.PaddingOffset; size = 1; return true;
-			case MuiMenuItemField.SubItem: offset = MuiMenuItemRecord.SubItemOffset; size = 4; return true;
-			case MuiMenuItemField.NextSelect: offset = MuiMenuItemRecord.NextSelectOffset; size = 2; return true;
+			case MuiMenuItemField.NextItem: index = 0; fieldSize = 4; return true;
+			case MuiMenuItemField.LeftEdge: index = 1; fieldSize = 2; return true;
+			case MuiMenuItemField.TopEdge: index = 2; fieldSize = 2; return true;
+			case MuiMenuItemField.Width: index = 3; fieldSize = 2; return true;
+			case MuiMenuItemField.Height: index = 4; fieldSize = 2; return true;
+			case MuiMenuItemField.Flags: index = 5; fieldSize = 2; return true;
+			case MuiMenuItemField.MutualExclude: index = 6; fieldSize = 4; return true;
+			case MuiMenuItemField.ItemFill: index = 7; fieldSize = 4; return true;
+			case MuiMenuItemField.SelectFill: index = 8; fieldSize = 4; return true;
+			case MuiMenuItemField.Command: index = 9; fieldSize = 1; return true;
+			case MuiMenuItemField.Padding: index = 10; fieldSize = 1; return true;
+			case MuiMenuItemField.SubItem: index = 11; fieldSize = 4; return true;
+			case MuiMenuItemField.NextSelect: index = 12; fieldSize = 2; return true;
 		}
-		offset = 0;
-		size = 0;
+		index = uint.MaxValue;
+		fieldSize = 0;
 		return false;
 	}
 
@@ -177,12 +184,36 @@ internal static class MuiMenuItemRecordMemoryCodec
 		APTR record, MuiMenuItemField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiMenuItemFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMenuItemFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset, out var size) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiMenuItemRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, size);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index,
+			out var selectedSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiMenuItemRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			var currentSize = current == 0 || current >= 6 && current <= 8 ||
+				current == 11 ? 4u : current <= 5 || current == 12 ? 2u : 1u;
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				currentSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = selectedSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -277,32 +308,22 @@ internal static class MuiMenuItemRecordMemoryCodec
 	}
 }
 
+internal static class MuiMenuItemFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMenuItemFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMenuItemFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiMenuItemRecordMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
+}
+
 internal static class MuiMenuItemMemoryCodec
 {
-	private static bool TryResolve(MuiMenuItemField field,
-		out uint offset, out uint size)
-	{
-		switch (field)
-		{
-			case MuiMenuItemField.NextItem: offset = MuiMenuItemRecord.NextItemOffset; size = 4; return true;
-			case MuiMenuItemField.LeftEdge: offset = MuiMenuItemRecord.LeftEdgeOffset; size = 2; return true;
-			case MuiMenuItemField.TopEdge: offset = MuiMenuItemRecord.TopEdgeOffset; size = 2; return true;
-			case MuiMenuItemField.Width: offset = MuiMenuItemRecord.WidthOffset; size = 2; return true;
-			case MuiMenuItemField.Height: offset = MuiMenuItemRecord.HeightOffset; size = 2; return true;
-			case MuiMenuItemField.Flags: offset = MuiMenuItemRecord.FlagsOffset; size = 2; return true;
-			case MuiMenuItemField.MutualExclude: offset = MuiMenuItemRecord.MutualExcludeOffset; size = 4; return true;
-			case MuiMenuItemField.ItemFill: offset = MuiMenuItemRecord.ItemFillOffset; size = 4; return true;
-			case MuiMenuItemField.SelectFill: offset = MuiMenuItemRecord.SelectFillOffset; size = 4; return true;
-			case MuiMenuItemField.Command: offset = MuiMenuItemRecord.CommandOffset; size = 1; return true;
-			case MuiMenuItemField.Padding: offset = MuiMenuItemRecord.PaddingOffset; size = 1; return true;
-			case MuiMenuItemField.SubItem: offset = MuiMenuItemRecord.SubItemOffset; size = 4; return true;
-			case MuiMenuItemField.NextSelect: offset = MuiMenuItemRecord.NextSelectOffset; size = 2; return true;
-		}
-		offset = 0;
-		size = 0;
-		return false;
-	}
-
 	internal static bool IsMapped<TPlatform>(ref TPlatform platform,
 		APTR address) where TPlatform : struct, IMuiGuestMemory =>
 		!address.IsNull && platform.IsMapped(address, MuiMenuItemRecord.Size);
@@ -495,23 +516,23 @@ internal static class MuiIntuiTextRecordCodec
 
 internal static class MuiIntuiTextRecordMemoryCodec
 {
-	private static bool TryResolve(MuiIntuiTextField field, out uint offset,
-		out uint size)
+	private static bool TryResolveFieldIndex(MuiIntuiTextField field,
+		out uint index, out uint fieldSize)
 	{
 		switch (field)
 		{
-			case MuiIntuiTextField.FrontPen: offset = MuiIntuiTextRecord.FrontPenOffset; size = 1; return true;
-			case MuiIntuiTextField.BackPen: offset = MuiIntuiTextRecord.BackPenOffset; size = 1; return true;
-			case MuiIntuiTextField.DrawMode: offset = MuiIntuiTextRecord.DrawModeOffset; size = 1; return true;
-			case MuiIntuiTextField.Padding: offset = MuiIntuiTextRecord.PaddingOffset; size = 1; return true;
-			case MuiIntuiTextField.LeftEdge: offset = MuiIntuiTextRecord.LeftEdgeOffset; size = 2; return true;
-			case MuiIntuiTextField.TopEdge: offset = MuiIntuiTextRecord.TopEdgeOffset; size = 2; return true;
-			case MuiIntuiTextField.Font: offset = MuiIntuiTextRecord.FontOffset; size = 4; return true;
-			case MuiIntuiTextField.Text: offset = MuiIntuiTextRecord.TextOffset; size = 4; return true;
-			case MuiIntuiTextField.NextText: offset = MuiIntuiTextRecord.NextTextOffset; size = 4; return true;
+			case MuiIntuiTextField.FrontPen: index = 0; fieldSize = 1; return true;
+			case MuiIntuiTextField.BackPen: index = 1; fieldSize = 1; return true;
+			case MuiIntuiTextField.DrawMode: index = 2; fieldSize = 1; return true;
+			case MuiIntuiTextField.Padding: index = 3; fieldSize = 1; return true;
+			case MuiIntuiTextField.LeftEdge: index = 4; fieldSize = 2; return true;
+			case MuiIntuiTextField.TopEdge: index = 5; fieldSize = 2; return true;
+			case MuiIntuiTextField.Font: index = 6; fieldSize = 4; return true;
+			case MuiIntuiTextField.Text: index = 7; fieldSize = 4; return true;
+			case MuiIntuiTextField.NextText: index = 8; fieldSize = 4; return true;
 		}
-		offset = 0;
-		size = 0;
+		index = uint.MaxValue;
+		fieldSize = 0;
 		return false;
 	}
 
@@ -519,12 +540,35 @@ internal static class MuiIntuiTextRecordMemoryCodec
 		APTR record, MuiIntuiTextField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiIntuiTextFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiIntuiTextFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset, out var size) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiIntuiTextRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, size);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index,
+			out var selectedSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiIntuiTextRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			var currentSize = current <= 3 ? 1u : current <= 5 ? 2u : 4u;
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				currentSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = selectedSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -686,10 +730,18 @@ internal static class MuiMenuItemTriggerStorageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		textAddress = APTR.Null;
-		if (!IsMapped(ref platform, address) ||
-			address.Raw > uint.MaxValue - MuiMenuItemRecord.Size) return false;
-		textAddress = APTR.FromPointer(address.Raw + MuiMenuItemRecord.Size);
-		return platform.IsMapped(textAddress, MuiIntuiTextRecord.Size);
+		if (!TryCreateStorageCursor(ref platform, address,
+			MuiMenuItemTriggerStoragePrefix.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiMenuItemRecord.Size, out _) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiIntuiTextRecord.Size, out textAddress) ||
+			!MuiGuestStructCursor.IsComplete(cursor))
+		{
+			textAddress = APTR.Null;
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetStringAddress<TPlatform>(ref TPlatform platform,
@@ -697,11 +749,29 @@ internal static class MuiMenuItemTriggerStorageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		stringAddress = APTR.Null;
-		if (!IsMapped(ref platform, address) || address.Raw >
-			uint.MaxValue - MuiMenuItemTriggerStoragePrefix.Size) return false;
-		stringAddress = APTR.FromPointer(address.Raw +
-			MuiMenuItemTriggerStoragePrefix.Size);
-		return platform.IsMapped(stringAddress, StringCapacity);
+		if (!TryCreateStorageCursor(ref platform, address, Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiMenuItemRecord.Size, out _) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiIntuiTextRecord.Size, out _) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				StringCapacity, out stringAddress) ||
+			!MuiGuestStructCursor.IsComplete(cursor))
+		{
+			stringAddress = APTR.Null;
+			return false;
+		}
+		return true;
+	}
+
+	private static bool TryCreateStorageCursor<TPlatform>(ref TPlatform platform,
+		APTR address, uint byteSize, out MuiGuestStructCursor cursor)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		cursor = default;
+		return IsMapped(ref platform, address) &&
+			MuiGuestStructCursor.TryCreate(ref platform, address,
+				byteSize, out cursor);
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform, APTR address,
@@ -764,28 +834,29 @@ internal enum MuiIntuiTextField : byte
 	NextText,
 }
 
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+internal struct MuiIntuiTextFieldCursor
+{
+	internal APTR Record;
+	internal MuiIntuiTextField Field;
+}
+
+internal static class MuiIntuiTextFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiIntuiTextFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiIntuiTextFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiIntuiTextRecordMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
+}
+
 internal static class MuiIntuiTextMemoryCodec
 {
-	private static bool TryResolve(MuiIntuiTextField field,
-		out uint offset, out uint size)
-	{
-		switch (field)
-		{
-			case MuiIntuiTextField.FrontPen: offset = 0; size = 1; return true;
-			case MuiIntuiTextField.BackPen: offset = 1; size = 1; return true;
-			case MuiIntuiTextField.DrawMode: offset = 2; size = 1; return true;
-			case MuiIntuiTextField.Padding: offset = 3; size = 1; return true;
-			case MuiIntuiTextField.LeftEdge: offset = 4; size = 2; return true;
-			case MuiIntuiTextField.TopEdge: offset = 6; size = 2; return true;
-			case MuiIntuiTextField.Font: offset = 8; size = 4; return true;
-			case MuiIntuiTextField.Text: offset = 12; size = 4; return true;
-			case MuiIntuiTextField.NextText: offset = 16; size = 4; return true;
-		}
-		offset = 0;
-		size = 0;
-		return false;
-	}
-
 	private static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiIntuiTextField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory

@@ -25,6 +25,19 @@ public sealed class MuiAreaCustomFontStructAdapterTests
 			ref platform, address, MuiAreaCustomFontStateField.Spec,
 			out var specAddress));
 		Assert.Equal(0x3A04u, specAddress.Raw);
+		var cursor = new MuiAreaCustomFontStateFieldCursor
+		{
+			Record = address,
+			Field = MuiAreaCustomFontStateField.Spec,
+		};
+		Assert.True(MuiAreaCustomFontStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedSpecAddress, out var typedSpecSize));
+		Assert.Equal(specAddress, typedSpecAddress);
+		Assert.Equal(MuiAreaCustomFontStateRecord.FieldSize, typedSpecSize);
+		Assert.True(MuiAreaCustomFontStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memorySpecAddress, out var memorySpecSize));
+		Assert.Equal(typedSpecAddress, memorySpecAddress);
+		Assert.Equal(typedSpecSize, memorySpecSize);
 		Assert.True(MuiAreaCustomFontStateRecordCodec.TryReadStructural(ref platform,
 			address, out var decoded));
 		Assert.Equal(value.Spec, decoded.Spec);
@@ -33,6 +46,13 @@ public sealed class MuiAreaCustomFontStructAdapterTests
 			ref platform, address, (MuiAreaCustomFontStateField)255, out _));
 		Assert.False(MuiAreaCustomFontStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiAreaCustomFontStateField.Magic, out _));
+		cursor.Field = (MuiAreaCustomFontStateField)255;
+		Assert.False(MuiAreaCustomFontStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiAreaCustomFontStateField.Magic;
+		Assert.False(MuiAreaCustomFontStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 		Assert.False(MuiAreaCustomFontStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

@@ -164,6 +164,38 @@ public sealed class MuiListCoreAdmissionTests
 	}
 
 	[Fact]
+	public void ListviewHorizontalScrollerFieldAdapterPreservesRecordSiblings()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x2A60);
+		var original = new MuiListHScrollerState
+		{
+			Magic = MuiListHScrollerState.Cookie,
+			Policy = 2,
+			ContentWidth = 1200,
+			ViewWidth = 320,
+			Visible = 1,
+			ScrollX = 40,
+			MaxScrollX = 880,
+		};
+
+		Assert.True(MuiListHScrollerStateCodec.WriteRecord(ref platform, address,
+			original));
+		Assert.True(MuiListHScrollerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiListHScrollerStateField.ScrollX, 160));
+		Assert.True(MuiListHScrollerStateCodec.TryReadStructural(ref platform,
+			address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(original.Policy, actual.Policy);
+		Assert.Equal(original.ContentWidth, actual.ContentWidth);
+		Assert.Equal(original.ViewWidth, actual.ViewWidth);
+		Assert.Equal(original.Visible, actual.Visible);
+		Assert.Equal(160u, actual.ScrollX);
+		Assert.Equal(original.MaxScrollX, actual.MaxScrollX);
+	}
+
+	[Fact]
 	public void ListImageSequentialRecordPreservesPointersFlagsAndBounds()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
@@ -190,5 +222,30 @@ public sealed class MuiListCoreAdmissionTests
 			value));
 		Assert.False(MuiListImageCodec.TryReadRecord(ref platform, crossingEnd,
 			out _));
+	}
+
+	[Fact]
+	public void ListImageFieldAdapterPreservesChainAndObjectSiblings()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x2A60);
+		var original = new MuiListImageState
+		{
+			Magic = MuiListImageState.Cookie,
+			ImageObject = APTR.FromPointer(0x2D00),
+			Flags = 3,
+			Next = APTR.FromPointer(0x2E00),
+		};
+
+		Assert.True(MuiListImageCodec.WriteRecord(ref platform, address, original));
+		Assert.True(MuiListImageMemoryCodec.TryWriteUInt32(ref platform, address,
+			MuiListImageField.Flags, 0xAABBCCDDu));
+		Assert.True(MuiListImageCodec.TryReadStructural(ref platform, address,
+			out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(original.ImageObject, actual.ImageObject);
+		Assert.Equal(0xAABBCCDDu, actual.Flags);
+		Assert.Equal(original.Next, actual.Next);
 	}
 }

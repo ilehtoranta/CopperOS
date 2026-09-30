@@ -57,6 +57,7 @@ internal struct MuiPopSpecialistState
 {
 	internal const uint Size = MuiPopSpecialistLayout.InstanceSize;
 	internal const uint Cookie = MuiPopSpecialistLayout.Magic;
+	internal const uint FieldSize = 4;
 
 	internal uint Magic;
 	internal uint Class;
@@ -127,30 +128,91 @@ internal struct MuiPopSpecialistRecordFieldCursor
 
 internal static class MuiPopSpecialistRecordFieldMemoryCodec
 {
-	private static bool TryResolve(MuiPopSpecialistRecordField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiPopSpecialistRecordField field,
+		out uint index)
 	{
-		var index = (uint)field;
-		if (index > (uint)MuiPopSpecialistRecordField.NotifyCount)
+		switch (field)
 		{
-			offset = 0;
-			return false;
+			case MuiPopSpecialistRecordField.Magic: index = 0; return true;
+			case MuiPopSpecialistRecordField.Class: index = 1; return true;
+			case MuiPopSpecialistRecordField.Flags: index = 2; return true;
+			case MuiPopSpecialistRecordField.StringChild: index = 3; return true;
+			case MuiPopSpecialistRecordField.ButtonChild: index = 4; return true;
+			case MuiPopSpecialistRecordField.OpenHook: index = 5; return true;
+			case MuiPopSpecialistRecordField.CloseHook: index = 6; return true;
+			case MuiPopSpecialistRecordField.PopObject: index = 7; return true;
+			case MuiPopSpecialistRecordField.ObjStrHook: index = 8; return true;
+			case MuiPopSpecialistRecordField.StrObjHook: index = 9; return true;
+			case MuiPopSpecialistRecordField.WindowHook: index = 10; return true;
+			case MuiPopSpecialistRecordField.Array: index = 11; return true;
+			case MuiPopSpecialistRecordField.MaterializedArray: index = 12; return true;
+			case MuiPopSpecialistRecordField.ArrayCount: index = 13; return true;
+			case MuiPopSpecialistRecordField.StartHook: index = 14; return true;
+			case MuiPopSpecialistRecordField.StopHook: index = 15; return true;
+			case MuiPopSpecialistRecordField.AslType: index = 16; return true;
+			case MuiPopSpecialistRecordField.FontStyles: index = 17; return true;
+			case MuiPopSpecialistRecordField.AslTags: index = 18; return true;
+			case MuiPopSpecialistRecordField.AslRequester: index = 19; return true;
+			case MuiPopSpecialistRecordField.AslState: index = 20; return true;
+			case MuiPopSpecialistRecordField.Window: index = 21; return true;
+			case MuiPopSpecialistRecordField.HookMsg: index = 22; return true;
+			case MuiPopSpecialistRecordField.Selected: index = 23; return true;
+			case MuiPopSpecialistRecordField.NotifyAttribute: index = 24; return true;
+			case MuiPopSpecialistRecordField.NotifyValue: index = 25; return true;
+			case MuiPopSpecialistRecordField.NotifyCount: index = 26; return true;
 		}
-		offset = index * 4;
-		return true;
+		index = uint.MaxValue;
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiPopSpecialistRecordField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiPopSpecialistRecordFieldCursor);
+		cursor.Address = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiPopSpecialistRecordFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiPopSpecialistState.Size))
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Address,
+				MuiPopSpecialistState.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiPopSpecialistState.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiPopSpecialistState.FieldSize;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiPopSpecialistRecordFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiPopSpecialistRecordField field, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiPopSpecialistRecordFieldCursor);
+		cursor.Address = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out fieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -185,6 +247,13 @@ internal static class MuiPopSpecialistRecordFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiPopSpecialistRecordFieldMemoryCodec.TryGetAddress(ref platform,
 			cursor.Address, cursor.Field, out address);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiPopSpecialistRecordFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiPopSpecialistRecordFieldMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiPopSpecialistRecordField field, out uint value)
@@ -607,6 +676,8 @@ internal static class MuiPopSpecialistAdmission
 internal struct MuiPoplistArrayEntry
 {
 	internal const uint Size = 4;
+	// Compatibility metadata for the historical wire position; live address
+	// publication uses MuiGuestStructCursor below.
 	internal const uint ValueOffset = 0;
 	internal APTR Value;
 }
@@ -631,10 +702,11 @@ internal static class MuiPoplistArrayEntryFieldMemoryCodec
 	{
 		address = APTR.Null;
 		if (field != MuiPoplistArrayEntryField.Value ||
-			record.IsNull || !platform.IsMapped(record,
-				MuiPoplistArrayEntry.Size)) return false;
-		address = APTR.FromPointer(record.Raw + MuiPoplistArrayEntry.ValueOffset);
-		return true;
+			!MuiGuestStructCursor.TryCreate(ref platform, record,
+				MuiPoplistArrayEntry.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiPoplistArrayEntry.Size, out address)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

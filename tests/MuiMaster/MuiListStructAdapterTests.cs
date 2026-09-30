@@ -37,6 +37,36 @@ public sealed class MuiListStructAdapterTests
 	}
 
 	[Fact]
+	public void ListEditFieldAdapterPreservesSignedAndPointerSiblings()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x17C0);
+		var original = new MuiListCore.MuiListEditState
+		{
+			Magic = MuiListCore.MuiListEditState.Cookie,
+			Row = -7,
+			Column = 3,
+			Entry = APTR.FromPointer(0x4400),
+			EditObject = APTR.FromPointer(0x4500),
+			Flags = 0xA55Au,
+		};
+
+		Assert.True(MuiListCore.MuiListEditStateCodec.WriteRecord(ref platform,
+			address, original));
+		Assert.True(MuiListCore.MuiListEditMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiListCore.MuiListEditField.Row,
+			unchecked((uint)-11)));
+		Assert.True(MuiListCore.MuiListEditStateCodec.TryReadRecord(ref platform,
+			address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(original.Column, actual.Column);
+		Assert.Equal(original.Entry, actual.Entry);
+		Assert.Equal(original.EditObject, actual.EditObject);
+		Assert.Equal(original.Flags, actual.Flags);
+		Assert.Equal(-11, actual.Row);
+	}
+
+	[Fact]
 	public void ListScalarAndDisplayRowsUseDedicatedStructAdapters()
 	{
 		var platform = CreatePlatform();
@@ -121,6 +151,34 @@ public sealed class MuiListStructAdapterTests
 	}
 
 	[Fact]
+	public void ListStateMemoryAdapterDispatchesThroughCompleteNamedRecord()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x18D0);
+		var original = new MuiListCore.MuiListRedrawState
+		{
+			Magic = MuiListCore.MuiListRedrawState.Cookie,
+			Dirty = 0x10203040u,
+			Requests = 3,
+		};
+
+		Assert.True(MuiListCore.MuiListRedrawStateCodec.WriteRecord(ref platform, address,
+			original));
+		Assert.True(MuiListCore.MuiListStateMemoryCodec.TryWriteUInt32(ref platform, address,
+			MuiListCore.MuiListStateRecordKind.Redraw, MuiListCore.MuiListStateField.Requests, 9));
+		Assert.True(MuiListCore.MuiListStateMemoryCodec.TryReadUInt32(ref platform, address,
+			MuiListCore.MuiListStateRecordKind.Redraw, MuiListCore.MuiListStateField.Dirty, out var dirty));
+		Assert.Equal(original.Dirty, dirty);
+		Assert.True(MuiListCore.MuiListRedrawStateCodec.TryReadRecord(ref platform, address,
+			out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(original.Dirty, actual.Dirty);
+		Assert.Equal(9u, actual.Requests);
+		Assert.False(MuiListCore.MuiListStateMemoryCodec.TryReadUInt32(ref platform, address,
+			MuiListCore.MuiListStateRecordKind.Redraw, MuiListCore.MuiListStateField.Position, out _));
+	}
+
+	[Fact]
 	public void ListSlotMemoryAdapterUsesNamedEntryAndFlagsFields()
 	{
 		var platform = CreatePlatform();
@@ -137,6 +195,26 @@ public sealed class MuiListStructAdapterTests
 		Assert.Equal(0x18A4u, flagsAddress.Raw);
 		Assert.False(MuiListSlotMemoryCodec.TryGetAddress(ref platform, address,
 			(MuiListSlotField)255, out _));
+	}
+
+	[Fact]
+	public void ListSlotFieldAdapterPreservesEntryAndFlagsSiblings()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x18A8);
+		var original = new MuiListSlotState
+		{
+			Entry = APTR.FromPointer(0x9120),
+			Flags = 0x10203040u,
+		};
+
+		Assert.True(MuiListSlotCodec.WriteRecord(ref platform, address, original));
+		Assert.True(MuiListSlotMemoryCodec.TryWriteUInt32(ref platform, address,
+			MuiListSlotField.Flags, 0xAABBCCDDu));
+		Assert.True(MuiListSlotCodec.TryReadRecord(ref platform, address,
+			out var actual));
+		Assert.Equal(original.Entry, actual.Entry);
+		Assert.Equal(0xAABBCCDDu, actual.Flags);
 	}
 
 	[Fact]
@@ -185,6 +263,30 @@ public sealed class MuiListStructAdapterTests
 	}
 
 	[Fact]
+	public void ListTitleArrayFieldAdapterPreservesMagicAndPointersSiblings()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x18D0);
+		var original = new MuiListCore.MuiListTitleArrayState
+		{
+			Magic = MuiListCore.MuiListTitleArrayState.Cookie,
+			Pointers = APTR.FromPointer(0x9A20),
+			Count = 2,
+		};
+
+		Assert.True(MuiListCore.MuiListTitleArrayStateCodec.WriteRecord(
+			ref platform, address, original));
+		Assert.True(MuiListCore.MuiListTitleArrayStateMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiListCore.MuiListTitleArrayStateField.Count,
+			7));
+		Assert.True(MuiListCore.MuiListTitleArrayStateCodec.TryReadStructural(
+			ref platform, address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(original.Pointers, actual.Pointers);
+		Assert.Equal(7u, actual.Count);
+	}
+
+	[Fact]
 	public void ListTitleMemoryAdapterUsesNamedMagicAndValueFields()
 	{
 		var platform = CreatePlatform();
@@ -203,6 +305,28 @@ public sealed class MuiListStructAdapterTests
 		Assert.False(MuiListCore.MuiListTitleStateMemoryCodec.TryGetAddress(
 			ref platform, address,
 			(MuiListCore.MuiListTitleStateField)255, out _));
+	}
+
+	[Fact]
+	public void ListTitleFieldAdapterPreservesMagicSibling()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x18F0);
+		var original = new MuiListCore.MuiListTitleState
+		{
+			Magic = MuiListCore.MuiListTitleState.Cookie,
+			Value = 0x0000A120u,
+		};
+
+		Assert.True(MuiListCore.MuiListTitleStateCodec.WriteRecord(ref platform,
+			address, original));
+		Assert.True(MuiListCore.MuiListTitleStateMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiListCore.MuiListTitleStateField.Value,
+			0xFFFFFFFFu));
+		Assert.True(MuiListCore.MuiListTitleStateCodec.TryReadStructural(
+			ref platform, address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(0xFFFFFFFFu, actual.Value);
 	}
 
 	[Fact]
@@ -225,6 +349,28 @@ public sealed class MuiListStructAdapterTests
 		Assert.False(MuiListCore.MuiListSelectionSignalStateMemoryCodec
 			.TryGetAddress(ref platform, address,
 				(MuiListCore.MuiListSelectionSignalStateField)255, out _));
+	}
+
+	[Fact]
+	public void ListSelectionSignalFieldAdapterPreservesMagicSibling()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1910);
+		var original = new MuiListCore.MuiListSelectionSignalState
+		{
+			Magic = MuiListCore.MuiListSelectionSignalState.Cookie,
+			Value = 1,
+		};
+
+		Assert.True(MuiListCore.MuiListSelectionSignalStateCodec.WriteRecord(
+			ref platform, address, original));
+		Assert.True(MuiListCore.MuiListSelectionSignalStateMemoryCodec
+			.TryWriteUInt32(ref platform, address,
+				MuiListCore.MuiListSelectionSignalStateField.Value, 0));
+		Assert.True(MuiListCore.MuiListSelectionSignalStateCodec
+			.TryReadStructural(ref platform, address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(0u, actual.Value);
 	}
 
 	[Fact]
@@ -254,6 +400,32 @@ public sealed class MuiListStructAdapterTests
 	}
 
 	[Fact]
+	public void ListFormatPolicyFieldAdapterPreservesFormatAndColumnSiblings()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1930);
+		var original = new MuiListCore.MuiListFormatPolicyState
+		{
+			Magic = MuiListCore.MuiListFormatPolicyState.Cookie,
+			Format = APTR.FromPointer(0xA400),
+			MaxColumns = 8,
+			Columns = 3,
+		};
+
+		Assert.True(MuiListCore.MuiListFormatPolicyStateCodec.WriteRecord(
+			ref platform, address, original));
+		Assert.True(MuiListCore.MuiListFormatPolicyStateMemoryCodec
+			.TryWriteUInt32(ref platform, address,
+				MuiListCore.MuiListFormatPolicyStateField.Columns, 6));
+		Assert.True(MuiListCore.MuiListFormatPolicyStateCodec
+			.TryReadStructural(ref platform, address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(original.Format, actual.Format);
+		Assert.Equal(original.MaxColumns, actual.MaxColumns);
+		Assert.Equal(6u, actual.Columns);
+	}
+
+	[Fact]
 	public void ListFontMemoryAdapterUsesNamedMagicAndFontFields()
 	{
 		var platform = CreatePlatform();
@@ -272,6 +444,28 @@ public sealed class MuiListStructAdapterTests
 		Assert.False(MuiListCore.MuiListFontStateMemoryCodec.TryGetAddress(
 			ref platform, address,
 			(MuiListCore.MuiListFontStateField)255, out _));
+	}
+
+	[Fact]
+	public void ListFontFieldAdapterPreservesMagicSibling()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1950);
+		var original = new MuiListCore.MuiListFontState
+		{
+			Magic = MuiListCore.MuiListFontState.Cookie,
+			Font = APTR.FromPointer(0xA600),
+		};
+
+		Assert.True(MuiListCore.MuiListFontStateCodec.WriteRecord(ref platform,
+			address, original));
+		Assert.True(MuiListCore.MuiListFontStateMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiListCore.MuiListFontStateField.Font,
+			0x0000A640u));
+		Assert.True(MuiListCore.MuiListFontStateCodec.TryReadStructural(
+			ref platform, address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(APTR.FromPointer(0xA640), actual.Font);
 	}
 
 	[Fact]
@@ -295,6 +489,30 @@ public sealed class MuiListStructAdapterTests
 		Assert.False(MuiListCore.MuiListRedrawStateMemoryCodec.TryGetAddress(
 			ref platform, address,
 			(MuiListCore.MuiListRedrawStateField)255, out _));
+	}
+
+	[Fact]
+	public void ListRedrawFieldAdapterPreservesDirtyAndMagicSiblings()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1970);
+		var original = new MuiListCore.MuiListRedrawState
+		{
+			Magic = MuiListCore.MuiListRedrawState.Cookie,
+			Dirty = 1,
+			Requests = 9,
+		};
+
+		Assert.True(MuiListCore.MuiListRedrawStateCodec.WriteRecord(ref platform,
+			address, original));
+		Assert.True(MuiListCore.MuiListRedrawStateMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiListCore.MuiListRedrawStateField.Requests,
+			12));
+		Assert.True(MuiListCore.MuiListRedrawStateCodec.TryReadStructural(
+			ref platform, address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(original.Dirty, actual.Dirty);
+		Assert.Equal(12u, actual.Requests);
 	}
 
 	[Fact]
@@ -322,6 +540,30 @@ public sealed class MuiListStructAdapterTests
 	}
 
 	[Fact]
+	public void ListActiveFieldAdapterPreservesPresenceAndMagicSiblings()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1990);
+		var original = new MuiListCore.MuiListActiveState
+		{
+			Magic = MuiListCore.MuiListActiveState.Cookie,
+			HasActive = 1,
+			Active = 7,
+		};
+
+		Assert.True(MuiListCore.MuiListActiveStateCodec.WriteRecord(ref platform,
+			address, original));
+		Assert.True(MuiListCore.MuiListActiveStateMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiListCore.MuiListActiveStateField.Active,
+			12));
+		Assert.True(MuiListCore.MuiListActiveStateCodec.TryReadStructural(
+			ref platform, address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(original.HasActive, actual.HasActive);
+		Assert.Equal(12u, actual.Active);
+	}
+
+	[Fact]
 	public void ListViewportMemoryAdapterUsesNamedPixelAndRowFields()
 	{
 		var platform = CreatePlatform();
@@ -343,6 +585,37 @@ public sealed class MuiListStructAdapterTests
 		Assert.False(MuiListCore.MuiListViewportStateMemoryCodec.TryGetAddress(
 			ref platform, address,
 			(MuiListCore.MuiListViewportStateField)255, out _));
+	}
+
+	[Fact]
+	public void ListViewportFieldAdapterPreservesMetricsSiblings()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x19C0);
+		var original = new MuiListCore.MuiListViewportState
+		{
+			Magic = MuiListCore.MuiListViewportState.Cookie,
+			TopPixel = 64,
+			VisiblePixel = 128,
+			TotalPixel = 512,
+			First = 4,
+			LineHeight = 16,
+			Visible = 20,
+			DropMark = 7,
+		};
+
+		Assert.True(MuiListCore.MuiListViewportStateCodec.WriteRecord(
+			ref platform, address, original));
+		Assert.True(MuiListCore.MuiListViewportStateMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiListCore.MuiListViewportStateField.Visible,
+			24));
+		Assert.True(MuiListCore.MuiListViewportStateCodec.TryReadStructural(
+			ref platform, address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(original.TopPixel, actual.TopPixel);
+		Assert.Equal(original.TotalPixel, actual.TotalPixel);
+		Assert.Equal(original.DropMark, actual.DropMark);
+		Assert.Equal(24u, actual.Visible);
 	}
 
 	[Fact]
@@ -372,6 +645,32 @@ public sealed class MuiListStructAdapterTests
 	}
 
 	[Fact]
+	public void ListInteractionPolicyFieldAdapterPreservesPolicySiblings()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x19E0);
+		var original = new MuiListCore.MuiListInteractionPolicyState
+		{
+			Magic = MuiListCore.MuiListInteractionPolicyState.Cookie,
+			Input = 1,
+			MultiSelect = 2,
+			ScrollerPos = 3,
+		};
+
+		Assert.True(MuiListCore.MuiListInteractionPolicyStateCodec.WriteRecord(
+			ref platform, address, original));
+		Assert.True(MuiListCore.MuiListInteractionPolicyStateMemoryCodec
+			.TryWriteUInt32(ref platform, address,
+				MuiListCore.MuiListInteractionPolicyStateField.MultiSelect, 5));
+		Assert.True(MuiListCore.MuiListInteractionPolicyStateCodec.TryReadStructural(
+			ref platform, address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(original.Input, actual.Input);
+		Assert.Equal(original.ScrollerPos, actual.ScrollerPos);
+		Assert.Equal(5u, actual.MultiSelect);
+	}
+
+	[Fact]
 	public void ListClickMemoryAdapterUsesNamedClickProjectionFields()
 	{
 		var platform = CreatePlatform();
@@ -393,6 +692,35 @@ public sealed class MuiListStructAdapterTests
 		Assert.False(MuiListCore.MuiListClickStateMemoryCodec.TryGetAddress(
 			ref platform, address,
 			(MuiListCore.MuiListClickStateField)255, out _));
+	}
+
+	[Fact]
+	public void ListClickFieldAdapterPreservesClickAndBooleanSiblings()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1A10);
+		var original = new MuiListCore.MuiListClickState
+		{
+			Magic = MuiListCore.MuiListClickState.Cookie,
+			ClickColumn = 2,
+			DoubleClick = 1,
+			AgainClick = 0,
+			Clicks = 3,
+			DefClickColumn = 4,
+		};
+
+		Assert.True(MuiListCore.MuiListClickStateCodec.WriteRecord(ref platform,
+			address, original));
+		Assert.True(MuiListCore.MuiListClickStateMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiListCore.MuiListClickStateField.Clicks, 5));
+		Assert.True(MuiListCore.MuiListClickStateCodec.TryReadStructural(
+			ref platform, address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(original.ClickColumn, actual.ClickColumn);
+		Assert.Equal(original.DoubleClick, actual.DoubleClick);
+		Assert.Equal(original.AgainClick, actual.AgainClick);
+		Assert.Equal(original.DefClickColumn, actual.DefClickColumn);
+		Assert.Equal(5u, actual.Clicks);
 	}
 
 	[Fact]
@@ -419,6 +747,36 @@ public sealed class MuiListStructAdapterTests
 	}
 
 	[Fact]
+	public void ListHookPolicyFieldAdapterPreservesHookSiblings()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1A40);
+		var original = new MuiListCore.MuiListHookPolicyState
+		{
+			Magic = MuiListCore.MuiListHookPolicyState.Cookie,
+			ConstructHook = 0x1001,
+			DestructHook = 0x1002,
+			DisplayHook = 0x1003,
+			CompareHook = 0x1004,
+			MultiTestHook = 0x1005,
+		};
+
+		Assert.True(MuiListCore.MuiListHookPolicyStateCodec.WriteRecord(ref platform,
+			address, original));
+		Assert.True(MuiListCore.MuiListHookPolicyStateMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			MuiListCore.MuiListHookPolicyStateField.DisplayHook, 0x2003));
+		Assert.True(MuiListCore.MuiListHookPolicyStateCodec.TryReadStructural(
+			ref platform, address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(original.ConstructHook, actual.ConstructHook);
+		Assert.Equal(original.DestructHook, actual.DestructHook);
+		Assert.Equal(original.CompareHook, actual.CompareHook);
+		Assert.Equal(original.MultiTestHook, actual.MultiTestHook);
+		Assert.Equal(0x2003u, actual.DisplayHook);
+	}
+
+	[Fact]
 	public void ListSortMemoryAdapterUsesNamedColumnFields()
 	{
 		var platform = CreatePlatform();
@@ -437,6 +795,29 @@ public sealed class MuiListStructAdapterTests
 		Assert.False(MuiListCore.MuiListSortStateMemoryCodec.TryGetAddress(
 			ref platform, address,
 			(MuiListCore.MuiListSortStateField)255, out _));
+	}
+
+	[Fact]
+	public void ListSortFieldAdapterPreservesColumnSiblings()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1A60);
+		var original = new MuiListCore.MuiListSortState
+		{
+			Magic = MuiListCore.MuiListSortState.Cookie,
+			SortColumn = 2,
+			TitleClick = 1,
+		};
+
+		Assert.True(MuiListCore.MuiListSortStateCodec.WriteRecord(ref platform,
+			address, original));
+		Assert.True(MuiListCore.MuiListSortStateMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiListCore.MuiListSortStateField.SortColumn, 5));
+		Assert.True(MuiListCore.MuiListSortStateCodec.TryReadStructural(
+			ref platform, address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(original.TitleClick, actual.TitleClick);
+		Assert.Equal(5u, actual.SortColumn);
 	}
 
 	[Fact]
@@ -466,6 +847,48 @@ public sealed class MuiListStructAdapterTests
 	}
 
 	[Fact]
+	public void ListPresentationPolicyFieldAdapterPreservesPolicySiblings()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1B00);
+		var original = new MuiListCore.MuiListPresentationPolicyState
+		{
+			Magic = MuiListCore.MuiListPresentationPolicyState.Cookie,
+			Editable = 1,
+			Quiet = 2,
+			AdjustHeight = 3,
+			AdjustWidth = 4,
+			Stripes = 5,
+			ShowDropMarks = 6,
+			DragSortable = 7,
+			DragType = 8,
+			AutoVisible = 9,
+			AutoLineHeight = 10,
+			MinLineHeight = 11,
+		};
+
+		Assert.True(MuiListCore.MuiListPresentationPolicyStateCodec.WriteRecord(
+			ref platform, address, original));
+		Assert.True(MuiListCore.MuiListPresentationPolicyStateMemoryCodec
+			.TryWriteUInt32(ref platform, address,
+				MuiListCore.MuiListPresentationPolicyStateField.DragType, 0x40));
+		Assert.True(MuiListCore.MuiListPresentationPolicyStateCodec.TryReadRecord(
+			ref platform, address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(original.Editable, actual.Editable);
+		Assert.Equal(original.Quiet, actual.Quiet);
+		Assert.Equal(original.AdjustHeight, actual.AdjustHeight);
+		Assert.Equal(original.AdjustWidth, actual.AdjustWidth);
+		Assert.Equal(original.Stripes, actual.Stripes);
+		Assert.Equal(original.ShowDropMarks, actual.ShowDropMarks);
+		Assert.Equal(original.DragSortable, actual.DragSortable);
+		Assert.Equal(0x40u, actual.DragType);
+		Assert.Equal(original.AutoVisible, actual.AutoVisible);
+		Assert.Equal(original.AutoLineHeight, actual.AutoLineHeight);
+		Assert.Equal(original.MinLineHeight, actual.MinLineHeight);
+	}
+
+	[Fact]
 	public void ListInsertPositionMemoryAdapterUsesNamedPositionField()
 	{
 		var platform = CreatePlatform();
@@ -489,6 +912,28 @@ public sealed class MuiListStructAdapterTests
 	}
 
 	[Fact]
+	public void ListInsertPositionFieldAdapterPreservesMagicSibling()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1AD0);
+		var original = new MuiListCore.MuiListInsertPositionState
+		{
+			Magic = MuiListCore.MuiListInsertPositionState.Cookie,
+			Position = 23,
+		};
+
+		Assert.True(MuiListCore.MuiListInsertPositionStateCodec.WriteRecord(
+			ref platform, address, original));
+		Assert.True(MuiListCore.MuiListInsertPositionStateMemoryCodec
+			.TryWriteUInt32(ref platform, address,
+				MuiListCore.MuiListInsertPositionStateField.Position, 31));
+		Assert.True(MuiListCore.MuiListInsertPositionStateCodec.TryReadStructural(
+			ref platform, address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(31u, actual.Position);
+	}
+
+	[Fact]
 	public void ListPoolPolicyMemoryAdapterUsesNamedPoolFields()
 	{
 		var platform = CreatePlatform();
@@ -506,6 +951,122 @@ public sealed class MuiListStructAdapterTests
 		Assert.Equal(0x1AECu, thresholdAddress.Raw);
 		Assert.False(MuiListCore.MuiListPoolPolicyMemoryCodec.TryGetAddress(ref platform,
 			address, (MuiListCore.MuiListPoolPolicyField)255, out _));
+	}
+
+	[Fact]
+	public void ListPoolPolicyFieldAdapterPreservesPoolAndOwnershipSiblings()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1B00);
+		var original = new MuiListCore.MuiListPoolPolicyState
+		{
+			Magic = MuiListCore.MuiListPoolPolicyState.Cookie,
+			Pool = APTR.FromPointer(0x4400),
+			PuddleSize = 4096,
+			ThresholdSize = 8192,
+			UsesExternalPool = 1,
+		};
+
+		Assert.True(MuiListCore.MuiListPoolPolicyStateCodec.WriteRecord(
+			ref platform, address, original));
+		Assert.True(MuiListCore.MuiListPoolPolicyMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			MuiListCore.MuiListPoolPolicyField.ThresholdSize, 16384));
+		Assert.True(MuiListCore.MuiListPoolPolicyStateCodec.TryReadRecord(
+			ref platform, address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(original.Pool, actual.Pool);
+		Assert.Equal(original.PuddleSize, actual.PuddleSize);
+		Assert.Equal(original.UsesExternalPool, actual.UsesExternalPool);
+		Assert.Equal(16384u, actual.ThresholdSize);
+	}
+
+	[Fact]
+	public void ListFormatDescriptorFieldAdapterPreservesPointerAndWidthSiblings()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1B40);
+		var original = new MuiListCore.MuiListFormatDescriptor
+		{
+			Delta = 0xFFFFFFFEu,
+			Weight = 3,
+			MinWidth = 8,
+			MaxWidth = 120,
+			Column = 2,
+			Flags = 0xA55Au,
+			Preparse = APTR.FromPointer(0x4400),
+			PreparseLength = 4,
+			PreparseStorage = APTR.FromPointer(0x4500),
+			PreparseStorageLength = 5,
+		};
+
+		Assert.True(MuiListCore.MuiListFormatDescriptorCodec.WriteRecord(
+			ref platform, address, original));
+		Assert.True(MuiListCore.MuiListFormatDescriptorMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			MuiListCore.MuiListFormatDescriptorField.PreparseLength, 9));
+		Assert.True(MuiListCore.MuiListFormatDescriptorCodec.TryReadRecord(
+			ref platform, address, out var actual));
+		Assert.Equal(original.Delta, actual.Delta);
+		Assert.Equal(original.Weight, actual.Weight);
+		Assert.Equal(original.MinWidth, actual.MinWidth);
+		Assert.Equal(original.MaxWidth, actual.MaxWidth);
+		Assert.Equal(original.Column, actual.Column);
+		Assert.Equal(original.Flags, actual.Flags);
+		Assert.Equal(original.Preparse, actual.Preparse);
+		Assert.Equal(original.PreparseStorage, actual.PreparseStorage);
+		Assert.Equal(original.PreparseStorageLength, actual.PreparseStorageLength);
+		Assert.Equal(9u, actual.PreparseLength);
+	}
+
+	[Fact]
+	public void ListFormatDescriptorStateFieldAdapterPreservesValuesSibling()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1B80);
+		var original = new MuiListCore.MuiListFormatDescriptorState
+		{
+			Magic = MuiListCore.MuiListFormatDescriptorState.Cookie,
+			Columns = 3,
+			Values = APTR.FromPointer(0x5000),
+		};
+
+		Assert.True(MuiListCore.MuiListFormatDescriptorStateCodec.WriteRecord(
+			ref platform, address, original));
+		Assert.True(MuiListCore.MuiListFormatDescriptorStateMemoryCodec
+			.TryWriteUInt32(ref platform, address,
+				MuiListCore.MuiListFormatDescriptorStateField.Columns, 5));
+		Assert.True(MuiListCore.MuiListFormatDescriptorStateCodec.TryReadRecord(
+			ref platform, address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(original.Values, actual.Values);
+		Assert.Equal(5u, actual.Columns);
+	}
+
+	[Fact]
+	public void ListColumnMetricsFieldAdapterPreservesColumnsAndValuesSiblings()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1BC0);
+		var original = new MuiListCore.MuiListColumnMetricsState
+		{
+			Magic = MuiListCore.MuiListColumnMetricsState.Cookie,
+			Width = 720,
+			Columns = 3,
+			Values = APTR.FromPointer(0x5000),
+		};
+
+		Assert.True(MuiListCore.MuiListColumnMetricsStateCodec.WriteRecord(
+			ref platform, address, original));
+		Assert.True(MuiListCore.MuiListColumnMetricsMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiListCore.MuiListColumnMetricsField.Width,
+			800));
+		Assert.True(MuiListCore.MuiListColumnMetricsStateCodec.TryReadRecord(
+			ref platform, address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(original.Columns, actual.Columns);
+		Assert.Equal(original.Values, actual.Values);
+		Assert.Equal(800u, actual.Width);
 	}
 
 	[Fact]
@@ -696,6 +1257,25 @@ public sealed class MuiListStructAdapterTests
 	}
 
 	[Fact]
+	public void ListColumnMetricFieldAdapterExchangesNamedValueRecord()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1BE0);
+		Assert.True(MuiListCore.MuiListColumnMetricCodec.WriteRecord(
+			ref platform, address,
+			new MuiListCore.MuiListColumnMetricValue { Value = 0xFEDCBA98u }));
+		Assert.True(MuiListCore.MuiListColumnMetricMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiListCore.MuiListColumnMetricField.Value,
+			0x80000001u));
+		Assert.True(MuiListCore.MuiListColumnMetricCodec.TryReadRecord(
+			ref platform, address, out var actual));
+		Assert.Equal(0x80000001u, actual.Value);
+		Assert.False(MuiListCore.MuiListColumnMetricMemoryCodec.TryReadUInt32(
+			ref platform, address,
+			(MuiListCore.MuiListColumnMetricField)255, out _));
+	}
+
+	[Fact]
 	public void ListColumnMetricVectorBridgeUsesNamedValues()
 	{
 		var platform = CreatePlatform();
@@ -748,6 +1328,117 @@ public sealed class MuiListStructAdapterTests
 			ref platform, cursor, out _));
 		Assert.False(MuiListCore.MuiListColumnMetricVectorCodec.TryWrite(
 			ref platform, cursor, expected));
+	}
+
+	[Fact]
+	public void ListColumnGeometryFieldAdapterPreservesWidthSibling()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1C20);
+		var original = new MuiListCore.MuiListColumnGeometry
+		{
+			Offset = 0xFEDCBA98u,
+			Width = 0x80000001u,
+		};
+
+		Assert.True(MuiListCore.MuiListColumnGeometryCodec.WriteRecord(
+			ref platform, address, original));
+		Assert.True(MuiListCore.MuiListColumnGeometryMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiListCore.MuiListColumnGeometryField.Offset,
+			16));
+		Assert.True(MuiListCore.MuiListColumnGeometryCodec.TryReadRecord(
+			ref platform, address, out var actual));
+		Assert.Equal(16u, actual.Offset);
+		Assert.Equal(original.Width, actual.Width);
+	}
+
+	[Fact]
+	public void ListColumnLayoutFieldAdapterPreservesColumnsAndValuesSiblings()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1C40);
+		var original = new MuiListCore.MuiListColumnLayoutState
+		{
+			Magic = MuiListCore.MuiListColumnLayoutState.Cookie,
+			Width = 640,
+			Columns = 3,
+			Values = APTR.FromPointer(0x5000),
+		};
+
+		Assert.True(MuiListCore.MuiListColumnLayoutStateCodec.WriteRecord(
+			ref platform, address, original));
+		Assert.True(MuiListCore.MuiListColumnLayoutMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiListCore.MuiListColumnLayoutField.Width,
+			800));
+		Assert.True(MuiListCore.MuiListColumnLayoutStateCodec.TryReadRecord(
+			ref platform, address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(original.Columns, actual.Columns);
+		Assert.Equal(original.Values, actual.Values);
+		Assert.Equal(800u, actual.Width);
+	}
+
+	[Fact]
+	public void ListColumnVisibilityFieldAdapterPreservesMaskSiblings()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1C80);
+		var original = new MuiListCore.MuiListColumnVisibilityState
+		{
+			Magic = MuiListCore.MuiListColumnVisibilityState.Cookie,
+			Low = 0x00000005,
+			High = 0x80000000,
+			Word2 = 0x00000012,
+			Word3 = 0x00000023,
+			Word4 = 0x00000034,
+			Word5 = 0x00000045,
+			Word6 = 0x00000056,
+			Word7 = 0x80000001,
+		};
+
+		Assert.True(MuiListCore.MuiListColumnVisibilityStateCodec.WriteRecord(
+			ref platform, address, original));
+		Assert.True(MuiListCore.MuiListColumnVisibilityStateMemoryCodec
+			.TryWriteUInt32(ref platform, address,
+				MuiListCore.MuiListColumnVisibilityStateField.Word7,
+				0x40000000));
+		Assert.True(MuiListCore.MuiListColumnVisibilityStateCodec.TryReadRecord(
+			ref platform, address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(original.Low, actual.Low);
+		Assert.Equal(original.High, actual.High);
+		Assert.Equal(original.Word2, actual.Word2);
+		Assert.Equal(original.Word3, actual.Word3);
+		Assert.Equal(original.Word4, actual.Word4);
+		Assert.Equal(original.Word5, actual.Word5);
+		Assert.Equal(original.Word6, actual.Word6);
+		Assert.Equal(0x40000000u, actual.Word7);
+	}
+
+	[Fact]
+	public void ListColumnOrderFieldAdapterPreservesPointerAndReservedSiblings()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1CC0);
+		var original = new MuiListCore.MuiListColumnOrderState
+		{
+			Magic = MuiListCore.MuiListColumnOrderState.Cookie,
+			Count = 4,
+			Values = APTR.FromPointer(0x6000),
+			Reserved = 0xA55A,
+		};
+
+		Assert.True(MuiListCore.MuiListColumnOrderStateCodec.WriteRecord(
+			ref platform, address, original));
+		Assert.True(MuiListCore.MuiListColumnOrderStateMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiListCore.MuiListColumnOrderStateField.Count,
+			8));
+		Assert.True(MuiListCore.MuiListColumnOrderStateCodec.TryReadRecord(
+			ref platform, address, out var actual));
+		Assert.Equal(original.Magic, actual.Magic);
+		Assert.Equal(8u, actual.Count);
+		Assert.Equal(original.Values, actual.Values);
+		Assert.Equal(original.Reserved, actual.Reserved);
 	}
 
 	[Fact]
@@ -1031,6 +1722,30 @@ public sealed class MuiListStructAdapterTests
 		Assert.Equal(value.Value, decoded.Value);
 		Assert.False(MuiListCore.MuiListColumnOrderByteCodec.TryReadRecord(ref platform,
 			APTR.FromPointer(0x21000), out _));
+	}
+
+	[Fact]
+	public void ListColumnOrderByteFieldAdapterUsesNamedByteStorage()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1C20);
+		Assert.True(MuiListCore.MuiListColumnOrderByteRecordMemoryCodec
+			.TryWriteByte(ref platform, address,
+				MuiListCore.MuiListColumnOrderByteField.Value, 0xFE));
+		Assert.True(MuiListCore.MuiListColumnOrderByteRecordMemoryCodec
+			.TryReadByte(ref platform, address,
+				MuiListCore.MuiListColumnOrderByteField.Value, out var value));
+		Assert.Equal((byte)0xFE, value);
+		Assert.True(MuiListCore.MuiListColumnOrderByteRecordMemoryCodec
+			.TryGetAddress(ref platform, address,
+				MuiListCore.MuiListColumnOrderByteField.Value, out var field));
+		Assert.Equal(address.Raw, field.Raw);
+		Assert.False(MuiListCore.MuiListColumnOrderByteRecordMemoryCodec
+			.TryReadByte(ref platform, APTR.Null,
+				MuiListCore.MuiListColumnOrderByteField.Value, out _));
+		Assert.False(MuiListCore.MuiListColumnOrderByteRecordMemoryCodec
+			.TryWriteByte(ref platform, address,
+				(MuiListCore.MuiListColumnOrderByteField)255, 0));
 	}
 
 	[Fact]

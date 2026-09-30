@@ -56,4 +56,46 @@ public sealed class MuiAreaHandledEventsStateStructCodecTests
 		Assert.False(MuiAreaHandledEventsStateStructCodec.TryRead(ref platform,
 			APTR.Null, out _));
 	}
+
+	[Fact]
+	public void HandledEventsStateFieldCursorUsesDeclarationOrderAndWidths()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x2600);
+		var value = new MuiAreaHandledEventsStateRecord
+		{
+			Signature = MuiAreaHandledEventsStateRecord.Magic,
+			Events = 0xA5A5u,
+			Window = APTR.FromPointer(0x3000),
+			Handler = APTR.FromPointer(0x3100),
+			Generation = 19,
+			HandlerFlags = 0x1234,
+			Priority = -7,
+			Reserved = 0x5A,
+		};
+		Assert.True(MuiAreaHandledEventsStateStructCodec.Write(ref platform,
+			address, value));
+		var cursor = new MuiAreaHandledEventsStateFieldCursor
+		{
+			Record = address,
+			Field = MuiAreaHandledEventsStateField.HandlerFlags,
+		};
+		Assert.True(MuiAreaHandledEventsStateFieldCursorCodec.TryGetAddress(
+			ref platform, cursor, out var flagsAddress, out var flagsSize));
+		Assert.Equal(address.Raw + 20, flagsAddress.Raw);
+		Assert.Equal(2u, flagsSize);
+		cursor.Field = MuiAreaHandledEventsStateField.Priority;
+		Assert.True(MuiAreaHandledEventsStateFieldCursorCodec.TryGetAddress(
+			ref platform, cursor, out var priorityAddress, out var prioritySize));
+		Assert.Equal(address.Raw + 22, priorityAddress.Raw);
+		Assert.Equal(1u, prioritySize);
+		cursor.Field = (MuiAreaHandledEventsStateField)255;
+		Assert.False(MuiAreaHandledEventsStateFieldCursorCodec.TryGetAddress(
+			ref platform, cursor, out _, out _));
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiAreaHandledEventsStateField.Signature;
+		Assert.False(MuiAreaHandledEventsStateFieldCursorCodec.TryGetAddress(
+			ref platform, cursor, out _, out _));
+	}
 }

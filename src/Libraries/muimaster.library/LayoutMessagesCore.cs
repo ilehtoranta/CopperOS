@@ -168,128 +168,134 @@ internal struct MuiLayoutFieldCursor
 
 internal static class MuiLayoutMessageMemoryCodec
 {
-	private static bool TryGetPacketSize(MuiLayoutPacketKind packet,
-		out uint size)
+	// Struct-first selector for fixed MorphOS layout packets. The index is the
+	// declaration-order ULONG in the named record; no wire offset is surfaced
+	// to callers.
+	private static bool TryResolveFieldIndex(MuiLayoutPacketKind packet,
+		MuiLayoutField field, out uint index, out uint recordSize)
 	{
-		if (packet == MuiLayoutPacketKind.Method)
-			size = MuiLayoutMethodMessage.Size;
-		else if (packet == MuiLayoutPacketKind.AskMinMax)
-			size = MuiLayoutAskMinMaxMessage.Size;
-		else if (packet == MuiLayoutPacketKind.Relayout)
-			size = MuiLayoutRelayoutMessage.Size;
-		else if (packet == MuiLayoutPacketKind.Rectangle)
-			size = MuiLayoutRectangleMessage.Size;
-		else if (packet == MuiLayoutPacketKind.Text)
-			size = MuiLayoutTextMessage.Size;
-		else if (packet == MuiLayoutPacketKind.RenderInfo)
-			size = MuiLayoutRenderInfoMessage.Size;
-		else if (packet == MuiLayoutPacketKind.Flags)
-			size = MuiLayoutFlagsMessage.Size;
-		else if (packet == MuiLayoutPacketKind.TextDimensions)
-			size = MuiLayoutTextDimensionsMessage.Size;
-		else if (packet == MuiLayoutPacketKind.Layout)
-			size = MuiLayoutMessage.Size;
-		else
+		index = uint.MaxValue;
+		recordSize = 0;
+		if (packet == MuiLayoutPacketKind.Method &&
+			field == MuiLayoutField.MethodId)
 		{
-			size = 0;
-			return false;
+			index = 0; recordSize = MuiLayoutMethodMessage.Size; return true;
 		}
-		return true;
-	}
-
-	private static bool TryResolve(MuiLayoutPacketKind packet,
-		MuiLayoutField field, out uint offset)
-	{
-		// Keep this as a straight-line selector instead of a switch/jump table.
-		// The native compiler can then lower every packet kind (including the
-		// later TextDimensions/Layout variants) without importing a managed
-		// dispatch helper.
-		if (packet == MuiLayoutPacketKind.Method)
+		if (packet == MuiLayoutPacketKind.AskMinMax)
 		{
-			if (field == MuiLayoutField.MethodId) { offset = MuiLayoutMethodMessage.MethodIdOffset; return true; }
-		}
-		else if (packet == MuiLayoutPacketKind.AskMinMax)
-		{
-			if (field == MuiLayoutField.MethodId) { offset = MuiLayoutAskMinMaxMessage.MethodIdOffset; return true; }
-			if (field == MuiLayoutField.Storage) { offset = MuiLayoutAskMinMaxMessage.StorageOffset; return true; }
+			if (field == MuiLayoutField.MethodId) { index = 0; recordSize = MuiLayoutAskMinMaxMessage.Size; return true; }
+			if (field == MuiLayoutField.Storage) { index = 1; recordSize = MuiLayoutAskMinMaxMessage.Size; return true; }
 		}
 		else if (packet == MuiLayoutPacketKind.Relayout)
 		{
-			if (field == MuiLayoutField.MethodId) { offset = MuiLayoutRelayoutMessage.MethodIdOffset; return true; }
-			if (field == MuiLayoutField.Flags) { offset = MuiLayoutRelayoutMessage.FlagsOffset; return true; }
+			if (field == MuiLayoutField.MethodId) { index = 0; recordSize = MuiLayoutRelayoutMessage.Size; return true; }
+			if (field == MuiLayoutField.Flags) { index = 1; recordSize = MuiLayoutRelayoutMessage.Size; return true; }
 		}
 		else if (packet == MuiLayoutPacketKind.Rectangle)
 		{
-			if (field == MuiLayoutField.MethodId) { offset = MuiLayoutRectangleMessage.MethodIdOffset; return true; }
-			if (field == MuiLayoutField.Left) { offset = MuiLayoutRectangleMessage.LeftOffset; return true; }
-			if (field == MuiLayoutField.Top) { offset = MuiLayoutRectangleMessage.TopOffset; return true; }
-			if (field == MuiLayoutField.RightOrWidth) { offset = MuiLayoutRectangleMessage.RightOrWidthOffset; return true; }
-			if (field == MuiLayoutField.BottomOrHeight) { offset = MuiLayoutRectangleMessage.BottomOrHeightOffset; return true; }
-			if (field == MuiLayoutField.Reserved0) { offset = MuiLayoutRectangleMessage.Reserved0Offset; return true; }
-			if (field == MuiLayoutField.Reserved1) { offset = MuiLayoutRectangleMessage.Reserved1Offset; return true; }
-			if (field == MuiLayoutField.Reserved2) { offset = MuiLayoutRectangleMessage.Reserved2Offset; return true; }
+			if (field == MuiLayoutField.MethodId) { index = 0; recordSize = MuiLayoutRectangleMessage.Size; return true; }
+			if (field == MuiLayoutField.Left) { index = 1; recordSize = MuiLayoutRectangleMessage.Size; return true; }
+			if (field == MuiLayoutField.Top) { index = 2; recordSize = MuiLayoutRectangleMessage.Size; return true; }
+			if (field == MuiLayoutField.RightOrWidth) { index = 3; recordSize = MuiLayoutRectangleMessage.Size; return true; }
+			if (field == MuiLayoutField.BottomOrHeight) { index = 4; recordSize = MuiLayoutRectangleMessage.Size; return true; }
+			if (field == MuiLayoutField.Reserved0) { index = 5; recordSize = MuiLayoutRectangleMessage.Size; return true; }
+			if (field == MuiLayoutField.Reserved1) { index = 6; recordSize = MuiLayoutRectangleMessage.Size; return true; }
+			if (field == MuiLayoutField.Reserved2) { index = 7; recordSize = MuiLayoutRectangleMessage.Size; return true; }
 		}
 		else if (packet == MuiLayoutPacketKind.Text)
 		{
-			if (field == MuiLayoutField.MethodId) { offset = MuiLayoutTextMessage.MethodIdOffset; return true; }
-			if (field == MuiLayoutField.Left) { offset = MuiLayoutTextMessage.LeftOffset; return true; }
-			if (field == MuiLayoutField.Top) { offset = MuiLayoutTextMessage.TopOffset; return true; }
-			if (field == MuiLayoutField.Width) { offset = MuiLayoutTextMessage.WidthOffset; return true; }
-			if (field == MuiLayoutField.Height) { offset = MuiLayoutTextMessage.HeightOffset; return true; }
-			if (field == MuiLayoutField.Text) { offset = MuiLayoutTextMessage.TextOffset; return true; }
-			if (field == MuiLayoutField.Length) { offset = MuiLayoutTextMessage.LengthOffset; return true; }
-			if (field == MuiLayoutField.PreParse) { offset = MuiLayoutTextMessage.PreParseOffset; return true; }
-			if (field == MuiLayoutField.TextFlags) { offset = MuiLayoutTextMessage.TextFlagsOffset; return true; }
+			if (field == MuiLayoutField.MethodId) { index = 0; recordSize = MuiLayoutTextMessage.Size; return true; }
+			if (field == MuiLayoutField.Left) { index = 1; recordSize = MuiLayoutTextMessage.Size; return true; }
+			if (field == MuiLayoutField.Top) { index = 2; recordSize = MuiLayoutTextMessage.Size; return true; }
+			if (field == MuiLayoutField.Width) { index = 3; recordSize = MuiLayoutTextMessage.Size; return true; }
+			if (field == MuiLayoutField.Height) { index = 4; recordSize = MuiLayoutTextMessage.Size; return true; }
+			if (field == MuiLayoutField.Text) { index = 5; recordSize = MuiLayoutTextMessage.Size; return true; }
+			if (field == MuiLayoutField.Length) { index = 6; recordSize = MuiLayoutTextMessage.Size; return true; }
+			if (field == MuiLayoutField.PreParse) { index = 7; recordSize = MuiLayoutTextMessage.Size; return true; }
+			if (field == MuiLayoutField.TextFlags) { index = 8; recordSize = MuiLayoutTextMessage.Size; return true; }
 		}
 		else if (packet == MuiLayoutPacketKind.RenderInfo)
 		{
-			if (field == MuiLayoutField.MethodId) { offset = MuiLayoutRenderInfoMessage.MethodIdOffset; return true; }
-			if (field == MuiLayoutField.RenderInfo) { offset = MuiLayoutRenderInfoMessage.RenderInfoOffset; return true; }
+			if (field == MuiLayoutField.MethodId) { index = 0; recordSize = MuiLayoutRenderInfoMessage.Size; return true; }
+			if (field == MuiLayoutField.RenderInfo) { index = 1; recordSize = MuiLayoutRenderInfoMessage.Size; return true; }
 		}
 		else if (packet == MuiLayoutPacketKind.Flags)
 		{
-			if (field == MuiLayoutField.MethodId) { offset = MuiLayoutFlagsMessage.MethodIdOffset; return true; }
-			if (field == MuiLayoutField.Flags) { offset = MuiLayoutFlagsMessage.FlagsOffset; return true; }
+			if (field == MuiLayoutField.MethodId) { index = 0; recordSize = MuiLayoutFlagsMessage.Size; return true; }
+			if (field == MuiLayoutField.Flags) { index = 1; recordSize = MuiLayoutFlagsMessage.Size; return true; }
 		}
 		else if (packet == MuiLayoutPacketKind.TextDimensions)
 		{
-			if (field == MuiLayoutField.MethodId) { offset = MuiLayoutTextDimensionsMessage.MethodIdOffset; return true; }
-			if (field == MuiLayoutField.Text) { offset = MuiLayoutTextDimensionsMessage.TextOffset; return true; }
-			if (field == MuiLayoutField.Length) { offset = MuiLayoutTextDimensionsMessage.LengthOffset; return true; }
-			if (field == MuiLayoutField.PreParse) { offset = MuiLayoutTextDimensionsMessage.PreParseOffset; return true; }
-			if (field == MuiLayoutField.TextFlags) { offset = MuiLayoutTextDimensionsMessage.TextFlagsOffset; return true; }
+			if (field == MuiLayoutField.MethodId) { index = 0; recordSize = MuiLayoutTextDimensionsMessage.Size; return true; }
+			if (field == MuiLayoutField.Text) { index = 1; recordSize = MuiLayoutTextDimensionsMessage.Size; return true; }
+			if (field == MuiLayoutField.Length) { index = 2; recordSize = MuiLayoutTextDimensionsMessage.Size; return true; }
+			if (field == MuiLayoutField.PreParse) { index = 3; recordSize = MuiLayoutTextDimensionsMessage.Size; return true; }
+			if (field == MuiLayoutField.TextFlags) { index = 4; recordSize = MuiLayoutTextDimensionsMessage.Size; return true; }
 		}
 		else if (packet == MuiLayoutPacketKind.Layout)
 		{
-			if (field == MuiLayoutField.MethodId) { offset = MuiLayoutMessage.MethodIdOffset; return true; }
-			if (field == MuiLayoutField.Left) { offset = MuiLayoutMessage.LeftOffset; return true; }
-			if (field == MuiLayoutField.Top) { offset = MuiLayoutMessage.TopOffset; return true; }
-			if (field == MuiLayoutField.Width) { offset = MuiLayoutMessage.WidthOffset; return true; }
-			if (field == MuiLayoutField.Height) { offset = MuiLayoutMessage.HeightOffset; return true; }
-			if (field == MuiLayoutField.Flags) { offset = MuiLayoutMessage.FlagsOffset; return true; }
+			if (field == MuiLayoutField.MethodId) { index = 0; recordSize = MuiLayoutMessage.Size; return true; }
+			if (field == MuiLayoutField.Left) { index = 1; recordSize = MuiLayoutMessage.Size; return true; }
+			if (field == MuiLayoutField.Top) { index = 2; recordSize = MuiLayoutMessage.Size; return true; }
+			if (field == MuiLayoutField.Width) { index = 3; recordSize = MuiLayoutMessage.Size; return true; }
+			if (field == MuiLayoutField.Height) { index = 4; recordSize = MuiLayoutMessage.Size; return true; }
+			if (field == MuiLayoutField.Flags) { index = 5; recordSize = MuiLayoutMessage.Size; return true; }
 		}
-		offset = 0;
 		return false;
 	}
+
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiLayoutFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-		=> TryGetAddress(ref platform, cursor.Message, cursor.Packet,
-			cursor.Field, out address);
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiLayoutFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Packet, cursor.Field, out var index,
+			out var recordSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Message, recordSize,
+				out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor, 4,
+				out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = 4;
+				return true;
+			}
+		}
+		return false;
+	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR message, MuiLayoutPacketKind packet, MuiLayoutField field,
 		out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (!TryResolve(packet, field, out var offset) ||
-			!TryGetPacketSize(packet, out var packetSize) || message.IsNull ||
-			message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(message, packetSize)) return false;
-		address = APTR.FromPointer(message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		var cursor = default(MuiLayoutFieldCursor);
+		cursor.Message = message;
+		cursor.Packet = packet;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR message, MuiLayoutPacketKind packet, MuiLayoutField field,
+		out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiLayoutFieldCursor);
+		cursor.Message = message;
+		cursor.Packet = packet;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out fieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -298,10 +304,125 @@ internal static class MuiLayoutMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, message, packet, field,
-			out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		switch (packet)
+		{
+			case MuiLayoutPacketKind.Method:
+				return field == MuiLayoutField.MethodId &&
+					MuiLayoutMethodHeaderCodec.TryReadValue(ref platform, message,
+						out value);
+			case MuiLayoutPacketKind.AskMinMax:
+				if (!MuiLayoutMessageStructCodec.TryReadAskMinMax(ref platform,
+					message, out var ask)) return false;
+				value = field switch
+				{
+					MuiLayoutField.MethodId => ask.MethodId,
+					MuiLayoutField.Storage => ask.Storage,
+					_ => 0,
+				};
+				return field is MuiLayoutField.MethodId or MuiLayoutField.Storage;
+			case MuiLayoutPacketKind.Relayout:
+				if (!MuiLayoutMessageStructCodec.TryReadRelayout(ref platform,
+					message, out var relayout)) return false;
+				value = field switch
+				{
+					MuiLayoutField.MethodId => relayout.MethodId,
+					MuiLayoutField.Flags => relayout.Flags,
+					_ => 0,
+				};
+				return field is MuiLayoutField.MethodId or MuiLayoutField.Flags;
+			case MuiLayoutPacketKind.Rectangle:
+				if (!MuiLayoutMessageStructCodec.TryReadRectangle(ref platform,
+					message, out var rectangle)) return false;
+				value = field switch
+				{
+					MuiLayoutField.MethodId => rectangle.MethodId,
+					MuiLayoutField.Left => rectangle.Left,
+					MuiLayoutField.Top => rectangle.Top,
+					MuiLayoutField.RightOrWidth => rectangle.RightOrWidth,
+					MuiLayoutField.BottomOrHeight => rectangle.BottomOrHeight,
+					MuiLayoutField.Reserved0 => rectangle.Reserved0,
+					MuiLayoutField.Reserved1 => rectangle.Reserved1,
+					MuiLayoutField.Reserved2 => rectangle.Reserved2,
+					_ => 0,
+				};
+				return field is MuiLayoutField.MethodId or MuiLayoutField.Left or
+					MuiLayoutField.Top or MuiLayoutField.RightOrWidth or
+					MuiLayoutField.BottomOrHeight or MuiLayoutField.Reserved0 or
+					MuiLayoutField.Reserved1 or MuiLayoutField.Reserved2;
+			case MuiLayoutPacketKind.Text:
+				if (!MuiLayoutMessageStructCodec.TryReadText(ref platform, message,
+					out var text)) return false;
+				value = field switch
+				{
+					MuiLayoutField.MethodId => text.MethodId,
+					MuiLayoutField.Left => text.Left,
+					MuiLayoutField.Top => text.Top,
+					MuiLayoutField.Width => text.Width,
+					MuiLayoutField.Height => text.Height,
+					MuiLayoutField.Text => text.Text,
+					MuiLayoutField.Length => text.Length,
+					MuiLayoutField.PreParse => text.PreParse,
+					MuiLayoutField.TextFlags => text.Flags,
+					_ => 0,
+				};
+				return field is MuiLayoutField.MethodId or MuiLayoutField.Left or
+					MuiLayoutField.Top or MuiLayoutField.Width or MuiLayoutField.Height or
+					MuiLayoutField.Text or MuiLayoutField.Length or
+					MuiLayoutField.PreParse or MuiLayoutField.TextFlags;
+			case MuiLayoutPacketKind.RenderInfo:
+				if (!MuiLayoutMessageStructCodec.TryReadRenderInfo(ref platform,
+					message, out var renderInfo)) return false;
+				value = field switch
+				{
+					MuiLayoutField.MethodId => renderInfo.MethodId,
+					MuiLayoutField.RenderInfo => renderInfo.RenderInfo,
+					_ => 0,
+				};
+				return field is MuiLayoutField.MethodId or MuiLayoutField.RenderInfo;
+			case MuiLayoutPacketKind.Flags:
+				if (!MuiLayoutMessageStructCodec.TryReadFlags(ref platform, message,
+					out var flags)) return false;
+				value = field switch
+				{
+					MuiLayoutField.MethodId => flags.MethodId,
+					MuiLayoutField.Flags => flags.Flags,
+					_ => 0,
+				};
+				return field is MuiLayoutField.MethodId or MuiLayoutField.Flags;
+			case MuiLayoutPacketKind.TextDimensions:
+				if (!MuiLayoutMessageStructCodec.TryReadTextDimensions(
+					ref platform, message, out var dimensions)) return false;
+				value = field switch
+				{
+					MuiLayoutField.MethodId => dimensions.MethodId,
+					MuiLayoutField.Text => dimensions.Text,
+					MuiLayoutField.Length => dimensions.Length,
+					MuiLayoutField.PreParse => dimensions.PreParse,
+					MuiLayoutField.TextFlags => dimensions.Flags,
+					_ => 0,
+				};
+				return field is MuiLayoutField.MethodId or MuiLayoutField.Text or
+					MuiLayoutField.Length or MuiLayoutField.PreParse or
+					MuiLayoutField.TextFlags;
+			case MuiLayoutPacketKind.Layout:
+				if (!MuiLayoutMessageStructCodec.TryReadLayout(ref platform, message,
+					out var layout)) return false;
+				value = field switch
+				{
+					MuiLayoutField.MethodId => layout.MethodId,
+					MuiLayoutField.Left => layout.Left,
+					MuiLayoutField.Top => layout.Top,
+					MuiLayoutField.Width => layout.Width,
+					MuiLayoutField.Height => layout.Height,
+					MuiLayoutField.Flags => layout.Flags,
+					_ => 0,
+				};
+				return field is MuiLayoutField.MethodId or MuiLayoutField.Left or
+					MuiLayoutField.Top or MuiLayoutField.Width or MuiLayoutField.Height or
+					MuiLayoutField.Flags;
+			default:
+				return false;
+		}
 	}
 
 	// Method admission stays on the named packed header; the field adapter
@@ -317,10 +438,123 @@ internal static class MuiLayoutMessageMemoryCodec
 		uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, message, packet, field,
-			out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		switch (packet)
+		{
+			case MuiLayoutPacketKind.Method:
+				return field == MuiLayoutField.MethodId &&
+					MuiLayoutMethodHeaderCodec.WriteValue(ref platform, message,
+						value);
+			case MuiLayoutPacketKind.AskMinMax:
+				if (!MuiLayoutMessageStructCodec.TryReadAskMinMax(ref platform,
+					message, out var ask)) return false;
+				switch (field)
+				{
+					case MuiLayoutField.MethodId: ask.MethodId = value; break;
+					case MuiLayoutField.Storage: ask.Storage = value; break;
+					default: return false;
+				}
+				return MuiLayoutMessageStructCodec.WriteAskMinMax(ref platform,
+					message, ask);
+			case MuiLayoutPacketKind.Relayout:
+				if (!MuiLayoutMessageStructCodec.TryReadRelayout(ref platform,
+					message, out var relayout)) return false;
+				switch (field)
+				{
+					case MuiLayoutField.MethodId: relayout.MethodId = value; break;
+					case MuiLayoutField.Flags: relayout.Flags = value; break;
+					default: return false;
+				}
+				return MuiLayoutMessageStructCodec.WriteRelayout(ref platform,
+					message, relayout);
+			case MuiLayoutPacketKind.Rectangle:
+				if (!MuiLayoutMessageStructCodec.TryReadRectangle(ref platform,
+					message, out var rectangle)) return false;
+				switch (field)
+				{
+					case MuiLayoutField.MethodId: rectangle.MethodId = value; break;
+					case MuiLayoutField.Left: rectangle.Left = value; break;
+					case MuiLayoutField.Top: rectangle.Top = value; break;
+					case MuiLayoutField.RightOrWidth: rectangle.RightOrWidth = value; break;
+					case MuiLayoutField.BottomOrHeight: rectangle.BottomOrHeight = value; break;
+					case MuiLayoutField.Reserved0: rectangle.Reserved0 = value; break;
+					case MuiLayoutField.Reserved1: rectangle.Reserved1 = value; break;
+					case MuiLayoutField.Reserved2: rectangle.Reserved2 = value; break;
+					default: return false;
+				}
+				return MuiLayoutMessageStructCodec.WriteRectangle(ref platform,
+					message, rectangle);
+			case MuiLayoutPacketKind.Text:
+				if (!MuiLayoutMessageStructCodec.TryReadText(ref platform, message,
+					out var text)) return false;
+				switch (field)
+				{
+					case MuiLayoutField.MethodId: text.MethodId = value; break;
+					case MuiLayoutField.Left: text.Left = value; break;
+					case MuiLayoutField.Top: text.Top = value; break;
+					case MuiLayoutField.Width: text.Width = value; break;
+					case MuiLayoutField.Height: text.Height = value; break;
+					case MuiLayoutField.Text: text.Text = value; break;
+					case MuiLayoutField.Length: text.Length = value; break;
+					case MuiLayoutField.PreParse: text.PreParse = value; break;
+					case MuiLayoutField.TextFlags: text.Flags = value; break;
+					default: return false;
+				}
+				return MuiLayoutMessageStructCodec.WriteText(ref platform, message,
+					text);
+			case MuiLayoutPacketKind.RenderInfo:
+				if (!MuiLayoutMessageStructCodec.TryReadRenderInfo(ref platform,
+					message, out var renderInfo)) return false;
+				switch (field)
+				{
+					case MuiLayoutField.MethodId: renderInfo.MethodId = value; break;
+					case MuiLayoutField.RenderInfo: renderInfo.RenderInfo = value; break;
+					default: return false;
+				}
+				return MuiLayoutMessageStructCodec.WriteRenderInfo(ref platform,
+					message, renderInfo);
+			case MuiLayoutPacketKind.Flags:
+				if (!MuiLayoutMessageStructCodec.TryReadFlags(ref platform, message,
+					out var flags)) return false;
+				switch (field)
+				{
+					case MuiLayoutField.MethodId: flags.MethodId = value; break;
+					case MuiLayoutField.Flags: flags.Flags = value; break;
+					default: return false;
+				}
+				return MuiLayoutMessageStructCodec.WriteFlags(ref platform, message,
+					flags);
+			case MuiLayoutPacketKind.TextDimensions:
+				if (!MuiLayoutMessageStructCodec.TryReadTextDimensions(
+					ref platform, message, out var dimensions)) return false;
+				switch (field)
+				{
+					case MuiLayoutField.MethodId: dimensions.MethodId = value; break;
+					case MuiLayoutField.Text: dimensions.Text = value; break;
+					case MuiLayoutField.Length: dimensions.Length = value; break;
+					case MuiLayoutField.PreParse: dimensions.PreParse = value; break;
+					case MuiLayoutField.TextFlags: dimensions.Flags = value; break;
+					default: return false;
+				}
+				return MuiLayoutMessageStructCodec.WriteTextDimensions(ref platform,
+					message, dimensions);
+			case MuiLayoutPacketKind.Layout:
+				if (!MuiLayoutMessageStructCodec.TryReadLayout(ref platform, message,
+					out var layout)) return false;
+				switch (field)
+				{
+					case MuiLayoutField.MethodId: layout.MethodId = value; break;
+					case MuiLayoutField.Left: layout.Left = value; break;
+					case MuiLayoutField.Top: layout.Top = value; break;
+					case MuiLayoutField.Width: layout.Width = value; break;
+					case MuiLayoutField.Height: layout.Height = value; break;
+					case MuiLayoutField.Flags: layout.Flags = value; break;
+					default: return false;
+				}
+				return MuiLayoutMessageStructCodec.WriteLayout(ref platform, message,
+					layout);
+			default:
+				return false;
+		}
 	}
 
 	internal static bool TryReadAt<TPlatform>(ref TPlatform platform,
@@ -337,8 +571,9 @@ internal static class MuiLayoutMessageMemoryCodec
 	}
 }
 
-// Compatibility wrapper retained for callers that still construct the typed
-// field cursor. Live layout packet codecs use MuiLayoutMessageMemoryCodec.
+// Compatibility wrapper retained for callers that construct the typed field
+// cursor. Live layout packet codecs route field access through declaration-
+// order traversal of the named records.
 internal static class MuiLayoutFieldCursorCodec
 {
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -348,11 +583,24 @@ internal static class MuiLayoutFieldCursorCodec
 			out address);
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiLayoutFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiLayoutMessageMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR message, MuiLayoutPacketKind packet, MuiLayoutField field,
 		out APTR address)
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiLayoutMessageMemoryCodec.TryGetAddress(ref platform, message, packet,
 			field, out address);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR message, MuiLayoutPacketKind packet, MuiLayoutField field,
+		out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiLayoutMessageMemoryCodec.TryGetAddress(ref platform, message, packet,
+			field, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR message, MuiLayoutPacketKind packet, MuiLayoutField field,

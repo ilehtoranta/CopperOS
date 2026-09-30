@@ -21,6 +21,19 @@ public sealed class MuiSleepStructAdapterTests
 
 		Assert.True(MuiSleepStateRecordCodec.WriteRecord(ref platform, address,
 			original));
+		var requestCursor = new MuiSleepStateFieldCursor
+		{
+			Record = address,
+			Field = MuiSleepStateField.Request,
+		};
+		Assert.True(MuiSleepStateFieldCursorCodec.TryGetAddress(ref platform,
+			requestCursor, out var cursorRequest, out var cursorFieldSize));
+		Assert.Equal(APTR.FromPointer(address.Raw + 12), cursorRequest);
+		Assert.Equal(MuiSleepStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiSleepStateRecordMemoryCodec.TryGetAddress(ref platform,
+			requestCursor, out var memoryRequest, out var memoryFieldSize));
+		Assert.Equal(cursorRequest, memoryRequest);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiSleepStateRecordMemoryCodec.TryReadUInt32(ref platform,
 			address, MuiSleepStateField.Depth, out var depth));
 		Assert.Equal(original.Depth, depth);
@@ -48,6 +61,13 @@ public sealed class MuiSleepStructAdapterTests
 			address, (MuiSleepStateField)255, out _));
 		Assert.False(MuiSleepStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 			APTR.FromPointer(0x30FF1), MuiSleepStateField.Depth, 1));
+		requestCursor.Field = (MuiSleepStateField)255;
+		Assert.False(MuiSleepStateFieldCursorCodec.TryGetAddress(ref platform,
+			requestCursor, out _, out _));
+		requestCursor.Record = APTR.Null;
+		requestCursor.Field = MuiSleepStateField.Request;
+		Assert.False(MuiSleepStateFieldCursorCodec.TryGetAddress(ref platform,
+			requestCursor, out _, out _));
 	}
 
 	[Fact]

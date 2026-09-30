@@ -101,32 +101,70 @@ internal static class MuiApplicationSettingsPersistenceStateFieldCursorCodec
 }
 
 // Fixed application settings persistence state is transferred as a named
-// record. Numeric guest positions are confined to this ABI adapter; the
-// compatibility cursor above remains available only to legacy callers and
-// malformed-state diagnostics.
+// record. The bounded cursor walks the complete packed struct before selecting
+// a field; offset constants remain ABI documentation/compatibility aliases
+// only.
 internal static class MuiApplicationSettingsPersistenceStateRecordMemoryCodec
 {
-	private static bool TryResolve(
-		MuiApplicationSettingsPersistenceStateField field, out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor,
+		MuiApplicationSettingsPersistenceStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (field == MuiApplicationSettingsPersistenceStateField.Magic)
-			offset = MuiApplicationSettingsPersistenceStateRecord.MagicOffset;
-		else if (field == MuiApplicationSettingsPersistenceStateField.Operation)
-			offset = MuiApplicationSettingsPersistenceStateRecord.OperationOffset;
-		else if (field == MuiApplicationSettingsPersistenceStateField.Name)
-			offset = MuiApplicationSettingsPersistenceStateRecord.NameOffset;
-		else if (field == MuiApplicationSettingsPersistenceStateField.Requests)
-			offset = MuiApplicationSettingsPersistenceStateRecord.RequestsOffset;
-		else if (field == MuiApplicationSettingsPersistenceStateField.Saves)
-			offset = MuiApplicationSettingsPersistenceStateRecord.SavesOffset;
-		else if (field == MuiApplicationSettingsPersistenceStateField.Loads)
-			offset = MuiApplicationSettingsPersistenceStateRecord.LoadsOffset;
-		else
+		address = APTR.Null;
+		switch (field)
 		{
-			offset = 0;
-			return false;
+			case MuiApplicationSettingsPersistenceStateField.Magic:
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsPersistenceStateRecord.FieldSize, out address);
+			case MuiApplicationSettingsPersistenceStateField.Operation:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsPersistenceStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsPersistenceStateRecord.FieldSize, out address);
+			case MuiApplicationSettingsPersistenceStateField.Name:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsPersistenceStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSettingsPersistenceStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsPersistenceStateRecord.FieldSize, out address);
+			case MuiApplicationSettingsPersistenceStateField.Requests:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsPersistenceStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSettingsPersistenceStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSettingsPersistenceStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsPersistenceStateRecord.FieldSize, out address);
+			case MuiApplicationSettingsPersistenceStateField.Saves:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsPersistenceStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSettingsPersistenceStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSettingsPersistenceStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSettingsPersistenceStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsPersistenceStateRecord.FieldSize, out address);
+			case MuiApplicationSettingsPersistenceStateField.Loads:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsPersistenceStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSettingsPersistenceStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSettingsPersistenceStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSettingsPersistenceStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSettingsPersistenceStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsPersistenceStateRecord.FieldSize, out address);
+			default:
+				return false;
 		}
-		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -135,14 +173,11 @@ internal static class MuiApplicationSettingsPersistenceStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiApplicationSettingsPersistenceStateRecord.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address))
 			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record,
-			MuiApplicationSettingsPersistenceStateRecord.Size) &&
-			platform.IsMapped(address,
-				MuiApplicationSettingsPersistenceStateRecord.FieldSize);
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

@@ -96,6 +96,19 @@ public sealed class MuiStringInteractionAdmissionTests
 			ref platform, recordAddress, MuiStringInteractionStateField.Multiline,
 			out var typedMultilineAddress));
 		Assert.Equal(0x1D2Cu, typedMultilineAddress.Raw);
+		var multilineCursor = new MuiStringInteractionStateFieldCursor
+		{
+			Record = recordAddress,
+			Field = MuiStringInteractionStateField.Multiline,
+		};
+		Assert.True(MuiStringInteractionStateFieldCursorCodec.TryGetAddress(ref platform,
+			multilineCursor, out var cursorMultilineAddress, out var cursorFieldSize));
+		Assert.Equal(typedMultilineAddress, cursorMultilineAddress);
+		Assert.Equal(MuiStringInteractionStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiStringInteractionStateRecordMemoryCodec.TryGetAddress(ref platform,
+			multilineCursor, out var memoryMultilineAddress, out var memoryFieldSize));
+		Assert.Equal(cursorMultilineAddress, memoryMultilineAddress);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiStringInteractionStateRecordMemoryCodec.TryReadUInt32(
 			ref platform, recordAddress, MuiStringInteractionStateField.Editable,
 			out var typedEditable));
@@ -128,6 +141,13 @@ public sealed class MuiStringInteractionAdmissionTests
 			ref platform, APTR.Null, (uint)0, out _));
 		Assert.False(MuiStringInteractionStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
+		multilineCursor.Field = (MuiStringInteractionStateField)255;
+		Assert.False(MuiStringInteractionStateFieldCursorCodec.TryGetAddress(ref platform,
+			multilineCursor, out _, out _));
+		multilineCursor.Record = APTR.Null;
+		multilineCursor.Field = MuiStringInteractionStateField.Multiline;
+		Assert.False(MuiStringInteractionStateFieldCursorCodec.TryGetAddress(ref platform,
+			multilineCursor, out _, out _));
 	}
 
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR stringClass)

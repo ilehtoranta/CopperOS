@@ -23,10 +23,6 @@ internal struct MuiAreaCustomFontStateRecord
 {
 	internal const uint Size = 16;
 	internal const uint FieldSize = 4;
-	internal const uint MagicOffset = 0;
-	internal const uint SpecOffset = 4;
-	internal const uint PresentOffset = 8;
-	internal const uint GenerationOffset = 12;
 	internal const uint Cookie = 0x4143464Eu; // 'ACFN'
 
 	internal uint Magic;
@@ -69,10 +65,14 @@ internal static class MuiAreaCustomFontStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaCustomFontStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiAreaCustomFontStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaCustomFontStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiAreaCustomFontStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiAreaCustomFontStateField field, out uint value)
@@ -91,25 +91,22 @@ internal static class MuiAreaCustomFontStateFieldCursorCodec
 	}
 }
 
-// Fixed Area CustomFont state is transferred as a named record. Numeric guest
-// positions are confined to this ABI adapter; the compatibility cursor above
-// remains available only to legacy callers and malformed-state diagnostics.
+// Fixed Area CustomFont state is transferred as a named record. The bounded
+// cursor walks the complete packed struct before selecting a field; the
+// compatibility cursor above remains available only to legacy callers and
+// malformed-state diagnostics.
 internal static class MuiAreaCustomFontStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiAreaCustomFontStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiAreaCustomFontStateField field,
+		out uint index)
 	{
-		if (field == MuiAreaCustomFontStateField.Magic)
-			offset = MuiAreaCustomFontStateRecord.MagicOffset;
-		else if (field == MuiAreaCustomFontStateField.Spec)
-			offset = MuiAreaCustomFontStateRecord.SpecOffset;
-		else if (field == MuiAreaCustomFontStateField.Present)
-			offset = MuiAreaCustomFontStateRecord.PresentOffset;
-		else if (field == MuiAreaCustomFontStateField.Generation)
-			offset = MuiAreaCustomFontStateRecord.GenerationOffset;
+		if (field == MuiAreaCustomFontStateField.Magic) index = 0;
+		else if (field == MuiAreaCustomFontStateField.Spec) index = 1;
+		else if (field == MuiAreaCustomFontStateField.Present) index = 2;
+		else if (field == MuiAreaCustomFontStateField.Generation) index = 3;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -119,13 +116,34 @@ internal static class MuiAreaCustomFontStateRecordMemoryCodec
 		APTR record, MuiAreaCustomFontStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiAreaCustomFontStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaCustomFontStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiAreaCustomFontStateRecord.Size) &&
-			platform.IsMapped(address, MuiAreaCustomFontStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiAreaCustomFontStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiAreaCustomFontStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiAreaCustomFontStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

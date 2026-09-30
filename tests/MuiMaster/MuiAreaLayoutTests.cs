@@ -79,6 +79,28 @@ public sealed class MuiAreaLayoutTests
 	}
 
 	[Fact]
+	public void SetupRequiresTypedRenderInfoWithLiveRastPort()
+	{
+		var platform = CreatePlatform(out var cl);
+		var area = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl,
+			APTR.Null);
+		var renderInfo = APTR.FromPointer(0x1300);
+		var record = default(MuiDrawingRenderInfoRecord);
+
+		Assert.True(MuiDrawingRenderInfoCodec.Write(ref platform, renderInfo,
+			record));
+		Assert.False(MuiAreaLayoutCore.Setup(ref platform, State, area, renderInfo));
+		Assert.False(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			area, MuiAreaWindowRelationshipCore.RenderInfoAttribute, out _));
+
+		record.RastPort = APTR.FromPointer(0x1400);
+		Assert.True(MuiDrawingRenderInfoCodec.Write(ref platform, renderInfo,
+			record));
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, area, renderInfo));
+		Assert.True(MuiAreaLayoutCore.Cleanup(ref platform, State, area));
+	}
+
+	[Fact]
 	public void AreaDrawingPublishesNamedRenderPolicy()
 	{
 		var platform = CreatePlatform(out var cl);
@@ -631,6 +653,14 @@ public sealed class MuiAreaLayoutTests
 			out var compatibilityAddress));
 		Assert.Equal(record.Raw + MuiMinMaxValues.DefHeightOffset,
 			compatibilityAddress.Raw);
+		Assert.True(MuiMinMaxFieldCursorCodec.TryGetAddress(ref platform, cursor,
+			out var typedAddress, out var typedSize));
+		Assert.Equal(compatibilityAddress, typedAddress);
+		Assert.Equal(MuiMinMaxValues.FieldSize, typedSize);
+		Assert.True(MuiMinMaxMemoryCodec.TryGetAddress(ref platform, cursor,
+			out var memoryAddress, out var memorySize));
+		Assert.Equal(typedAddress, memoryAddress);
+		Assert.Equal(typedSize, memorySize);
 		Assert.False(MuiMinMaxMemoryCodec.TryGetAddress(ref platform, record,
 			(MuiMinMaxField)255, out _));
 		Assert.False(MuiMinMaxMemoryCodec.TryGetAddress(ref platform,
@@ -1190,6 +1220,10 @@ public sealed class MuiAreaLayoutTests
 		Assert.True(MuiLayoutFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out address));
 		Assert.Equal(packet.Raw + 20, address.Raw);
+		Assert.True(MuiLayoutFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out address, out var fieldSize));
+		Assert.Equal(packet.Raw + 20, address.Raw);
+		Assert.Equal(4u, fieldSize);
 
 		Assert.True(MuiLayoutFieldCursorCodec.TryReadUInt32(ref platform,
 			packet, MuiLayoutPacketKind.Rectangle, MuiLayoutField.Reserved2,

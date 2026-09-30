@@ -1,0 +1,221 @@
+#!/usr/bin/env python3
+"""Generate fixed-width MorphOs320M68k MUI message records from the ABI ledger."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+from dataclasses import dataclass
+from pathlib import Path
+
+
+CORE_RECORDS = {
+    "MUI_Command", "MUI_Palette_Entry", "MUI_InputHandlerNode",
+    "MUI_EventHandlerNode", "MUI_List_TestPos_Result", "MUI_RGBColor",
+    "MUI_GlobalInfo", "MUI_NotifyData", "MUI_MinMax", "MUI_LayoutMsg",
+    "MUI_AreaData", "MUI_DragImage", "MUI_RenderInfo", "MUI_PenSpec",
+    "MUI_CustomClass",
+}
+
+CSHARP_KEYWORDS = {
+    "abstract", "as", "base", "bool", "break", "byte", "case", "catch",
+    "char", "checked", "class", "const", "continue", "decimal", "default",
+    "delegate", "do", "double", "else", "enum", "event", "explicit",
+    "extern", "false", "finally", "fixed", "float", "for", "foreach",
+    "goto", "if", "implicit", "in", "int", "interface", "internal", "is",
+    "lock", "long", "namespace", "new", "null", "object", "operator",
+    "out", "override", "params", "private", "protected", "public",
+    "readonly", "ref", "return", "sbyte", "sealed", "short", "sizeof",
+    "stackalloc", "static", "string", "struct", "switch", "this", "throw",
+    "true", "try", "typeof", "uint", "ulong", "unchecked", "unsafe",
+    "ushort", "using", "virtual", "void", "volatile", "while",
+}
+
+SCALARS = {
+    "ULONG": ("uint", 4, 2),
+    "LONG": ("int", 4, 2),
+    "UWORD": ("ushort", 2, 2),
+    "int": ("int", 4, 2),
+    "size_t": ("uint", 4, 2),
+    "IPTR": ("uint", 4, 2),
+    "APTR": ("APTR", 4, 2),
+    "CONST_APTR": ("APTR", 4, 2),
+    "STRPTR": ("APTR", 4, 2),
+    "CONST_STRPTR": ("APTR", 4, 2),
+    "Msg": ("APTR", 4, 2),
+}
+
+
+@dataclass(frozen=True)
+class Field:
+    name: str
+    cs_name: str
+    cs_type: str
+    offset: int
+    count: int | None
+    flexible: bool
+
+    @property
+    def width(self) -> int:
+        if self.flexible:
+            return 0
+        return scalar_width(self.cs_type) * (self.count or 1)
+
+
+def scalar_width(cs_type: str) -> int:
+    return {"byte": 1, "ushort": 2, "int": 4, "uint": 4, "APTR": 4}[cs_type]
+
+
+def escaped(name: str) -> str:
+    return f"@{name}" if name in CSHARP_KEYWORDS else name
+
+
+def parse_field(entry: dict, current_offset: int) -> tuple[Field, int, int]:
+    name = entry["name"]
+    declaration = entry["declaration"].strip().rstrip(";")
+    match = re.fullmatch(
+        rf"(?P<type>.+?)\s*\b{re.escape(name)}\b\s*(?:\[(?P<count>\d*)\])?",
+        declaration,
+    )
+    if not match:
+        raise ValueError(f"Unsupported declaration: {declaration!r}")
+
+    c_type = " ".join(match.group("type").split())
+    count_text = match.group("count")
+    is_array = count_text is not None
+    flexible = is_array and count_text in ("", "0")
+    count = None if flexible or not is_array else int(count_text)
+
+    if c_type.endswith("*"):
+        cs_type, width, alignment = "APTR", 4, 2
+    elif c_type in SCALARS:
+        cs_type, width, alignment = SCALARS[c_type]
+    elif c_type == "UBYTE" and is_array:
+        cs_type, width, alignment = "byte", 1, 1
+    else:
+        raise ValueError(f"Unsupported C type {c_type!r} in {declaration!r}")
+
+    if is_array and cs_type == "APTR":
+        # Fixed buffers only accept primitive element types. A guest pointer is
+        # represented by its exact 32-bit storage in fixed pointer arrays.
+        cs_type = "uint"
+
+    offset = (current_offset + alignment - 1) & ~(alignment - 1)
+    field = Field(name, escaped(name), cs_type, offset, count, flexible)
+    next_offset = offset if flexible else offset + width * (count or 1)
+    return field, next_offset, alignment
+
+
+def records(inventory: dict) -> list[tuple[str, list[Field], int]]:
+    result = []
+    for record in inventory["structures_and_messages"]:
+        if record["name"] in CORE_RECORDS:
+            continue
+        fields = []
+        seen_fields: set[str] = set()
+        offset = 0
+        max_alignment = 1
+        for entry in record["fields"]:
+            if entry["name"] in seen_fields:
+                # Some SDK headers spell the same flexible tail as [] or [0]
+                # under mutually exclusive compiler branches.
+                if re.search(r"\[(?:0)?\]\s*$", entry["declaration"]):
+                    continue
+                raise ValueError(f"Duplicate field {record['name']}.{entry['name']}")
+            field, offset, alignment = parse_field(entry, offset)
+            seen_fields.add(entry["name"])
+            fields.append(field)
+            max_alignment = max(max_alignment, alignment)
+        size = (offset + max_alignment - 1) & ~(max_alignment - 1)
+        result.append((record["name"], fields, size))
+    return result
+
+
+def generate_structures(items: list[tuple[str, list[Field], int]]) -> str:
+    lines = [
+        "/*", "- Copyright (C) 2026 Ilkka Lehtoranta",
+        "- SPDX-License-Identifier: MIT", "*/", "",
+        "// Generated by CopperOS/tools/MuiInventory/generate_csharp_messages.py.",
+        "// Public identifiers and fixed-width ABI facts only.", "",
+        "using System.Runtime.InteropServices;", "", "namespace Amiga.MUI;", "",
+    ]
+    for name, fields, size in items:
+        unsafe = any(field.count is not None for field in fields)
+        lines.extend([
+            "[StructLayout(LayoutKind.Sequential, Pack = 2)]",
+            f"public {'unsafe ' if unsafe else ''}struct {name}", "{",
+            f"\tpublic const uint AbiSize = {size};",
+        ])
+        for field in fields:
+            if field.flexible:
+                lines.append(f"\tpublic const uint {field.cs_name}Offset = {field.offset};")
+            elif field.count is not None:
+                lines.append(f"\tpublic fixed {field.cs_type} {field.cs_name}[{field.count}];")
+            else:
+                lines.append(f"\tpublic {field.cs_type} {field.cs_name};")
+        lines.extend(["}", ""])
+
+    return "\n".join(lines)
+
+
+def generate_tests(items: list[tuple[str, list[Field], int]]) -> str:
+    lines = [
+        "/*", "- Copyright (C) 2026 Ilkka Lehtoranta",
+        "- SPDX-License-Identifier: MIT", "*/", "",
+        "// Generated by CopperOS/tools/MuiInventory/generate_csharp_messages.py.",
+        "// Public identifiers and fixed-width ABI facts only.", "",
+        "using System.Reflection;", "using System.Runtime.CompilerServices;", "using System.Runtime.InteropServices;", "using Amiga;", "using Amiga.MUI;", "using Xunit;", "",
+        "namespace CopperSharp.Compiler.Tests;", "", "public sealed class MuiMessageAbiTests", "{",
+    ]
+    for name, fields, size in items:
+        lines.extend([
+            "\t[Fact]", f"\tpublic void {name}_HasExactMorphOs320M68kLayout()", "\t{",
+            f"\t\tAssert.Equal({size}, Marshal.SizeOf<{name}>());",
+            f"\t\tAssert.Equal({size}u, {name}.AbiSize);",
+        ])
+        for field in fields:
+            if field.flexible:
+                lines.append(f"\t\tAssert.Equal({field.offset}u, {name}.{field.cs_name}Offset);")
+            else:
+                lines.append(
+                    f"\t\tAssert.Equal((nint){field.offset}, "
+                    f"Marshal.OffsetOf<{name}>(nameof({name}.{field.cs_name})));"
+                )
+                if field.count is not None:
+                    variable = f"fixed_{field.name}"
+                    lines.append(
+                        f"\t\tvar {variable} = typeof({name}).GetField(nameof({name}.{field.cs_name}))!"
+                        ".GetCustomAttribute<FixedBufferAttribute>()!;"
+                    )
+                    lines.append(f"\t\tAssert.Equal(typeof({field.cs_type}), {variable}.ElementType);")
+                    lines.append(f"\t\tAssert.Equal({field.count}, {variable}.Length);")
+                else:
+                    lines.append(
+                        f"\t\tAssert.Equal(typeof({field.cs_type}), typeof({name})"
+                        f".GetField(nameof({name}.{field.cs_name}))!.FieldType);"
+                    )
+        lines.extend(["\t}", ""])
+    lines.extend(["}", ""])
+    return "\n".join(lines)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--inventory", type=Path, required=True)
+    parser.add_argument("--structures-output", type=Path, required=True)
+    parser.add_argument("--tests-output", type=Path, required=True)
+    args = parser.parse_args()
+
+    inventory = json.loads(args.inventory.read_text(encoding="utf-8"))
+    items = records(inventory)
+    if len(items) != 356:
+        raise ValueError(f"Expected 356 generated records, found {len(items)}")
+
+    args.structures_output.write_text(generate_structures(items), encoding="utf-8", newline="\n")
+    args.tests_output.write_text(generate_tests(items), encoding="utf-8", newline="\n")
+    print(json.dumps({"records": len(items), "structures": str(args.structures_output), "tests": str(args.tests_output)}, indent=2))
+
+
+if __name__ == "__main__":
+    main()

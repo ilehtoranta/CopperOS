@@ -18,6 +18,8 @@ internal struct MuiApplicationSettingsHeader
 {
 	internal const uint Size = 16;
 	internal const uint FieldSize = 4;
+	// ABI/documentation aliases retained for diagnostics; production access is
+	// declaration-ordered cursor traversal below.
 	internal const uint MagicValueOffset = 0;
 	internal const uint VersionValueOffset = 4;
 	internal const uint RecordCountOffset = 8;
@@ -48,33 +50,52 @@ internal struct MuiApplicationSettingsHeaderFieldCursor
 // and complete-record bounds in one place.
 internal static class MuiApplicationSettingsHeaderMemoryCodec
 {
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiApplicationSettingsHeaderField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		switch (field)
+		{
+			case MuiApplicationSettingsHeaderField.MagicValue:
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsHeader.FieldSize, out address);
+			case MuiApplicationSettingsHeaderField.VersionValue:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsHeader.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsHeader.FieldSize, out address);
+			case MuiApplicationSettingsHeaderField.RecordCount:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsHeader.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSettingsHeader.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsHeader.FieldSize, out address);
+			case MuiApplicationSettingsHeaderField.PayloadBytes:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsHeader.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSettingsHeader.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSettingsHeader.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsHeader.FieldSize, out address);
+			default:
+				return false;
+		}
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR header, MuiApplicationSettingsHeaderField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		uint offset;
-		switch (field)
-		{
-			case MuiApplicationSettingsHeaderField.MagicValue:
-				offset = MuiApplicationSettingsHeader.MagicValueOffset;
-				break;
-			case MuiApplicationSettingsHeaderField.VersionValue:
-				offset = MuiApplicationSettingsHeader.VersionValueOffset;
-				break;
-			case MuiApplicationSettingsHeaderField.RecordCount:
-				offset = MuiApplicationSettingsHeader.RecordCountOffset;
-				break;
-			case MuiApplicationSettingsHeaderField.PayloadBytes:
-				offset = MuiApplicationSettingsHeader.PayloadBytesOffset;
-				break;
-			default:
-				return false;
-		}
-		if (header.IsNull || header.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(header, MuiApplicationSettingsHeader.Size)) return false;
-		address = APTR.FromPointer(header.Raw + offset);
-		return platform.IsMapped(address, MuiApplicationSettingsHeader.FieldSize);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, header,
+			MuiApplicationSettingsHeader.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address)) return false;
+		return true;
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -139,6 +160,8 @@ internal struct MuiApplicationSettingsRecord
 {
 	internal const uint Size = 8;
 	internal const uint FieldSize = 4;
+	// ABI/documentation aliases retained for diagnostics; production access is
+	// declaration-ordered cursor traversal below.
 	internal const uint KeyOffset = 0;
 	internal const uint LengthOffset = 4;
 	internal uint Key;
@@ -162,27 +185,36 @@ internal struct MuiApplicationSettingsRecordFieldCursor
 // record. The surrounding transfer cursor remains a byte-stream concern.
 internal static class MuiApplicationSettingsRecordMemoryCodec
 {
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiApplicationSettingsRecordField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		switch (field)
+		{
+			case MuiApplicationSettingsRecordField.Key:
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsRecord.FieldSize, out address);
+			case MuiApplicationSettingsRecordField.Length:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsRecord.FieldSize, out address);
+			default:
+				return false;
+		}
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiApplicationSettingsRecordField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		uint offset;
-		switch (field)
-		{
-			case MuiApplicationSettingsRecordField.Key:
-				offset = MuiApplicationSettingsRecord.KeyOffset;
-				break;
-			case MuiApplicationSettingsRecordField.Length:
-				offset = MuiApplicationSettingsRecord.LengthOffset;
-				break;
-			default:
-				return false;
-		}
-		if (record.IsNull || record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiApplicationSettingsRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiApplicationSettingsRecord.FieldSize);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiApplicationSettingsRecord.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address)) return false;
+		return true;
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,

@@ -21,8 +21,6 @@ internal struct MuiBitmapRemappedStateRecord
 {
 	internal const uint Size = 8;
 	internal const uint FieldSize = 4;
-	internal const uint MagicOffset = 0;
-	internal const uint RemappedOffset = 4;
 	internal const uint Cookie = 0x4D425253u; // 'MBRS'
 
 	internal uint Magic;
@@ -66,10 +64,14 @@ internal static class MuiBitmapRemappedStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiBitmapRemappedStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiBitmapRemappedStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiBitmapRemappedStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiBitmapRemappedStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiBitmapRemappedStateField field, out uint value)
@@ -89,21 +91,21 @@ internal static class MuiBitmapRemappedStateFieldCursorCodec
 }
 
 // Struct-first guest-memory adapter. Remapped-source consumers use the named
-// record; this bounded adapter is the only layer that translates its fixed
-// guest layout into addresses. The cursor codec remains for compatibility and
-// malformed-state diagnostics.
+// record; the bounded cursor walks its complete packed shape before selecting
+// a field. The cursor codec remains for compatibility and malformed-state
+// diagnostics.
 internal static class MuiBitmapRemappedStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiBitmapRemappedStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiBitmapRemappedStateField field,
+		out uint index)
 	{
 		if (field == MuiBitmapRemappedStateField.Magic)
-			offset = MuiBitmapRemappedStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiBitmapRemappedStateField.Remapped)
-			offset = MuiBitmapRemappedStateRecord.RemappedOffset;
+			index = 1;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -113,13 +115,34 @@ internal static class MuiBitmapRemappedStateRecordMemoryCodec
 		APTR record, MuiBitmapRemappedStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiBitmapRemappedStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiBitmapRemappedStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
-			MuiBitmapRemappedStateRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address,
-			MuiBitmapRemappedStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiBitmapRemappedStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiBitmapRemappedStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiBitmapRemappedStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

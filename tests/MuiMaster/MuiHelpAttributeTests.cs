@@ -32,6 +32,18 @@ public sealed class MuiHelpAttributeTests
 		Assert.True(MuiHelpStateFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out var lineAddress));
 		Assert.Equal(address.Raw + 8, lineAddress.Raw);
+		Assert.True(MuiHelpStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var sizedLineAddress, out var fieldSize));
+		Assert.Equal(lineAddress, sizedLineAddress);
+		Assert.Equal(MuiHelpStateRecord.FieldSize, fieldSize);
+		Assert.True(MuiHelpStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryLineAddress, out var memoryFieldSize));
+		Assert.Equal(lineAddress, memoryLineAddress);
+		Assert.Equal(MuiHelpStateRecord.FieldSize, memoryFieldSize);
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiHelpStateField.Magic;
+		Assert.False(MuiHelpStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 		Assert.False(MuiHelpStateRecordCodec.TryRead(ref platform,
 			APTR.FromPointer(0x20FFFu), out _));
 	}

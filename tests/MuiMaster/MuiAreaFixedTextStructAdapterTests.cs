@@ -24,6 +24,19 @@ public sealed class MuiAreaFixedTextStructAdapterTests
 		Assert.True(MuiAreaFixedTextStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, MuiAreaFixedTextStateField.WidthText, out var widthAddress));
 		Assert.Equal(0x3D04u, widthAddress.Raw);
+		var cursor = new MuiAreaFixedTextStateFieldCursor
+		{
+			Record = address,
+			Field = MuiAreaFixedTextStateField.WidthText,
+		};
+		Assert.True(MuiAreaFixedTextStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedWidthAddress, out var typedWidthSize));
+		Assert.Equal(widthAddress, typedWidthAddress);
+		Assert.Equal(MuiAreaFixedTextStateRecord.FieldSize, typedWidthSize);
+		Assert.True(MuiAreaFixedTextStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryWidthAddress, out var memoryWidthSize));
+		Assert.Equal(typedWidthAddress, memoryWidthAddress);
+		Assert.Equal(typedWidthSize, memoryWidthSize);
 		Assert.True(MuiAreaFixedTextStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiAreaFixedTextStateField.Generation, 9));
 		Assert.True(MuiAreaFixedTextStateRecordCodec.TryReadStructural(ref platform,
@@ -35,6 +48,13 @@ public sealed class MuiAreaFixedTextStructAdapterTests
 			address, (MuiAreaFixedTextStateField)255, out _));
 		Assert.False(MuiAreaFixedTextStateRecordMemoryCodec.TryGetAddress(ref platform,
 			APTR.Null, MuiAreaFixedTextStateField.Magic, out _));
+		cursor.Field = (MuiAreaFixedTextStateField)255;
+		Assert.False(MuiAreaFixedTextStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiAreaFixedTextStateField.Magic;
+		Assert.False(MuiAreaFixedTextStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 		Assert.False(MuiAreaFixedTextStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

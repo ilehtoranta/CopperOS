@@ -25,8 +25,6 @@ internal struct MuiChoiceEntriesStateRecord
 {
 	internal const uint Size = 8;
 	internal const uint FieldSize = 4;
-	internal const uint MagicOffset = 0;
-	internal const uint EntriesOffset = 4;
 	internal const uint Cookie = 0x4D434553u; // 'MCES'
 
 	internal uint Magic;
@@ -51,10 +49,14 @@ internal static class MuiChoiceEntriesStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiChoiceEntriesStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiChoiceEntriesStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiChoiceEntriesStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiChoiceEntriesStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiChoiceEntriesStateField field, out uint value)
@@ -74,21 +76,21 @@ internal static class MuiChoiceEntriesStateFieldCursorCodec
 }
 
 // Struct-first guest-memory adapter. Choice/Radio consumers use the named
-// record; this bounded adapter is the only layer that translates its fixed
-// guest layout into addresses. The cursor codec remains for compatibility and
-// malformed-state diagnostics.
+// record; the bounded cursor walks its complete packed shape before selecting
+// a field. The cursor codec remains for compatibility and malformed-state
+// diagnostics.
 internal static class MuiChoiceEntriesStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiChoiceEntriesStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiChoiceEntriesStateField field,
+		out uint index)
 	{
 		if (field == MuiChoiceEntriesStateField.Magic)
-			offset = MuiChoiceEntriesStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiChoiceEntriesStateField.Entries)
-			offset = MuiChoiceEntriesStateRecord.EntriesOffset;
+			index = 1;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -98,12 +100,34 @@ internal static class MuiChoiceEntriesStateRecordMemoryCodec
 		APTR record, MuiChoiceEntriesStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiChoiceEntriesStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiChoiceEntriesStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
-				MuiChoiceEntriesStateRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiChoiceEntriesStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiChoiceEntriesStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiChoiceEntriesStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiChoiceEntriesStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

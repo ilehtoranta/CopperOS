@@ -17,14 +17,6 @@ namespace CopperOS.MuiMaster;
 internal struct MuiWindowInputEventRecord
 {
 	internal const uint Size = 22;
-	internal const uint NextEventOffset = 0;
-	internal const uint ClassOffset = 4;
-	internal const uint SubClassOffset = 5;
-	internal const uint CodeOffset = 6;
-	internal const uint QualifierOffset = 8;
-	internal const uint PositionOffset = 10;
-	internal const uint SecondsOffset = 14;
-	internal const uint MicrosecondsOffset = 18;
 
 	internal APTR NextEvent;
 	internal byte Class;
@@ -34,6 +26,41 @@ internal struct MuiWindowInputEventRecord
 	internal int Position;
 	internal uint Seconds;
 	internal uint Microseconds;
+}
+
+// IDCMP_RAWKEY's IntuiMessage.IAddress points to a guest APTR containing the
+// dead-key event-address value. Keep that indirection named and bounded rather
+// than treating the message field as an InputEvent position directly.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiWindowInputEventAddressRecord
+{
+	internal const uint Size = 4;
+	internal APTR Address;
+}
+
+internal static class MuiWindowInputEventAddressCodec
+{
+	internal static bool TryRead<TMemory>(ref TMemory memory, APTR address,
+		out MuiWindowInputEventAddressRecord value)
+		where TMemory : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref memory, address,
+			MuiWindowInputEventAddressRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref memory, ref cursor,
+				out var eventAddress) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
+		value.Address = APTR.FromPointer(eventAddress);
+		return true;
+	}
+
+	internal static bool Write<TMemory>(ref TMemory memory, APTR address,
+		MuiWindowInputEventAddressRecord value)
+		where TMemory : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref memory, address,
+			MuiWindowInputEventAddressRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref memory, ref cursor,
+			value.Address.Raw) && MuiGuestStructCursor.IsComplete(cursor);
 }
 
 internal enum MuiWindowInputEventField : byte
@@ -48,32 +75,38 @@ internal enum MuiWindowInputEventField : byte
 	Microseconds,
 }
 
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiWindowInputEventFieldCursor
+{
+	internal APTR Record;
+	internal MuiWindowInputEventField Field;
+}
+
 internal static class MuiWindowInputEventMemoryCodec
 {
-	private static bool TryResolve(MuiWindowInputEventField field,
-		out uint offset, out uint size)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiWindowInputEventField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		switch (field)
+		address = APTR.Null;
+		var selected = (uint)field;
+		if (selected > (uint)MuiWindowInputEventField.Microseconds) return false;
+		for (var index = 0u; index <= selected; index++)
 		{
-			case MuiWindowInputEventField.NextEvent:
-				offset = MuiWindowInputEventRecord.NextEventOffset; size = 4; return true;
-			case MuiWindowInputEventField.Class:
-				offset = MuiWindowInputEventRecord.ClassOffset; size = 1; return true;
-			case MuiWindowInputEventField.SubClass:
-				offset = MuiWindowInputEventRecord.SubClassOffset; size = 1; return true;
-			case MuiWindowInputEventField.Code:
-				offset = MuiWindowInputEventRecord.CodeOffset; size = 2; return true;
-			case MuiWindowInputEventField.Qualifier:
-				offset = MuiWindowInputEventRecord.QualifierOffset; size = 2; return true;
-			case MuiWindowInputEventField.Position:
-				offset = MuiWindowInputEventRecord.PositionOffset; size = 4; return true;
-			case MuiWindowInputEventField.Seconds:
-				offset = MuiWindowInputEventRecord.SecondsOffset; size = 4; return true;
-			case MuiWindowInputEventField.Microseconds:
-				offset = MuiWindowInputEventRecord.MicrosecondsOffset; size = 4; return true;
+			var size = 4u;
+			if (index == (uint)MuiWindowInputEventField.Class ||
+				index == (uint)MuiWindowInputEventField.SubClass) size = 1;
+			else if (index == (uint)MuiWindowInputEventField.Code ||
+				index == (uint)MuiWindowInputEventField.Qualifier) size = 2;
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, size,
+				out var candidate)) return false;
+			if (index == selected)
+			{
+				address = candidate;
+				return true;
+			}
 		}
-		offset = 0;
-		size = 0;
 		return false;
 	}
 
@@ -82,11 +115,9 @@ internal static class MuiWindowInputEventMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset, out var size) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
-			MuiWindowInputEventRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, size);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiWindowInputEventRecord.Size, out var cursor)) return false;
+		return TryTakeField(ref platform, ref cursor, field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -180,6 +211,15 @@ internal static class MuiWindowInputEventMemoryCodec
 		return MuiWindowInputEventRecordCodec.WriteStructural(ref platform,
 			record, state);
 	}
+}
+
+internal static class MuiWindowInputEventFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiWindowInputEventFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiWindowInputEventMemoryCodec.TryGetAddress(ref platform, cursor.Record,
+			cursor.Field, out address);
 }
 
 internal static class MuiWindowInputEventRecordCodec

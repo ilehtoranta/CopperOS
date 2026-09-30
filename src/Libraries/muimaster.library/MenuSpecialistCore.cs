@@ -39,7 +39,7 @@ internal static class MuiMenuSpecialistLayout
 	public const uint SidecarAttribute = 0x7F4D4E55u;
 
 	// The sidecar wire shape is represented by MuiMenuSpecialistState below;
-	// field offsets are confined to its codec.
+	// member boundaries are confined to its typed cursor codec.
 	public const uint InstanceSize = 52;
 
 	// Flags.
@@ -60,19 +60,6 @@ internal struct MuiMenuSpecialistState
 	internal const uint Size = MuiMenuSpecialistLayout.InstanceSize;
 	internal const uint Cookie = MuiMenuSpecialistLayout.Magic;
 	internal const uint FieldSize = 4;
-	internal const uint MagicOffset = 0;
-	internal const uint ClassOffset = 4;
-	internal const uint ChangeDepthOffset = 8;
-	internal const uint TitleOwnedOffset = 12;
-	internal const uint TitleOwnedSizeOffset = 16;
-	internal const uint ShortcutOwnedOffset = 20;
-	internal const uint ShortcutOwnedSizeOffset = 24;
-	internal const uint FlagsOffset = 28;
-	internal const uint TriggerOffset = 32;
-	internal const uint NotifyAttributeOffset = 36;
-	internal const uint NotifyValueOffset = 40;
-	internal const uint NotifyCountOffset = 44;
-	internal const uint Reserved0Offset = 48;
 
 	internal uint Magic;
 	internal uint Class;
@@ -115,55 +102,76 @@ internal struct MuiMenuRecordFieldCursor
 
 internal static class MuiMenuRecordMemoryCodec
 {
-	private static bool TryResolve(MuiMenuRecordField field,
-		out uint offset, out uint recordSize)
+	private static bool TryResolveFieldIndex(MuiMenuRecordField field,
+		out uint index)
 	{
-		recordSize = MuiMenuSpecialistState.Size;
-		if (field == MuiMenuRecordField.Magic)
-			offset = MuiMenuSpecialistState.MagicOffset;
-		else if (field == MuiMenuRecordField.Class)
-			offset = MuiMenuSpecialistState.ClassOffset;
-		else if (field == MuiMenuRecordField.ChangeDepth)
-			offset = MuiMenuSpecialistState.ChangeDepthOffset;
-		else if (field == MuiMenuRecordField.TitleOwned)
-			offset = MuiMenuSpecialistState.TitleOwnedOffset;
-		else if (field == MuiMenuRecordField.TitleOwnedSize)
-			offset = MuiMenuSpecialistState.TitleOwnedSizeOffset;
-		else if (field == MuiMenuRecordField.ShortcutOwned)
-			offset = MuiMenuSpecialistState.ShortcutOwnedOffset;
-		else if (field == MuiMenuRecordField.ShortcutOwnedSize)
-			offset = MuiMenuSpecialistState.ShortcutOwnedSizeOffset;
-		else if (field == MuiMenuRecordField.Flags)
-			offset = MuiMenuSpecialistState.FlagsOffset;
-		else if (field == MuiMenuRecordField.Trigger)
-			offset = MuiMenuSpecialistState.TriggerOffset;
-		else if (field == MuiMenuRecordField.NotifyAttribute)
-			offset = MuiMenuSpecialistState.NotifyAttributeOffset;
-		else if (field == MuiMenuRecordField.NotifyValue)
-			offset = MuiMenuSpecialistState.NotifyValueOffset;
-		else if (field == MuiMenuRecordField.NotifyCount)
-			offset = MuiMenuSpecialistState.NotifyCountOffset;
-		else if (field == MuiMenuRecordField.Reserved0)
-			offset = MuiMenuSpecialistState.Reserved0Offset;
-		else
+		switch (field)
 		{
-			offset = 0;
-			recordSize = 0;
-			return false;
+			case MuiMenuRecordField.Magic: index = 0; return true;
+			case MuiMenuRecordField.Class: index = 1; return true;
+			case MuiMenuRecordField.ChangeDepth: index = 2; return true;
+			case MuiMenuRecordField.TitleOwned: index = 3; return true;
+			case MuiMenuRecordField.TitleOwnedSize: index = 4; return true;
+			case MuiMenuRecordField.ShortcutOwned: index = 5; return true;
+			case MuiMenuRecordField.ShortcutOwnedSize: index = 6; return true;
+			case MuiMenuRecordField.Flags: index = 7; return true;
+			case MuiMenuRecordField.Trigger: index = 8; return true;
+			case MuiMenuRecordField.NotifyAttribute: index = 9; return true;
+			case MuiMenuRecordField.NotifyValue: index = 10; return true;
+			case MuiMenuRecordField.NotifyCount: index = 11; return true;
+			case MuiMenuRecordField.Reserved0: index = 12; return true;
 		}
-		return true;
+		index = uint.MaxValue;
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiMenuRecordField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiMenuRecordFieldCursor);
+		cursor.Address = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMenuRecordFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset, out var recordSize) ||
-			record.IsNull || record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, recordSize)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiMenuSpecialistState.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Address,
+				MuiMenuSpecialistState.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiMenuSpecialistState.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiMenuSpecialistState.FieldSize;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMenuRecordFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiMenuRecordField field, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiMenuRecordFieldCursor);
+		cursor.Address = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out fieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -197,6 +205,12 @@ internal static class MuiMenuRecordFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiMenuRecordMemoryCodec.TryGetAddress(ref platform, cursor.Address,
 			cursor.Field, out address);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMenuRecordFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiMenuRecordMemoryCodec.TryGetAddress(ref platform, cursor, out address,
+			out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiMenuRecordField field, out uint value)

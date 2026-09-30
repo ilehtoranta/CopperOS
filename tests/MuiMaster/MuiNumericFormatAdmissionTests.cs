@@ -101,6 +101,19 @@ public sealed class MuiNumericFormatAdmissionTests
 			address, MuiNumericFormatStateField.Format, out var typedFormat));
 		Assert.Equal(address.Raw + MuiNumericFormatStateRecord.FormatOffset,
 			typedFormat.Raw);
+		var formatCursor = new MuiNumericFormatStateFieldCursor
+		{
+			Record = address,
+			Field = MuiNumericFormatStateField.Format,
+		};
+		Assert.True(MuiNumericFormatStateFieldCursorCodec.TryGetAddress(ref platform,
+			formatCursor, out var cursorFormat, out var cursorFieldSize));
+		Assert.Equal(typedFormat, cursorFormat);
+		Assert.Equal(MuiNumericFormatStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiNumericFormatStateRecordMemoryCodec.TryGetAddress(ref platform,
+			formatCursor, out var memoryFormat, out var memoryFieldSize));
+		Assert.Equal(cursorFormat, memoryFormat);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiNumericFormatStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiNumericFormatStateField.Format, source.Raw));
 		Assert.True(MuiNumericFormatStateRecordMemoryCodec.TryReadUInt32(ref platform,
@@ -115,6 +128,13 @@ public sealed class MuiNumericFormatAdmissionTests
 			address, MuiNumericFormatStateRecord.Size, out _));
 		Assert.False(MuiNumericFormatStateRecordMemoryCodec.TryGetAddress(ref platform,
 			APTR.Null, (uint)0, out _));
+		formatCursor.Field = (MuiNumericFormatStateField)255;
+		Assert.False(MuiNumericFormatStateFieldCursorCodec.TryGetAddress(ref platform,
+			formatCursor, out _, out _));
+		formatCursor.Record = APTR.Null;
+		formatCursor.Field = MuiNumericFormatStateField.Format;
+		Assert.False(MuiNumericFormatStateFieldCursorCodec.TryGetAddress(ref platform,
+			formatCursor, out _, out _));
 		Assert.False(MuiNumericFormatStateRecordCodec.TryReadRecord(ref platform,
 			APTR.Null, out _));
 	}

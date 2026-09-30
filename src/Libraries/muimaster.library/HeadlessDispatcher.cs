@@ -85,6 +85,35 @@ public static class MuiHeadlessDispatcher
 		return result;
 	}
 
+	// Class dispatchers enter here when the caller has already resolved the
+	// declaration-ordered MUI class records. OM_NEW and OM_DISPOSE are handled
+	// by the bounded base lifecycle cores; all other methods continue through
+	// the ordinary headless method dispatcher. The explicit class operands keep
+	// the native ABI boundary typed without reading an object-layout offset.
+	public static uint DispatchWithLifecycle<TPlatform>(ref TPlatform platform,
+		APTR state, APTR dispatchClassRecord, APTR owningClassRecord,
+		APTR objectOperand, APTR message)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!MuiBoopsiMethodMessageCodec.TryReadMethodId(ref platform, message,
+			out var method)) return 0;
+		if (method == BOOPSI.OM_NEW)
+		{
+			if (!MuiBoopsiBaseConstructionCore.TryConstruct(ref platform, state,
+				dispatchClassRecord, owningClassRecord, objectOperand, message,
+				out var construction)) return 0;
+			return construction.InitializedObject.Raw;
+		}
+		if (method == BOOPSI.OM_DISPOSE)
+		{
+			if (!MuiBoopsiBaseDisposalCore.TryDispose(ref platform, state,
+				dispatchClassRecord, objectOperand, message, out var result))
+				return 0;
+			return result;
+		}
+		return Dispatch(ref platform, state, objectOperand, message);
+	}
+
 	// Focused native-qualification seam for MUIM_GetConfigItem.  Keeping the
 	// packet closure separate from the broad Notify/store dispatcher lets the
 	// freestanding artifact prove only the documented configuration query.

@@ -28,6 +28,20 @@ public sealed class MuiWindowEventReuseStructAdapterTests
 			ref platform, address, MuiWindowEventReuseStateField.MuiKey,
 			out var keyAddress));
 		Assert.Equal(0x3518u, keyAddress.Raw);
+		var fieldCursor = new MuiWindowEventReuseStateFieldCursor
+		{
+			Record = address,
+			Field = MuiWindowEventReuseStateField.MuiKey,
+		};
+		Assert.True(MuiWindowEventReuseStateFieldCursorCodec.TryGetAddress(
+			ref platform, fieldCursor, out var cursorAddress, out var fieldSize));
+		Assert.Equal(keyAddress, cursorAddress);
+		Assert.Equal(MuiWindowEventReuseStateRecord.FieldSize, fieldSize);
+		Assert.True(MuiWindowEventReuseStateRecordMemoryCodec.TryGetAddress(
+			ref platform, fieldCursor, out var memoryCursorAddress,
+			out var memoryFieldSize));
+		Assert.Equal(keyAddress, memoryCursorAddress);
+		Assert.Equal(MuiWindowEventReuseStateRecord.FieldSize, memoryFieldSize);
 		Assert.True(MuiWindowEventReuseStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiWindowEventReuseStateField.MuiKey,
 			unchecked((uint)-8)));
@@ -39,6 +53,10 @@ public sealed class MuiWindowEventReuseStructAdapterTests
 			MuiWindowEventReuseStateField.Magic, out _));
 		Assert.False(MuiWindowEventReuseStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiWindowEventReuseStateField.Magic, out _));
+		fieldCursor.Record = APTR.Null;
+		fieldCursor.Field = MuiWindowEventReuseStateField.Magic;
+		Assert.False(MuiWindowEventReuseStateFieldCursorCodec.TryGetAddress(
+			ref platform, fieldCursor, out _, out _));
 	}
 
 	[Fact]

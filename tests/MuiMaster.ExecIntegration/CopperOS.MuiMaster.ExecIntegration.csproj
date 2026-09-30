@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <CopperSharp68kRoot Condition="'$(CopperSharp68kRoot)' == ''">$(MSBuildThisFileDirectory)..\..\..\CopperSharp68k</CopperSharp68kRoot>
+    <CopperStartRoot Condition="'$(CopperStartRoot)' == ''">$(MSBuildThisFileDirectory)..\..\..\CopperStart</CopperStartRoot>
+    <CopperModRoot Condition="'$(CopperModRoot)' == ''">$(MSBuildThisFileDirectory)..\..\..\CopperMod</CopperModRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MuiMaster.NativeRoot\CopperOS.MuiMaster.NativeRoot.csproj" />
+    <ProjectReference Include="$(CopperStartRoot)\src\CopperStart.Exec\CopperStart.Exec.csproj" />
+    <ProjectReference Include="$(CopperStartRoot)\src\CopperStart.Intuition\CopperStart.Intuition.csproj" />
+    <ProjectReference Include="$(CopperSharp68kRoot)\Targets.Amiga\CopperSharp.Targets.Amiga.csproj" />
+    <ProjectReference Include="$(CopperModRoot)\Copper68k\Copper68k.csproj" />
+  </ItemGroup>
+</Project>

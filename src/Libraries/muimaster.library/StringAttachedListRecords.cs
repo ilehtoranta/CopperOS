@@ -60,8 +60,14 @@ internal static class MuiStringAttachedListStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiStringAttachedListStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringAttachedListStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
 		=> MuiStringAttachedListStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiStringAttachedListStateField field, out uint value)
@@ -86,32 +92,53 @@ internal static class MuiStringAttachedListStateFieldCursorCodec
 // diagnostics.
 internal static class MuiStringAttachedListStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiStringAttachedListStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiStringAttachedListStateField field,
+		out uint index)
 	{
-		switch (field)
+		if (field == MuiStringAttachedListStateField.Magic)
+			index = 0;
+		else if (field == MuiStringAttachedListStateField.Listview)
+			index = 1;
+		else
 		{
-			case MuiStringAttachedListStateField.Magic:
-				offset = MuiStringAttachedListStateRecord.MagicOffset;
-				return true;
-			case MuiStringAttachedListStateField.Listview:
-				offset = MuiStringAttachedListStateRecord.ListviewOffset;
-				return true;
+			index = uint.MaxValue;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiStringAttachedListStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiStringAttachedListStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringAttachedListStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
-			MuiStringAttachedListStateRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiStringAttachedListStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiStringAttachedListStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiStringAttachedListStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiStringAttachedListStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

@@ -19,6 +19,8 @@ internal struct MuiCallHookMessage
 	internal const uint FieldSize = 4;
 	internal const uint MethodIdOffset = 0;
 	internal const uint HookOffset = 4;
+	// Compatibility metadata for the named Param1 field; live variadic-vector
+	// admission obtains this boundary through MuiCallHookMessageMemoryCodec.
 	internal const uint Param1Offset = 8;
 	internal uint MethodId;
 	internal APTR Hook;
@@ -103,29 +105,26 @@ internal struct MuiCallHookPacketFieldCursor
 // the 4-byte method record remains a deliberate header-only exception.
 internal static class MuiCallHookMessageMemoryCodec
 {
-	private static bool TryResolve(MuiCallHookPacketField field,
-		out uint offset, out uint recordSize)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiCallHookPacketField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		recordSize = MuiCallHookMessage.Size;
-		if (field == MuiCallHookPacketField.MethodId)
+		address = APTR.Null;
+		uint fieldIndex;
+		switch (field)
 		{
-			offset = MuiCallHookMessage.MethodIdOffset;
-			recordSize = MuiCallHookMethodMessage.Size;
-			return true;
+			case MuiCallHookPacketField.MethodId: fieldIndex = 0; break;
+			case MuiCallHookPacketField.Hook: fieldIndex = 1; break;
+			case MuiCallHookPacketField.Param1: fieldIndex = 2; break;
+			default: return false;
 		}
-		if (field == MuiCallHookPacketField.Hook)
-		{
-			offset = MuiCallHookMessage.HookOffset;
-			return true;
-		}
-		if (field == MuiCallHookPacketField.Param1)
-		{
-			offset = MuiCallHookMessage.Param1Offset;
-			return true;
-		}
-		offset = 0;
-		recordSize = 0;
-		return false;
+		if (fieldIndex > 0 && !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, MuiCallHookMessage.FieldSize, out _)) return false;
+		if (fieldIndex > 1 && !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, MuiCallHookMessage.FieldSize, out _)) return false;
+		return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiCallHookMessage.FieldSize, out address);
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -133,11 +132,13 @@ internal static class MuiCallHookMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset, out var recordSize) ||
-			message.IsNull || message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(message, recordSize)) return false;
-		address = APTR.FromPointer(message.Raw + offset);
-		return platform.IsMapped(address, MuiCallHookMessage.FieldSize);
+		var recordSize = field == MuiCallHookPacketField.MethodId
+			? MuiCallHookMethodMessage.Size
+			: MuiCallHookMessage.Size;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message, recordSize,
+			out var cursor) || !TryTakeField(ref platform, ref cursor, field,
+				out address)) return false;
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -282,11 +283,9 @@ internal static class MuiCallHookParameterMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCallHookMessage.Size) || message.Raw > uint.MaxValue -
-			MuiCallHookMessage.Param1Offset) return false;
-		var baseAddress = message.Raw +
-			MuiCallHookMessage.Param1Offset;
+		if (message.IsNull ||
+			!MuiCallHookMessageMemoryCodec.TryGetAddress(ref platform, message,
+				MuiCallHookPacketField.Param1, out var baseAddress)) return false;
 		if (index > (uint.MaxValue - baseAddress) /
 			MuiCallHookParameterRecord.Size) return false;
 		var offset = index * MuiCallHookParameterRecord.Size;

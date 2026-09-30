@@ -22,9 +22,6 @@ internal struct MuiAreaDisappearPolicyStateRecord
 {
 	internal const uint Size = 12;
 	internal const uint FieldSize = 4;
-	internal const uint MagicOffset = 0;
-	internal const uint HorizDisappearOffset = 4;
-	internal const uint VertDisappearOffset = 8;
 	internal const uint Cookie = 0x41445052u; // 'ADPR'
 
 	internal uint Magic;
@@ -63,10 +60,14 @@ internal static class MuiAreaDisappearPolicyStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaDisappearPolicyStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiAreaDisappearPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaDisappearPolicyStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiAreaDisappearPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiAreaDisappearPolicyStateField field, out uint value)
@@ -85,24 +86,24 @@ internal static class MuiAreaDisappearPolicyStateFieldCursorCodec
 	}
 }
 
-// Fixed Area disappearance policy is transferred as a named record. Numeric
-// guest positions are confined to this ABI adapter; the compatibility cursor
-// above remains available only to legacy callers and malformed-state
-// diagnostics.
+// Fixed Area disappearance policy is transferred as a named record. The
+// bounded cursor walks the complete packed struct before selecting a field; the
+// compatibility cursor above remains available only to legacy callers and
+// malformed-state diagnostics.
 internal static class MuiAreaDisappearPolicyStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiAreaDisappearPolicyStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiAreaDisappearPolicyStateField field,
+		out uint index)
 	{
 		if (field == MuiAreaDisappearPolicyStateField.Magic)
-			offset = MuiAreaDisappearPolicyStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiAreaDisappearPolicyStateField.HorizDisappear)
-			offset = MuiAreaDisappearPolicyStateRecord.HorizDisappearOffset;
+			index = 1;
 		else if (field == MuiAreaDisappearPolicyStateField.VertDisappear)
-			offset = MuiAreaDisappearPolicyStateRecord.VertDisappearOffset;
+			index = 2;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -112,13 +113,34 @@ internal static class MuiAreaDisappearPolicyStateRecordMemoryCodec
 		APTR record, MuiAreaDisappearPolicyStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiAreaDisappearPolicyStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaDisappearPolicyStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiAreaDisappearPolicyStateRecord.Size) &&
-			platform.IsMapped(address, MuiAreaDisappearPolicyStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiAreaDisappearPolicyStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiAreaDisappearPolicyStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiAreaDisappearPolicyStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

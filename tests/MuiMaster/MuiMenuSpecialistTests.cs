@@ -62,10 +62,18 @@ public sealed class MuiMenuSpecialistTests
 		Assert.True(MuiMenuRecordFieldCursorCodec.TryGetAddress(ref p, cursor,
 			out var fieldAddress));
 		Assert.Equal(0x142Cu, fieldAddress.Raw);
+		Assert.True(MuiMenuRecordFieldCursorCodec.TryGetAddress(ref p, cursor,
+			out fieldAddress, out var fieldSize));
+		Assert.Equal(0x142Cu, fieldAddress.Raw);
+		Assert.Equal(4u, fieldSize);
 		cursor.Field = MuiMenuRecordField.TitleOwned;
 		Assert.True(MuiMenuRecordFieldCursorCodec.TryGetAddress(ref p, cursor,
 			out fieldAddress));
 		Assert.Equal(0x140Cu, fieldAddress.Raw);
+		Assert.True(MuiMenuRecordFieldCursorCodec.TryGetAddress(ref p, cursor,
+			out fieldAddress, out fieldSize));
+		Assert.Equal(0x140Cu, fieldAddress.Raw);
+		Assert.Equal(4u, fieldSize);
 		Assert.True(MuiMenuRecordFieldCursorCodec.TryWriteUInt32(ref p,
 			cursor.Address, MuiMenuRecordField.Flags, 0xA5A5u));
 		Assert.True(MuiMenuRecordFieldCursorCodec.TryReadUInt32(ref p,
@@ -73,11 +81,11 @@ public sealed class MuiMenuSpecialistTests
 		Assert.Equal(0xA5A5u, flags);
 		cursor.Field = (MuiMenuRecordField)255;
 		Assert.False(MuiMenuRecordFieldCursorCodec.TryGetAddress(ref p, cursor,
-			out _));
+			out _, out _));
 		cursor.Address = APTR.FromPointer(0xFFFFFFF0u);
 		cursor.Field = MuiMenuRecordField.NotifyValue;
 		Assert.False(MuiMenuRecordFieldCursorCodec.TryGetAddress(ref p, cursor,
-			out _));
+			out _, out _));
 	}
 
 	[Fact]
@@ -924,16 +932,19 @@ public sealed class MuiMenuSpecialistTests
 		cursor.Packet = MuiMenuSpecialistPacketKind.Get;
 		cursor.Field = MuiMenuSpecialistField.MethodId;
 		Assert.True(MuiMenuSpecialistFieldCursorCodec.TryGetAddress(ref p,
-			cursor, out var address));
+			cursor, out var address, out var fieldSize));
 		Assert.Equal(Packet.Raw, address.Raw);
+		Assert.Equal(4u, fieldSize);
 		cursor.Field = MuiMenuSpecialistField.Attribute;
 		Assert.True(MuiMenuSpecialistFieldCursorCodec.TryGetAddress(ref p,
-			cursor, out address));
+			cursor, out address, out fieldSize));
 		Assert.Equal(Packet.Raw + 4, address.Raw);
+		Assert.Equal(4u, fieldSize);
 		cursor.Field = MuiMenuSpecialistField.Storage;
 		Assert.True(MuiMenuSpecialistFieldCursorCodec.TryGetAddress(ref p,
-			cursor, out address));
+			cursor, out address, out fieldSize));
 		Assert.Equal(Packet.Raw + 8, address.Raw);
+		Assert.Equal(4u, fieldSize);
 
 		Assert.True(MuiMenuSpecialistFieldCursorCodec.TryWriteUInt32(ref p,
 			Packet, MuiMenuSpecialistPacketKind.Popup,

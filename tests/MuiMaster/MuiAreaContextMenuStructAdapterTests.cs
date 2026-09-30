@@ -25,6 +25,19 @@ public sealed class MuiAreaContextMenuStructAdapterTests
 			ref platform, address, MuiAreaContextMenuStateField.Trigger,
 			out var triggerAddress));
 		Assert.Equal(0x3508u, triggerAddress.Raw);
+		var cursor = new MuiAreaContextMenuStateFieldCursor
+		{
+			Record = address,
+			Field = MuiAreaContextMenuStateField.Trigger,
+		};
+		Assert.True(MuiAreaContextMenuStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedTriggerAddress, out var typedTriggerSize));
+		Assert.Equal(triggerAddress, typedTriggerAddress);
+		Assert.Equal(MuiAreaContextMenuStateRecord.FieldSize, typedTriggerSize);
+		Assert.True(MuiAreaContextMenuStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryTriggerAddress, out var memoryTriggerSize));
+		Assert.Equal(typedTriggerAddress, memoryTriggerAddress);
+		Assert.Equal(typedTriggerSize, memoryTriggerSize);
 		Assert.True(MuiAreaContextMenuStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiAreaContextMenuStateField.Trigger, 0xABCDEF01));
 		Assert.True(MuiAreaContextMenuStateRecordCodec.TryReadStructural(ref platform,
@@ -34,6 +47,13 @@ public sealed class MuiAreaContextMenuStructAdapterTests
 			ref platform, address, (MuiAreaContextMenuStateField)255, out _));
 		Assert.False(MuiAreaContextMenuStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiAreaContextMenuStateField.Magic, out _));
+		cursor.Field = (MuiAreaContextMenuStateField)255;
+		Assert.False(MuiAreaContextMenuStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiAreaContextMenuStateField.Magic;
+		Assert.False(MuiAreaContextMenuStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 		Assert.False(MuiAreaContextMenuStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}
