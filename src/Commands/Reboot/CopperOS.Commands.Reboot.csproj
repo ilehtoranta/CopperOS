@@ -1,10 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- No shipping [M68kEntryPoint] in Entry/ yet, so this is a plain library and
-       publish emits no C: file. Add Entry/RebootEntry.cs plus RuntimeIdentifier,
-       CopperOSCommandName and CopperSharpEntry (see MakeDir) to ship it. -->
   <PropertyGroup>
     <AssemblyName>CopperOS.Commands.Reboot</AssemblyName>
     <RootNamespace>CopperOS.Commands</RootNamespace>
+    <RuntimeIdentifier>amiga-m68k</RuntimeIdentifier>
+    <CopperOSCommandName>Reboot</CopperOSCommandName>
+    <CopperSharpEntry>CopperOS.Commands.Entries.RebootEntry::Main</CopperSharpEntry>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\CopperOS.Commands.Common.csproj" />

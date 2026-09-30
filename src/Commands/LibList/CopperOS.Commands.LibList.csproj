@@ -1,10 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- No shipping [M68kEntryPoint] in Entry/ yet, so this is a plain library and
-       publish emits no C: file. Add Entry/LibListEntry.cs plus RuntimeIdentifier,
-       CopperOSCommandName and CopperSharpEntry (see MakeDir) to ship it. -->
   <PropertyGroup>
     <AssemblyName>CopperOS.Commands.LibList</AssemblyName>
     <RootNamespace>CopperOS.Commands</RootNamespace>
+    <RuntimeIdentifier>amiga-m68k</RuntimeIdentifier>
+    <CopperOSCommandName>LibList</CopperOSCommandName>
+    <CopperSharpEntry>CopperOS.Commands.Entries.LibListEntry::Main</CopperSharpEntry>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\CopperOS.Commands.Common.csproj" />

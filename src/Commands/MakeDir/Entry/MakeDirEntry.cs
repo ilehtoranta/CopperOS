@@ -5,25 +5,33 @@ using CopperSharp.Compiler;
 namespace CopperOS.Commands.Entries;
 
 /// <summary>
-/// <c>C:MakeDir</c> (Workbench 3.1 template <c>NAME/M</c>). CLI-only, like the
-/// qualified <c>Workbench31MakeDirProbe</c> in tests/Commands.NativeRoot;
-/// Workbench launch is not handled or qualified.
+/// <c>C:MakeDir</c> (Workbench 3.1 body). Startup sequence copied verbatim from the
+/// qualified <c>Workbench31MakeDirEntry</c> in tests/Commands.AddBuffersNativeRoot/.
+/// Keep the two in step.
 /// </summary>
 public static class MakeDirEntry
 {
     [M68kEntryPoint]
     public static int Main(int argumentLength, CONST_STRPTR argumentText)
     {
+        var workbench = NativeCommandStartup.ReceiveWorkbenchMessage();
         if (!NativeCommandStartup.OpenDos(36))
         {
-            // The original CLI entry writes pr_Result2 without calling DOS
-            // when that library cannot be opened. A valid Process is required.
-            var execBase = APTR.FromPointer(APTR.ReadUInt32(APTR.FromPointer(4), 0));
-            var process = APTR.FromPointer(APTR.ReadUInt32(execBase, ExecLayout.ExecBase.ThisTask));
+            // The original command writes pr_Result2 directly when DOS is not
+            // available; no DOS call can be used to publish that error.
+            var process = Exec.FindTask(CString.FromPointer(0));
             APTR.WriteUInt32(process, DosLayout.Process.Result2,
                 (uint)DOS.Error.InvalidResidentLibrary);
-            return DOS.RETURN_FAIL;
+            return NativeCommandStartup.Finish(DOS.RETURN_FAIL,
+                (int)DOS.Error.InvalidResidentLibrary, workbench);
         }
+        if (workbench.IsNotNull)
+            return NativeCommandStartup.Finish(DOS.RETURN_ERROR,
+                (int)DOS.Error.ObjectWrongType, workbench);
+        if (argumentLength < 0 ||
+            (argumentLength != 0 && argumentText.IsNull))
+            return NativeCommandStartup.Finish(DOS.RETURN_ERROR,
+                (int)DOS.Error.LineTooLong, APTR.Null);
 
         var result = Workbench31MakeDirCommand.Run(out var ioError);
         return NativeCommandStartup.Finish(result, ioError, APTR.Null);

@@ -3840,6 +3840,9 @@ internal sealed partial class ProbeFixture
                 invocation.Allocations == 2 ? "GuessBootDevNameBuffer" : "Exec";
             return Bus.Allocate(invocation, state.D[0], allocationKind, true);
         });
+        // RegisterRenameAllocationExec already owns AllocVec/FreeVec for this suite;
+        // registering the generic pair as well collides on the same gateway vector.
+        if (suite != WorkbenchRenameStartupSuite)
         Register(ExecBase, ExecLvo.AllocVec, "AllocVec", (state, invocation) =>
         {
             if (IsWorkbench31VersionEntrySuite(suite))
@@ -4166,6 +4169,7 @@ internal sealed partial class ProbeFixture
             invocation.SetDateLayout!.Anchor = anchor;
             return anchor;
         });
+        if (suite != WorkbenchRenameStartupSuite)
         Register(ExecBase, ExecLvo.FreeVec, "FreeVec", (state, invocation) =>
         {
             if (IsWorkbench31VersionEntrySuite(suite))

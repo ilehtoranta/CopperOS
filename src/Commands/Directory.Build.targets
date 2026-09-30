@@ -40,6 +40,36 @@
            Text="CopperSharp compiler not built at '$(CopperSharpCompilerAssembly)'. Run: dotnet build &quot;$(CopperSharp68kRoot)\Compiler.Cli\CopperSharp.Compiler.Cli.csproj&quot; -c Release -p:SkipCopperScreenHeadlessProjectReference=true (or tools\Commands\build-c.ps1)." />
   </Target>
 
+  <!-- The qualifier scripts compile with peephole=disabled and memory=none, and
+       the fixed-point peephole default miscompiles Eval (classic-left-shift-word
+       returns 10). Sdk.targets has no typed property for either, but the
+       compiler's response manifest accepts both keys, so add them to the
+       manifest the SDK just wrote. Set CopperOSPeephole/CopperOSMemory empty to
+       fall back to the compiler defaults. -->
+  <PropertyGroup Condition="'$(CopperOSCommandName)' != ''">
+    <CopperOSPeephole Condition="'$(CopperOSPeephole)' == ''">disabled</CopperOSPeephole>
+    <CopperOSMemory Condition="'$(CopperOSMemory)' == ''">none</CopperOSMemory>
+  </PropertyGroup>
+
+  <Target Name="CopperOSExtendPublishManifest"
+          AfterTargets="PrepareCopperSharpPublishManifest"
+          BeforeTargets="CompileCopperSharpPublishedImage"
+          Condition="'$(CopperOSCommandName)' != '' and '$(RuntimeIdentifier)' == 'amiga-m68k'">
+    <ReadLinesFromFile File="$(CopperSharpResponseManifestPath)">
+      <Output TaskParameter="Lines" ItemName="_CopperOSManifestLine" />
+    </ReadLinesFromFile>
+    <ItemGroup>
+      <_CopperOSManifestLine Remove="@(_CopperOSManifestLine)"
+                             Condition="$([System.String]::Copy('%(Identity)').StartsWith('peephole=')) or $([System.String]::Copy('%(Identity)').StartsWith('memory='))" />
+      <_CopperOSManifestLine Include="peephole=$(CopperOSPeephole)" Condition="'$(CopperOSPeephole)' != ''" />
+      <_CopperOSManifestLine Include="memory=$(CopperOSMemory)" Condition="'$(CopperOSMemory)' != ''" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(CopperSharpResponseManifestPath)"
+                      Lines="@(_CopperOSManifestLine)"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+  </Target>
+
   <Target Name="CopperOSCopyToCDirectory"
           AfterTargets="CompileCopperSharpPublishedImage"
           Condition="'$(CopperOSCommandName)' != '' and '$(RuntimeIdentifier)' == 'amiga-m68k'">
