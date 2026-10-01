@@ -24,6 +24,8 @@ internal static class Program
             return LoadResourceActionsRuntimeSuite.Run(args);
         if (args.Length == 4 && args[3] == LoadResourceLaunchRuntimeSuite.Suite)
             return LoadResourceLaunchRuntimeSuite.Run(args);
+        if (args.Length == 4 && args[3] == ExecuteEntrySuite.Suite)
+            return ExecuteEntrySuite.Run(args);
         if (args.Length == 5 && args[3] == AddBuffersReferenceSuite.Suite)
             return AddBuffersReferenceSuite.Run(args);
         if (args.Length == 5 && args[3] == RelabelReferenceSuite.Suite)

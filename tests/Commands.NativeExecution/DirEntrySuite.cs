@@ -718,8 +718,10 @@ internal sealed partial class ProbeFixture
                         (uint)DosConstants.SoftLink :
                         entries[entryIndex].Directory ? 2u : unchecked((uint)-3));
             }
+            // Real dos.library ExAll: eac_Entries is a record count and the
+            // ExAllData chain starts at the caller's buffer (D2).
             Bus.Long(state.D[5] + DosLayout.ExAllControl.Entries,
-                record);
+                count);
             var end = start + count;
             Bus.Long(state.D[5] + DosLayout.ExAllControl.LastKey, end);
             var more = end < entries.Length;

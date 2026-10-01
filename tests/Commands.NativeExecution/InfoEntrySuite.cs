@@ -743,8 +743,7 @@ internal sealed partial class ProbeFixture
                 Require(format == "%s %s\n" || format == "%s [Mounted]\n",
                     "Workbench Info status format differs.");
                 var mounted = format == "%s [Mounted]\n";
-                var name = mounted ? Bus.CString(args) :
-                    Bus.CString(Bus.Long(args));
+                var name = Bus.CString(Bus.Long(args));
                 Require(name is "DH0:" or "DH1:",
                     "Workbench Info status name differs.");
                 var text = mounted

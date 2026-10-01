@@ -181,12 +181,26 @@ public static class NativeWorkbench31InfoCommand
             APTR.WriteUInt8(volumeName, 0, 0);
             var volumeHeaderEmitted = false;
 
+            // Probing an empty drive must report "No disk present", not
+            // open a system requester and wait for a click: disable DOS
+            // requesters for this process while locking devices.
+            var process = Exec.FindTask(CString.FromPointer(0));
+            var savedWindow = APTR.ReadUInt32(process,
+                DosLayout.Process.WindowPointer);
+            APTR.WriteUInt32(process, DosLayout.Process.WindowPointer,
+                0xffffffffu);
+
+            // Devices first, then volumes, whatever order the DOS list holds
+            // them in: the volume header must follow every device row.
+            for (var pass = 0u; pass < 2 && error == 0; pass++)
             for (var index = 0u; index < recordCount; index++)
             {
                 var record = APTR.FromPointer(workspace.Raw +
                     index * RecordBytes);
                 var name = APTR.FromPointer(APTR.ReadUInt32(record, 0));
                 var type = APTR.ReadUInt32(record, 4);
+                if ((type == (uint)DosListType.Volume) != (pass == 1))
+                    continue;
                 if (type == (uint)DosListType.Volume)
                 {
                     if (!volumeHeaderEmitted)
@@ -194,7 +208,9 @@ public static class NativeWorkbench31InfoCommand
                         DOS.FPuts(DOS.Output(), "\nVolumes available:\n");
                         volumeHeaderEmitted = true;
                     }
-                    DOS.VPrintf("%s [Mounted]\n", name);
+                    // VPrintf takes an argument array, not the string itself.
+                    var volume = new Pair { Name = name.Raw, Status = 0 };
+                    DOS.VPrintf("%s [Mounted]\n", Pair.AddressOf(ref volume));
                     continue;
                 }
 
@@ -231,8 +247,10 @@ public static class NativeWorkbench31InfoCommand
                     DosLayout.InfoData.NumberOfBlocksUsed);
                 var blockSize = APTR.ReadUInt32(info,
                     DosLayout.InfoData.BytesPerBlock);
-                var sizeKb = (total * blockSize) >> 10;
-                var usedKb = (used * blockSize) >> 10;
+                // total * blockSize overflows 32 bits above 4 GB; scale the
+                // block count to KB first.
+                var sizeKb = ToKilobytes(total, blockSize);
+                var usedKb = ToKilobytes(used, blockSize);
                 var freeKb = sizeKb >= usedKb ? sizeKb - usedKb : 0;
                 var full = sizeKb == 0 ? 0 : (usedKb * 100) / sizeKb;
                 var row = new Row
@@ -259,6 +277,8 @@ public static class NativeWorkbench31InfoCommand
                     break;
                 }
             }
+            APTR.WriteUInt32(process, DosLayout.Process.WindowPointer,
+                savedWindow);
         }
         while (false);
 
@@ -274,6 +294,13 @@ public static class NativeWorkbench31InfoCommand
                 DOS.RETURN_FAIL;
         }
         return result;
+    }
+
+    private static uint ToKilobytes(uint blocks, uint blockSize)
+    {
+        if (blockSize >= 1024) return blocks * (blockSize >> 10);
+        if (blockSize == 0) return 0;
+        return blocks / (1024 / blockSize);
     }
 
     private static uint CStringLength(APTR text)

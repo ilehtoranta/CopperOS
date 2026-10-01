@@ -322,8 +322,11 @@ public static class NativeMorphOSDirCommand
                 result = DOS.RETURN_ERROR;
                 break;
             }
-            var entry = APTR.ReadUInt32(control,
+            // eac_Entries is the number of ExAllData records this call
+            // placed in the buffer; the chain always starts at the buffer.
+            var entryCount = APTR.ReadUInt32(control,
                 DosLayout.ExAllControl.Entries);
+            var entry = entryCount != 0 ? exAllBuffer.Raw : 0u;
             while (entry != 0)
             {
                 var name = APTR.ReadUInt32(APTR.FromPointer(entry),

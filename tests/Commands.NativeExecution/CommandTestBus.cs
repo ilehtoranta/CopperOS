@@ -222,6 +222,13 @@ internal sealed class CommandTestBus : IM68kBus
         var copyDirectoryEntryStorage = owner.CopyDirectoryEntryLayout?.Contains(address, size) == true;
         var copyDirectoryExitStorage = owner.CopyDirectoryExitLayout?.Contains(address, size) == true;
         var copyRequesterWrite = (owner.CopyArgumentGateLayout is not null || owner.CopyTraversalWorkLayout is not null) && address >= owner.Process + (uint)Amiga.DosLayout.Process.WindowPointer && (ulong)address + (uint)size <= owner.Process + (uint)Amiga.DosLayout.Process.WindowPointer + 4;
+        // Workbench Info disables DOS requesters (pr_WindowPtr = -1) while it probes devices.
+        var infoWindowPointerWrite = owner.Definition.Info is not null &&
+            address >= owner.Process + (uint)Amiga.DosLayout.Process.WindowPointer &&
+            (ulong)address + (uint)size <= owner.Process + (uint)Amiga.DosLayout.Process.WindowPointer + 4;
+        var executeWindowPointerWrite = owner.AllowsWindowPointerWrite &&
+            address >= owner.Process + (uint)Amiga.DosLayout.Process.WindowPointer &&
+            (ulong)address + (uint)size <= owner.Process + (uint)Amiga.DosLayout.Process.WindowPointer + 4;
         var guessBootDevProcessWrite = owner.Definition.GuessBootDev is not null &&
             address >= owner.Process + (uint)Amiga.DosLayout.Process.WindowPointer &&
             (ulong)address + (uint)size <= owner.Process + (uint)Amiga.DosLayout.Process.WindowPointer + 4;
@@ -244,7 +251,7 @@ internal sealed class CommandTestBus : IM68kBus
             (ulong)address + (uint)size <= owner.Process + (uint)Amiga.DosLayout.Process.Result2 + 4;
         var writableImage = writableImageRegions.Any(region => address >= region.Start &&
             (ulong)address + (uint)size <= (ulong)region.Start + region.Size);
-        Require(writableImage || ownProcessErrorWrite || copyRequesterWrite || guessBootDevProcessWrite || addDataTypesWindowPointerWrite || versionAmbientWindowPointerWrite || addDataTypesSharedStorage || stackWrite || ioOutputWrite || copyFilePairStorage || copyDestinationStorage || copyDestinationDirectoriesStorage || copyNonFileSystemStorage || copyLoopGuardStorage || copyMetadataStorage || copyResultPolicyStorage || copyOpenDestinationStorage || copyPatternClassifierStorage || copyFlatTraversalStorage || copyDirectoryExitStorage || copyDirectoryEntryStorage || copyTraversalWorkStorage || copyWorkStorage || copyOutputStorage || copyDirectoryOperationStorage || copyLinkOperationStorage || copyFileOperationStorage || copyFileTransferStorage || copyWorkPreparationStorage || copyTraversalStorage || copyMatchStepStorage || copySoftLinkStorage || owner.NativeIo is null && allocations.Values.Any(a => ReferenceEquals(a.Owner, owner) &&
+        Require(writableImage || ownProcessErrorWrite || copyRequesterWrite || executeWindowPointerWrite || guessBootDevProcessWrite || infoWindowPointerWrite || addDataTypesWindowPointerWrite || versionAmbientWindowPointerWrite || addDataTypesSharedStorage || stackWrite || ioOutputWrite || copyFilePairStorage || copyDestinationStorage || copyDestinationDirectoriesStorage || copyNonFileSystemStorage || copyLoopGuardStorage || copyMetadataStorage || copyResultPolicyStorage || copyOpenDestinationStorage || copyPatternClassifierStorage || copyFlatTraversalStorage || copyDirectoryExitStorage || copyDirectoryEntryStorage || copyTraversalWorkStorage || copyWorkStorage || copyOutputStorage || copyDirectoryOperationStorage || copyLinkOperationStorage || copyFileOperationStorage || copyFileTransferStorage || copyWorkPreparationStorage || copyTraversalStorage || copyMatchStepStorage || copySoftLinkStorage || owner.NativeIo is null && allocations.Values.Any(a => ReferenceEquals(a.Owner, owner) &&
             address >= a.Address && (ulong)address + (uint)size <= (ulong)a.Address + a.Size),
             $"Native write outside invocation-owned storage at ${address:X8}.");
         if (stackWrite) owner.LowestStackWrite = Math.Min(owner.LowestStackWrite, address);

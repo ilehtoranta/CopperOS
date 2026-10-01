@@ -1,0 +1,39 @@
+# Reference captures of the ORIGINAL commands, replayed against out/C by run-smoke.ps1.
+# One capture JSON per line, relative to the repository root. The probe script
+# named in the capture is replayed verbatim (Echo lines included); see run-smoke.ps1.
+docs/Commands/Workbench31MorphOS320/reference-captures/eval-wb31-basic.json
+docs/Commands/Workbench31MorphOS320/reference-captures/eval-wb31-classic-caret.json
+docs/Commands/Workbench31MorphOS320/reference-captures/eval-wb31-classic-grammar.json
+docs/Commands/Workbench31MorphOS320/reference-captures/eval-wb31-classic-numeric.json
+docs/Commands/Workbench31MorphOS320/reference-captures/eval-wb31-classic-operators.json
+docs/Commands/Workbench31MorphOS320/reference-captures/eval-wb31-leading-zero-20260928.json
+
+docs/Commands/Workbench31MorphOS320/reference-captures/which-wb31-all-resident-path.json
+docs/Commands/Workbench31MorphOS320/reference-captures/which-wb31-all-status.json
+docs/Commands/Workbench31MorphOS320/reference-captures/which-wb31-basic-lookup.json
+docs/Commands/Workbench31MorphOS320/reference-captures/which-wb31-internal-all-status.json
+docs/Commands/Workbench31MorphOS320/reference-captures/which-wb31-internal-category.json
+docs/Commands/Workbench31MorphOS320/reference-captures/which-wb31-internal-combinations-status.json
+docs/Commands/Workbench31MorphOS320/reference-captures/which-wb31-internal-options.json
+docs/Commands/Workbench31MorphOS320/reference-captures/which-wb31-no-match-status.json
+docs/Commands/Workbench31MorphOS320/reference-captures/which-wb31-nores-res-all-status.json
+docs/Commands/Workbench31MorphOS320/reference-captures/which-wb31-nores-status.json
+docs/Commands/Workbench31MorphOS320/reference-captures/which-wb31-nores.json
+docs/Commands/Workbench31MorphOS320/reference-captures/which-wb31-res-all-status.json
+docs/Commands/Workbench31MorphOS320/reference-captures/which-wb31-res-missing-status.json
+docs/Commands/Workbench31MorphOS320/reference-captures/which-wb31-resident-category.json
+docs/Commands/Workbench31MorphOS320/reference-captures/which-wb31-resident-default-options.json
+docs/Commands/Workbench31MorphOS320/reference-captures/which-wb31-status.json
+# Execute: probe captures of the original 37.11 (capture_text or capture_text_before_nul).
+docs/Commands/Workbench31MorphOS320/reference-captures/execute-wb31-key-substitution.json
+docs/Commands/Workbench31MorphOS320/reference-captures/execute-wb31-late-brackets.json
+docs/Commands/Workbench31MorphOS320/reference-captures/execute-wb31-def-default.json
+docs/Commands/Workbench31MorphOS320/reference-captures/execute-wb31-def-equals-explicit.json
+docs/Commands/Workbench31MorphOS320/reference-captures/execute-wb31-def-duplicate.json
+docs/Commands/Workbench31MorphOS320/reference-captures/execute-wb31-def-empty-name.json
+docs/Commands/Workbench31MorphOS320/reference-captures/execute-wb31-def-equals-empty.json
+docs/Commands/Workbench31MorphOS320/reference-captures/execute-wb31-def-equals-extra-value.json
+docs/Commands/Workbench31MorphOS320/reference-captures/execute-wb31-def-extra-value-expansion.json
+docs/Commands/Workbench31MorphOS320/reference-captures/execute-wb31-def-missing-name.json
+docs/Commands/Workbench31MorphOS320/reference-captures/execute-wb31-def-undeclared.json
+docs/Commands/Workbench31MorphOS320/reference-captures/execute-wb31-def-whitespace-empty.json

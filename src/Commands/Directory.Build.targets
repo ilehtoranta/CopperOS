@@ -49,6 +49,12 @@
   <PropertyGroup Condition="'$(CopperOSCommandName)' != ''">
     <CopperOSPeephole Condition="'$(CopperOSPeephole)' == ''">disabled</CopperOSPeephole>
     <CopperOSMemory Condition="'$(CopperOSMemory)' == ''">none</CopperOSMemory>
+    <!-- No HUNK_SYMBOL block, like the original C: binaries. Kickstart 3.1's
+         LoadSeg rejects a symbol name longer than 32 longwords (128 bytes)
+         with ERROR_BAD_HUNK, and CopperSharp's mangled names can exceed that
+         (Eval: 36 longwords). The .map file next to each image still holds
+         the symbols. Set CopperOSSymbols=on to keep them. -->
+    <CopperOSSymbols Condition="'$(CopperOSSymbols)' == ''">off</CopperOSSymbols>
   </PropertyGroup>
 
   <Target Name="CopperOSExtendPublishManifest"
@@ -60,9 +66,10 @@
     </ReadLinesFromFile>
     <ItemGroup>
       <_CopperOSManifestLine Remove="@(_CopperOSManifestLine)"
-                             Condition="$([System.String]::Copy('%(Identity)').StartsWith('peephole=')) or $([System.String]::Copy('%(Identity)').StartsWith('memory='))" />
+                             Condition="$([System.String]::Copy('%(Identity)').StartsWith('peephole=')) or $([System.String]::Copy('%(Identity)').StartsWith('memory=')) or $([System.String]::Copy('%(Identity)').StartsWith('symbols='))" />
       <_CopperOSManifestLine Include="peephole=$(CopperOSPeephole)" Condition="'$(CopperOSPeephole)' != ''" />
       <_CopperOSManifestLine Include="memory=$(CopperOSMemory)" Condition="'$(CopperOSMemory)' != ''" />
+      <_CopperOSManifestLine Include="symbols=$(CopperOSSymbols)" Condition="'$(CopperOSSymbols)' != ''" />
     </ItemGroup>
     <WriteLinesToFile File="$(CopperSharpResponseManifestPath)"
                       Lines="@(_CopperOSManifestLine)"
