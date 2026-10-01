@@ -140,8 +140,8 @@ if (-not $NoReplay -and (Test-Path -LiteralPath $ReplaysFile)) {
             # persisted the capture.
             $src = Join-Path $repo $cap.probe.source
             if (-not (Test-Path -LiteralPath $src)) { throw "Probe source not found: $($cap.probe.source)" }
-            # Hash the LF form: the capture hashed the probe as run, and a
-            # core.autocrlf checkout adds CRs that are not part of it.
+            # Hash the LF form: the capture hashed the probe as run. .gitattributes
+            # keeps fixtures LF, but an older checkout may still carry CRs.
             $srcText = $latin1.GetString([IO.File]::ReadAllBytes($src)).Replace("`r`n", "`n")
             $sha = ([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($latin1.GetBytes($srcText))) -replace '-', '').ToLowerInvariant()
             if ($sha -ne $cap.probe.source_sha256) {

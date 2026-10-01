@@ -1,0 +1,11 @@
+# Text files are stored with LF in the repository. Working copies use the
+# platform's line ending (CRLF on Windows), so files written with LF on a
+# Windows checkout no longer flip between the two.
+* text=auto
+
+# AmigaDOS probe scripts are run on the Amiga side and hashed byte for byte
+# against their reference captures, so they stay LF in every working copy.
+tests/Commands/fixtures/** text eol=lf
+
+# Visual Studio expects CRLF in solution files.
+*.sln text eol=crlf
