@@ -728,6 +728,114 @@ public sealed class MuiProcessSpecialistTests
 			0, 1, out _));
 	}
 
+	[Theory]
+	[InlineData(true)]
+	[InlineData(false)]
+	public void ProcessArgumentVectorRejectsTruncatedDeclaredTailBeforeReadingOrWriting(
+		bool dispatchPacket)
+	{
+		var p = NewPlatform();
+		var kind = dispatchPacket ? MuiProcessArgumentVectorKind.DispatchPacket :
+			MuiProcessArgumentVectorKind.MethodMessage;
+		var headerSize = dispatchPacket ? MuiProcessDispatchPacketHeader.Size :
+			MuiProcessMethodMessageHeader.Size;
+		var firstSlot = APTR.FromPointer(Base + (uint)Size -
+			MuiProcessDispatchArgumentSlot.Size);
+		var message = APTR.FromPointer(firstSlot.Raw - headerSize);
+		const uint original = 0xC001D00Du;
+		Assert.True(MuiProcessDispatchArgumentSlotCodec.Write(ref p, firstSlot,
+			new MuiProcessDispatchArgumentSlot { Value = original }));
+
+		// The complete one-argument packet fits exactly, but a declaration of
+		// two arguments must not expose even its mapped first argument.
+		Assert.True(MuiProcessArgumentVectorCodec.TryReadValue(ref p, message,
+			kind, 0, 1, out var value));
+		Assert.Equal(original, value);
+		Assert.False(MuiProcessArgumentVectorMemoryCodec.TryGetEntry(ref p,
+			message, kind, 0, 2, out var address));
+		Assert.True(address.IsNull);
+		Assert.False(MuiProcessArgumentVectorCodec.TryReadValue(ref p, message,
+			kind, 0, 2, out value));
+		Assert.Equal(0u, value);
+		Assert.False(MuiProcessArgumentVectorCodec.TryWrite(ref p, message,
+			kind, 0, 2, new MuiProcessDispatchArgumentSlot { Value = 0x12345678u }));
+		Assert.True(MuiProcessDispatchArgumentSlotCodec.TryRead(ref p, firstSlot,
+			out var unchanged));
+		Assert.Equal(original, unchanged.Value);
+	}
+
+	[Theory]
+	[InlineData(true)]
+	[InlineData(false)]
+	public void ProcessArgumentVectorRejectsUnmappedHeaderWithMappedSelectedSlot(
+		bool dispatchPacket)
+	{
+		var p = new MuiHeadlessTestPlatform(Base, Size, FirstAllocation, State);
+		var kind = dispatchPacket ? MuiProcessArgumentVectorKind.DispatchPacket :
+			MuiProcessArgumentVectorKind.MethodMessage;
+		var headerSize = dispatchPacket ? MuiProcessDispatchPacketHeader.Size :
+			MuiProcessMethodMessageHeader.Size;
+		var firstSlot = APTR.FromPointer(Base);
+		var message = APTR.FromPointer(firstSlot.Raw - headerSize);
+		const uint original = 0xFEDCBA98u;
+		Assert.True(MuiProcessDispatchArgumentSlotCodec.WriteValue(ref p,
+			firstSlot, original));
+		Assert.True(p.IsMapped(firstSlot, MuiProcessDispatchArgumentSlot.Size));
+		Assert.False(p.IsMapped(message, headerSize));
+
+		Assert.False(MuiProcessArgumentVectorMemoryCodec.TryGetEntry(ref p,
+			message, kind, 0, 1, out var address));
+		Assert.True(address.IsNull);
+		Assert.False(MuiProcessArgumentVectorCodec.TryReadValue(ref p, message,
+			kind, 0, 1, out var value));
+		Assert.Equal(0u, value);
+		Assert.False(MuiProcessArgumentVectorCodec.TryWriteValue(ref p, message,
+			kind, 0, 1, 0x12345678u));
+		Assert.True(MuiProcessDispatchArgumentSlotCodec.TryReadValue(ref p,
+			firstSlot, out value));
+		Assert.Equal(original, value);
+	}
+
+	[Theory]
+	[InlineData(true)]
+	[InlineData(false)]
+	public void ProcessArgumentVectorRejectsInvalidSelectionWithoutWriting(
+		bool dispatchPacket)
+	{
+		var p = NewPlatform();
+		var kind = dispatchPacket ? MuiProcessArgumentVectorKind.DispatchPacket :
+			MuiProcessArgumentVectorKind.MethodMessage;
+		var headerSize = dispatchPacket ? MuiProcessDispatchPacketHeader.Size :
+			MuiProcessMethodMessageHeader.Size;
+		var firstSlot = APTR.FromPointer(Packet.Raw + headerSize);
+		const uint original = 0xB2468ACEu;
+		Assert.True(MuiProcessDispatchArgumentSlotCodec.WriteValue(ref p,
+			firstSlot, original));
+
+		var invalidSelections = new (MuiProcessArgumentVectorKind Kind,
+			uint Index, uint Count)[]
+		{
+			((MuiProcessArgumentVectorKind)0xFF, 0, 1),
+			(kind, 0, 0),
+			(kind, 0, MuiProcessSpecialistLayout.MaximumDispatchArgs + 1),
+			(kind, 0, uint.MaxValue),
+			(kind, 1, 1),
+			(kind, uint.MaxValue, 1),
+		};
+		foreach (var selection in invalidSelections)
+		{
+			Assert.False(MuiProcessArgumentVectorMemoryCodec.TryGetEntry(ref p,
+				Packet, selection.Kind, selection.Index, selection.Count,
+				out var address));
+			Assert.True(address.IsNull);
+			Assert.False(MuiProcessArgumentVectorCodec.TryWriteValue(ref p, Packet,
+				selection.Kind, selection.Index, selection.Count, 0x12345678u));
+			Assert.True(MuiProcessDispatchArgumentSlotCodec.TryReadValue(ref p,
+				firstSlot, out var value));
+			Assert.Equal(original, value);
+		}
+	}
+
 	[Fact]
 	public void ProcessArgumentVectorBridgeUsesNamedDispatchSlots()
 	{
@@ -805,8 +913,9 @@ public sealed class MuiProcessSpecialistTests
 		cursor.Record = MuiProcessRecordKind.Specialist;
 		cursor.Field = MuiProcessRecordField.NotifyAttribute;
 		Assert.True(MuiProcessRecordFieldCursorCodec.TryGetAddress(ref p,
-			cursor, out fieldAddress));
+			cursor, out fieldAddress, out var fieldSize));
 		Assert.Equal(0x2C30u, fieldAddress.Raw);
+		Assert.Equal(4u, fieldSize);
 		Assert.True(MuiProcessRecordFieldCursorCodec.TryWriteUInt32(ref p,
 			cursor.Address, MuiProcessRecordKind.Specialist,
 			MuiProcessRecordField.NameOwned, 0xDEADBEEFu));
@@ -869,6 +978,12 @@ public sealed class MuiProcessSpecialistTests
 		Assert.True(MuiProcessRecordFieldMemoryCodec.TryWriteUInt32(ref p,
 			recordAddress, MuiProcessRecordKind.Specialist,
 			MuiProcessRecordField.NotifyAttribute, 0x8042F002u));
+		Assert.True(MuiProcessRecordFieldMemoryCodec.TryGetAddress(ref p,
+			recordAddress, MuiProcessRecordKind.Specialist,
+			MuiProcessRecordField.NameOwned, out var nameAddress,
+			out var nameSize));
+		Assert.Equal(recordAddress.Raw + 16, nameAddress.Raw);
+		Assert.Equal(4u, nameSize);
 		Assert.True(MuiProcessRecordFieldMemoryCodec.TryReadUInt32(ref p,
 			recordAddress, MuiProcessRecordKind.Specialist,
 			MuiProcessRecordField.NotifyAttribute, out var attribute));
@@ -1108,8 +1223,9 @@ public sealed class MuiProcessSpecialistTests
 		cursor.Packet = MuiProcessSpecialistPacketKind.Get;
 		cursor.Field = MuiProcessSpecialistField.MethodId;
 		Assert.True(MuiProcessSpecialistFieldCursorCodec.TryGetAddress(ref p,
-			cursor, out var address));
+			cursor, out var address, out var methodSize));
 		Assert.Equal(Message.Raw, address.Raw);
+		Assert.Equal(4u, methodSize);
 		cursor.Field = MuiProcessSpecialistField.Attribute;
 		Assert.True(MuiProcessSpecialistFieldCursorCodec.TryGetAddress(ref p,
 			cursor, out address));

@@ -10,3 +10,5 @@
 .vs
 *.map
 *.hunk
+# Generated C: directory (tools/Commands/build-c.ps1)
+/out/

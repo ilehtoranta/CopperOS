@@ -24,6 +24,20 @@ public sealed class MuiAreaGeometryStructAdapterTests
 
 		Assert.True(MuiAreaGeometryStateRecordCodec.WriteRecord(ref platform,
 			address, value));
+		var cursor = new MuiAreaGeometryStateFieldCursor
+		{
+			Record = address,
+			Field = MuiAreaGeometryStateField.Left,
+		};
+		Assert.True(MuiAreaGeometryStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedLeftAddress, out var typedLeftSize));
+		Assert.Equal(APTR.FromPointer(0x3F04), typedLeftAddress);
+		Assert.Equal(MuiAreaGeometryStateRecord.FieldSize, typedLeftSize);
+		Assert.True(MuiAreaGeometryStateRecordMemoryCodec.TryGetFieldAddress(
+			ref platform, address, MuiAreaGeometryStateField.Left,
+			out var memoryLeftAddress, out var memoryLeftSize));
+		Assert.Equal(typedLeftAddress, memoryLeftAddress);
+		Assert.Equal(typedLeftSize, memoryLeftSize);
 		Assert.True(MuiAreaGeometryStateRecordMemoryCodec.TryWriteFieldInt32(
 			ref platform, address, MuiAreaGeometryStateField.Left, -7));
 		Assert.True(MuiAreaGeometryStateRecordMemoryCodec.TryReadFieldInt32(
@@ -42,6 +56,13 @@ public sealed class MuiAreaGeometryStructAdapterTests
 		Assert.Equal(value.Bottom, decoded.Bottom);
 		Assert.False(MuiAreaGeometryStateRecordMemoryCodec.TryReadFieldUInt32(ref platform,
 			address, (MuiAreaGeometryStateField)255, out _));
+		cursor.Field = (MuiAreaGeometryStateField)255;
+		Assert.False(MuiAreaGeometryStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiAreaGeometryStateField.Left;
+		Assert.False(MuiAreaGeometryStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 	}
 
 	[Fact]
@@ -77,5 +98,42 @@ public sealed class MuiAreaGeometryStructAdapterTests
 			crossingEnd, value));
 		Assert.False(MuiAreaGeometryStateRecordCodec.TryReadRecord(ref platform,
 			crossingEnd, out _));
+	}
+
+	[Fact]
+	public void AreaGeometryOffsetBridgeUsesNamedUlongCodec()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x4100);
+		var value = new MuiAreaGeometryStateRecord
+		{
+			Magic = 0x10203040u,
+			Left = 10,
+			Top = 20,
+			Width = 30,
+			Height = 40,
+			Right = 50,
+			Bottom = 60,
+		};
+		Assert.True(MuiAreaGeometryStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiAreaGeometryStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaGeometryStateRecord.LeftOffset, unchecked((uint)-7)));
+		Assert.True(MuiAreaGeometryStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiAreaGeometryStateRecord.LeftOffset, out var left));
+		Assert.Equal(unchecked((uint)-7), left);
+		Assert.True(MuiAreaGeometryStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.Equal(-7, decoded.Left);
+		Assert.Equal(value.Top, decoded.Top);
+		Assert.Equal(value.Width, decoded.Width);
+		Assert.Equal(value.Height, decoded.Height);
+		Assert.Equal(value.Right, decoded.Right);
+		Assert.Equal(value.Bottom, decoded.Bottom);
+		Assert.False(MuiAreaGeometryStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiAreaGeometryStateRecord.Size, out _));
+		Assert.False(MuiAreaGeometryStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.Null, MuiAreaGeometryStateRecord.LeftOffset, 1));
 	}
 }

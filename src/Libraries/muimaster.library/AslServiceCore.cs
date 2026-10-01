@@ -58,43 +58,72 @@ internal struct MuiAslRecordFieldCursor
 // record admission and the packed field translation.
 internal static class MuiAslRecordMemoryCodec
 {
-	private static bool TryResolve(MuiAslRecordKind kind,
-		MuiAslRecordField field, out uint offset, out uint size,
-		out uint fieldSize)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiAslRecordKind kind,
+		MuiAslRecordField field, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		offset = 0;
-		size = 0;
+		address = APTR.Null;
 		fieldSize = 0;
-		switch (kind)
+		if (kind == MuiAslRecordKind.State)
 		{
-			case MuiAslRecordKind.State:
-				size = MuiAslServiceStateRecord.Size;
-				offset = field switch
-				{
-					MuiAslRecordField.Magic => MuiAslServiceStateRecord.MagicOffset,
-					MuiAslRecordField.Head => MuiAslServiceStateRecord.HeadOffset,
-					MuiAslRecordField.Generation => MuiAslServiceStateRecord.GenerationOffset,
-					_ => uint.MaxValue,
-				};
-				fieldSize = MuiAslServiceStateRecord.FieldSize;
-				break;
-			case MuiAslRecordKind.Lease:
-				size = MuiAslRequestLeaseRecord.Size;
-				offset = field switch
-				{
-					MuiAslRecordField.Next => MuiAslRequestLeaseRecord.NextOffset,
-					MuiAslRecordField.Requester => MuiAslRequestLeaseRecord.RequesterOffset,
-					MuiAslRecordField.Type => MuiAslRequestLeaseRecord.TypeOffset,
-					MuiAslRecordField.Tags => MuiAslRequestLeaseRecord.TagsOffset,
-					_ => uint.MaxValue,
-				};
-				fieldSize = MuiAslRequestLeaseRecord.FieldSize;
-				break;
-			default:
-				offset = uint.MaxValue;
-				break;
+			fieldSize = MuiAslServiceStateRecord.FieldSize;
+			if (field == MuiAslRecordField.Magic)
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					fieldSize, out address);
+			if (field == MuiAslRecordField.Head)
+			{
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					fieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					fieldSize, out address);
+			}
+			if (field == MuiAslRecordField.Generation)
+			{
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					fieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					fieldSize, out address);
+			}
+			return false;
 		}
-		return offset != uint.MaxValue;
+		if (kind == MuiAslRecordKind.Lease)
+		{
+			fieldSize = MuiAslRequestLeaseRecord.FieldSize;
+			if (field == MuiAslRecordField.Next)
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					fieldSize, out address);
+			if (field == MuiAslRecordField.Requester)
+			{
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					fieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					fieldSize, out address);
+			}
+			if (field == MuiAslRecordField.Type)
+			{
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					fieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					fieldSize, out address);
+			}
+			if (field == MuiAslRecordField.Tags)
+			{
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					fieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						fieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					fieldSize, out address);
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -104,12 +133,23 @@ internal static class MuiAslRecordMemoryCodec
 	{
 		address = APTR.Null;
 		fieldSize = 0;
-		if (!TryResolve(kind, field, out var offset,
-			out var recordSize, out fieldSize) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, recordSize)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, fieldSize);
+		if (kind == MuiAslRecordKind.State)
+		{
+			if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+				MuiAslServiceStateRecord.Size, out var stateCursor) ||
+				!TryTakeField(ref platform, ref stateCursor, kind, field,
+					out address, out fieldSize)) return false;
+			return true;
+		}
+		if (kind == MuiAslRecordKind.Lease)
+		{
+			if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+				MuiAslRequestLeaseRecord.Size, out var leaseCursor) ||
+				!TryTakeField(ref platform, ref leaseCursor, kind, field,
+					out address, out fieldSize)) return false;
+			return true;
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -333,7 +373,7 @@ internal static class MuiAslServiceAdmission
 {
 	internal static bool TryReadReadyState<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiAslServiceStateRecord record)
-		where TPlatform : struct, IMuiServicePlatform
+		where TPlatform : struct, IMuiAslServicePlatform
 	{
 		record = default;
 		if ((address.Raw & 1u) != 0 ||
@@ -354,7 +394,7 @@ internal static class MuiAslServiceAdmission
 
 	internal static bool TryReadLease<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiAslRequestLeaseRecord record)
-		where TPlatform : struct, IMuiServicePlatform
+		where TPlatform : struct, IMuiAslServicePlatform
 	{
 		record = default;
 		if ((address.Raw & 1u) != 0 ||
@@ -422,7 +462,7 @@ public static class MuiAslServiceRecordPacketCore
 public static class MuiAslServiceCore
 {
 	public static bool Initialize<TPlatform>(ref TPlatform platform,
-		APTR serviceState) where TPlatform : struct, IMuiServicePlatform
+		APTR serviceState) where TPlatform : struct, IMuiAslServicePlatform
 	{
 		if (serviceState.IsNull ||
 			!platform.IsMapped(serviceState, MuiAslServiceStateRecord.Size))
@@ -439,7 +479,7 @@ public static class MuiAslServiceCore
 
 	public static APTR AllocAslRequest<TPlatform>(ref TPlatform platform,
 		APTR serviceState, uint requestType, APTR tags)
-		where TPlatform : struct, IMuiServicePlatform
+		where TPlatform : struct, IMuiAslServicePlatform
 	{
 		if (!MuiAslServiceAdmission.TryReadReadyState(ref platform,
 			serviceState, out _) ||
@@ -486,7 +526,7 @@ public static class MuiAslServiceCore
 
 	public static int AslRequest<TPlatform>(ref TPlatform platform,
 		APTR serviceState, APTR requester, APTR tags)
-		where TPlatform : struct, IMuiServicePlatform
+		where TPlatform : struct, IMuiAslServicePlatform
 	{
 		if (!MuiAslServiceAdmission.TryReadReadyState(ref platform,
 			serviceState, out _) || requester.IsNull ||
@@ -500,7 +540,7 @@ public static class MuiAslServiceCore
 	// keeps double-free behavior observable in host/native tests.
 	public static bool FreeAslRequest<TPlatform>(ref TPlatform platform,
 		APTR serviceState, APTR requester)
-		where TPlatform : struct, IMuiServicePlatform
+		where TPlatform : struct, IMuiAslServicePlatform
 	{
 		if (!MuiAslServiceAdmission.TryReadReadyState(ref platform,
 			serviceState, out _) || requester.IsNull) return false;
@@ -544,7 +584,7 @@ public static class MuiAslServiceCore
 	}
 
 	private static APTR Find<TPlatform>(ref TPlatform platform, APTR state,
-		APTR requester) where TPlatform : struct, IMuiServicePlatform
+		APTR requester) where TPlatform : struct, IMuiAslServicePlatform
 	{
 		if (!MuiAslServiceAdmission.TryReadReadyState(ref platform, state,
 			out var service)) return APTR.Null;

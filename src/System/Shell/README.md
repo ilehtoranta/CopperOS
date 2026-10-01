@@ -51,14 +51,30 @@ CLI/DOS owner; Shell does not embed an error-message database.
 `PromptCommand` implements the bounded MorphOS `Prompt` form. With no
 argument it asks the CLI/DOS owner to restore the default prompt; with an
 argument it passes the decoded `/F` text, including quoted spaces and star
-escapes, to that owner. Prompt substitution expansion and prompt storage stay
-in the CLI/DOS boundary rather than in a managed Shell object.
+escapes, to that owner. Prompt storage and `%N`, `%S`, and `%R` expansion use
+the CLI/DOS boundary rather than a managed Shell object.
+
+The interactive runner emits one prompt before reading each command only when
+the CLI is marked interactive and its current input is the standard input.
+New DOS CLIs start with the MorphOS default `%N.%S>`; an explicitly empty
+prompt stays empty, and `Prompt` without arguments restores the default.
+Expansion supports `%N`, `%S`, and `%R` without appending a space. A bounded
+prompt parser also handles backtick command substitutions through the normal
+Shell alias, redirection, internal-command, and external-command paths. Their
+default output is captured to a runner-owned temporary file and copied in
+bounded reads; explicit command redirection remains in effect. The resumable
+expansion cursor and capture handle are carried in the named
+`ShellScriptPromptExpansionState` frame field. Captured bytes are currently
+preserved verbatim; exact MorphOS newline normalization still needs
+differential verification.
 
 `FailatCommand` changes the active command-sequence failure threshold through
 the CLI boundary; sequence teardown remains responsible for restoring the
 default. `FaultCommand` collects bounded numeric error codes in guest memory
 and delegates translation and formatting to DOS. Both now use their DOS
-`ReadArgs` templates (`RCLIM/A/N` and `ERROR/N/M`). `Stack` and `Quit` use
+`ReadArgs` templates (`RCLIM/N` and `ERROR/N/M`). An argumentless `Failat`
+displays the CLI-owned current limit; a supplied limit must be positive.
+`Stack` and `Quit` use
 the corresponding optional numeric templates. The simple name/switch
 commands use `NAME/A`, `NAME/A,SAVE/S`, and `RESET/S` templates. Named
 full-argument commands use DOS `/F` templates and copy their results before
@@ -99,8 +115,10 @@ interactive read plus condition-flag update to the inherited CLI streams.
 VAL/S,EXISTS/K,NOREQ/S` result from DOS `ReadArgs`. The anonymous positional
 entry carries the left comparison operand; the command copies both operands
 into bounded guest buffers before `FreeArgs` and delegates previous-result,
-case rules, filesystem existence, numeric `VAL` mode, and script-branch state
-to the DOS/script owner.
+case rules, numeric `VAL` mode, and script-branch state to the DOS/script
+owner. `EXISTS` probes with a shared DOS lock so files and directories both
+match; a missing object is treated as a false condition and its expected
+lookup `IoErr` is cleared.
 
 `RunCommand` consumes `DETACH/S,QUIET/S,STACK/K/N,PRI/K/N,COMMAND/F` through
 the same boundary. It copies the full command text and optional numeric
@@ -159,11 +177,14 @@ above and supplies a caller-owned `ShellCommandWorkspace`; name resolution,
 option parsing, command semantics, and DOS process ownership therefore remain
 separate layers.
 
-`ShellScriptFrameCodec` defines the guest-resident 96-byte frame used by the
+`ShellScriptFrameCodec` defines the guest-resident 152-byte version-5 frame used by the
 script engine. It records inherited handles, line/offset position, failure and
 last-result state, condition state, label count, pending control requests, and
 guest pointers to the input metadata, nested control chain, label chain, and
-optional signal record and a pending external-command continuation.
+optional signal record and a pending external-command continuation. Its
+`ShellScriptDeferredCommandState` is a named record for the unconsumed right
+side of a compound command; the byte layout remains private to the frame
+codec.
 `ShellScriptControlCodec`
 encodes each 36-byte `If`/`Skip` record, including parent, branch flags, block
 position, and skip target. `ShellScriptInputCodec` records only the current
@@ -171,17 +192,38 @@ bounded buffer span/cursor, while `ShellScriptLabelCodec` and its transitions
 maintain a bounded parent-linked label index. These codecs perform bounded
 transitions without owning block scheduling or process behavior.
 
-`ShellScriptEngine.Step` consumes one bounded line from the frame's input
-through `IShellScriptPlatform`. It dispatches recognized internal commands
+`ShellScriptEngine.Step` consumes one command step from a bounded line in the
+frame's input through `IShellScriptPlatform`. It dispatches recognized internal commands
 through `ShellCommandDispatcher`, suppresses ordinary commands while a frame
 is skipping, and sends unknown/external lines back to the DOS/Shell owner. The
 stepper advances only the guest line/offset record; it does not preload a
 script, create a task, or retain a managed continuation.
 
+`ShellScriptCompoundParser` recognizes whitespace-delimited `&&`, `||`, and
+`|` outside quotes, star escapes, and semicolon comments. Operator identity is
+carried as a named enum field in `ShellScriptCompoundSplit`. The runner
+executes `&&` by comparing the left command's return level with the frame's
+`Failat` threshold. A simple `||` pair currently runs sequentially through the
+inherited output handle regardless of the left command's return level. The
+operator kind, deferred text, and physical input cursor are retained in the
+named `ShellScriptDeferredCommandState`, so external commands can complete
+asynchronously before the chain resumes. This does not yet provide the
+composable common stream needed when concatenated output feeds a later pipeline
+(as in the reference example), or whole-expression redirection. A recognized
+`|` line still fails explicitly instead of being passed as ordinary arguments;
+pipeline scheduling and Queue-Handler integration remain required. Exact
+MorphOS 3.20 behavior remains to be verified. The runner's caller-owned
+workspace must remain mapped and stable until that logical line completes.
+
 Command-scoped redirection is represented by `ShellRedirectionSpec` and
 `ShellRedirectionWorkspace`. The bounded parser recognizes `<`, `>`, `>>`,
-`2>`, and `2>>` outside quotes, copies the cleaned command and target paths
-into caller-owned guest buffers, and rejects duplicate or malformed streams.
+`*>`, `*>>`, and `*<>` outside quotes, copies the cleaned command and target
+paths into caller-owned guest buffers, and rejects duplicate or malformed
+streams.
+`*<>` aliases the error handle to the selected output handle without creating
+a second ownership claim. Operators must begin at a whitespace-delimited
+boundary; the former `2>` and `2>>` spellings are not MorphOS redirection
+operators.
 `ShellRedirectionTransaction` opens only the requested streams, rolls back
 already-opened handles on a later failure, passes the temporary handles to the
 internal or external command, and closes them in reverse order. The inherited
@@ -216,7 +258,7 @@ terminal signal, platform failure, or an explicit step limit. The result is a
 fixed-width status/result/count record; no managed command stack or preloaded
 script is created.
 `ShellScriptEngine.Start` is the corresponding startup handoff: it validates
-the caller-owned workspace, publishes the initial 96-byte frame, and then
+the caller-owned workspace, publishes the initial 152-byte frame, and then
 invokes `Run`. `ShellScriptStartRequest` contains only the guest frame pointer,
 fixed-width initial frame state, reusable workspace, and step bound, so a DOS
 adapter can pass its cursor/handles into Shell without a managed startup

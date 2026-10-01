@@ -83,13 +83,21 @@ public sealed class MuiGaugeInfoRateTests
 		};
 		Assert.True(MuiGaugeInfoRateStateRecordCodec.Write(ref platform, address,
 			record));
+		var infoRateCursor = new MuiGaugeInfoRateStateFieldCursor
+		{
+			Record = address,
+			Field = MuiGaugeInfoRateStateField.InfoRate,
+		};
 		Assert.True(MuiGaugeInfoRateStateFieldCursorCodec.TryGetAddress(
-			ref platform, new MuiGaugeInfoRateStateFieldCursor
-			{
-				Record = address,
-				Field = MuiGaugeInfoRateStateField.InfoRate,
-			}, out var infoRateAddress));
+			ref platform, infoRateCursor, out var infoRateAddress,
+			out var cursorFieldSize));
 		Assert.Equal(0x1804u, infoRateAddress.Raw);
+		Assert.Equal(MuiGaugeInfoRateStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiGaugeInfoRateStateRecordMemoryCodec.TryGetAddress(
+			ref platform, infoRateCursor, out var memoryInfoRateAddress,
+			out var memoryFieldSize));
+		Assert.Equal(infoRateAddress, memoryInfoRateAddress);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiGaugeInfoRateStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiGaugeInfoRateStateField.InfoRate,
 			unchecked((uint)-7)));
@@ -108,12 +116,13 @@ public sealed class MuiGaugeInfoRateTests
 			APTR.Null, out _));
 		Assert.False(MuiGaugeInfoRateStateRecordMemoryCodec.TryReadUInt32(
 			ref platform, address, (MuiGaugeInfoRateStateField)0xFF, out _));
+		infoRateCursor.Field = (MuiGaugeInfoRateStateField)0xFF;
 		Assert.False(MuiGaugeInfoRateStateFieldCursorCodec.TryGetAddress(
-			ref platform, new MuiGaugeInfoRateStateFieldCursor
-			{
-				Record = address,
-				Field = (MuiGaugeInfoRateStateField)0xFF,
-			}, out _));
+			ref platform, infoRateCursor, out _, out _));
+		infoRateCursor.Record = APTR.Null;
+		infoRateCursor.Field = MuiGaugeInfoRateStateField.InfoRate;
+		Assert.False(MuiGaugeInfoRateStateFieldCursorCodec.TryGetAddress(
+			ref platform, infoRateCursor, out _, out _));
 	}
 
 	[Fact]

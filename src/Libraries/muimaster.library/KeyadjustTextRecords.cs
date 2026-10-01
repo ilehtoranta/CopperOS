@@ -38,19 +38,23 @@ internal struct MuiKeyadjustTextFieldCursor
 
 internal static class MuiKeyadjustTextRecordMemoryCodec
 {
-	private static bool TryResolve(MuiKeyadjustTextField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiKeyadjustTextField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
+		address = APTR.Null;
 		if (field == MuiKeyadjustTextField.Character)
-			offset = MuiKeyadjustTextRecord.CharacterOffset;
-		else if (field == MuiKeyadjustTextField.Terminator)
-			offset = MuiKeyadjustTextRecord.TerminatorOffset;
-		else
+			return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiKeyadjustTextRecord.FieldSize, out address);
+		if (field == MuiKeyadjustTextField.Terminator)
 		{
-			offset = 0;
-			return false;
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiKeyadjustTextRecord.FieldSize, out _)) return false;
+			return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiKeyadjustTextRecord.FieldSize, out address);
 		}
-		return true;
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -58,12 +62,11 @@ internal static class MuiKeyadjustTextRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiKeyadjustTextRecord.Size))
-			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, MuiKeyadjustTextRecord.FieldSize);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+			MuiKeyadjustTextRecord.Size, out var guestCursor) ||
+			!TryTakeField(ref platform, ref guestCursor, cursor.Field,
+				out address)) return false;
+		return true;
 	}
 
 	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,

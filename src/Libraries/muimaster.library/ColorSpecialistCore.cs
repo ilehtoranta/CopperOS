@@ -131,30 +131,30 @@ internal struct MuiColorRecordFieldCursor
 
 internal static class MuiColorRecordMemoryCodec
 {
-	private static bool TryResolve(MuiColorRecordKind record,
-		MuiColorRecordField field, out uint offset, out uint size)
+	private static bool TryResolveFieldIndex(MuiColorRecordKind record,
+		MuiColorRecordField field, out uint index, out uint size)
 	{
-		offset = 0;
+		index = 0;
 		size = 0;
 		if (record == MuiColorRecordKind.PenSpec)
 		{
 			size = MuiColorPenSpecRecord.Size;
 			if (field == MuiColorRecordField.Kind)
-				offset = MuiColorPenSpecRecord.KindOffset;
+				index = 0;
 			else if (field == MuiColorRecordField.Scalar)
-				offset = MuiColorPenSpecRecord.ScalarOffset;
+				index = 1;
 			else if (field == MuiColorRecordField.Red)
-				offset = MuiColorPenSpecRecord.RedOffset;
+				index = 2;
 			else if (field == MuiColorRecordField.Green)
-				offset = MuiColorPenSpecRecord.GreenOffset;
+				index = 3;
 			else if (field == MuiColorRecordField.Blue)
-				offset = MuiColorPenSpecRecord.BlueOffset;
+				index = 4;
 			else if (field == MuiColorRecordField.Reserved0)
-				offset = MuiColorPenSpecRecord.Reserved0Offset;
+				index = 5;
 			else if (field == MuiColorRecordField.Reserved1)
-				offset = MuiColorPenSpecRecord.Reserved1Offset;
+				index = 6;
 			else if (field == MuiColorRecordField.Reserved2)
-				offset = MuiColorPenSpecRecord.Reserved2Offset;
+				index = 7;
 			else return false;
 			return true;
 		}
@@ -162,37 +162,37 @@ internal static class MuiColorRecordMemoryCodec
 		{
 			size = MuiColorSpecialistState.Size;
 			if (field == MuiColorRecordField.Magic)
-				offset = MuiColorSpecialistState.MagicOffset;
+				index = 0;
 			else if (field == MuiColorRecordField.Class)
-				offset = MuiColorSpecialistState.ClassOffset;
+				index = 1;
 			else if (field == MuiColorRecordField.Flags)
-				offset = MuiColorSpecialistState.FlagsOffset;
+				index = 2;
 			else if (field == MuiColorRecordField.RenderInfo)
-				offset = MuiColorSpecialistState.RenderInfoOffset;
+				index = 3;
 			else if (field == MuiColorRecordField.DrawState)
-				offset = MuiColorSpecialistState.DrawStateOffset;
+				index = 4;
 			else if (field == MuiColorRecordField.Pen)
-				offset = MuiColorSpecialistState.PenOffset;
+				index = 5;
 			else if (field == MuiColorRecordField.SpecBlock)
-				offset = MuiColorSpecialistState.SpecBlockOffset;
+				index = 6;
 			else if (field == MuiColorRecordField.RgbBlock)
-				offset = MuiColorSpecialistState.RgbBlockOffset;
+				index = 7;
 			else if (field == MuiColorRecordField.Reference)
-				offset = MuiColorSpecialistState.ReferenceOffset;
+				index = 8;
 			else if (field == MuiColorRecordField.ModeID)
-				offset = MuiColorSpecialistState.ModeIDOffset;
+				index = 9;
 			else if (field == MuiColorRecordField.Alpha)
-				offset = MuiColorSpecialistState.AlphaOffset;
+				index = 10;
 			else if (field == MuiColorRecordField.Entries)
-				offset = MuiColorSpecialistState.EntriesOffset;
+				index = 11;
 			else if (field == MuiColorRecordField.Names)
-				offset = MuiColorSpecialistState.NamesOffset;
+				index = 12;
 			else if (field == MuiColorRecordField.NotifyAttribute)
-				offset = MuiColorSpecialistState.NotifyAttributeOffset;
+				index = 13;
 			else if (field == MuiColorRecordField.NotifyValue)
-				offset = MuiColorSpecialistState.NotifyValueOffset;
+				index = 14;
 			else if (field == MuiColorRecordField.NotifyCount)
-				offset = MuiColorSpecialistState.NotifyCountOffset;
+				index = 15;
 			else return false;
 			return true;
 		}
@@ -200,13 +200,34 @@ internal static class MuiColorRecordMemoryCodec
 		{
 			size = MuiColorRgbRecord.Size;
 			if (field == MuiColorRecordField.Red)
-				offset = MuiColorRgbRecord.RedOffset;
+				index = 0;
 			else if (field == MuiColorRecordField.Green)
-				offset = MuiColorRgbRecord.GreenOffset;
+				index = 1;
 			else if (field == MuiColorRecordField.Blue)
-				offset = MuiColorRgbRecord.BlueOffset;
+				index = 2;
 			else return false;
 			return true;
+		}
+		return false;
+	}
+
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiColorRecordKind record,
+		MuiColorRecordField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolveFieldIndex(record, field, out var index, out _))
+			return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiColorPenSpecRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				return true;
+			}
 		}
 		return false;
 	}
@@ -217,11 +238,10 @@ internal static class MuiColorRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(record, field, out var offset, out var size) ||
-			recordAddress.IsNull || recordAddress.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(recordAddress, size)) return false;
-		address = APTR.FromPointer(recordAddress.Raw + offset);
-		return platform.IsMapped(address, MuiColorPenSpecRecord.FieldSize);
+		if (!TryResolveFieldIndex(record, field, out _, out var size) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, recordAddress, size,
+				out var cursor)) return false;
+		return TryTakeField(ref platform, ref cursor, record, field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -229,22 +249,118 @@ internal static class MuiColorRecordMemoryCodec
 		out uint value) where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, address, record, field,
-			out var fieldAddress))
-			return false;
-		value = platform.ReadUInt32(fieldAddress, 0);
-		return true;
+		switch (record)
+		{
+			case MuiColorRecordKind.PenSpec:
+				if (!MuiColorPenSpecCodec.TryReadRecord(ref platform, address,
+					out var penSpec)) return false;
+				switch (field)
+				{
+					case MuiColorRecordField.Kind: value = penSpec.Kind; return true;
+					case MuiColorRecordField.Scalar: value = penSpec.Scalar; return true;
+					case MuiColorRecordField.Red: value = penSpec.Red; return true;
+					case MuiColorRecordField.Green: value = penSpec.Green; return true;
+					case MuiColorRecordField.Blue: value = penSpec.Blue; return true;
+					case MuiColorRecordField.Reserved0: value = penSpec.Reserved0; return true;
+					case MuiColorRecordField.Reserved1: value = penSpec.Reserved1; return true;
+					case MuiColorRecordField.Reserved2: value = penSpec.Reserved2; return true;
+				}
+				return false;
+			case MuiColorRecordKind.State:
+				if (!MuiColorSpecialistStateCodec.TryReadStructural(ref platform,
+					address, out var state)) return false;
+				switch (field)
+				{
+					case MuiColorRecordField.Magic: value = state.Magic; return true;
+					case MuiColorRecordField.Class: value = state.Class; return true;
+					case MuiColorRecordField.Flags: value = state.Flags; return true;
+					case MuiColorRecordField.RenderInfo: value = state.RenderInfo.Raw; return true;
+					case MuiColorRecordField.DrawState: value = state.DrawState.Raw; return true;
+					case MuiColorRecordField.Pen: value = state.Pen; return true;
+					case MuiColorRecordField.SpecBlock: value = state.SpecBlock.Raw; return true;
+					case MuiColorRecordField.RgbBlock: value = state.RgbBlock.Raw; return true;
+					case MuiColorRecordField.Reference: value = state.Reference.Raw; return true;
+					case MuiColorRecordField.ModeID: value = state.ModeID; return true;
+					case MuiColorRecordField.Alpha: value = state.Alpha; return true;
+					case MuiColorRecordField.Entries: value = state.Entries.Raw; return true;
+					case MuiColorRecordField.Names: value = state.Names.Raw; return true;
+					case MuiColorRecordField.NotifyAttribute: value = state.NotifyAttribute; return true;
+					case MuiColorRecordField.NotifyValue: value = state.NotifyValue; return true;
+					case MuiColorRecordField.NotifyCount: value = state.NotifyCount; return true;
+				}
+				return false;
+			case MuiColorRecordKind.Rgb:
+				if (!MuiColorRgbCodec.TryReadRecord(ref platform, address,
+					out var rgb)) return false;
+				if (field == MuiColorRecordField.Red) value = rgb.Red;
+				else if (field == MuiColorRecordField.Green) value = rgb.Green;
+				else if (field == MuiColorRecordField.Blue) value = rgb.Blue;
+				else return false;
+				return true;
+			default:
+				return false;
+		}
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiColorRecordKind record, MuiColorRecordField field,
 		uint value) where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, address, record, field,
-			out var fieldAddress))
-			return false;
-		platform.WriteUInt32(fieldAddress, 0, value);
-		return true;
+		switch (record)
+		{
+			case MuiColorRecordKind.PenSpec:
+				if (!MuiColorPenSpecCodec.TryReadRecord(ref platform, address,
+					out var penSpec)) return false;
+				switch (field)
+				{
+					case MuiColorRecordField.Kind: penSpec.Kind = value; break;
+					case MuiColorRecordField.Scalar: penSpec.Scalar = value; break;
+					case MuiColorRecordField.Red: penSpec.Red = value; break;
+					case MuiColorRecordField.Green: penSpec.Green = value; break;
+					case MuiColorRecordField.Blue: penSpec.Blue = value; break;
+					case MuiColorRecordField.Reserved0: penSpec.Reserved0 = value; break;
+					case MuiColorRecordField.Reserved1: penSpec.Reserved1 = value; break;
+					case MuiColorRecordField.Reserved2: penSpec.Reserved2 = value; break;
+					default: return false;
+				}
+				return MuiColorPenSpecCodec.WriteRecord(ref platform, address,
+					penSpec);
+			case MuiColorRecordKind.State:
+				if (!MuiColorSpecialistStateCodec.TryReadStructural(ref platform,
+					address, out var state)) return false;
+				switch (field)
+				{
+					case MuiColorRecordField.Magic: state.Magic = value; break;
+					case MuiColorRecordField.Class: state.Class = value; break;
+					case MuiColorRecordField.Flags: state.Flags = value; break;
+					case MuiColorRecordField.RenderInfo: state.RenderInfo = APTR.FromPointer(value); break;
+					case MuiColorRecordField.DrawState: state.DrawState = APTR.FromPointer(value); break;
+					case MuiColorRecordField.Pen: state.Pen = value; break;
+					case MuiColorRecordField.SpecBlock: state.SpecBlock = APTR.FromPointer(value); break;
+					case MuiColorRecordField.RgbBlock: state.RgbBlock = APTR.FromPointer(value); break;
+					case MuiColorRecordField.Reference: state.Reference = APTR.FromPointer(value); break;
+					case MuiColorRecordField.ModeID: state.ModeID = value; break;
+					case MuiColorRecordField.Alpha: state.Alpha = value; break;
+					case MuiColorRecordField.Entries: state.Entries = APTR.FromPointer(value); break;
+					case MuiColorRecordField.Names: state.Names = APTR.FromPointer(value); break;
+					case MuiColorRecordField.NotifyAttribute: state.NotifyAttribute = value; break;
+					case MuiColorRecordField.NotifyValue: state.NotifyValue = value; break;
+					case MuiColorRecordField.NotifyCount: state.NotifyCount = value; break;
+					default: return false;
+				}
+				return MuiColorSpecialistStateCodec.WriteRecord(ref platform, address,
+					state);
+			case MuiColorRecordKind.Rgb:
+				if (!MuiColorRgbCodec.TryReadRecord(ref platform, address,
+					out var rgb)) return false;
+				if (field == MuiColorRecordField.Red) rgb.Red = value;
+				else if (field == MuiColorRecordField.Green) rgb.Green = value;
+				else if (field == MuiColorRecordField.Blue) rgb.Blue = value;
+				else return false;
+				return MuiColorRgbCodec.WriteRecord(ref platform, address, rgb);
+			default:
+				return false;
+		}
 	}
 }
 

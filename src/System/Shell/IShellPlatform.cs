@@ -17,6 +17,9 @@ public interface IShellPlatform : IAmigaGuestMemory
     /// </summary>
     bool TryReadCliDefaultStack(APTR cli, out int stackBytes);
 
+    /// <summary>Reads the CLI-owned active command-sequence failure limit.</summary>
+    bool TryReadCliFailureLimit(APTR cli, out uint failureLimit);
+
     /// <summary>
     /// Updates only the current CLI's default child-command stack.
     /// </summary>
@@ -103,16 +106,17 @@ public interface IShellPlatform : IAmigaGuestMemory
         uint back);
 
     /// <summary>
-    /// Displays a prompt, reads the user's bounded answer, and updates the
-    /// active script condition flag. Input/output ownership remains DOS/CLI
-    /// state rather than a Shell-managed stream.
+    /// Displays a prompt and returns the user's bounded Y/N/empty response.
+    /// Input/output ownership remains DOS/CLI state rather than a Shell-managed
+    /// stream; Ask's return level is recorded by the normal command path.
     /// </summary>
     bool TryAsk(
         APTR cli,
         BPTR input,
         BPTR output,
         APTR prompt,
-        uint promptLength);
+        uint promptLength,
+        out ShellAskResponse response);
 
     /// <summary>
     /// Evaluates one parsed IF condition against CLI/script state and records
@@ -186,19 +190,22 @@ public interface IShellPlatform : IAmigaGuestMemory
     /// </summary>
     bool TryManageResident(
         APTR cli,
-        BPTR output,
-        APTR name,
-        uint nameLength,
-        APTR file,
-        uint fileLength,
-        APTR alias,
-        uint aliasLength,
-        uint remove,
-        uint add,
-        uint replace,
-        uint force,
-        uint system,
-        uint defer);
+        in ShellResidentManagementRequest request);
+
+    /// <summary>
+    /// Reads the enabled state for a Shell internal-command identity. A
+    /// command which has no explicit DOS-owned state is enabled by default.
+    /// </summary>
+    bool TryGetInternalCommandEnabled(
+        APTR cli,
+        uint commandIdentity,
+        out uint enabled);
+
+    /// <summary>Changes the enabled state of one CLI-owned internal command.</summary>
+    bool TrySetInternalCommandEnabled(
+        APTR cli,
+        uint commandIdentity,
+        uint enabled);
 
     /// <summary>
     /// Creates a child CLI/Shell through the DOS scheduler. The optional
@@ -231,9 +238,9 @@ public interface IShellPlatform : IAmigaGuestMemory
         out int result);
 
     /// <summary>
-    /// Releases only resources marked as owned by a terminal continuation.
-    /// The DOS owner performs actual handle/record closure and may report a
-    /// retryable failure; parent-owned streams must never be inferred here.
+    /// Acknowledges a terminal continuation after DOS has retired its child.
+    /// The flags identify the continuation record's ownership; saved child
+    /// handles are historical snapshots and must never be closed here.
     /// </summary>
     bool TryReleaseShellContinuation(
         APTR cli,
@@ -349,6 +356,9 @@ public interface IShellPlatform : IAmigaGuestMemory
     /// otherwise the caller-owned decoded text becomes the prompt template.
     /// </summary>
     bool TrySetPrompt(APTR cli, APTR value, uint valueLength, uint reset);
+
+	/// <summary>Reads bytes from a DOS file handle; zero denotes EOF.</summary>
+	int Read(BPTR handle, APTR destination, uint length);
 
     /// <summary>
     /// Writes exactly the requested guest bytes to a DOS file handle, or a

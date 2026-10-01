@@ -21,9 +21,6 @@ internal struct MuiAreaShortHelpStateRecord
 {
 	internal const uint Size = 12;
 	internal const uint FieldSize = 4;
-	internal const uint MagicOffset = 0;
-	internal const uint TextOffset = 4;
-	internal const uint GenerationOffset = 8;
 	internal const uint Cookie = 0x41534850u; // 'ASHP'
 
 	internal uint Magic;
@@ -66,10 +63,14 @@ internal static class MuiAreaShortHelpStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaShortHelpStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiAreaShortHelpStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaShortHelpStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiAreaShortHelpStateRecordMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiAreaShortHelpStateField field, out uint value)
@@ -88,23 +89,20 @@ internal static class MuiAreaShortHelpStateFieldCursorCodec
 	}
 }
 
-// Fixed Area ShortHelp state is transferred as a named record. Numeric guest
-// positions are confined to this ABI adapter; the compatibility cursor above
-// remains available only to legacy callers and malformed-state diagnostics.
+// Fixed Area ShortHelp state is transferred as a named record. The typed
+// cursor is the canonical address path; the enum overload below is only a
+// bounded compatibility adapter for existing callers.
 internal static class MuiAreaShortHelpStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiAreaShortHelpStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiAreaShortHelpStateField field,
+		out uint index)
 	{
-		if (field == MuiAreaShortHelpStateField.Magic)
-			offset = MuiAreaShortHelpStateRecord.MagicOffset;
-		else if (field == MuiAreaShortHelpStateField.Text)
-			offset = MuiAreaShortHelpStateRecord.TextOffset;
-		else if (field == MuiAreaShortHelpStateField.Generation)
-			offset = MuiAreaShortHelpStateRecord.GenerationOffset;
+		if (field == MuiAreaShortHelpStateField.Magic) index = 0;
+		else if (field == MuiAreaShortHelpStateField.Text) index = 1;
+		else if (field == MuiAreaShortHelpStateField.Generation) index = 2;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -114,13 +112,34 @@ internal static class MuiAreaShortHelpStateRecordMemoryCodec
 		APTR record, MuiAreaShortHelpStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiAreaShortHelpStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaShortHelpStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiAreaShortHelpStateRecord.Size) &&
-			platform.IsMapped(address, MuiAreaShortHelpStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiAreaShortHelpStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiAreaShortHelpStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiAreaShortHelpStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

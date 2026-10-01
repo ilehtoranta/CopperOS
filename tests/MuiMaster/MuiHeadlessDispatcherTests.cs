@@ -347,8 +347,17 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiDataspaceMessageMemoryCodec.TryGetAddress(ref platform,
 			packet, MuiDataspacePacketKind.Add, MuiDataspaceField.Data,
 			out var dataAddress));
-		Assert.Equal(packet.Raw + MuiDataspaceAddMessage.DataOffset,
-			dataAddress.Raw);
+		Assert.Equal(packet.Raw + 4u, dataAddress.Raw);
+		var typedCursor = new MuiDataspaceFieldCursor
+		{
+			Message = packet,
+			Packet = MuiDataspacePacketKind.Add,
+			Field = MuiDataspaceField.Data,
+		};
+		Assert.True(MuiDataspaceFieldCursorCodec.TryGetAddress(ref platform,
+			typedCursor, out var typedAddress, out var typedFieldSize));
+		Assert.Equal(dataAddress.Raw, typedAddress.Raw);
+		Assert.Equal(4u, typedFieldSize);
 		Assert.True(MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform,
 			packet, MuiDataspacePacketKind.Add, MuiDataspaceField.Length,
 			unchecked((uint)-12)));
@@ -435,8 +444,9 @@ public sealed class MuiHeadlessDispatcherTests
 		cursor.Packet = MuiStorePacketKind.DatamapSet;
 		cursor.Field = MuiStoreField.MethodId;
 		Assert.True(MuiStoreFieldCursorCodec.TryGetAddress(ref platform,
-			cursor, out var address));
+			cursor, out var address, out var fieldSize));
 		Assert.Equal(packet.Raw, address.Raw);
+		Assert.Equal(4u, fieldSize);
 		cursor.Field = MuiStoreField.Data;
 		Assert.True(MuiStoreFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out address));
@@ -498,8 +508,9 @@ public sealed class MuiHeadlessDispatcherTests
 		cursor.Packet = MuiFamilyPacketKind.Child;
 		cursor.Field = MuiFamilyPacketField.MethodId;
 		Assert.True(MuiFamilyPacketFieldCursorCodec.TryGetAddress(ref platform,
-			cursor, out var address));
+			cursor, out var address, out var fieldSize));
 		Assert.Equal(packet.Raw, address.Raw);
+		Assert.Equal(4u, fieldSize);
 		cursor.Field = MuiFamilyPacketField.Object;
 		Assert.True(MuiFamilyPacketFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out address));
@@ -1863,14 +1874,12 @@ public sealed class MuiHeadlessDispatcherTests
 			packet, MuiNotifyWritePacketKind.WriteLong,
 			MuiNotifyWritePacketField.Value, MuiWriteLongMessage.Size,
 			out var directValueAddress));
-		Assert.Equal(packet.Raw + MuiWriteLongMessage.ValueOffset,
-			directValueAddress.Raw);
+		Assert.Equal(packet.Raw + 4, directValueAddress.Raw);
 		Assert.True(MuiNotifyWritePacketMemoryCodec.TryGetAddress(ref platform,
 			packet, MuiNotifyWritePacketKind.WriteString,
 			MuiNotifyWritePacketField.String, MuiWriteStringMessage.Size,
 			out var directStringAddress));
-		Assert.Equal(packet.Raw + MuiWriteStringMessage.StringOffset,
-			directStringAddress.Raw);
+		Assert.Equal(packet.Raw + 4, directStringAddress.Raw);
 		var cursor = default(MuiNotifyWritePacketFieldCursor);
 		cursor.Message = packet;
 		cursor.Packet = MuiNotifyWritePacketKind.WriteLong;
@@ -2716,6 +2725,10 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiUpdateConfigPacketFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out var address));
 		Assert.Equal(message.Raw, address.Raw);
+		Assert.True(MuiUpdateConfigPacketFieldCursorCodec.TryGetAddress(
+			ref platform, cursor, out var typedAddress, out var typedSize));
+		Assert.Equal(address, typedAddress);
+		Assert.Equal(4u, typedSize);
 		cursor.Field = MuiUpdateConfigPacketField.CfgId;
 		Assert.True(MuiUpdateConfigPacketFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out address));

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>CopperOS.Commands.Break</AssemblyName>
+    <RootNamespace>CopperOS.Commands</RootNamespace>
+    <RuntimeIdentifier>amiga-m68k</RuntimeIdentifier>
+    <CopperOSCommandName>Break</CopperOSCommandName>
+    <CopperSharpEntry>CopperOS.Commands.Entries.BreakEntry::Main</CopperSharpEntry>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Common\CopperOS.Commands.Common.csproj" />
+  </ItemGroup>
+</Project>

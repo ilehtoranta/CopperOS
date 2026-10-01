@@ -86,6 +86,22 @@ public sealed class MuiTextPreParseAdmissionTests
 		};
 		Assert.True(MuiTextPreParseStateRecordCodec.Write(ref platform,
 			recordAddress, value));
+		var fieldCursor = new MuiTextPreParseStateFieldCursor
+		{
+			Record = recordAddress,
+			Field = MuiTextPreParseStateField.PreParse,
+		};
+		Assert.True(MuiTextPreParseStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out var cursorPreParseAddress));
+		Assert.Equal(0x1D64u, cursorPreParseAddress.Raw);
+		Assert.True(MuiTextPreParseStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out var typedCursorPreParseAddress, out var typedCursorFieldSize));
+		Assert.Equal(cursorPreParseAddress, typedCursorPreParseAddress);
+		Assert.Equal(MuiTextPreParseStateRecord.FieldSize, typedCursorFieldSize);
+		Assert.True(MuiTextPreParseStateRecordMemoryCodec.TryGetAddress(ref platform,
+			fieldCursor, out var memoryCursorPreParseAddress, out var memoryCursorFieldSize));
+		Assert.Equal(typedCursorPreParseAddress, memoryCursorPreParseAddress);
+		Assert.Equal(typedCursorFieldSize, memoryCursorFieldSize);
 		Assert.True(MuiTextPreParseStateRecordMemoryCodec.TryGetAddress(ref platform,
 			recordAddress, MuiTextPreParseStateField.PreParse,
 			out var typedPreParseAddress));
@@ -106,6 +122,13 @@ public sealed class MuiTextPreParseAdmissionTests
 		Assert.Equal(MuiTextPreParseStateRecord.Cookie, typedMagic);
 		Assert.False(MuiTextPreParseStateRecordMemoryCodec.TryReadUInt32(ref platform,
 			recordAddress, (MuiTextPreParseStateField)255, out _));
+		fieldCursor.Field = (MuiTextPreParseStateField)255;
+		Assert.False(MuiTextPreParseStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
+		fieldCursor.Record = APTR.Null;
+		fieldCursor.Field = MuiTextPreParseStateField.PreParse;
+		Assert.False(MuiTextPreParseStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
 		Assert.True(MuiTextPreParseStateRecordCodec.TryReadStructural(ref platform,
 			recordAddress, out var typedUpdated));
 		Assert.Equal(MuiTextPreParseStateRecord.Cookie, typedUpdated.Magic);

@@ -185,6 +185,10 @@ public sealed class MuiPopSpecialistTests
 		Assert.True(MuiPopSpecialistRecordFieldCursorCodec.TryGetAddress(ref p,
 			cursor, out fieldAddress));
 		Assert.Equal(0x3068u, fieldAddress.Raw);
+		Assert.True(MuiPopSpecialistRecordFieldCursorCodec.TryGetAddress(ref p,
+			cursor, out fieldAddress, out var fieldSize));
+		Assert.Equal(0x3068u, fieldAddress.Raw);
+		Assert.Equal(4u, fieldSize);
 		Assert.True(MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref p,
 			cursor.Address, MuiPopSpecialistRecordField.Flags, 0xA5A5u));
 		Assert.True(MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref p,
@@ -209,6 +213,11 @@ public sealed class MuiPopSpecialistTests
 		Assert.True(MuiPopSpecialistRecordFieldMemoryCodec.TryGetAddress(ref p,
 			address, MuiPopSpecialistRecordField.ArrayCount, out var fieldAddress));
 		Assert.Equal(address.Raw + 52u, fieldAddress.Raw);
+		Assert.True(MuiPopSpecialistRecordFieldMemoryCodec.TryGetAddress(ref p,
+			address, MuiPopSpecialistRecordField.ArrayCount, out fieldAddress,
+			out var fieldSize));
+		Assert.Equal(address.Raw + 52u, fieldAddress.Raw);
+		Assert.Equal(4u, fieldSize);
 		Assert.False(MuiPopSpecialistRecordFieldMemoryCodec.TryGetAddress(ref p,
 			address, (MuiPopSpecialistRecordField)0xFF, out _));
 	}
@@ -960,6 +969,10 @@ public sealed class MuiPopSpecialistTests
 		Assert.True(MuiPopSpecialistFieldCursorCodec.TryGetAddress(ref p,
 			cursor, out address));
 		Assert.Equal(Packet.Raw + 8, address.Raw);
+		Assert.True(MuiPopSpecialistFieldCursorCodec.TryGetAddress(ref p,
+			cursor, out address, out var fieldSize));
+		Assert.Equal(Packet.Raw + 8, address.Raw);
+		Assert.Equal(4u, fieldSize);
 
 		Assert.True(MuiPopSpecialistFieldCursorCodec.TryWriteUInt32(ref p,
 			Packet, MuiPopSpecialistPacketKind.Close,

@@ -47,23 +47,24 @@ internal struct MuiObjectPersistencePacketFieldCursor
 // compatibility callers and adapter-focused tests.
 internal static class MuiObjectPersistenceMessageMemoryCodec
 {
-	private static bool TryResolve(MuiObjectPersistencePacketField field,
-		out uint offset, out uint size)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiObjectPersistencePacketField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
+		address = APTR.Null;
 		if (field == MuiObjectPersistencePacketField.MethodId)
 		{
-			offset = MuiObjectPersistenceMethodMessage.MethodIdOffset;
-			size = MuiObjectPersistenceMethodMessage.Size;
-			return true;
+			return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiObjectPersistenceMethodMessage.FieldSize, out address);
 		}
 		if (field == MuiObjectPersistencePacketField.Dataspace)
 		{
-			offset = MuiObjectPersistenceMessage.DataspaceOffset;
-			size = MuiObjectPersistenceMessage.Size;
-			return true;
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiObjectPersistenceMessage.FieldSize, out _)) return false;
+			return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiObjectPersistenceMessage.FieldSize, out address);
 		}
-		offset = 0;
-		size = 0;
 		return false;
 	}
 
@@ -72,11 +73,19 @@ internal static class MuiObjectPersistenceMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset, out var size) || message.IsNull ||
-			message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(message, size)) return false;
-		address = APTR.FromPointer(message.Raw + offset);
-		return platform.IsMapped(address, MuiObjectPersistenceMessage.FieldSize);
+		if (field == MuiObjectPersistencePacketField.MethodId)
+		{
+			if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+				MuiObjectPersistenceMethodMessage.Size, out var methodCursor)) return false;
+			return TryTakeField(ref platform, ref methodCursor, field, out address);
+		}
+		if (field == MuiObjectPersistencePacketField.Dataspace)
+		{
+			if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+				MuiObjectPersistenceMessage.Size, out var packetCursor)) return false;
+			return TryTakeField(ref platform, ref packetCursor, field, out address);
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -84,9 +93,13 @@ internal static class MuiObjectPersistenceMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, message, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (field == MuiObjectPersistencePacketField.MethodId)
+			return MuiObjectPersistenceMethodHeaderCodec.TryReadValue(ref platform,
+				message, out value);
+		if (field != MuiObjectPersistencePacketField.Dataspace ||
+			!MuiObjectPersistenceMessageStructCodec.TryRead(ref platform, message,
+				out var packet)) return false;
+		value = packet.Dataspace.Raw;
 		return true;
 	}
 
@@ -94,10 +107,15 @@ internal static class MuiObjectPersistenceMessageMemoryCodec
 		APTR message, MuiObjectPersistencePacketField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, message, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (field == MuiObjectPersistencePacketField.MethodId)
+			return MuiObjectPersistenceMethodHeaderCodec.WriteValue(ref platform,
+				message, value);
+		if (field != MuiObjectPersistencePacketField.Dataspace ||
+			!MuiObjectPersistenceMessageStructCodec.TryRead(ref platform, message,
+				out var packet)) return false;
+		packet.Dataspace = APTR.FromPointer(value);
+		return MuiObjectPersistenceMessageStructCodec.TryWrite(ref platform,
+			message, packet.MethodId, packet.Dataspace);
 	}
 }
 

@@ -70,10 +70,14 @@ internal static class MuiSelectgroupActiveStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiSelectgroupActiveStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiSelectgroupActiveStateRecordMemoryCodec.TryGetAddress(
-			ref platform, cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiSelectgroupActiveStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiSelectgroupActiveStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiSelectgroupActiveStateField field, out uint value)
@@ -98,33 +102,53 @@ internal static class MuiSelectgroupActiveStateFieldCursorCodec
 // for compatibility and malformed-state diagnostics.
 internal static class MuiSelectgroupActiveStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiSelectgroupActiveStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiSelectgroupActiveStateField field,
+		out uint index)
 	{
-		switch (field)
+		if (field == MuiSelectgroupActiveStateField.Magic)
+			index = 0;
+		else if (field == MuiSelectgroupActiveStateField.Active)
+			index = 1;
+		else
 		{
-			case MuiSelectgroupActiveStateField.Magic:
-				offset = MuiSelectgroupActiveStateRecord.MagicOffset;
-				return true;
-			case MuiSelectgroupActiveStateField.Active:
-				offset = MuiSelectgroupActiveStateRecord.ActiveOffset;
-				return true;
+			index = uint.MaxValue;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiSelectgroupActiveStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiSelectgroupActiveStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiSelectgroupActiveStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
-			MuiSelectgroupActiveStateRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address,
-			MuiSelectgroupActiveStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiSelectgroupActiveStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiSelectgroupActiveStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiSelectgroupActiveStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -132,8 +156,13 @@ internal static class MuiSelectgroupActiveStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiSelectgroupActiveStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiSelectgroupActiveStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiSelectgroupActiveStateField.Active)
+			value = state.Active;
+		else return false;
 		return true;
 	}
 
@@ -141,9 +170,15 @@ internal static class MuiSelectgroupActiveStateRecordMemoryCodec
 		APTR record, MuiSelectgroupActiveStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiSelectgroupActiveStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiSelectgroupActiveStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiSelectgroupActiveStateField.Active)
+			state.Active = value;
+		else return false;
+		return MuiSelectgroupActiveStateRecordCodec.WriteRecord(ref platform,
+			record, state);
 	}
 }
 

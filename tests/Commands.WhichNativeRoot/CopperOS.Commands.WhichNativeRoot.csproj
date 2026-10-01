@@ -10,8 +10,8 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\..\src\Commands\Native\NativeCommandArguments.cs" Link="NativeCommandArguments.cs" />
-    <Compile Include="..\..\src\Commands\Native\NativeCommandStartup.cs" Link="NativeCommandStartup.cs" />
-    <Compile Include="..\..\src\Commands\Native\Workbench31WhichCommand.cs" Link="Workbench31WhichCommand.cs" />
+    <Compile Include="..\..\src\Commands\Common\NativeCommandArguments.cs" Link="NativeCommandArguments.cs" />
+    <Compile Include="..\..\src\Commands\Common\NativeCommandStartup.cs" Link="NativeCommandStartup.cs" />
+    <Compile Include="..\..\src\Commands\Which\Native\Workbench31WhichCommand.cs" Link="Workbench31WhichCommand.cs" />
   </ItemGroup>
 </Project>

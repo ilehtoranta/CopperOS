@@ -57,10 +57,14 @@ internal static class MuiBodychunkFormatStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiBodychunkFormatStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiBodychunkFormatStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiBodychunkFormatStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiBodychunkFormatStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiBodychunkFormatStateField field, out uint value)
@@ -86,20 +90,20 @@ internal static class MuiBodychunkFormatStateFieldCursorCodec
 // malformed-state diagnostics.
 internal static class MuiBodychunkFormatStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiBodychunkFormatStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiBodychunkFormatStateField field,
+		out uint index)
 	{
 		if (field == MuiBodychunkFormatStateField.Magic)
-			offset = MuiBodychunkFormatStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiBodychunkFormatStateField.Compression)
-			offset = MuiBodychunkFormatStateRecord.CompressionOffset;
+			index = 1;
 		else if (field == MuiBodychunkFormatStateField.Depth)
-			offset = MuiBodychunkFormatStateRecord.DepthOffset;
+			index = 2;
 		else if (field == MuiBodychunkFormatStateField.Masking)
-			offset = MuiBodychunkFormatStateRecord.MaskingOffset;
+			index = 3;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -109,13 +113,34 @@ internal static class MuiBodychunkFormatStateRecordMemoryCodec
 		APTR record, MuiBodychunkFormatStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiBodychunkFormatStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiBodychunkFormatStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiBodychunkFormatStateRecord.Size) &&
-			platform.IsMapped(address, MuiBodychunkFormatStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiBodychunkFormatStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiBodychunkFormatStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiBodychunkFormatStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -177,8 +202,8 @@ internal static class MuiBodychunkFormatStateRecordMemoryCodec
 	{
 		value = 0;
 		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+			out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -186,7 +211,7 @@ internal static class MuiBodychunkFormatStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
+		MuiGuestUlongStorageCodec.WriteValue(ref platform, address, value);
 		return true;
 	}
 }

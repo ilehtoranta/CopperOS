@@ -24,6 +24,19 @@ public sealed class MuiSliderPresentationStructAdapterTests
 			ref platform, address, MuiSliderPresentationStateField.Quiet,
 			out var quietAddress));
 		Assert.Equal(0x3508u, quietAddress.Raw);
+		var quietCursor = new MuiSliderPresentationStateFieldCursor
+		{
+			Record = address,
+			Field = MuiSliderPresentationStateField.Quiet,
+		};
+		Assert.True(MuiSliderPresentationStateFieldCursorCodec.TryGetAddress(
+			ref platform, quietCursor, out var cursorQuiet, out var cursorFieldSize));
+		Assert.Equal(quietAddress, cursorQuiet);
+		Assert.Equal(MuiSliderPresentationStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiSliderPresentationStateRecordMemoryCodec.TryGetAddress(
+			ref platform, quietCursor, out var memoryQuiet, out var memoryFieldSize));
+		Assert.Equal(cursorQuiet, memoryQuiet);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiSliderPresentationStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiSliderPresentationStateField.Horizontal, 0));
 		Assert.True(MuiSliderPresentationStateRecordCodec.TryReadRecord(
@@ -35,5 +48,12 @@ public sealed class MuiSliderPresentationStructAdapterTests
 			MuiSliderPresentationStateField.Magic, out _));
 		Assert.False(MuiSliderPresentationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiSliderPresentationStateField.Magic, out _));
+		quietCursor.Field = (MuiSliderPresentationStateField)255;
+		Assert.False(MuiSliderPresentationStateFieldCursorCodec.TryGetAddress(
+			ref platform, quietCursor, out _, out _));
+		quietCursor.Record = APTR.Null;
+		quietCursor.Field = MuiSliderPresentationStateField.Quiet;
+		Assert.False(MuiSliderPresentationStateFieldCursorCodec.TryGetAddress(
+			ref platform, quietCursor, out _, out _));
 	}
 }

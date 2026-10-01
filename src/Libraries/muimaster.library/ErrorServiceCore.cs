@@ -44,34 +44,57 @@ internal struct MuiErrorServiceStateFieldCursor
 	internal MuiErrorServiceStateField Field;
 }
 
-// Struct-first guest-memory adapter for the process-local error record.
+// Struct-first guest-memory adapter for the retired provisional error record.
 internal static class MuiErrorServiceStateMemoryCodec
 {
-	private static bool TryResolve(MuiErrorServiceStateField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiErrorServiceStateField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		offset = field switch
+		address = APTR.Null;
+		if (field == MuiErrorServiceStateField.Magic)
+			return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiErrorServiceStateRecord.FieldSize, out address);
+		if (field == MuiErrorServiceStateField.Version)
 		{
-			MuiErrorServiceStateField.Magic => MuiErrorServiceStateRecord.MagicOffset,
-			MuiErrorServiceStateField.Version => MuiErrorServiceStateRecord.VersionOffset,
-			MuiErrorServiceStateField.Error => MuiErrorServiceStateRecord.ErrorOffset,
-			MuiErrorServiceStateField.Sequence => MuiErrorServiceStateRecord.SequenceOffset,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiErrorServiceStateRecord.FieldSize, out _)) return false;
+			return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiErrorServiceStateRecord.FieldSize, out address);
+		}
+		if (field == MuiErrorServiceStateField.Error)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiErrorServiceStateRecord.FieldSize, out _) ||
+				!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiErrorServiceStateRecord.FieldSize, out _)) return false;
+			return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiErrorServiceStateRecord.FieldSize, out address);
+		}
+		if (field == MuiErrorServiceStateField.Sequence)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiErrorServiceStateRecord.FieldSize, out _) ||
+				!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiErrorServiceStateRecord.FieldSize, out _) ||
+				!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiErrorServiceStateRecord.FieldSize, out _)) return false;
+			return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiErrorServiceStateRecord.FieldSize, out address);
+		}
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiErrorServiceStateField field, out APTR address)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiErrorServiceStateRecord.Size))
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiErrorServiceStateRecord.FieldSize);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiErrorServiceStateRecord.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address)) return false;
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -135,9 +158,9 @@ internal static class MuiErrorServiceStateFieldCursorCodec
 		value);
 }
 
-// Sequential codec for the complete process-local error record.  The field
-// cursor remains a compatibility/diagnostic surface; live error state uses
-// declaration-ordered named members through the bounded guest cursor.
+// Sequential codec for the complete legacy error record. The field cursor is
+// retained for compatibility tests; the exported error vectors no longer use
+// this storage and instead call DOS IoErr/SetIoErr.
 internal static class MuiErrorServiceStateStructCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -215,13 +238,13 @@ public static class MuiErrorServiceRecordPacketCore
 	}
 }
 
-// Native-safe MUI_Error/MUI_SetError state. The public MUI API exposes a
-// process-local error value; CopperOS stores that value in an explicit guest
-// record so the production path has no managed static state or runtime service.
+// Retained non-native model of the old provisional error record. The exported
+// MorphOS vectors no longer call this helper; they forward to DOS IoErr and
+// SetIoErr. Keep this state core isolated from native vector behavior.
 public static class MuiErrorServiceCore
 {
 	public static bool Initialize<TPlatform>(ref TPlatform platform,
-		APTR serviceState) where TPlatform : struct, IMuiServicePlatform
+		APTR serviceState) where TPlatform : struct, IMuiGuestMemory
 	{
 		if (serviceState.IsNull ||
 			!platform.IsMapped(serviceState, MuiErrorServiceStateRecord.Size))
@@ -237,9 +260,9 @@ public static class MuiErrorServiceCore
 		return MuiErrorServiceStateCodec.Write(ref platform, serviceState, record);
 	}
 
-	// MUI_Error(). An uninitialised service has the documented neutral value.
+	// An uninitialised service returns zero under the provisional local policy.
 	public static int Error<TPlatform>(ref TPlatform platform, APTR serviceState)
-		where TPlatform : struct, IMuiServicePlatform
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!Ready(ref platform, serviceState) ||
 			!MuiErrorServiceStateCodec.TryRead(ref platform, serviceState,
@@ -247,10 +270,10 @@ public static class MuiErrorServiceCore
 		return unchecked((int)record.Error);
 	}
 
-	// MUI_SetError() returns the previous error value, then publishes the updated
-	// value. The sequence is diagnostic guest state and is not part of the ABI.
+	// Returning the previous value is provisional CopperOS policy, not an
+	// established MorphOS contract. Sequence is diagnostic guest state only.
 	public static int SetError<TPlatform>(ref TPlatform platform,
-		APTR serviceState, int error) where TPlatform : struct, IMuiServicePlatform
+		APTR serviceState, int error) where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!Ready(ref platform, serviceState)) return 0;
 		if (!MuiErrorServiceStateCodec.TryRead(ref platform, serviceState,
@@ -264,7 +287,7 @@ public static class MuiErrorServiceCore
 	}
 
 	private static bool Ready<TPlatform>(ref TPlatform platform, APTR state)
-		where TPlatform : struct, IMuiServicePlatform =>
+		where TPlatform : struct, IMuiGuestMemory =>
 		!state.IsNull && MuiErrorServiceStateCodec.TryRead(ref platform, state,
 			out var record) && record.Magic == MuiErrorServiceLayout.Magic &&
 		record.Version == MuiErrorServiceLayout.Version;

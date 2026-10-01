@@ -23,7 +23,7 @@ internal static class Program
         try
         {
             IoTestBus.Require(args.Length == 4,
-                "usage: Exe2ArcIoNativeExecution <generated.hunk> <68000|68020|68040> <new-report.json> <exe2arc-rar4-cab-dos-components>");
+                "usage: Exe2ArcIoNativeExecution <generated.hunk> <68000|68020|68040> <new-report.json> <exe2arc-rar4-cab-ace-dos-components>");
             IoTestBus.Require(args[3] == IoCases.Suite, "Unknown suite; no fallback or skipped cases.");
             var model = args[1] switch
             {
@@ -58,7 +58,7 @@ internal static class Program
         var report = new
         {
             schemaVersion = 1, status, suite = args.ElementAtOrDefault(3), expectedSuite = IoCases.Suite,
-            scope = "generated-RAR4-CAB-scanning-copy-with-supplied-DOS-vectors",
+            scope = "generated-RAR4-CAB-ACE-scanning-copy-with-supplied-DOS-vectors",
             cpu = args.ElementAtOrDefault(1), inputHunk = args.ElementAtOrDefault(0), imageSha256 = imageHash,
             imageBytes, failure, lastFailure = fixture?.LastFailure, lastCase = fixture?.ActiveCase,
             expectedNativeInvocations = IoCases.ExpectedInvocations,
@@ -107,7 +107,7 @@ internal static class Program
             }
         }
         if (status != "passed") return 1;
-        Console.WriteLine($"PASS {args[1]}: {fixture!.Returned.Count} native Exe2Arc DOS component invocations; one shared image.");
+        Console.WriteLine($"PASS {args[1]}: {fixture!.Returned.Count} native Exe2Arc DOS component invocations (RAR4/CAB/ACE); one shared image.");
         return 0;
     }
 
@@ -121,11 +121,11 @@ internal static class Program
             .Append(Path.Combine(executor, "CopperOS.Commands.Exe2ArcIoNativeExecution.csproj"))
             .Append(Path.Combine(probe, "CopperOS.Commands.Exe2ArcIoNativeRoot.csproj"))
             .Append(Path.Combine(root, "tests", "Commands.NativeExecution", "HunkImage.cs"))
-            .Append(Path.Combine(root, "src", "Commands", "Exe2ArcHeaderProbe.cs"))
-            .Append(Path.Combine(root, "src", "Commands", "Exe2ArcIo.cs"))
-            .Append(Path.Combine(root, "src", "Commands", "Exe2ArcForwardScanner.cs"))
-            .Append(Path.Combine(root, "src", "Commands", "Exe2ArcPayloadCopy.cs"))
-            .Append(Path.Combine(root, "src", "Commands", "Native", "NativeExe2ArcIo.cs"))
+            .Append(Path.Combine(root, "src", "Commands", "Exe2Arc", "Exe2ArcHeaderProbe.cs"))
+            .Append(Path.Combine(root, "src", "Commands", "Exe2Arc", "Exe2ArcIo.cs"))
+            .Append(Path.Combine(root, "src", "Commands", "Exe2Arc", "Exe2ArcForwardScanner.cs"))
+            .Append(Path.Combine(root, "src", "Commands", "Exe2Arc", "Exe2ArcPayloadCopy.cs"))
+            .Append(Path.Combine(root, "src", "Commands", "Exe2Arc", "Native", "NativeExe2ArcIo.cs"))
             .Append(Path.Combine(root, "CopperOS.Portable.props"));
         return files.Order(StringComparer.Ordinal).Select(p => new AuditFile(Path.GetFullPath(p), Hash(p))).ToArray();
     }

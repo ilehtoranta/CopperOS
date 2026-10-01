@@ -213,8 +213,9 @@ public sealed class MuiVirtgroupAdmissionTests
 		Assert.True(MuiVirtgroupInputRecordMemoryCodec.TryGetAddress(ref platform,
 			displayAddress, MuiVirtgroupInputRecordKind.Display,
 			MuiVirtgroupInputField.Height,
-			out var heightAddress));
+			out var heightAddress, out var inputFieldSize));
 		Assert.Equal(0x1A10u, heightAddress.Raw);
+		Assert.Equal(4u, inputFieldSize);
 		Assert.True(MuiVirtgroupInputRecordMemoryCodec.TryGetAddress(ref platform,
 			pointerAddress, MuiVirtgroupInputRecordKind.Pointer,
 			MuiVirtgroupInputField.LastY,
@@ -224,6 +225,21 @@ public sealed class MuiVirtgroupAdmissionTests
 			ref platform, policyAddress, MuiVirtgroupPolicyStateField.TryFit,
 			out var tryFitAddress));
 		Assert.Equal(0x1A78u, tryFitAddress.Raw);
+		var policyCursor = new MuiVirtgroupPolicyStateFieldCursor
+		{
+			Record = policyAddress,
+			Field = MuiVirtgroupPolicyStateField.TryFit,
+		};
+		Assert.True(MuiVirtgroupPolicyStateFieldCursorCodec.TryGetAddress(
+			ref platform, policyCursor, out var cursorTryFitAddress,
+			out var fieldSize));
+		Assert.Equal(tryFitAddress, cursorTryFitAddress);
+		Assert.Equal(MuiVirtgroupPolicyStateRecord.FieldSize, fieldSize);
+		Assert.True(MuiVirtgroupPolicyStateRecordMemoryCodec.TryGetAddress(
+			ref platform, policyCursor, out var memoryCursorAddress,
+			out var memoryFieldSize));
+		Assert.Equal(tryFitAddress, memoryCursorAddress);
+		Assert.Equal(MuiVirtgroupPolicyStateRecord.FieldSize, memoryFieldSize);
 		Assert.True(MuiVirtgroupInputRecordMemoryCodec.TryReadUInt32(ref platform,
 			displayAddress, MuiVirtgroupInputRecordKind.Display,
 			MuiVirtgroupInputField.Left,
@@ -248,6 +264,10 @@ public sealed class MuiVirtgroupAdmissionTests
 			MuiVirtgroupInputField.Magic, out _));
 		Assert.False(MuiVirtgroupPolicyStateRecordMemoryCodec.TryGetAddress(
 			ref platform, policyAddress, (MuiVirtgroupPolicyStateField)255, out _));
+		policyCursor.Record = APTR.Null;
+		policyCursor.Field = MuiVirtgroupPolicyStateField.Magic;
+		Assert.False(MuiVirtgroupPolicyStateFieldCursorCodec.TryGetAddress(
+			ref platform, policyCursor, out _, out _));
 		Assert.False(MuiVirtgroupPolicyStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

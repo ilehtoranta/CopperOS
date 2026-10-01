@@ -75,7 +75,10 @@ public static class MuiWindowPublicCore
 	}
 
 	public const uint Window = 0x80426A42;
+	public const uint Activate = 0x80428D2F;
 	public const uint Open = 0x80428AA0;
+	public const uint ActiveObject = 0x80427925;
+	public const uint DefaultObject = 0x804294D7;
 	public const uint Id = 0x804201BD;
 	public const uint CloseRequest = 0x8042E86E;
 	public const uint RootObject = 0x8042CBA5;
@@ -120,6 +123,23 @@ public static class MuiWindowPublicCore
 	public const uint Backdrop = 0x8042C0BB;
 	public const uint Borderless = 0x80429B79;
 	public const uint PanelWindow = 0x80429528;
+
+	internal static bool TryGetActivationValue(uint eventClass,
+		out uint value)
+	{
+		if ((eventClass & (uint)IDCMPFlags.ActiveWindow) != 0)
+		{
+			value = 1;
+			return true;
+		}
+		if ((eventClass & (uint)IDCMPFlags.InactiveWindow) != 0)
+		{
+			value = 0;
+			return true;
+		}
+		value = 0;
+		return false;
+	}
 
 	private const uint NativeWindow = 0x7FFE0011;
 	private const uint MenuNoMenu = uint.MaxValue;
@@ -735,6 +755,7 @@ public static class MuiWindowPublicCore
 	// handle Window.mui (which is outside the common-control classifier).
 	internal static bool IsPublicGetterAttribute(uint attribute) =>
 		attribute == Window || attribute == Open || attribute == Id ||
+		attribute == Activate ||
 		attribute == CloseRequest || attribute == RootObject ||
 		attribute == DisableKeys || attribute == Sleep || attribute == Menu ||
 		attribute == NoMenus || attribute == HasAlpha || attribute == Opacity ||
@@ -871,6 +892,7 @@ public static class MuiWindowPublicCore
 			return true;
 		}
 		var storage = attribute == Window ? NativeWindow :
+			attribute == Activate ? Activate :
 			attribute == Open ? Open : attribute == Id ? Id : attribute == CloseRequest ? CloseRequest :
 			attribute == DisableKeys ? DisableKeys :
 			attribute == NoMenus ? NoMenus : attribute == HasAlpha ? HasAlpha :

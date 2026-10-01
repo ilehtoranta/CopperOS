@@ -73,61 +73,65 @@ internal struct MuiWindowEventStateFieldCursor
 
 internal static class MuiWindowEventStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiWindowEventStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiWindowEventStateField field,
+		out uint index)
 	{
-		if (field == MuiWindowEventStateField.Magic)
-			offset = MuiWindowEventStateRecord.MagicOffset;
-		else if (field == MuiWindowEventStateField.CloseRequest)
-			offset = MuiWindowEventStateRecord.CloseRequestOffset;
-		else if (field == MuiWindowEventStateField.InputEvent)
-			offset = MuiWindowEventStateRecord.InputEventOffset;
-		else if (field == MuiWindowEventStateField.MouseObject)
-			offset = MuiWindowEventStateRecord.MouseObjectOffset;
-		else
+		index = field switch
 		{
-			offset = 0;
-			return false;
-		}
-		return true;
+			MuiWindowEventStateField.Magic => 0,
+			MuiWindowEventStateField.CloseRequest => 1,
+			MuiWindowEventStateField.InputEvent => 2,
+			MuiWindowEventStateField.MouseObject => 3,
+			_ => uint.MaxValue,
+		};
+		return index != uint.MaxValue;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiWindowEventStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiWindowEventStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiWindowEventStateRecord.Size))
-			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, MuiWindowEventStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiWindowEventStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiWindowEventStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiWindowEventStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiWindowEventStateField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiWindowEventStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiWindowEventStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiWindowEventStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiWindowEventStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		return MuiWindowEventStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
 	}
 }
 
@@ -136,32 +140,52 @@ internal static class MuiWindowEventStateFieldCursorCodec
 // adapter owns only their fixed four-byte guest representation.
 internal static class MuiWindowEventStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiWindowEventStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiWindowEventStateField field,
+		out uint index)
 	{
-		if (field == MuiWindowEventStateField.Magic)
-			offset = MuiWindowEventStateRecord.MagicOffset;
-		else if (field == MuiWindowEventStateField.CloseRequest)
-			offset = MuiWindowEventStateRecord.CloseRequestOffset;
-		else if (field == MuiWindowEventStateField.InputEvent)
-			offset = MuiWindowEventStateRecord.InputEventOffset;
-		else if (field == MuiWindowEventStateField.MouseObject)
-			offset = MuiWindowEventStateRecord.MouseObjectOffset;
-		else
+		index = field switch
 		{
-			offset = 0;
-			return false;
-		}
-		return true;
+			MuiWindowEventStateField.Magic => 0,
+			MuiWindowEventStateField.CloseRequest => 1,
+			MuiWindowEventStateField.InputEvent => 2,
+			MuiWindowEventStateField.MouseObject => 3,
+			_ => uint.MaxValue,
+		};
+		return index != uint.MaxValue;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiWindowEventStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiWindowEventStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiWindowEventStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		return TryResolve(field, out var offset) &&
-			TryGetAddress(ref platform, record, offset, out address);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiWindowEventStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiWindowEventStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiWindowEventStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

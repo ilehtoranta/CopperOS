@@ -1,0 +1,14 @@
+; Disposable WB 3.1 Eval caret grammar probe. Output is retained in S:Shell-Startup.
+FailAt 21
+Echo "BEGIN" >RAM:eval-capture
+C:Eval 2^3 >>RAM:eval-capture
+C:Eval 2 ^ 3 >>RAM:eval-capture
+C:Eval 2^3+4 >>RAM:eval-capture
+C:Eval 2 + 3 ^ 4 >>RAM:eval-capture
+C:Eval 2 ** 3 >>RAM:eval-capture
+C:Eval 2 pow 3 >>RAM:eval-capture
+C:Eval 2 junk >>RAM:eval-capture
+C:Eval 2+3junk >>RAM:eval-capture
+Echo "END" >>RAM:eval-capture
+Copy RAM:eval-capture S:Shell-Startup >NIL:
+EndCLI >NIL:

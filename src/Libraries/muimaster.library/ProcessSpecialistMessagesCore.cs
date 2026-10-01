@@ -46,64 +46,91 @@ internal struct MuiProcessSpecialistFieldCursor
 // without exposing numeric positions to dispatch code.
 internal static class MuiProcessSpecialistMessageMemoryCodec
 {
-	private static bool TryResolve(MuiProcessSpecialistPacketKind packet,
-		MuiProcessSpecialistField field, out uint offset, out uint size)
+	private static bool TryResolveFieldIndex(MuiProcessSpecialistPacketKind packet,
+		MuiProcessSpecialistField field, out uint index, out uint recordSize)
 	{
+		index = uint.MaxValue;
+		recordSize = 0;
 		switch (packet)
 		{
 			case MuiProcessSpecialistPacketKind.Method:
-				size = MuiProcessSpecialistMethodMessage.Size;
 				if (field == MuiProcessSpecialistField.MethodId)
-					offset = MuiProcessSpecialistMethodMessage.MethodIdOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
+				{
+					index = 0; recordSize = MuiProcessSpecialistMethodMessage.Size;
+					return true;
+				}
+				return false;
 			case MuiProcessSpecialistPacketKind.Get:
-				size = MuiProcessSpecialistGetMessage.Size;
 				if (field == MuiProcessSpecialistField.MethodId)
-					offset = MuiProcessSpecialistGetMessage.MethodIdOffset;
-				else if (field == MuiProcessSpecialistField.Attribute)
-					offset = MuiProcessSpecialistGetMessage.AttributeOffset;
-				else if (field == MuiProcessSpecialistField.Storage)
-					offset = MuiProcessSpecialistGetMessage.StorageOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
+				{
+					index = 0; recordSize = MuiProcessSpecialistGetMessage.Size;
+					return true;
+				}
+				if (field == MuiProcessSpecialistField.Attribute)
+				{
+					index = 1; recordSize = MuiProcessSpecialistGetMessage.Size;
+					return true;
+				}
+				if (field == MuiProcessSpecialistField.Storage)
+				{
+					index = 2; recordSize = MuiProcessSpecialistGetMessage.Size;
+					return true;
+				}
+				return false;
 			case MuiProcessSpecialistPacketKind.Set:
-				size = MuiProcessSpecialistSetMessage.Size;
 				if (field == MuiProcessSpecialistField.MethodId)
-					offset = MuiProcessSpecialistSetMessage.MethodIdOffset;
-				else if (field == MuiProcessSpecialistField.Attribute)
-					offset = MuiProcessSpecialistSetMessage.AttributeOffset;
-				else if (field == MuiProcessSpecialistField.Value)
-					offset = MuiProcessSpecialistSetMessage.ValueOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
+				{
+					index = 0; recordSize = MuiProcessSpecialistSetMessage.Size;
+					return true;
+				}
+				if (field == MuiProcessSpecialistField.Attribute)
+				{
+					index = 1; recordSize = MuiProcessSpecialistSetMessage.Size;
+					return true;
+				}
+				if (field == MuiProcessSpecialistField.Value)
+				{
+					index = 2; recordSize = MuiProcessSpecialistSetMessage.Size;
+					return true;
+				}
+				return false;
 			case MuiProcessSpecialistPacketKind.Signal:
-				size = MuiProcessSpecialistSignalMessage.Size;
 				if (field == MuiProcessSpecialistField.MethodId)
-					offset = MuiProcessSpecialistSignalMessage.MethodIdOffset;
-				else if (field == MuiProcessSpecialistField.Signals)
-					offset = MuiProcessSpecialistSignalMessage.SignalsOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
+				{
+					index = 0; recordSize = MuiProcessSpecialistSignalMessage.Size;
+					return true;
+				}
+				if (field == MuiProcessSpecialistField.Signals)
+				{
+					index = 1; recordSize = MuiProcessSpecialistSignalMessage.Size;
+					return true;
+				}
+				return false;
 			case MuiProcessSpecialistPacketKind.Error:
-				size = MuiProcessSpecialistErrorMessage.Size;
 				if (field == MuiProcessSpecialistField.MethodId)
-					offset = MuiProcessSpecialistErrorMessage.MethodIdOffset;
-				else if (field == MuiProcessSpecialistField.ErrorCode)
-					offset = MuiProcessSpecialistErrorMessage.ErrorCodeOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
+				{
+					index = 0; recordSize = MuiProcessSpecialistErrorMessage.Size;
+					return true;
+				}
+				if (field == MuiProcessSpecialistField.ErrorCode)
+				{
+					index = 1; recordSize = MuiProcessSpecialistErrorMessage.Size;
+					return true;
+				}
+				return false;
 			case MuiProcessSpecialistPacketKind.Dispatch:
-				size = MuiProcessSpecialistDispatchMessage.Size;
 				if (field == MuiProcessSpecialistField.MethodId)
-					offset = MuiProcessSpecialistDispatchMessage.MethodIdOffset;
-				else if (field == MuiProcessSpecialistField.Packet)
-					offset = MuiProcessSpecialistDispatchMessage.PacketOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
+				{
+					index = 0; recordSize = MuiProcessSpecialistDispatchMessage.Size;
+					return true;
+				}
+				if (field == MuiProcessSpecialistField.Packet)
+				{
+					index = 1; recordSize = MuiProcessSpecialistDispatchMessage.Size;
+					return true;
+				}
+				return false;
 		}
-		offset = 0;
-		size = 0;
 		return false;
 	}
 
@@ -112,12 +139,33 @@ internal static class MuiProcessSpecialistMessageMemoryCodec
 		MuiProcessSpecialistField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		return TryGetAddress(ref platform, message, packet, field,
+			out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR message, MuiProcessSpecialistPacketKind packet,
+		MuiProcessSpecialistField field, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(packet, field, out var offset, out var size) ||
-			message.IsNull || message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(message, size)) return false;
-		address = APTR.FromPointer(message.Raw + offset);
-		return platform.IsMapped(address, MuiProcessSpecialistMethodMessage.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(packet, field, out var index,
+			out var recordSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, message, recordSize,
+				out var cursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 4,
+				out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = 4;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -153,6 +201,13 @@ internal static class MuiProcessSpecialistFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiProcessSpecialistMessageMemoryCodec.TryGetAddress(ref platform,
 			cursor.Message, cursor.Packet, cursor.Field, out address);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiProcessSpecialistFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiProcessSpecialistMessageMemoryCodec.TryGetAddress(ref platform,
+			cursor.Message, cursor.Packet, cursor.Field, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR message, MuiProcessSpecialistPacketKind packet,

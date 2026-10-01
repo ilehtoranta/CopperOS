@@ -90,8 +90,16 @@ internal static class MuiVirtgroupPolicyStateFieldCursorCodec
 		MuiVirtgroupPolicyStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiVirtgroupPolicyStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		return MuiVirtgroupPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
+			cursor, out address, out fieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -116,26 +124,26 @@ internal static class MuiVirtgroupPolicyStateFieldCursorCodec
 // here.
 internal static class MuiVirtgroupPolicyStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiVirtgroupPolicyStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiVirtgroupPolicyStateField field,
+		out uint index)
 	{
 		if (field == MuiVirtgroupPolicyStateField.Magic)
-			offset = MuiVirtgroupPolicyStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiVirtgroupPolicyStateField.Input)
-			offset = MuiVirtgroupPolicyStateRecord.InputOffset;
+			index = 1;
 		else if (field == MuiVirtgroupPolicyStateField.Width)
-			offset = MuiVirtgroupPolicyStateRecord.WidthOffset;
+			index = 2;
 		else if (field == MuiVirtgroupPolicyStateField.Height)
-			offset = MuiVirtgroupPolicyStateRecord.HeightOffset;
+			index = 3;
 		else if (field == MuiVirtgroupPolicyStateField.Left)
-			offset = MuiVirtgroupPolicyStateRecord.LeftOffset;
+			index = 4;
 		else if (field == MuiVirtgroupPolicyStateField.Top)
-			offset = MuiVirtgroupPolicyStateRecord.TopOffset;
+			index = 5;
 		else if (field == MuiVirtgroupPolicyStateField.TryFit)
-			offset = MuiVirtgroupPolicyStateRecord.TryFitOffset;
+			index = 6;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -145,12 +153,34 @@ internal static class MuiVirtgroupPolicyStateRecordMemoryCodec
 		APTR record, MuiVirtgroupPolicyStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiVirtgroupPolicyStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiVirtgroupPolicyStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiVirtgroupPolicyStateRecord.Size) &&
-			platform.IsMapped(address, MuiVirtgroupPolicyStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiVirtgroupPolicyStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiVirtgroupPolicyStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiVirtgroupPolicyStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -158,8 +188,23 @@ internal static class MuiVirtgroupPolicyStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiVirtgroupPolicyStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiVirtgroupPolicyStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiVirtgroupPolicyStateField.Input)
+			value = state.Input;
+		else if (field == MuiVirtgroupPolicyStateField.Width)
+			value = unchecked((uint)state.Width);
+		else if (field == MuiVirtgroupPolicyStateField.Height)
+			value = unchecked((uint)state.Height);
+		else if (field == MuiVirtgroupPolicyStateField.Left)
+			value = unchecked((uint)state.Left);
+		else if (field == MuiVirtgroupPolicyStateField.Top)
+			value = unchecked((uint)state.Top);
+		else if (field == MuiVirtgroupPolicyStateField.TryFit)
+			value = state.TryFit;
+		else return false;
 		return true;
 	}
 
@@ -167,9 +212,25 @@ internal static class MuiVirtgroupPolicyStateRecordMemoryCodec
 		APTR record, MuiVirtgroupPolicyStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiVirtgroupPolicyStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiVirtgroupPolicyStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiVirtgroupPolicyStateField.Input)
+			state.Input = value;
+		else if (field == MuiVirtgroupPolicyStateField.Width)
+			state.Width = unchecked((int)value);
+		else if (field == MuiVirtgroupPolicyStateField.Height)
+			state.Height = unchecked((int)value);
+		else if (field == MuiVirtgroupPolicyStateField.Left)
+			state.Left = unchecked((int)value);
+		else if (field == MuiVirtgroupPolicyStateField.Top)
+			state.Top = unchecked((int)value);
+		else if (field == MuiVirtgroupPolicyStateField.TryFit)
+			state.TryFit = value;
+		else return false;
+		return MuiVirtgroupPolicyStateRecordCodec.WriteStructural(ref platform,
+			record, state);
 	}
 }
 
@@ -224,6 +285,11 @@ internal static class MuiVirtgroupPolicyStateRecordCodec
 			unchecked((uint)value.Top)) &&
 		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 			value.TryFit) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address, MuiVirtgroupPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> WriteRecord(ref platform, address, value);
 
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address,

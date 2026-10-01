@@ -8,6 +8,7 @@
     <RootNamespace>CopperOS.Commands.NativeRoot</RootNamespace>
     <ImplicitUsings>false</ImplicitUsings>
     <IsPackable>false</IsPackable>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Commands\Native\CopperOS.Commands.Native.csproj" />

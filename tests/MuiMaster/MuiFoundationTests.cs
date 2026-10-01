@@ -71,6 +71,10 @@ public sealed class MuiFoundationTests
 			ref platform, cursor, out var fieldAddress));
 		Assert.Equal(address.Raw + MuiMasterPrivateRoot.FlagsOffset,
 			fieldAddress.Raw);
+		Assert.True(MuiMasterPrivateRootFieldCursorCodec.TryGetAddress(
+			ref platform, cursor, out var typedFieldAddress, out var fieldSize));
+		Assert.Equal(fieldAddress, typedFieldAddress);
+		Assert.Equal(4u, fieldSize);
 		Assert.True(MuiMasterPrivateRootFieldCursorCodec.TryWriteUInt32(
 			ref platform, address, MuiMasterPrivateRootField.Flags, 0xCAFEBABE));
 		Assert.True(MuiMasterPrivateRootFieldCursorCodec.TryReadUInt32(

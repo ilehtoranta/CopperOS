@@ -47,10 +47,14 @@ internal static class MuiBalancePolicyStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiBalancePolicyStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiBalancePolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiBalancePolicyStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiBalancePolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiBalancePolicyStateField field, out uint value)
@@ -76,16 +80,18 @@ internal static class MuiBalancePolicyStateFieldCursorCodec
 // malformed-state diagnostics.
 internal static class MuiBalancePolicyStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiBalancePolicyStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiBalancePolicyStateField field,
+		out uint index)
 	{
 		if (field == MuiBalancePolicyStateField.Magic)
-			offset = MuiBalancePolicyStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiBalancePolicyStateField.Quiet)
-			offset = MuiBalancePolicyStateRecord.QuietOffset;
+		{
+			index = 1;
+		}
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -95,13 +101,34 @@ internal static class MuiBalancePolicyStateRecordMemoryCodec
 		APTR record, MuiBalancePolicyStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiBalancePolicyStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiBalancePolicyStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiBalancePolicyStateRecord.Size) &&
-			platform.IsMapped(address, MuiBalancePolicyStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiBalancePolicyStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiBalancePolicyStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiBalancePolicyStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -155,8 +182,8 @@ internal static class MuiBalancePolicyStateRecordMemoryCodec
 	{
 		value = 0;
 		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+			out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -164,7 +191,7 @@ internal static class MuiBalancePolicyStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
+		MuiGuestUlongStorageCodec.WriteValue(ref platform, address, value);
 		return true;
 	}
 }

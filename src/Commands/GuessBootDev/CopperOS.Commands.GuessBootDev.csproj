@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>CopperOS.Commands.GuessBootDev</AssemblyName>
+    <RootNamespace>CopperOS.Commands</RootNamespace>
+    <RuntimeIdentifier>amiga-m68k</RuntimeIdentifier>
+    <CopperOSCommandName>GuessBootDev</CopperOSCommandName>
+    <CopperSharpEntry>CopperOS.Commands.Entries.GuessBootDevEntry::Main</CopperSharpEntry>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Common\CopperOS.Commands.Common.csproj" />
+  </ItemGroup>
+</Project>

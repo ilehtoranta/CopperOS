@@ -1,11 +1,24 @@
 # Workbench 3.1 / MorphOS 3.20 command qualification
 
 Started 2026-08-30; historical checkpoint updated 2026-09-08. The current
-qualification checkpoint is 2026-09-27. Goal remains active. **No new shipping
+qualification checkpoint is 2026-09-28. Goal remains active. **No new shipping
 command is qualified.**
 This is an execution record for the stable
 [goal plan](../../../Goals/WORKBENCH31_MORPHOS_C_COMMANDS_GOAL.md), not a reduced
 replacement objective. Existing unrelated Shell/MUI goals retain their owners.
+
+### 2026-09-28 managed and native foundation refresh
+
+`dotnet test tests/Commands/CopperOS.Commands.Tests.csproj --configuration
+Release --no-restore` passes **843 tests** with no failures or skips. The
+separate foundation qualification passes nine HUNK/suite executions across
+68000/020/040: 31 startup, 25 argument-boundary, and 32 I/O vectors per CPU
+(264 total). It records one image load per CPU, no leaked resources, and zero
+shared-image writes. The hash-bound receipt is
+`tests/Commands.NativeRoot/bin/Release/net10.0/qualification/3e1bbbbf271c43288b90a1ec8a141256/qualification.json`.
+It reports no original Kickstart/CopperStart execution, real DOS parser/I/O,
+minimum-stack qualification, or PURE/shipping approval. It advances only the
+native ABI fixture baseline, not any command profile's admission.
 
 ### 2026-09-26 managed regression baseline
 

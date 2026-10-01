@@ -86,98 +86,105 @@ internal struct MuiAreaShortHelpMessageFieldCursor
 // select semantic packet/field enum values instead of passing raw offsets.
 internal static class MuiAreaShortHelpMessageMemoryCodec
 {
-	private static bool TryGetPacketSize(MuiAreaShortHelpPacketKind packet,
-		out uint size)
+	private static bool TryResolveFieldIndex(MuiAreaShortHelpPacketKind packet,
+		MuiAreaShortHelpMessageField field, out uint index, out uint recordSize)
 	{
-		switch (packet)
+		if (packet == MuiAreaShortHelpPacketKind.Check &&
+			field == MuiAreaShortHelpMessageField.MethodId)
 		{
-			case MuiAreaShortHelpPacketKind.Check:
-				size = MuiAreaCheckShortHelpMessage.Size;
-				return true;
-			case MuiAreaShortHelpPacketKind.Create:
-				size = MuiAreaCreateShortHelpMessage.Size;
-				return true;
-			case MuiAreaShortHelpPacketKind.Delete:
-				size = MuiAreaDeleteShortHelpMessage.Size;
-				return true;
+			index = 0;
+			recordSize = MuiAreaCheckShortHelpMessage.Size;
+			return true;
 		}
-		size = 0;
-		return false;
-	}
-
-	private static bool TryResolve(MuiAreaShortHelpPacketKind packet,
-		MuiAreaShortHelpMessageField field, out uint offset)
-	{
-		switch (packet)
+		if (packet == MuiAreaShortHelpPacketKind.Check &&
+			field == MuiAreaShortHelpMessageField.Help)
 		{
-			case MuiAreaShortHelpPacketKind.Check:
-				if (field == MuiAreaShortHelpMessageField.MethodId)
-				{
-					offset = MuiAreaCheckShortHelpMessage.MethodIdOffset;
-					return true;
-				}
-				if (field == MuiAreaShortHelpMessageField.Help)
-				{
-					offset = MuiAreaCheckShortHelpMessage.HelpOffset;
-					return true;
-				}
-				if (field == MuiAreaShortHelpMessageField.MouseX)
-				{
-					offset = MuiAreaCheckShortHelpMessage.MouseXOffset;
-					return true;
-				}
-				if (field == MuiAreaShortHelpMessageField.MouseY)
-				{
-					offset = MuiAreaCheckShortHelpMessage.MouseYOffset;
-					return true;
-				}
-				break;
-			case MuiAreaShortHelpPacketKind.Create:
-				if (field == MuiAreaShortHelpMessageField.MethodId)
-				{
-					offset = MuiAreaCreateShortHelpMessage.MethodIdOffset;
-					return true;
-				}
-				if (field == MuiAreaShortHelpMessageField.MouseX)
-				{
-					offset = MuiAreaCreateShortHelpMessage.MouseXOffset;
-					return true;
-				}
-				if (field == MuiAreaShortHelpMessageField.MouseY)
-				{
-					offset = MuiAreaCreateShortHelpMessage.MouseYOffset;
-					return true;
-				}
-				break;
-			case MuiAreaShortHelpPacketKind.Delete:
-				if (field == MuiAreaShortHelpMessageField.MethodId)
-				{
-					offset = MuiAreaDeleteShortHelpMessage.MethodIdOffset;
-					return true;
-				}
-				if (field == MuiAreaShortHelpMessageField.Help)
-				{
-					offset = MuiAreaDeleteShortHelpMessage.HelpOffset;
-					return true;
-				}
-				break;
+			index = 1;
+			recordSize = MuiAreaCheckShortHelpMessage.Size;
+			return true;
 		}
-		offset = 0;
+		if (packet == MuiAreaShortHelpPacketKind.Check &&
+			field == MuiAreaShortHelpMessageField.MouseX)
+		{
+			index = 2;
+			recordSize = MuiAreaCheckShortHelpMessage.Size;
+			return true;
+		}
+		if (packet == MuiAreaShortHelpPacketKind.Check &&
+			field == MuiAreaShortHelpMessageField.MouseY)
+		{
+			index = 3;
+			recordSize = MuiAreaCheckShortHelpMessage.Size;
+			return true;
+		}
+		if (packet == MuiAreaShortHelpPacketKind.Create &&
+			field == MuiAreaShortHelpMessageField.MethodId)
+		{
+			index = 0;
+			recordSize = MuiAreaCreateShortHelpMessage.Size;
+			return true;
+		}
+		if (packet == MuiAreaShortHelpPacketKind.Create &&
+			field == MuiAreaShortHelpMessageField.MouseX)
+		{
+			index = 1;
+			recordSize = MuiAreaCreateShortHelpMessage.Size;
+			return true;
+		}
+		if (packet == MuiAreaShortHelpPacketKind.Create &&
+			field == MuiAreaShortHelpMessageField.MouseY)
+		{
+			index = 2;
+			recordSize = MuiAreaCreateShortHelpMessage.Size;
+			return true;
+		}
+		if (packet == MuiAreaShortHelpPacketKind.Delete &&
+			field == MuiAreaShortHelpMessageField.MethodId)
+		{
+			index = 0;
+			recordSize = MuiAreaDeleteShortHelpMessage.Size;
+			return true;
+		}
+		if (packet == MuiAreaShortHelpPacketKind.Delete &&
+			field == MuiAreaShortHelpMessageField.Help)
+		{
+			index = 1;
+			recordSize = MuiAreaDeleteShortHelpMessage.Size;
+			return true;
+		}
+		index = uint.MaxValue;
+		recordSize = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaShortHelpMessageFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaShortHelpMessageFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset) ||
-			!TryGetPacketSize(cursor.Packet, out var packetSize) ||
-			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Message, packetSize))
-			return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, MuiAreaShortHelpMethodMessage.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Packet, cursor.Field, out var index,
+			out var recordSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Message, recordSize,
+				out var guestCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref guestCursor,
+				MuiAreaCreateShortHelpMessage.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiAreaCreateShortHelpMessage.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -295,6 +302,13 @@ internal static class MuiAreaShortHelpMessageFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiAreaShortHelpMessageMemoryCodec.TryGetAddress(ref platform, cursor,
 			out address);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaShortHelpMessageFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAreaShortHelpMessageMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR message, MuiAreaShortHelpPacketKind packet,

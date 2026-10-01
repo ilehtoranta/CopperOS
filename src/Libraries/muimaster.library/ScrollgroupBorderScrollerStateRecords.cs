@@ -84,10 +84,14 @@ internal static class MuiScrollgroupBorderScrollerStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiScrollgroupBorderScrollerStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryGetAddress(
-			ref platform, cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiScrollgroupBorderScrollerStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiScrollgroupBorderScrollerStateField field, out uint value)
@@ -110,26 +114,26 @@ internal static class MuiScrollgroupBorderScrollerStateFieldCursorCodec
 // named semantic fields; bounded fixed guest-layout translation lives here.
 internal static class MuiScrollgroupBorderScrollerStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiScrollgroupBorderScrollerStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiScrollgroupBorderScrollerStateField field,
+		out uint index)
 	{
 		if (field == MuiScrollgroupBorderScrollerStateField.Magic)
-			offset = MuiScrollgroupBorderScrollerStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiScrollgroupBorderScrollerStateField.Window)
-			offset = MuiScrollgroupBorderScrollerStateRecord.WindowOffset;
+			index = 1;
 		else if (field == MuiScrollgroupBorderScrollerStateField.UseWindowBorder)
-			offset = MuiScrollgroupBorderScrollerStateRecord.UseWindowBorderOffset;
+			index = 2;
 		else if (field == MuiScrollgroupBorderScrollerStateField.HorizontalRequested)
-			offset = MuiScrollgroupBorderScrollerStateRecord.HorizontalRequestedOffset;
+			index = 3;
 		else if (field == MuiScrollgroupBorderScrollerStateField.VerticalRequested)
-			offset = MuiScrollgroupBorderScrollerStateRecord.VerticalRequestedOffset;
+			index = 4;
 		else if (field == MuiScrollgroupBorderScrollerStateField.Applied)
-			offset = MuiScrollgroupBorderScrollerStateRecord.AppliedOffset;
+			index = 5;
 		else if (field == MuiScrollgroupBorderScrollerStateField.Reserved)
-			offset = MuiScrollgroupBorderScrollerStateRecord.ReservedOffset;
+			index = 6;
 		else
 		{
-			offset = 0;
+			index = 0;
 			return false;
 		}
 		return true;
@@ -139,12 +143,35 @@ internal static class MuiScrollgroupBorderScrollerStateRecordMemoryCodec
 		APTR record, MuiScrollgroupBorderScrollerStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiScrollgroupBorderScrollerStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiScrollgroupBorderScrollerStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiScrollgroupBorderScrollerStateRecord.Size) &&
-			platform.IsMapped(address, MuiScrollgroupBorderScrollerStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiScrollgroupBorderScrollerStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiScrollgroupBorderScrollerStateRecord.FieldSize,
+				out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiScrollgroupBorderScrollerStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

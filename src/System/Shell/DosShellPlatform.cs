@@ -17,6 +17,20 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 	IShellScriptPlatform where TDosPlatform : struct, IExecMemoryPlatform,
 	IDosPlatform
 {
+	private struct ShellLaunchResources
+	{
+		public BPTR Input;
+		public BPTR Output;
+		public BPTR Error;
+		public BPTR Window;
+		public BPTR From;
+	}
+
+	private const uint ShellLaunchTagBytes = TagItem.Size * 5;
+	private const uint DefaultShellStartupLength = 15;
+	private const uint DefaultShellStartupStorage =
+		DefaultShellStartupLength + 1;
+
 	public DosShellPlatform(TDosPlatform dos, APTR state)
 	{
 		Dos = dos;
@@ -40,6 +54,7 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 	private const uint ScriptCommandNameCapacity = 256;
 	private const uint ScriptTokenCapacity = 4096;
 	private const uint ScriptSmallCapacity = 512;
+	private const uint ScriptPromptCapacity = 256;
 	private const uint ScriptErrorCodeCapacity = FaultCommand.MaximumErrorCodes * 4;
 	private const uint ScriptMaximumSteps = 4096;
 
@@ -56,6 +71,10 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 	public bool TryReadCliDefaultStack(APTR cli, out int stackBytes) =>
 		DosShellNativeBridge.ReadCliDefaultStack(ref Dos, State, cli,
 			out stackBytes);
+
+	public bool TryReadCliFailureLimit(APTR cli, out uint failureLimit) =>
+		DosShellNativeBridge.ReadCliFailureLimit(ref Dos, State, cli,
+			out failureLimit);
 
 	public bool TryWriteCliDefaultStack(APTR cli, int stackBytes) =>
 		DosShellNativeBridge.WriteCliDefaultStack(ref Dos, State, cli,
@@ -162,19 +181,18 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 	}
 
 	public bool TryAsk(APTR cli, BPTR input, BPTR output, APTR prompt,
-		uint promptLength)
+		uint promptLength, out ShellAskResponse response)
 	{
+		response = default;
 		if (cli.IsNull || input.IsNull || output.IsNull || prompt.IsNull ||
 			promptLength == 0 || promptLength > 4095 ||
 			prompt.Raw > uint.MaxValue - promptLength ||
 			!Dos.IsMapped(prompt, promptLength) ||
 			!DosShellNativeBridge.TryGetScriptFrame(ref Dos, State, cli,
-				out var frame))
+				out _))
 			return false;
 		if (DosShellNativeBridge.Write(ref Dos, State, output, prompt,
-			promptLength) < 0 || DosShellNativeBridge.WriteByte(ref Dos, State,
-			output, (byte)'?') < 0 || DosShellNativeBridge.WriteByte(ref Dos,
-			State, output, (byte)' ') < 0)
+			promptLength) < 0)
 			return false;
 
 		const uint AnswerCapacity = 256;
@@ -191,13 +209,10 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 			Dos.FreeGuest(answer, AnswerCapacity);
 			return false;
 		}
-		var first = Dos.ReadUInt8(answer);
-		var yes = first is (byte)'Y' or (byte)'y';
-		var no = first is (byte)'N' or (byte)'n';
+		var decoded = ShellAskResponse.TryDecode(ref this, answer,
+			AnswerCapacity, out response);
 		Dos.FreeGuest(answer, AnswerCapacity);
-		if (!yes && !no) return false;
-		return ShellScriptFrameCodec.TryRecordCondition(ref this, frame,
-			(uint)ShellIfCondition.Value, yes ? 0u : 1u);
+		return decoded;
 	}
 
 	public bool TryEvaluateIf(APTR cli, uint condition, uint threshold,
@@ -337,6 +352,7 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 		var lookupPath = Dos.AllocateGuest(ScriptSmallCapacity);
 		var keyTemplate = Dos.AllocateGuest(ScriptLineCapacity);
 		var temporaryPath = Dos.AllocateGuest(ScriptSmallCapacity);
+		var promptTemplate = Dos.AllocateGuest(ScriptPromptCapacity);
 		var runnerValue = new DosShellScriptRunnerRecord
 		{
 			Cli = cli, Frame = frame, Input = input, Line = line,
@@ -349,6 +365,7 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 			RedirectionError = redirectionError, AliasLine = aliasLine,
 			LookupPath = lookupPath, ScriptKeyTemplate = keyTemplate,
 			ScriptTemporaryPath = temporaryPath,
+			PromptTemplate = promptTemplate,
 			ScriptSourcePath = sourcePath,
 			ScriptSourcePathLength = fileLength,
 			ScriptArguments = ownedArguments,
@@ -368,15 +385,22 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 			return ShellScriptExecutionStatus.Failed;
 		}
 		var cliValue = DosCommandLineInterfaceCodec.Read(ref Dos, cli);
+		if (!DosCore.TryGetShellProcessContext(ref Dos, State, cli,
+			out var processContext))
+		{
+			DosShellNativeBridge.FreeScriptRunner(ref Dos, State, runner);
+			return ShellScriptExecutionStatus.Failed;
+		}
 		var output = cliValue.CurrentOutput.IsNotNull
 			? cliValue.CurrentOutput : cliValue.StandardOutput;
 		var initial = new ShellScriptFrameState
 		{
 			Parent = cli, Cli = cli, Input = input, Output = output,
-			Error = output, CurrentDirectory = cliValue.CurrentDirectoryName,
+			Error = processContext.Error, CurrentDirectory = processContext.CurrentDirectory,
 			CurrentLine = 1, CurrentOffset = 0,
 			FailureLimit = cliValue.FailLevel > 0
-				? unchecked((uint)cliValue.FailLevel) : 0,
+				? unchecked((uint)cliValue.FailLevel)
+				: ShellScriptFrameCodec.DefaultFailureLimit,
 			LastResult = (int)ShellCommandResult.Ok,
 			Flags = ShellScriptFrameFlags.Active,
 			ScriptArguments = ownedArguments,
@@ -462,7 +486,13 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 			}
 			if (prepared == ShellScriptPreScanResult.Transformed &&
 				!DosShellNativeBridge.ReadScriptRunner(ref Dos, State, runner,
-					out stored)) return ShellScriptExecutionStatus.Failed;
+					out stored))
+			{
+				DosShellNativeBridge.FreeScriptRunner(ref Dos, State, runner);
+				DosShellNativeBridge.UnbindScriptFrame(ref Dos, State,
+					stored.Cli, stored.Frame);
+				return ShellScriptExecutionStatus.Failed;
+			}
 		}
 		var run = ShellScriptEngine.Run(ref this, stored.Frame, in workspace,
 			ScriptMaximumSteps);
@@ -476,6 +506,8 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 			return ShellScriptExecutionStatus.Pending;
 		}
 		var terminal = run.Status == ShellScriptStepStatus.EndOfFile;
+		var diagnosticsCaptured = ShellScriptCompletionDiagnostics.TryCapture(
+			ref this, stored.Cli, in run, out var diagnostics);
 		DosShellNativeBridge.SetScriptRunnerState(ref Dos, runner,
 			terminal ? DosShellScriptRunnerState.Completed :
 			DosShellScriptRunnerState.Failed, run.Result, run.Steps);
@@ -487,6 +519,14 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 		DosShellNativeBridge.FreeScriptRunner(ref Dos, State, runner);
 		DosShellNativeBridge.UnbindScriptFrame(ref Dos, State, cli,
 			stored.Frame);
+		var failureLimitRestored = TryWriteCliFailureLimit(cli,
+			ShellScriptFrameCodec.DefaultFailureLimit);
+		if (!failureLimitRestored || !diagnosticsCaptured ||
+			!TryPublishCommandDiagnostics(cli, in diagnostics))
+		{
+			result = (int)ShellCommandResult.Error;
+			return ShellScriptExecutionStatus.Failed;
+		}
 		return terminal ? ShellScriptExecutionStatus.Completed :
 			ShellScriptExecutionStatus.Failed;
 	}
@@ -506,9 +546,22 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 			ScriptLineCapacity);
 		var lookupWorkspace = new ShellScriptLookupWorkspace(stored.LookupPath,
 			ScriptSmallCapacity);
-		return new ShellScriptStepWorkspace(stored.Line, ScriptLineCapacity,
+		var workspace = new ShellScriptStepWorkspace(stored.Line, ScriptLineCapacity,
 			stored.CommandName, ScriptCommandNameCapacity, in commandWorkspace,
 			in redirectionWorkspace, in aliasWorkspace, in lookupWorkspace);
+		workspace.PromptTemplate = stored.PromptTemplate;
+		workspace.PromptTemplateCapacity = ScriptPromptCapacity;
+		workspace.PromptCapturePath = stored.ScriptTemporaryPath;
+		workspace.PromptCapturePathCapacity = ScriptSmallCapacity;
+		if (DosCore.TryGetShellProcessContext(ref Dos, State, stored.Cli,
+			out var processContext))
+		{
+			var shellNumber = DosProcessCodec.ReadTaskNumber(ref Dos,
+				processContext.Task);
+			if (shellNumber > 0)
+				workspace.ShellNumber = unchecked((uint)shellNumber);
+		}
+		return workspace;
 	}
 
 	private bool ValidScriptRunnerBuffers(in DosShellScriptRunnerRecord value)
@@ -537,6 +590,8 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 			Dos.IsMapped(value.ScriptKeyTemplate, ScriptLineCapacity) &&
 			value.ScriptTemporaryPath.IsNotNull && Dos.IsMapped(
 				value.ScriptTemporaryPath, ScriptSmallCapacity) &&
+			value.PromptTemplate.IsNotNull && Dos.IsMapped(
+				value.PromptTemplate, ScriptPromptCapacity) &&
 			(value.ScriptSourcePathLength == 0
 				? value.ScriptSourcePath.IsNull
 				: value.ScriptSourcePath.IsNotNull &&
@@ -572,6 +627,7 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 		ReleaseScriptGuest(ref value.LookupPath, ScriptSmallCapacity);
 		ReleaseScriptGuest(ref value.ScriptKeyTemplate, ScriptLineCapacity);
 		ReleaseScriptGuest(ref value.ScriptTemporaryPath, ScriptSmallCapacity);
+		ReleaseScriptGuest(ref value.PromptTemplate, ScriptPromptCapacity);
 		ReleaseScriptGuest(ref value.ScriptSourcePath,
 			value.ScriptSourcePathLength == 0 ? 0 :
 				value.ScriptSourcePathLength + 1);
@@ -624,15 +680,27 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 		BPTR currentDirectory, APTR continuation, APTR command, uint commandLength, uint detach,
 		uint quiet, uint stack, uint stackPresent, int priority,
 		uint priorityPresent)
+		=> TryRunCommandCore(cli, input, output, error, currentDirectory,
+			continuation, command, commandLength, detach, quiet, stack,
+			stackPresent, priority, priorityPresent, out _);
+
+	private bool TryRunCommandCore(APTR cli, BPTR input, BPTR output,
+		BPTR error, BPTR currentDirectory, APTR continuation, APTR command,
+		uint commandLength, uint detach, uint quiet, uint stack,
+		uint stackPresent, int priority, uint priorityPresent,
+		out bool rollbackComplete)
 	{
-		var inheritance = new ShellChildInheritance(input, output, error,
-			currentDirectory);
+		rollbackComplete = false;
 		_ = detach;
 		_ = quiet;
 		if (ExecBase.IsNull || cli.IsNull || command.IsNull || commandLength == 0 ||
 			commandLength > 65_535 || command.Raw > uint.MaxValue - commandLength ||
 			!Dos.IsMapped(command, commandLength))
 			return false;
+		if (!DosCore.TryGetShellProcessContext(ref Dos, State, cli,
+			out var processContext)) return false;
+		var inheritance = new ShellChildInheritance(input, output, error,
+			processContext.CurrentDirectory, processContext.CliState);
 
 		var nameLength = FirstTokenLength(ref Dos, command, commandLength);
 		if (nameLength == 0) return false;
@@ -649,8 +717,8 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 		Dos.WriteUInt8(name, unchecked((int)nameLength), 0);
 
 		var found = DosShellNativeBridge.LookupCommand(ref Dos, State, cli, name,
-			nameLength, path, 512, out var lookupKind, out var pathLength);
-		if (!found || pathLength == 0 || lookupKind ==
+			nameLength, path, 512, out var lookup);
+		if (!found || lookup.PathLength == 0 || lookup.Kind ==
 			DosShellNativeBridge.LookupKind.Script)
 		{
 			Dos.FreeGuest(name, nameLength + 1);
@@ -661,7 +729,7 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 		var residentEntry = APTR.Null;
 		var residentAcquired = false;
 		BPTR segment;
-		if (lookupKind == DosShellNativeBridge.LookupKind.Resident)
+		if (lookup.Kind == DosShellNativeBridge.LookupKind.Resident)
 		{
 			if (!DosShellNativeBridge.AcquireResident(ref Dos, State, name,
 				nameLength, out segment, out residentEntry))
@@ -701,7 +769,21 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 		Dos.Clear(tags, TagItem.Size * 5);
 		WriteTaskTag(ref Dos, tags, 0, ExecConstants.TaskTagProgramCounter,
 			image.EntryPoint.Raw);
-		var requestedStack = stackPresent != 0 ? stack : 4096u;
+		if (stackPresent > 1 ||
+			(stackPresent == 0 && inheritance.CliState.DefaultStack < 0))
+		{
+			Dos.FreeGuest(tags, TagItem.Size * 5);
+			if (residentAcquired)
+				DosShellNativeBridge.ReleaseResident(ref Dos, State, residentEntry);
+			else if (segment.IsNotNull)
+				DosSegmentLoaderCore.Unload(ref Dos, State, segment);
+			Dos.FreeGuest(name, nameLength + 1);
+			Dos.FreeGuest(path, 512);
+			return false;
+		}
+		var inheritedStack = inheritance.CliState.DefaultStack;
+		var requestedStack = stackPresent != 0 ? stack : inheritedStack == 0
+			? 4096u : unchecked((uint)inheritedStack);
 		if (requestedStack < 64 || requestedStack > 16u * 1024u * 1024u)
 		{
 			Dos.FreeGuest(tags, TagItem.Size * 5);
@@ -715,18 +797,22 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 		}
 		WriteTaskTag(ref Dos, tags, 1, ExecConstants.TaskTagM68kStackSize,
 			requestedStack);
+		WriteTaskTag(ref Dos, tags, 2, ExecConstants.TaskTagName, name.Raw);
+		// Keep required fields before the optional slot, which is TagDone when absent.
 		if (priorityPresent != 0)
-			WriteTaskTag(ref Dos, tags, 2, ExecConstants.TaskTagPriority,
+			WriteTaskTag(ref Dos, tags, 3, ExecConstants.TaskTagPriority,
 				unchecked((uint)priority));
-		WriteTaskTag(ref Dos, tags, 3, ExecConstants.TaskTagName, name.Raw);
 		WriteTaskTag(ref Dos, tags, 4, ExecConstants.TagDone, 0);
 
-		var startup = new DosChildCliStartup(name, nameLength, name, nameLength,
-			path, pathLength, APTR.Null, 0);
-		var task = DosChildProcessLaunchCore.CreateFromImageWithStartup<
+		var startup = new DosChildCliStartup(APTR.Null, 0, name, nameLength,
+			path, lookup.PathLength, APTR.Null, 0);
+		startup.ParentCli = cli;
+		var inheritedResources = new DosChildInheritedResources(
+			inheritance.Input, inheritance.Output, inheritance.Error,
+			inheritance.CurrentDirectory);
+		var task = DosChildProcessLaunchCore.PrepareFromImageWithStartup<
 			TDosPlatform, ClassicPolicy>(ref Dos, ExecBase, State, tags, segment,
-			continuation, inheritance.Input, inheritance.Output,
-			inheritance.CurrentDirectory, in startup);
+			continuation, in inheritedResources, in startup);
 		Dos.FreeGuest(tags, TagItem.Size * 5);
 		Dos.FreeGuest(name, nameLength + 1);
 		Dos.FreeGuest(path, 512);
@@ -738,18 +824,22 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 				DosSegmentLoaderCore.Unload(ref Dos, State, segment);
 			return false;
 		}
-		if (residentAcquired && !DosProcessImageCore.BindResident(ref Dos,
-			State, task, residentEntry, segment))
+		var argumentStart = nameLength;
+		while (argumentStart < commandLength &&
+			Dos.ReadUInt8(command, unchecked((int)argumentStart)) is
+				(byte)' ' or (byte)'\t') argumentStart++;
+		var child = new DosShellPreparedChild
 		{
-			// Prevent the generic task teardown from treating this shared resident
-			// image as a loader-owned segment if metadata publication fails.
-			DosProcessCodec.WriteSegmentList(ref Dos, task, BPTR.Null);
-			DosProcessLifecycleCore.Terminate<TDosPlatform, ClassicPolicy>(ref Dos,
-				ExecBase, State, task);
-			DosShellNativeBridge.ReleaseResident(ref Dos, State, residentEntry);
-			return false;
-		}
-		return true;
+			State = State, ExecBase = ExecBase, Task = task,
+			Entry = image.EntryPoint, Continuation = continuation,
+			Arguments = APTR.FromPointer(argumentStart < commandLength
+				? command.Raw + argumentStart : 0u),
+			ArgumentLength = commandLength - argumentStart,
+			CommandArguments = 1,
+			Segment = segment, ResidentEntry = residentEntry,
+		};
+		return DosShellPreparedChildCore.Publish(ref Dos, in child,
+			out rollbackComplete);
 	}
 
 	private static uint FirstTokenLength<TMemory>(ref TMemory memory,
@@ -777,27 +867,223 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 		});
 	}
 
-	public bool TryManageResident(APTR cli, BPTR output, APTR name,
-		uint nameLength, APTR file, uint fileLength, APTR alias,
-		uint aliasLength, uint remove, uint add, uint replace, uint force,
-		uint system, uint defer) => DosShellNativeBridge.ManageResident(
-		ref Dos, State, output, name, nameLength, file, fileLength, alias,
-		aliasLength, remove, add, replace, force, system, defer);
-
 	public bool TryCreateShell(APTR parentCli, ShellLaunchKind kind,
 		BPTR input, BPTR output, BPTR error, BPTR currentDirectory,
 		APTR continuation, APTR window,
-		uint windowLength, APTR from, uint fromLength) => false;
+		uint windowLength, APTR from, uint fromLength)
+	{
+		if (ExecBase.IsNull || State.IsNull || parentCli.IsNull ||
+			(kind != ShellLaunchKind.NewCli && kind != ShellLaunchKind.NewShell &&
+			 kind != ShellLaunchKind.Cli) ||
+			(window.IsNull ? windowLength != 0 : windowLength == 0) ||
+			(from.IsNull && fromLength != 0) || fromLength > 255 ||
+			(from.IsNotNull && (from.Raw > uint.MaxValue - fromLength - 1 ||
+				!Dos.IsMapped(from, fromLength + 1) ||
+				Dos.ReadUInt8(from, unchecked((int)fromLength)) != 0)))
+			return false;
+		if (!DosCore.TryGetShellProcessContext(ref Dos, State, parentCli,
+			out var processContext) ||
+			!DosShellNativeLaunchCore.TryResolveChildStack(
+				processContext.CliState.DefaultStack, 0, 0, out var childStack))
+			return false;
+
+		var startupScript = APTR.Null;
+		var startupScriptLength = 0u;
+		var ownedStartupScript = APTR.Null;
+		if (kind == ShellLaunchKind.NewShell)
+		{
+			startupScript = from;
+			startupScriptLength = fromLength;
+			if (startupScript.IsNull)
+			{
+				ownedStartupScript = Dos.AllocateGuest(
+					DefaultShellStartupStorage);
+				if (ownedStartupScript.IsNull || !Dos.IsMapped(
+					ownedStartupScript, DefaultShellStartupStorage))
+				{
+					if (ownedStartupScript.IsNotNull)
+						Dos.FreeGuest(ownedStartupScript,
+							DefaultShellStartupStorage);
+					return false;
+				}
+				DosShellNativeLaunchCore.WriteDefaultShellStartup(ref Dos,
+					ownedStartupScript);
+				startupScript = ownedStartupScript;
+				startupScriptLength = DefaultShellStartupLength;
+			}
+		}
+
+		var resources = new ShellLaunchResources
+		{
+			Input = input,
+			Output = output,
+			Error = error,
+		};
+		if (window.IsNotNull)
+		{
+			resources.Window = DosCore.OpenConsoleName(ref Dos, State,
+				window, windowLength);
+			if (resources.Window.IsNull)
+			{
+				if (ownedStartupScript.IsNotNull)
+					Dos.FreeGuest(ownedStartupScript,
+						DefaultShellStartupStorage);
+				return false;
+			}
+			resources.Input = resources.Window;
+			resources.Output = resources.Window;
+			resources.Error = resources.Window;
+		}
+		if (kind == ShellLaunchKind.NewCli && from.IsNotNull)
+		{
+			resources.From = DosCore.OpenConsoleName(ref Dos, State, from,
+				fromLength);
+			if (resources.From.IsNull)
+			{
+				var openError = DosCore.IoErr(ref Dos, State);
+				CloseLaunchHandles(in resources, openError);
+				if (ownedStartupScript.IsNotNull)
+					Dos.FreeGuest(ownedStartupScript,
+						DefaultShellStartupStorage);
+				return false;
+			}
+			resources.Input = resources.From;
+			if (resources.Window.IsNull)
+			{
+				resources.Output = resources.From;
+				resources.Error = resources.From;
+			}
+		}
+		if (resources.Window.IsNull && resources.From.IsNull)
+		{
+			resources.Window = DosCore.OpenDefaultConsole(ref Dos, State);
+			if (resources.Window.IsNull)
+			{
+				var openError = DosCore.IoErr(ref Dos, State);
+				CloseLaunchHandles(in resources, openError);
+				if (ownedStartupScript.IsNotNull)
+					Dos.FreeGuest(ownedStartupScript,
+						DefaultShellStartupStorage);
+				return false;
+			}
+			resources.Input = resources.Window;
+			resources.Output = resources.Window;
+			resources.Error = resources.Window;
+		}
+
+		var childEntry = DosShellNativeEntrypoints.AddressOfShellChild();
+		if (childEntry.IsNull)
+		{
+			var launchError = DosCore.IoErr(ref Dos, State);
+			CloseLaunchHandles(in resources, launchError);
+			if (ownedStartupScript.IsNotNull)
+				Dos.FreeGuest(ownedStartupScript, DefaultShellStartupStorage);
+			return false;
+		}
+		var tags = Dos.AllocateGuest(ShellLaunchTagBytes);
+		if (tags.IsNull || !Dos.IsMapped(tags, ShellLaunchTagBytes))
+		{
+			var launchError = DosCore.IoErr(ref Dos, State);
+			if (tags.IsNotNull) Dos.FreeGuest(tags, ShellLaunchTagBytes);
+			CloseLaunchHandles(in resources, launchError);
+			if (ownedStartupScript.IsNotNull)
+				Dos.FreeGuest(ownedStartupScript, DefaultShellStartupStorage);
+			return false;
+		}
+		Dos.Clear(tags, ShellLaunchTagBytes);
+		WriteTaskTag(ref Dos, tags, 0,
+			ExecConstants.TaskTagProgramCounter, childEntry.Raw);
+		WriteTaskTag(ref Dos, tags, 1, ExecConstants.TaskTagM68kStackSize,
+			childStack);
+		WriteTaskTag(ref Dos, tags, 2, ExecConstants.TagDone, 0);
+		WriteTaskTag(ref Dos, tags, 3, ExecConstants.TagDone, 0);
+		WriteTaskTag(ref Dos, tags, 4, ExecConstants.TagDone, 0);
+
+		var startup = new DosChildCliStartup
+		{
+			CommandFile = startupScript,
+			CommandFileLength = startupScriptLength,
+			ParentCli = parentCli,
+			InteractivePresent = 1,
+			Interactive = 1,
+		};
+		var inherited = new DosChildInheritedResources(resources.Input,
+			resources.Output, resources.Error, processContext.CurrentDirectory);
+		var task = DosChildProcessLaunchCore.PrepareWithStartup<
+			TDosPlatform, ClassicPolicy>(ref Dos, ExecBase, State, tags,
+			continuation, in inherited, in startup);
+		Dos.FreeGuest(tags, ShellLaunchTagBytes);
+		if (ownedStartupScript.IsNotNull)
+			Dos.FreeGuest(ownedStartupScript, DefaultShellStartupStorage);
+
+		var published = false;
+		if (task.IsNotNull)
+		{
+			var child = new DosShellPreparedChild
+			{
+				State = State, ExecBase = ExecBase, Task = task, Entry = childEntry,
+				Continuation = continuation,
+				CommandArguments = 0,
+			};
+			published = DosShellPreparedChildCore.Publish(ref Dos, in child);
+		}
+		var finalError = DosCore.IoErr(ref Dos, State);
+		CloseLaunchHandles(in resources, finalError);
+		if (!published) DosCore.SetIoErr(ref Dos, State, finalError);
+		return published;
+	}
+
+	private void CloseLaunchHandles(in ShellLaunchResources resources,
+		DOS.Error restoreError)
+	{
+		if (resources.Window.IsNotNull)
+			DosCore.Close(ref Dos, State, resources.Window);
+		if (resources.From.IsNotNull && resources.From != resources.Window)
+			DosCore.Close(ref Dos, State, resources.From);
+		DosCore.SetIoErr(ref Dos, State, restoreError);
+	}
+
+	public bool TryManageResident(APTR cli,
+		in ShellResidentManagementRequest request)
+	{
+		var dosRequest = new DosResidentManageRequest
+		{
+			Output = request.Output,
+			Name = request.Name,
+			NameLength = request.NameLength,
+			File = request.File,
+			FileLength = request.FileLength,
+			Alias = request.Alias,
+			AliasLength = request.AliasLength,
+			Remove = request.Remove,
+			Add = request.Add,
+			Replace = request.Replace,
+			Force = request.Force,
+			System = request.System,
+			Defer = request.Defer,
+		};
+		return DosShellNativeBridge.ManageResident(ref Dos, State,
+			in dosRequest);
+	}
+
+	public bool TryGetInternalCommandEnabled(APTR cli, uint commandIdentity,
+		out uint enabled) => DosShellNativeBridge.TryGetInternalCommandEnabled(
+		ref Dos, State, cli, commandIdentity, out enabled);
+
+	public bool TrySetInternalCommandEnabled(APTR cli, uint commandIdentity,
+		uint enabled) => DosShellNativeBridge.TrySetInternalCommandEnabled(
+		ref Dos, State, cli, commandIdentity, enabled);
 
 	public bool TryPollShellContinuation(APTR cli, APTR continuation,
 		out ShellProcessContinuationState state, out int result)
 	{
 		state = ShellProcessContinuationState.Failed;
 		result = (int)ShellCommandResult.Error;
-		if (!DosShellNativeBridge.PollChildContinuation(ref Dos, State, cli,
-			continuation, out var childState, out result))
+		if (!DosChildCompletionCore.TryPoll(ref Dos, State, cli,
+			continuation, out var outcome))
 			return false;
-		state = childState switch
+		result = outcome.Result;
+		state = outcome.State switch
 		{
 			DosChildContinuationState.Pending =>
 				ShellProcessContinuationState.Pending,
@@ -814,28 +1100,39 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 		return true;
 	}
 
+	public bool TryReadContinuationDiagnostics(APTR cli, APTR continuation,
+		out ShellCommandDiagnostics diagnostics)
+	{
+		diagnostics = default;
+		if (!DosChildCompletionCore.TryPoll(ref Dos, State, cli,
+			continuation, out var outcome) || outcome.ResourcesRetired == 0 ||
+			outcome.State is DosChildContinuationState.Pending or
+				DosChildContinuationState.Running) return false;
+		diagnostics.ReturnCode = outcome.Result;
+		diagnostics.IoError = outcome.IoError;
+		return true;
+	}
+
 	public bool TryReleaseShellContinuation(APTR cli, APTR continuation,
 		uint ownedFlags)
 	{
-		if (ExecBase.IsNull || cli.IsNull || continuation.IsNull ||
+		if (cli.IsNull || continuation.IsNull ||
 			!DosChildContinuationCodec.TryRead(ref Dos, continuation,
-				out var current) || current.ChildCli.IsNull ||
+				out var current) || current.ParentCli != cli ||
 			(current.Flags & (uint)DosChildContinuationFlags.ResourcesClosed) == 0)
 			return false;
 		if (ownedFlags != (current.Flags & ~(uint)
 			DosChildContinuationFlags.ResourcesClosed)) return false;
-		if (!DosCore.TryFindProcessTaskByCli(ref Dos, State, current.ChildCli,
-			out var task)) return false;
-		var released = DosChildContinuationCore.TryReleaseAfterShellMark<
-			TDosPlatform, ClassicPolicy>(ref Dos, ExecBase, State, task,
+		// DOS has already retired the child's process and handles. Only the
+		// durable completion is acknowledged; ChildCli and BPTR snapshots may
+		// now name unrelated allocations and must not be dereferenced.
+		if ((current.Flags & (uint)DosChildContinuationFlags.RecordOwned) != 0)
+			return DosShellNativeBridge.TryGetScriptFrame(ref Dos, State, cli,
+				out var frame) && DosChildCompletionCore.TryAcknowledgeScriptRecord(
+					ref Dos, State, cli, continuation, frame);
+		// Caller-owned Run/NewShell records remain caller-owned.
+		return DosChildCompletionCore.TryAcknowledge(ref Dos, State, cli,
 			continuation);
-		if (!released) return false;
-		if ((current.Flags & (uint)DosChildContinuationFlags.RecordOwned) != 0 &&
-			DosShellNativeBridge.TryGetScriptFrame(ref Dos, State, cli,
-				out var frame))
-			DosShellNativeBridge.FreeScriptRecord(ref Dos, State, frame,
-				continuation, 3);
-		return true;
 	}
 
 	public bool TryReadArgs(APTR argumentText, uint argumentLength,
@@ -896,17 +1193,49 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 			(byte)'\f') >= 0;
 	}
 
-	public bool TryWriteWhy(BPTR output, APTR cli) => false;
+	public bool TryWriteWhy(BPTR output, APTR cli) =>
+		DosShellNativeBridge.WriteWhy(ref Dos, State, output, cli);
 
 	public bool TryWriteFault(BPTR output, APTR errorCodes,
-		uint errorCount) => false;
+		uint errorCount) => DosShellNativeBridge.WriteFault(ref Dos, State,
+			output, errorCodes, errorCount);
 
 	public bool TrySetPrompt(APTR cli, APTR value, uint valueLength,
 		uint reset) => DosShellNativeBridge.SetPrompt(ref Dos, State, cli,
 		value, valueLength, reset);
 
+	public bool TryWriteScriptPrompt(APTR cli, BPTR output) =>
+		DosShellNativeBridge.WriteShellPrompt(ref Dos, State, cli, output);
+
+	public bool TryCopyScriptPromptTemplate(APTR cli, APTR destination,
+		uint destinationCapacity, out ShellScriptPromptTemplate template)
+	{
+		template = default;
+		if (!DosShellNativeBridge.ReadShellPromptTemplate(ref Dos, State, cli,
+			destination, destinationCapacity, out var length)) return false;
+		template.Text = destination;
+		template.Length = length;
+		return true;
+	}
+
+	public bool TryWriteScriptPromptLiteral(APTR cli, BPTR output,
+		in ShellScriptPromptSegment segment)
+	{
+		if (segment.Kind != ShellScriptPromptSegmentKind.Literal) return false;
+		var span = new DosShellPromptTextSpan
+		{
+			Text = segment.Text,
+			Length = segment.Length,
+		};
+		return DosShellNativeBridge.WriteShellPromptLiteral(ref Dos, State,
+			cli, output, in span);
+	}
+
 	public int Write(BPTR handle, APTR source, uint length) =>
 		DosShellNativeBridge.Write(ref Dos, State, handle, source, length);
+
+	public int Read(BPTR handle, APTR destination, uint length) =>
+		DosShellNativeBridge.Read(ref Dos, State, handle, destination, length);
 
 	public int WriteByte(BPTR handle, byte value) =>
 		DosShellNativeBridge.WriteByte(ref Dos, State, handle, value);
@@ -937,6 +1266,35 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 		return true;
 	}
 
+	public bool TryCaptureCommandDiagnostics(APTR cli, int returnCode,
+		out ShellCommandDiagnostics diagnostics)
+	{
+		diagnostics = new ShellCommandDiagnostics { ReturnCode = returnCode };
+		if (!DosShellNativeBridge.TryCaptureCommandError(ref Dos, State, cli,
+			returnCode, out var error)) return false;
+		diagnostics.IoError = error;
+		return true;
+	}
+
+	public bool TryReadPublishedCommandDiagnostics(APTR cli,
+		out ShellCommandDiagnostics diagnostics)
+	{
+		diagnostics = default;
+		if (!DosCommandLineInterfaceCodec.IsMapped(ref Dos, cli)) return false;
+		var published = DosCommandLineInterfaceCodec.Read(ref Dos, cli);
+		diagnostics.ReturnCode = published.ReturnCode;
+		diagnostics.IoError = published.Result2;
+		return true;
+	}
+
+	public bool TryBeginCommandDiagnostics(APTR cli) =>
+		DosShellNativeBridge.BeginCommandDiagnostics(ref Dos, State, cli);
+
+	public bool TryPublishCommandDiagnostics(APTR cli,
+		in ShellCommandDiagnostics diagnostics) =>
+		DosShellNativeBridge.PublishCommandDiagnostics(ref Dos, State, cli,
+			diagnostics.ReturnCode, diagnostics.IoError);
+
 	public bool TryAcknowledgeScriptSignal(APTR cli,
 		in ShellScriptSignalEvent signal)
 	{
@@ -953,23 +1311,45 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 			out expandedLength);
 
 	public bool TryLookupScriptCommand(APTR cli, APTR name,
-		uint nameLength, APTR path, uint pathCapacity,
-		out ShellScriptLookupKind kind, out uint pathLength)
+		uint nameLength, in ShellScriptLookupWorkspace workspace,
+		out ShellScriptLookupResult lookup)
 	{
 		var result = DosShellNativeBridge.LookupCommand(ref Dos, State, cli,
-			name, nameLength, path, pathCapacity, out var dosKind,
-			out pathLength);
-		kind = dosKind switch
+			name, nameLength, workspace.Path, workspace.Capacity,
+			out var dosLookup);
+		lookup = new ShellScriptLookupResult
 		{
-			DosShellNativeBridge.LookupKind.Resident =>
-				ShellScriptLookupKind.Resident,
-			DosShellNativeBridge.LookupKind.File =>
-				ShellScriptLookupKind.ExplicitFile,
-			DosShellNativeBridge.LookupKind.Script =>
-				ShellScriptLookupKind.Script,
-			DosShellNativeBridge.LookupKind.NotFound =>
-				ShellScriptLookupKind.NotFound,
-			_ => ShellScriptLookupKind.Malformed,
+			Kind = dosLookup.Kind switch
+			{
+				DosShellNativeBridge.LookupKind.Resident =>
+					ShellScriptLookupKind.Resident,
+				DosShellNativeBridge.LookupKind.File =>
+					ShellScriptLookupKind.ExplicitFile,
+				DosShellNativeBridge.LookupKind.CurrentDirectory =>
+					ShellScriptLookupKind.CurrentDirectory,
+				DosShellNativeBridge.LookupKind.CommandPath =>
+					ShellScriptLookupKind.CommandPath,
+				DosShellNativeBridge.LookupKind.Script =>
+					ShellScriptLookupKind.Script,
+				DosShellNativeBridge.LookupKind.NotFound =>
+					ShellScriptLookupKind.NotFound,
+				_ => ShellScriptLookupKind.Malformed,
+			},
+			Origin = dosLookup.Origin switch
+			{
+				DosShellNativeBridge.LookupOrigin.Resident =>
+					ShellScriptLookupOrigin.Resident,
+				DosShellNativeBridge.LookupOrigin.ExplicitFile =>
+					ShellScriptLookupOrigin.ExplicitFile,
+				DosShellNativeBridge.LookupOrigin.CurrentDirectory =>
+					ShellScriptLookupOrigin.CurrentDirectory,
+				DosShellNativeBridge.LookupOrigin.CommandPath =>
+					ShellScriptLookupOrigin.CommandPath,
+				_ => ShellScriptLookupOrigin.None,
+			},
+			Protection = dosLookup.Protection,
+			ResolvedPath = workspace.Path,
+			PathLength = dosLookup.PathLength,
 		};
 		return result;
 	}
@@ -982,49 +1362,66 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 			currentOffset, destination, destinationCapacity, out lineLength,
 			out nextLine, out nextOffset, out endOfFile);
 
-	public bool TryExecuteScriptCommand(APTR cli, APTR frame, APTR line,
-		uint lineLength, ShellScriptLookupKind lookupKind,
-		APTR resolvedPath, uint resolvedPathLength, BPTR input, BPTR output,
+	public bool TryExecuteScriptCommand(APTR cli, APTR frame,
+		in ShellScriptCommandInvocation command,
+		in ShellScriptLookupResult lookup,
+		BPTR input, BPTR output,
 		BPTR error, out int result, out APTR continuation)
 	{
 		result = (int)ShellCommandResult.Error;
 		continuation = APTR.Null;
-		if (ExecBase.IsNull || cli.IsNull || frame.IsNull || line.IsNull ||
-			lineLength == 0 || lineLength > 65_535 ||
-			line.Raw > uint.MaxValue - lineLength || !Dos.IsMapped(line, lineLength) ||
-			resolvedPath.IsNull || resolvedPathLength == 0 ||
-			resolvedPathLength > 65_535 ||
-			resolvedPath.Raw > uint.MaxValue - resolvedPathLength ||
-			!Dos.IsMapped(resolvedPath, resolvedPathLength) ||
-			lookupKind is ShellScriptLookupKind.NotFound or
+		if (lookup.Kind == ShellScriptLookupKind.Script)
+			return TryLaunchScriptThroughExecute(cli, frame, in command,
+				in lookup, input, output, error, out result, out continuation);
+		if (ExecBase.IsNull || cli.IsNull || frame.IsNull ||
+			command.Line.IsNull || command.LineLength == 0 ||
+			command.LineLength > 65_535 ||
+			command.Line.Raw > uint.MaxValue - command.LineLength ||
+			!Dos.IsMapped(command.Line, command.LineLength) ||
+			command.CommandName.IsNull || command.CommandNameLength == 0 ||
+			command.CommandNameLength > 65_535 ||
+			command.CommandName.Raw > uint.MaxValue - command.CommandNameLength ||
+			!Dos.IsMapped(command.CommandName, command.CommandNameLength) ||
+			!command.Arguments.IsContainedBy(command.Line, command.LineLength) ||
+			lookup.ResolvedPath.IsNull || lookup.PathLength == 0 ||
+			lookup.PathLength > 65_535 ||
+			lookup.ResolvedPath.Raw > uint.MaxValue - lookup.PathLength ||
+			!Dos.IsMapped(lookup.ResolvedPath, lookup.PathLength) ||
+			lookup.Kind is ShellScriptLookupKind.NotFound or
 			ShellScriptLookupKind.Script or ShellScriptLookupKind.Malformed)
 			return false;
-		var nameLength = FirstTokenLength(ref Dos, line, lineLength);
-		if (nameLength == 0) return false;
+		if (!DosCore.TryGetShellProcessContext(ref Dos, State, cli,
+			out var processContext)) return false;
+		if (processContext.CliState.DefaultStack < 0) return false;
+		var inheritedStack = processContext.CliState.DefaultStack == 0
+			? 4096u : unchecked((uint)processContext.CliState.DefaultStack);
+		if (inheritedStack < 64 || inheritedStack > 16u * 1024u * 1024u)
+			return false;
+		var nameLength = command.CommandNameLength;
 		var name = Dos.AllocateGuest(nameLength + 1);
-		var path = Dos.AllocateGuest(resolvedPathLength + 1);
+		var path = Dos.AllocateGuest(lookup.PathLength + 1);
 		if (name.IsNull || path.IsNull || !Dos.IsMapped(name, nameLength + 1) ||
-			!Dos.IsMapped(path, resolvedPathLength + 1))
+			!Dos.IsMapped(path, lookup.PathLength + 1))
 		{
 			if (name.IsNotNull) Dos.FreeGuest(name, nameLength + 1);
-			if (path.IsNotNull) Dos.FreeGuest(path, resolvedPathLength + 1);
+			if (path.IsNotNull) Dos.FreeGuest(path, lookup.PathLength + 1);
 			return false;
 		}
-		Dos.Copy(line, name, nameLength);
+		Dos.Copy(command.CommandName, name, nameLength);
 		Dos.WriteUInt8(name, unchecked((int)nameLength), 0);
-		Dos.Copy(resolvedPath, path, resolvedPathLength);
-		Dos.WriteUInt8(path, unchecked((int)resolvedPathLength), 0);
+		Dos.Copy(lookup.ResolvedPath, path, lookup.PathLength);
+		Dos.WriteUInt8(path, unchecked((int)lookup.PathLength), 0);
 
 		var residentEntry = APTR.Null;
 		var residentAcquired = false;
 		BPTR segment;
-		if (lookupKind == ShellScriptLookupKind.Resident)
+		if (lookup.Kind == ShellScriptLookupKind.Resident)
 		{
 			if (!DosShellNativeBridge.AcquireResident(ref Dos, State, name,
 				nameLength, out segment, out residentEntry))
 			{
 				Dos.FreeGuest(name, nameLength + 1);
-				Dos.FreeGuest(path, resolvedPathLength + 1);
+				Dos.FreeGuest(path, lookup.PathLength + 1);
 				return false;
 			}
 			residentAcquired = true;
@@ -1039,11 +1436,11 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 			else if (segment.IsNotNull)
 				DosSegmentLoaderCore.Unload(ref Dos, State, segment);
 			Dos.FreeGuest(name, nameLength + 1);
-			Dos.FreeGuest(path, resolvedPathLength + 1);
+			Dos.FreeGuest(path, lookup.PathLength + 1);
 			return false;
 		}
 
-		var commandStorage = lineLength == uint.MaxValue ? 0u : lineLength + 1;
+		var commandStorage = command.LineLength + 1;
 		var record = DosShellNativeBridge.AllocateScriptRecord(ref Dos, State,
 			frame, DosChildContinuationCodec.Size, 3, commandStorage,
 			out var storedCommand);
@@ -1056,16 +1453,16 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 			else
 				DosSegmentLoaderCore.Unload(ref Dos, State, segment);
 			Dos.FreeGuest(name, nameLength + 1);
-			Dos.FreeGuest(path, resolvedPathLength + 1);
+			Dos.FreeGuest(path, lookup.PathLength + 1);
 			return false;
 		}
-		Dos.Copy(line, storedCommand, lineLength);
-		Dos.WriteUInt8(storedCommand, unchecked((int)lineLength), 0);
+		Dos.Copy(command.Line, storedCommand, command.LineLength);
+		Dos.WriteUInt8(storedCommand, unchecked((int)command.LineLength), 0);
 		var initialContinuation = new DosChildContinuationRecord
 		{
 			ParentCli = cli,
 			Command = storedCommand,
-			CommandLength = lineLength,
+			CommandLength = command.LineLength,
 			State = DosChildContinuationState.Pending,
 			Flags = (uint)DosChildContinuationFlags.RecordOwned,
 		};
@@ -1078,7 +1475,7 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 			else
 				DosSegmentLoaderCore.Unload(ref Dos, State, segment);
 			Dos.FreeGuest(name, nameLength + 1);
-			Dos.FreeGuest(path, resolvedPathLength + 1);
+			Dos.FreeGuest(path, lookup.PathLength + 1);
 			return false;
 		}
 
@@ -1092,26 +1489,29 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 			else
 				DosSegmentLoaderCore.Unload(ref Dos, State, segment);
 			Dos.FreeGuest(name, nameLength + 1);
-			Dos.FreeGuest(path, resolvedPathLength + 1);
+			Dos.FreeGuest(path, lookup.PathLength + 1);
 			return false;
 		}
 		Dos.Clear(tags, TagItem.Size * 5);
 		WriteTaskTag(ref Dos, tags, 0, ExecConstants.TaskTagProgramCounter,
 			image.EntryPoint.Raw);
-		WriteTaskTag(ref Dos, tags, 1, ExecConstants.TaskTagM68kStackSize, 4096);
+		WriteTaskTag(ref Dos, tags, 1, ExecConstants.TaskTagM68kStackSize,
+			inheritedStack);
 		WriteTaskTag(ref Dos, tags, 2, ExecConstants.TaskTagName, name.Raw);
 		WriteTaskTag(ref Dos, tags, 3, ExecConstants.TagDone, 0);
 		// Keep a deterministic fifth slot for future foreground priority policy.
 		WriteTaskTag(ref Dos, tags, 4, ExecConstants.TagDone, 0);
-		var startup = new DosChildCliStartup(name, nameLength, name, nameLength,
-			path, resolvedPathLength, APTR.Null, 0);
-		var task = DosChildProcessLaunchCore.CreateFromImageWithStartup<
+		var startup = new DosChildCliStartup(APTR.Null, 0, name, nameLength,
+			path, lookup.PathLength, APTR.Null, 0);
+		startup.ParentCli = cli;
+		var inheritedResources = new DosChildInheritedResources(input, output,
+			error, processContext.CurrentDirectory);
+		var task = DosChildProcessLaunchCore.PrepareFromImageWithStartup<
 			TDosPlatform, ClassicPolicy>(ref Dos, ExecBase, State, tags, segment,
-			record, input, output, DosCommandLineInterfaceCodec.Read(ref Dos,
-				cli).CurrentDirectoryName, in startup);
+			record, in inheritedResources, in startup);
 		Dos.FreeGuest(tags, TagItem.Size * 5);
 		Dos.FreeGuest(name, nameLength + 1);
-		Dos.FreeGuest(path, resolvedPathLength + 1);
+		Dos.FreeGuest(path, lookup.PathLength + 1);
 		if (task.IsNull)
 		{
 			DosShellNativeBridge.FreeScriptRecord(ref Dos, State, frame, record, 3);
@@ -1122,24 +1522,148 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 			return false;
 		}
 
-		// The child receives the argument tail from DOS-owned continuation
-		// storage, not from the caller's reusable line buffer.
-		var argumentStart = nameLength;
-		while (argumentStart < lineLength &&
-			Dos.ReadUInt8(storedCommand, unchecked((int)argumentStart)) is
-				(byte)' ' or (byte)'\t') argumentStart++;
-		DosProcessCodec.WriteArguments(ref Dos, task,
-			argumentStart < lineLength
-				? APTR.FromPointer(storedCommand.Raw + argumentStart)
-				: APTR.Null);
-		if (residentAcquired && !DosProcessImageCore.BindResident(ref Dos,
-			State, task, residentEntry, segment))
+		// DOS copies the argument tail into independent child-owned storage
+		// before publication; neither the caller nor continuation owns its life.
+		var arguments = command.Arguments;
+		while (arguments.Length != 0 &&
+			Dos.ReadUInt8(arguments.Data, 0) is (byte)' ' or (byte)'\t')
 		{
-			DosProcessCodec.WriteSegmentList(ref Dos, task, BPTR.Null);
-			DosProcessLifecycleCore.Terminate<TDosPlatform, ClassicPolicy>(ref Dos,
-				ExecBase, State, task);
-			DosShellNativeBridge.FreeScriptRecord(ref Dos, State, frame, record, 3);
-			DosShellNativeBridge.ReleaseResident(ref Dos, State, residentEntry);
+			arguments.Data = APTR.FromPointer(arguments.Data.Raw + 1);
+			arguments.Length--;
+		}
+		var child = new DosShellPreparedChild
+		{
+			State = State, ExecBase = ExecBase, Task = task,
+			Entry = image.EntryPoint, Continuation = record,
+			Arguments = arguments.Length == 0 ? APTR.Null : arguments.Data,
+			ArgumentLength = arguments.Length,
+			CommandArguments = 1,
+			Segment = segment, ResidentEntry = residentEntry,
+		};
+		if (!DosShellPreparedChildCore.Publish(ref Dos, in child, out var rollbackComplete))
+		{
+			if (rollbackComplete)
+				DosShellNativeBridge.FreeScriptRecord(ref Dos, State, frame, record, 3);
+			return false;
+		}
+		continuation = record;
+		result = (int)ShellCommandResult.Ok;
+		return true;
+	}
+
+	private bool TryLaunchScriptThroughExecute(APTR cli, APTR frame,
+		in ShellScriptCommandInvocation command,
+		in ShellScriptLookupResult lookup, BPTR input, BPTR output, BPTR error,
+		out int result, out APTR continuation)
+	{
+		result = (int)ShellCommandResult.Error;
+		continuation = APTR.Null;
+		if (ExecBase.IsNull || State.IsNull || cli.IsNull || frame.IsNull ||
+			lookup.Origin != ShellScriptLookupOrigin.CommandPath ||
+			(lookup.Protection & FileProtection.Script) == 0 ||
+			lookup.ResolvedPath.IsNull || lookup.PathLength == 0 ||
+			lookup.PathLength > 65_535 ||
+			lookup.ResolvedPath.Raw > uint.MaxValue - lookup.PathLength ||
+			!Dos.IsMapped(lookup.ResolvedPath, lookup.PathLength) ||
+			command.Line.IsNull || command.LineLength == 0 ||
+			command.LineLength > 65_535 ||
+			command.Line.Raw > uint.MaxValue - command.LineLength ||
+			!Dos.IsMapped(command.Line, command.LineLength) ||
+			!command.Arguments.IsContainedBy(command.Line, command.LineLength))
+			return false;
+
+		var arguments = command.Arguments;
+		while (arguments.Length != 0 &&
+			Dos.ReadUInt8(arguments.Data, 0) is
+				(byte)' ' or (byte)'\t' or (byte)'\r' or (byte)'\n')
+		{
+			arguments.Data = APTR.FromPointer(arguments.Data.Raw + 1);
+			arguments.Length--;
+		}
+		var argumentLength = arguments.Length;
+		var quotedPathLength = lookup.PathLength;
+		for (var index = 0u; index < lookup.PathLength; index++)
+		{
+			var value = Dos.ReadUInt8(lookup.ResolvedPath,
+				unchecked((int)index));
+			if (value == 0) return false;
+			if (value is (byte)'*' or (byte)'"') quotedPathLength++;
+		}
+		const uint executeNameLength = 7;
+		var executeLineLength = executeNameLength + 1 + 1 +
+			quotedPathLength + 1;
+		if (argumentLength != 0)
+		{
+			if (executeLineLength >= 65_535 ||
+				argumentLength > 65_535 - executeLineLength - 1)
+				return false;
+			executeLineLength += 1 + argumentLength;
+		}
+		if (executeLineLength == 0 || executeLineLength > 65_535)
+			return false;
+
+		var record = DosShellNativeBridge.AllocateScriptRecord(ref Dos, State,
+			frame, DosChildContinuationCodec.Size, 3, executeLineLength + 1,
+			out var executeCommand);
+		if (record.IsNull || executeCommand.IsNull)
+		{
+			if (record.IsNotNull)
+				DosShellNativeBridge.FreeScriptRecord(ref Dos, State, frame,
+					record, 3);
+			return false;
+		}
+
+		var cursor = 0u;
+		Dos.WriteUInt8(executeCommand, unchecked((int)cursor++), (byte)'E');
+		Dos.WriteUInt8(executeCommand, unchecked((int)cursor++), (byte)'x');
+		Dos.WriteUInt8(executeCommand, unchecked((int)cursor++), (byte)'e');
+		Dos.WriteUInt8(executeCommand, unchecked((int)cursor++), (byte)'c');
+		Dos.WriteUInt8(executeCommand, unchecked((int)cursor++), (byte)'u');
+		Dos.WriteUInt8(executeCommand, unchecked((int)cursor++), (byte)'t');
+		Dos.WriteUInt8(executeCommand, unchecked((int)cursor++), (byte)'e');
+		Dos.WriteUInt8(executeCommand, unchecked((int)cursor++), (byte)' ');
+		Dos.WriteUInt8(executeCommand, unchecked((int)cursor++), (byte)'"');
+		for (var index = 0u; index < lookup.PathLength; index++)
+		{
+			var value = Dos.ReadUInt8(lookup.ResolvedPath,
+				unchecked((int)index));
+			if (value is (byte)'*' or (byte)'"')
+				Dos.WriteUInt8(executeCommand, unchecked((int)cursor++), (byte)'*');
+			Dos.WriteUInt8(executeCommand, unchecked((int)cursor++), value);
+		}
+		Dos.WriteUInt8(executeCommand, unchecked((int)cursor++), (byte)'"');
+		if (argumentLength != 0)
+		{
+			Dos.WriteUInt8(executeCommand, unchecked((int)cursor++), (byte)' ');
+			Dos.Copy(arguments.Data,
+				APTR.FromPointer(executeCommand.Raw + cursor), argumentLength);
+			cursor += argumentLength;
+		}
+		Dos.WriteUInt8(executeCommand, unchecked((int)cursor), 0);
+		var initialContinuation = new DosChildContinuationRecord
+		{
+			ParentCli = cli,
+			Command = executeCommand,
+			CommandLength = executeLineLength,
+			State = DosChildContinuationState.Pending,
+			Flags = (uint)DosChildContinuationFlags.RecordOwned,
+		};
+		if (!DosChildContinuationCodec.Initialize(ref Dos, record,
+			in initialContinuation))
+		{
+			DosShellNativeBridge.FreeScriptRecord(ref Dos, State, frame,
+				record, 3);
+			return false;
+		}
+
+		var launched = TryRunCommandCore(cli, input, output, error, BPTR.Null,
+			record, executeCommand, executeLineLength, 0, 0, 0, 0, 0, 0,
+			out var rollbackComplete);
+		if (!launched)
+		{
+			if (rollbackComplete)
+				DosShellNativeBridge.FreeScriptRecord(ref Dos, State, frame,
+					record, 3);
 			return false;
 		}
 		continuation = record;
@@ -1185,6 +1709,14 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 		Dos.IsMapped(path, pathLength + 1) &&
 		Dos.ReadUInt8(path, unchecked((int)pathLength)) == 0 &&
 		DosCore.DeleteFile(ref Dos, State, path) != 0;
+
+	public bool TrySetScriptPromptCapture(APTR cli, APTR path,
+		uint pathLength, BPTR input) => cli.IsNotNull && path.IsNotNull &&
+		pathLength != 0 && pathLength < ScriptSmallCapacity &&
+		Dos.IsMapped(path, pathLength + 1) &&
+		Dos.ReadUInt8(path, unchecked((int)pathLength)) == 0 &&
+		DosShellNativeBridge.SetScriptRunnerPromptCapture(ref Dos, State,
+			cli, path, pathLength, input);
 
 	public bool TryCloseScriptRedirection(APTR cli, BPTR handle) =>
 		DosShellNativeBridge.CloseScript(ref Dos, State, handle);

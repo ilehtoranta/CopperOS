@@ -93,36 +93,22 @@ internal struct MuiMinMaxFieldCursor
 }
 
 // The fixed six-short MinMax record owns its packed positions in this bounded
-// adapter. Live layout code uses it directly; the typed cursor remains only
-// for compatibility callers and adapter-focused tests.
+// adapter. The typed cursor is the canonical address path; the enum overload
+// remains as a compatibility adapter for existing callers.
 internal static class MuiMinMaxMemoryCodec
 {
-	private static bool TryResolve(MuiMinMaxField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiMinMaxField field, out uint index)
 	{
-		switch (field)
+		if (field == MuiMinMaxField.MinWidth) index = 0;
+		else if (field == MuiMinMaxField.MinHeight) index = 1;
+		else if (field == MuiMinMaxField.MaxWidth) index = 2;
+		else if (field == MuiMinMaxField.MaxHeight) index = 3;
+		else if (field == MuiMinMaxField.DefWidth) index = 4;
+		else if (field == MuiMinMaxField.DefHeight) index = 5;
+		else
 		{
-			case MuiMinMaxField.MinWidth:
-				offset = MuiMinMaxValues.MinWidthOffset;
-				break;
-			case MuiMinMaxField.MinHeight:
-				offset = MuiMinMaxValues.MinHeightOffset;
-				break;
-			case MuiMinMaxField.MaxWidth:
-				offset = MuiMinMaxValues.MaxWidthOffset;
-				break;
-			case MuiMinMaxField.MaxHeight:
-				offset = MuiMinMaxValues.MaxHeightOffset;
-				break;
-			case MuiMinMaxField.DefWidth:
-				offset = MuiMinMaxValues.DefWidthOffset;
-				break;
-			case MuiMinMaxField.DefHeight:
-				offset = MuiMinMaxValues.DefHeightOffset;
-				break;
-			default:
-				offset = 0;
-				return false;
+			index = uint.MaxValue;
+			return false;
 		}
 		return true;
 	}
@@ -131,12 +117,33 @@ internal static class MuiMinMaxMemoryCodec
 		APTR record, MuiMinMaxField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiMinMaxFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMinMaxFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiMinMaxValues.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiMinMaxValues.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiMinMaxValues.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiMinMaxValues.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiMinMaxValues.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -144,9 +151,15 @@ internal static class MuiMinMaxMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = unchecked((short)platform.ReadUInt16(address, 0));
+		if (!MuiMinMaxRecordCodec.TryReadRecord(ref platform, record,
+			out var values)) return false;
+		if (field == MuiMinMaxField.MinWidth) value = values.MinWidth;
+		else if (field == MuiMinMaxField.MinHeight) value = values.MinHeight;
+		else if (field == MuiMinMaxField.MaxWidth) value = values.MaxWidth;
+		else if (field == MuiMinMaxField.MaxHeight) value = values.MaxHeight;
+		else if (field == MuiMinMaxField.DefWidth) value = values.DefWidth;
+		else if (field == MuiMinMaxField.DefHeight) value = values.DefHeight;
+		else return false;
 		return true;
 	}
 
@@ -154,10 +167,16 @@ internal static class MuiMinMaxMemoryCodec
 		APTR record, MuiMinMaxField field, short value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt16(address, 0, unchecked((ushort)value));
-		return true;
+		if (!MuiMinMaxRecordCodec.TryReadRecord(ref platform, record,
+			out var values)) return false;
+		if (field == MuiMinMaxField.MinWidth) values.MinWidth = value;
+		else if (field == MuiMinMaxField.MinHeight) values.MinHeight = value;
+		else if (field == MuiMinMaxField.MaxWidth) values.MaxWidth = value;
+		else if (field == MuiMinMaxField.MaxHeight) values.MaxHeight = value;
+		else if (field == MuiMinMaxField.DefWidth) values.DefWidth = value;
+		else if (field == MuiMinMaxField.DefHeight) values.DefHeight = value;
+		else return false;
+		return MuiMinMaxRecordCodec.WriteRecord(ref platform, record, values);
 	}
 }
 
@@ -166,8 +185,13 @@ internal static class MuiMinMaxFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiMinMaxFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiMinMaxMemoryCodec.TryGetAddress(ref platform, cursor.Record,
-			cursor.Field, out address);
+		TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMinMaxFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiMinMaxMemoryCodec.TryGetAddress(ref platform, cursor, out address,
+			out fieldSize);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR record, MuiMinMaxField field, out short value)
@@ -183,8 +207,8 @@ internal static class MuiMinMaxFieldCursorCodec
 internal static class MuiMinMaxRecordCodec
 {
 	// Sequential named-struct path used by layout and control code. The
-	// six-short wire shape is consumed in declaration order; numeric offsets
-	// remain confined to MuiMinMaxMemoryCodec for compatibility diagnostics.
+	// six-short wire shape is consumed in declaration order; typed field access
+	// follows the same bounded guest cursor.
 	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
 		APTR address, MuiMinMaxValues values)
 		where TPlatform : struct, IMuiGuestMemory =>
@@ -361,7 +385,10 @@ public static class MuiAreaLayoutCore
 	public static bool Setup<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj, APTR renderInfo) where TPlatform : struct, IMuiLayoutPlatform
 	{
-		if (renderInfo.IsNull || !platform.IsMapped(renderInfo, 28)) return false;
+		if (renderInfo.IsNull ||
+			!MuiDrawingRenderInfoCodec.TryRead(ref platform, renderInfo,
+				out var renderInfoRecord) || renderInfoRecord.RastPort.IsNull)
+			return false;
 		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			RenderInfo, renderInfo.Raw, false)) return false;
 		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,

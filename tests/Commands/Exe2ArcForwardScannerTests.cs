@@ -5,6 +5,158 @@ namespace CopperOS.Commands.Tests;
 public sealed class Exe2ArcForwardScannerTests
 {
     [Theory]
+    [InlineData("EXA-ACE.small", 100, 8, true, 1)]
+    [InlineData("EXA-ACE.eof-last-first-window", 102400, 102386, true, 1)]
+    [InlineData("EXA-ACE.eof-at-next-window", 102401, 102387, false, 1)]
+    [InlineData("EXA-ACE.eof-inside-next-window", 102402, 102388, true, 2)]
+    public void Ace_source_window_matrix(string fixture, int fileLength, int offset,
+        bool expectedMatch, int expectedWindows)
+    {
+        Assert.NotEmpty(fixture);
+        var state = new Exe2ArcTestIoState(Exe2ArcTestIoState.InputWithAceMarker(
+            fileLength, offset));
+        var io = new Exe2ArcTestIo(state);
+
+        var status = Exe2ArcForwardScanner.ScanAce(ref io, Exe2ArcTestIoState.Input,
+            state.Scratch, 102400, (uint)fileLength, out uint archiveOffset,
+            out uint payloadLength, out var observed);
+
+        Assert.Equal(expectedMatch ? Exe2ArcIoStatus.Completed : Exe2ArcIoStatus.NoMatch,
+            status);
+        Assert.Equal(expectedMatch ? (uint)offset : 0u, archiveOffset);
+        Assert.Equal(expectedMatch ? (uint)(fileLength - offset) : 0u, payloadLength);
+        Assert.Equal(expectedWindows, state.Calls.Count(call => call.Operation == "Read"));
+        Assert.Equal(expectedWindows != 0, observed.HasResult);
+        if (expectedMatch)
+        {
+            int stride = 102387;
+            int windowStart = (expectedWindows - 1) * stride;
+            int candidateIndex = offset - windowStart;
+            var seeks = state.Calls.Where(call => call.Operation == "Seek").ToArray();
+            Assert.Equal(-candidateIndex, seeks[^2].Argument);
+            Assert.Equal(0, seeks[^2].Mode);
+            Assert.Equal(offset, seeks[^1].Argument);
+            Assert.Equal(-1, seeks[^1].Mode);
+            Assert.Equal(offset, state.Cursor);
+            Assert.Equal(Exe2ArcIoStage.PayloadSeek, observed.Stage);
+        }
+        state.AssertUnownedResourcesAndGuards();
+    }
+
+    [Fact]
+    public void Ace_zero_offset_stops_before_a_later_marker()
+    {
+        byte[] bytes = Exe2ArcTestIoState.InputWithAceMarker(100, 0);
+        Exe2ArcTestIoState.PutAceMarker(bytes, 40);
+        var state = new Exe2ArcTestIoState(bytes);
+        var io = new Exe2ArcTestIo(state);
+
+        var status = Exe2ArcForwardScanner.ScanAce(ref io, Exe2ArcTestIoState.Input,
+            state.Scratch, 102400, 100, out uint offset, out uint length, out var observed);
+
+        Assert.Equal(Exe2ArcIoStatus.OffsetZero, status);
+        Assert.Equal(0u, offset);
+        Assert.Equal(0u, length);
+        Assert.Equal(["Seek", "Read", "Seek"], state.Calls.Select(x => x.Operation));
+        Assert.Equal(Exe2ArcIoStage.CandidateSeek, observed.Stage);
+        state.AssertUnownedResourcesAndGuards();
+    }
+
+    [Fact]
+    public void Arj_valid_crc_returns_payload_to_eof()
+    {
+        const int fileLength = 100;
+        const int marker = 8;
+        var state = new Exe2ArcTestIoState(
+            Exe2ArcTestIoState.InputWithArjMarker(fileLength, marker));
+        var io = new Exe2ArcTestIo(state);
+
+        var status = Exe2ArcForwardScanner.ScanArj(ref io,
+            Exe2ArcTestIoState.Input, state.Scratch, 102400, fileLength,
+            out uint offset, out uint length, out var observed);
+
+        Assert.Equal(Exe2ArcIoStatus.Completed, status);
+        Assert.Equal((uint)marker, offset);
+        Assert.Equal((uint)(fileLength - marker), length);
+        Assert.Equal(marker, state.Cursor);
+        Assert.Equal(Exe2ArcIoStage.PayloadSeek, observed.Stage);
+        state.AssertUnownedResourcesAndGuards();
+    }
+
+    [Fact]
+    public void Arj_bad_crc_is_skipped_before_a_later_valid_candidate()
+    {
+        byte[] bytes = Exe2ArcTestIoState.InputWithArjMarker(140, 8,
+            validCrc: false);
+        Exe2ArcTestIoState.PutArjMarker(bytes, 60);
+        var state = new Exe2ArcTestIoState(bytes);
+        var io = new Exe2ArcTestIo(state);
+
+        var status = Exe2ArcForwardScanner.ScanArj(ref io,
+            Exe2ArcTestIoState.Input, state.Scratch, 102400, 140,
+            out uint offset, out uint length, out _);
+
+        Assert.Equal(Exe2ArcIoStatus.Completed, status);
+        Assert.Equal(60u, offset);
+        Assert.Equal(80u, length);
+        state.AssertUnownedResourcesAndGuards();
+    }
+
+    [Fact]
+    public void Arj_truncated_crc_tail_is_rejected_without_reading_past_window()
+    {
+        byte[] bytes = Exe2ArcTestIoState.InputWithArjMarker(56, 1,
+            headerLength: 44);
+        var state = new Exe2ArcTestIoState(bytes);
+        var io = new Exe2ArcTestIo(state);
+
+        var status = Exe2ArcForwardScanner.ScanArj(ref io,
+            Exe2ArcTestIoState.Input, state.Scratch, 102400, 52,
+            out uint offset, out uint length, out _);
+
+        Assert.Equal(Exe2ArcIoStatus.NoMatch, status);
+        Assert.Equal(0u, offset);
+        Assert.Equal(0u, length);
+        state.AssertUnownedResourcesAndGuards();
+    }
+
+    [Fact]
+    public void Lzh_uses_the_source_scan_window_level_byte()
+    {
+        byte[] bytes = Exe2ArcTestIoState.InputWithLzhMarker(100, 8);
+        bytes[28] = 3; // candidate byte +20 is ignored by the source predicate.
+        var state = new Exe2ArcTestIoState(bytes);
+        var io = new Exe2ArcTestIo(state);
+
+        var status = Exe2ArcForwardScanner.ScanLzh(ref io,
+            Exe2ArcTestIoState.Input, state.Scratch, 102400, 100,
+            out uint offset, out uint length, out _);
+
+        Assert.Equal(Exe2ArcIoStatus.Completed, status);
+        Assert.Equal(8u, offset);
+        Assert.Equal(92u, length);
+        state.AssertUnownedResourcesAndGuards();
+    }
+
+    [Fact]
+    public void Lzh_rejects_a_high_level_window_and_does_not_skip_to_later_marker()
+    {
+        byte[] bytes = Exe2ArcTestIoState.InputWithLzhMarker(100, 8, level: 3);
+        Exe2ArcTestIoState.PutLzhMarker(bytes, 40);
+        var state = new Exe2ArcTestIoState(bytes);
+        var io = new Exe2ArcTestIo(state);
+
+        var status = Exe2ArcForwardScanner.ScanLzh(ref io,
+            Exe2ArcTestIoState.Input, state.Scratch, 102400, 100,
+            out uint offset, out uint length, out _);
+
+        Assert.Equal(Exe2ArcIoStatus.NoMatch, status);
+        Assert.Equal(0u, offset);
+        Assert.Equal(0u, length);
+        state.AssertUnownedResourcesAndGuards();
+    }
+
+    [Theory]
     [InlineData("EXA-S04.small", false, 100, 32, true, 1)]
     [InlineData("EXA-S05.small", true, 100, 32, true, 1)]
     [InlineData("EXA-S04.eof", false, 8, 1, true, 1)]

@@ -59,6 +59,13 @@ internal static class MuiSetAsStringPacketFieldCursorCodec
 		=> MuiSetAsStringMessageMemoryCodec.TryGetAddress(ref platform,
 			cursor.Message, cursor.Field, MuiSetAsStringMessage.Size, out address);
 
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiSetAsStringPacketFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiSetAsStringMessageMemoryCodec.TryGetAddress(ref platform, cursor,
+			MuiSetAsStringMessage.Size, out address, out fieldSize);
+
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR message, MuiSetAsStringPacketField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
@@ -77,32 +84,84 @@ internal static class MuiSetAsStringPacketFieldCursorCodec
 // the method-only header admission distinct from the complete packet.
 internal static class MuiSetAsStringMessageMemoryCodec
 {
-	private static bool TryResolve(MuiSetAsStringPacketField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiSetAsStringPacketField field,
+		out uint index)
 	{
-		offset = field switch
+		switch (field)
 		{
-			MuiSetAsStringPacketField.MethodId => MuiSetAsStringMessage.MethodIdOffset,
-			MuiSetAsStringPacketField.Attribute => MuiSetAsStringMessage.AttributeOffset,
-			MuiSetAsStringPacketField.Format => MuiSetAsStringMessage.FormatOffset,
-			MuiSetAsStringPacketField.Value => MuiSetAsStringMessage.ValueOffset,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			case MuiSetAsStringPacketField.MethodId: index = 0; return true;
+			case MuiSetAsStringPacketField.Attribute: index = 1; return true;
+			case MuiSetAsStringPacketField.Format: index = 2; return true;
+			case MuiSetAsStringPacketField.Value: index = 3; return true;
+		}
+		index = uint.MaxValue;
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR message, MuiSetAsStringPacketField field, uint availableSize,
 		out APTR address) where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiSetAsStringPacketFieldCursor);
+		cursor.Message = message;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, availableSize, out address,
+			out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiSetAsStringPacketFieldCursor cursor, uint availableSize,
+		out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || message.IsNull ||
-			availableSize < offset || availableSize - offset <
-			MuiSetAsStringMessage.FieldSize ||
-			message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(message, availableSize)) return false;
-		address = APTR.FromPointer(message.Raw + offset);
-		return platform.IsMapped(address, MuiSetAsStringMessage.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			cursor.Message.IsNull || availableSize == 0 ||
+			!platform.IsMapped(cursor.Message, availableSize)) return false;
+		var recordSize = availableSize < MuiSetAsStringMessage.Size
+			? MuiSetAsStringMethodMessage.Size : MuiSetAsStringMessage.Size;
+		if (availableSize < recordSize ||
+			(index != 0 && recordSize < MuiSetAsStringMessage.Size) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Message,
+				recordSize, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiSetAsStringMessage.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiSetAsStringMessage.FieldSize;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiSetAsStringPacketFieldCursor cursor, uint availableSize,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryGetAddress(ref platform, cursor, availableSize, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiSetAsStringPacketFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryGetAddress(ref platform, cursor, MuiSetAsStringMessage.Size,
+			out address, out fieldSize);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR message, MuiSetAsStringPacketField field, uint availableSize,
+		out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiSetAsStringPacketFieldCursor);
+		cursor.Message = message;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, availableSize, out address,
+			out fieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -110,20 +169,73 @@ internal static class MuiSetAsStringMessageMemoryCodec
 		out uint value) where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, message, field, availableSize,
-			out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		// A method-only packet is a deliberately supported four-byte view.  Keep
+		// this compatibility path separate from the complete named record so a
+		// caller cannot accidentally read sibling fields past its bound.
+		if (field == MuiSetAsStringPacketField.MethodId &&
+			availableSize < MuiSetAsStringMessage.Size)
+			return availableSize >= MuiSetAsStringMethodMessage.Size &&
+				message.IsNotNull && platform.IsMapped(message, availableSize) &&
+				MuiSetAsStringMessageCodec.TryReadMethodHeaderValue(ref platform,
+					message, out value);
+		if (availableSize < MuiSetAsStringMessage.Size || message.IsNull ||
+			!platform.IsMapped(message, availableSize) ||
+			!MuiSetAsStringMessageCodec.TryReadRecord(ref platform, message,
+				out var packet)) return false;
+		switch (field)
+		{
+			case MuiSetAsStringPacketField.MethodId:
+				value = packet.MethodId;
+				return true;
+			case MuiSetAsStringPacketField.Attribute:
+				value = packet.Attribute;
+				return true;
+			case MuiSetAsStringPacketField.Format:
+				value = packet.Format.Raw;
+				return true;
+			case MuiSetAsStringPacketField.Value:
+				value = packet.Value;
+				return true;
+			default:
+				return false;
+		}
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR message, MuiSetAsStringPacketField field, uint availableSize,
 		uint value) where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, message, field, availableSize,
-			out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		// Preserve the method-only header ABI while all complete-packet writes
+		// use a read/modify/write of the named record, retaining sibling fields.
+		if (field == MuiSetAsStringPacketField.MethodId &&
+			availableSize < MuiSetAsStringMessage.Size)
+			return availableSize >= MuiSetAsStringMethodMessage.Size &&
+				message.IsNotNull && platform.IsMapped(message, availableSize) &&
+				MuiSetAsStringMessageCodec.WriteMethodHeaderValue(ref platform,
+					message, value);
+		if (availableSize < MuiSetAsStringMessage.Size || message.IsNull ||
+			!platform.IsMapped(message, availableSize) ||
+			!MuiSetAsStringMessageCodec.TryReadRecord(ref platform, message,
+				out var packet)) return false;
+		switch (field)
+		{
+			case MuiSetAsStringPacketField.MethodId:
+				packet.MethodId = value;
+				break;
+			case MuiSetAsStringPacketField.Attribute:
+				packet.Attribute = value;
+				break;
+			case MuiSetAsStringPacketField.Format:
+				packet.Format = APTR.FromPointer(value);
+				break;
+			case MuiSetAsStringPacketField.Value:
+				packet.Value = value;
+				break;
+			default:
+				return false;
+		}
+		return MuiSetAsStringMessageCodec.WriteRecord(ref platform, message,
+			packet);
 	}
 }
 
@@ -241,7 +353,7 @@ internal static class MuiSetAsStringMessageCodec
 		methodId = 0;
 		if (message.IsNotNull && platform.IsMapped(message,
 			MuiSetAsStringMessage.Size) &&
-			TryReadFixed(ref platform, message, out var complete))
+			TryReadRecord(ref platform, message, out var complete))
 		{
 			methodId = complete.MethodId;
 			return true;
@@ -255,7 +367,7 @@ internal static class MuiSetAsStringMessageCodec
 		out MuiSetAsStringMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryReadFixed(ref platform, message, out packet) ||
+		if (!TryReadRecord(ref platform, message, out packet) ||
 			packet.MethodId != Method)
 		{
 			packet = default;
@@ -269,6 +381,21 @@ internal static class MuiSetAsStringMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (packet.MethodId != Method) return false;
+		return WriteRecord(ref platform, message, packet);
+	}
+
+	// Raw named-record bridge used by packet-field adapters.  It intentionally
+	// does not validate the method selector so a field mutation can preserve or
+	// inspect arbitrary sibling values without changing packet admission rules.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiSetAsStringMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadFixed(ref platform, message, out packet);
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR message, MuiSetAsStringMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
 			MuiSetAsStringMessage.Size, out var cursor) ||
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,

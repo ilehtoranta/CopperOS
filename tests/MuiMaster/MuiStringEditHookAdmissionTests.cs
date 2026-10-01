@@ -103,6 +103,19 @@ public sealed class MuiStringEditHookAdmissionTests
 			ref platform, recordAddress, MuiStringEditHookStateField.EditHook,
 			out var typedHookAddress));
 		Assert.Equal(0x1D44u, typedHookAddress.Raw);
+		var hookCursor = new MuiStringEditHookStateFieldCursor
+		{
+			Record = recordAddress,
+			Field = MuiStringEditHookStateField.EditHook,
+		};
+		Assert.True(MuiStringEditHookStateFieldCursorCodec.TryGetAddress(ref platform,
+			hookCursor, out var cursorHookAddress, out var cursorFieldSize));
+		Assert.Equal(typedHookAddress, cursorHookAddress);
+		Assert.Equal(MuiStringEditHookStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiStringEditHookStateRecordMemoryCodec.TryGetAddress(ref platform,
+			hookCursor, out var memoryHookAddress, out var memoryFieldSize));
+		Assert.Equal(cursorHookAddress, memoryHookAddress);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiStringEditHookStateRecordMemoryCodec.TryGetAddress(
 			ref platform, recordAddress,
 			MuiStringEditHookStateField.LonelyEditHook, out var typedLonelyAddress));
@@ -141,6 +154,13 @@ public sealed class MuiStringEditHookAdmissionTests
 			ref platform, APTR.Null, (uint)0, out _));
 		Assert.False(MuiStringEditHookStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
+		hookCursor.Field = (MuiStringEditHookStateField)255;
+		Assert.False(MuiStringEditHookStateFieldCursorCodec.TryGetAddress(ref platform,
+			hookCursor, out _, out _));
+		hookCursor.Record = APTR.Null;
+		hookCursor.Field = MuiStringEditHookStateField.EditHook;
+		Assert.False(MuiStringEditHookStateFieldCursorCodec.TryGetAddress(ref platform,
+			hookCursor, out _, out _));
 	}
 
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR stringClass)

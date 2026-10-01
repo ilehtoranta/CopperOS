@@ -116,10 +116,32 @@ public sealed class MuiGadgetAdmissionTests
 		Assert.True(MuiGadgetInteractionStateRecordMemoryCodec.TryReadUInt32(
 			ref platform, address, 4u, out var inputMode));
 		Assert.Equal(value.InputMode, inputMode);
+		var interactionCursor = new MuiGadgetInteractionStateFieldCursor
+		{
+			Record = address,
+			Field = MuiGadgetInteractionStateField.ShowSelState,
+		};
+		Assert.True(MuiGadgetInteractionStateFieldCursorCodec.TryGetAddress(
+			ref platform, interactionCursor, out var cursorShowSelField,
+			out var cursorFieldSize));
+		Assert.Equal(showSelField, cursorShowSelField);
+		Assert.Equal(MuiGadgetInteractionStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiGadgetInteractionStateRecordMemoryCodec.TryGetAddress(
+			ref platform, interactionCursor, out var memoryCursorField,
+			out var memoryCursorFieldSize));
+		Assert.Equal(cursorShowSelField, memoryCursorField);
+		Assert.Equal(cursorFieldSize, memoryCursorFieldSize);
 		Assert.False(MuiGadgetInteractionStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiGadgetInteractionStateRecord.Size, out _));
 		Assert.False(MuiGadgetInteractionStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, 0u, out _));
+		interactionCursor.Field = (MuiGadgetInteractionStateField)255;
+		Assert.False(MuiGadgetInteractionStateFieldCursorCodec.TryGetAddress(
+			ref platform, interactionCursor, out _, out _));
+		interactionCursor.Record = APTR.Null;
+		interactionCursor.Field = MuiGadgetInteractionStateField.ShowSelState;
+		Assert.False(MuiGadgetInteractionStateFieldCursorCodec.TryGetAddress(
+			ref platform, interactionCursor, out _, out _));
 		Assert.False(MuiGadgetInteractionStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

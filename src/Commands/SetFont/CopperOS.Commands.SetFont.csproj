@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>CopperOS.Commands.SetFont</AssemblyName>
+    <RootNamespace>CopperOS.Commands</RootNamespace>
+    <RuntimeIdentifier>amiga-m68k</RuntimeIdentifier>
+    <CopperOSCommandName>SetFont</CopperOSCommandName>
+    <CopperSharpEntry>CopperOS.Commands.Entries.SetFontEntry::Main</CopperSharpEntry>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Common\CopperOS.Commands.Common.csproj" />
+  </ItemGroup>
+</Project>

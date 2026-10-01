@@ -115,6 +115,20 @@ public sealed class MuiConfigItemTests
 		Assert.True(MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform,
 			packet, MuiGetConfigItemPacketField.MethodId, out var method));
 		Assert.Equal(MuiNotifyConfigMessageCore.GetConfigItemMethod, method);
+		var cursor = new MuiGetConfigItemPacketFieldCursor
+		{
+			Message = packet,
+			Field = MuiGetConfigItemPacketField.Storage,
+		};
+		Assert.True(MuiGetConfigItemPacketFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var storageAddress, out var storageSize));
+		Assert.Equal(packet.Raw + 8u, storageAddress.Raw);
+		Assert.Equal(4u, storageSize);
+		cursor.Field = MuiGetConfigItemPacketField.MethodId;
+		Assert.True(MuiGetConfigItemPacketFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var methodAddress, out var methodSize));
+		Assert.Equal(packet.Raw, methodAddress.Raw);
+		Assert.Equal(4u, methodSize);
 		Assert.False(MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform,
 			APTR.FromPointer(0x5FF5), MuiGetConfigItemPacketField.Storage,
 			out _));
@@ -122,6 +136,10 @@ public sealed class MuiConfigItemTests
 			packet, (MuiGetConfigItemPacketField)255, out _));
 		Assert.False(MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform,
 			APTR.Null, MuiGetConfigItemPacketField.ConfigId, out _));
+		cursor.Message = APTR.FromPointer(0x5FF5);
+		cursor.Field = MuiGetConfigItemPacketField.Storage;
+		Assert.False(MuiGetConfigItemPacketFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 	}
 
 	[Fact]

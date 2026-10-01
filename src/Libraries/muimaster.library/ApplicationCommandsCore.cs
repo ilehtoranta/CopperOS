@@ -83,37 +83,122 @@ internal static class MuiApplicationCommandFieldCursorCodec
 	}
 }
 
-// Fixed MUI_Command records are read and written as named value types. Keep
-// the packed guest positions in this bounded ABI adapter; command-table
-// consumers never choose a numeric slot through the compatibility surface.
+// Fixed MUI_Command records are read and written as named value types. The
+// bounded cursor walks the complete packed struct before selecting a field;
+// command-table consumers never choose a numeric slot through the
+// compatibility surface.
 internal static class MuiApplicationCommandRecordMemoryCodec
 {
-	private static bool TryResolve(MuiApplicationCommandField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiApplicationCommandField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
+		address = APTR.Null;
 		switch (field)
 		{
 			case MuiApplicationCommandField.Name:
-				offset = MuiApplicationCommandRecord.NameOffset; return true;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationCommandRecord.FieldSize, out address);
 			case MuiApplicationCommandField.Template:
-				offset = MuiApplicationCommandRecord.TemplateOffset; return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationCommandRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationCommandRecord.FieldSize, out address);
 			case MuiApplicationCommandField.Parameters:
-				offset = MuiApplicationCommandRecord.ParametersOffset; return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationCommandRecord.FieldSize, out address);
 			case MuiApplicationCommandField.Hook:
-				offset = MuiApplicationCommandRecord.HookOffset; return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationCommandRecord.FieldSize, out address);
 			case MuiApplicationCommandField.Reserved0:
-				offset = MuiApplicationCommandRecord.Reserved0Offset; return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationCommandRecord.FieldSize, out address);
 			case MuiApplicationCommandField.Reserved1:
-				offset = MuiApplicationCommandRecord.Reserved1Offset; return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationCommandRecord.FieldSize, out address);
 			case MuiApplicationCommandField.Reserved2:
-				offset = MuiApplicationCommandRecord.Reserved2Offset; return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationCommandRecord.FieldSize, out address);
 			case MuiApplicationCommandField.Reserved3:
-				offset = MuiApplicationCommandRecord.Reserved3Offset; return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationCommandRecord.FieldSize, out address);
 			case MuiApplicationCommandField.Reserved4:
-				offset = MuiApplicationCommandRecord.Reserved4Offset; return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationCommandRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationCommandRecord.FieldSize, out address);
+			default:
+				return false;
 		}
-		offset = 0;
-		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -121,12 +206,10 @@ internal static class MuiApplicationCommandRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiApplicationCommandRecord.Size) &&
-			platform.IsMapped(address, MuiApplicationCommandRecord.FieldSize);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiApplicationCommandRecord.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address)) return false;
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

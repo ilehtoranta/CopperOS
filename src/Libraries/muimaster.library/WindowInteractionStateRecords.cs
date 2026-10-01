@@ -97,27 +97,28 @@ internal struct MuiWindowInteractionStateFieldCursor
 
 internal static class MuiWindowInteractionStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiWindowInteractionStateField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiWindowInteractionStateField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (field == MuiWindowInteractionStateField.Magic)
-			offset = MuiWindowInteractionStateRecord.MagicOffset;
-		else if (field == MuiWindowInteractionStateField.SnapshotFlags)
-			offset = MuiWindowInteractionStateRecord.SnapshotFlagsOffset;
-		else if (field == MuiWindowInteractionStateField.SnapshotRequests)
-			offset = MuiWindowInteractionStateRecord.SnapshotRequestsOffset;
-		else if (field == MuiWindowInteractionStateField.CycleChainHead)
-			offset = MuiWindowInteractionStateRecord.CycleChainHeadOffset;
-		else if (field == MuiWindowInteractionStateField.CycleChainCount)
-			offset = MuiWindowInteractionStateRecord.CycleChainCountOffset;
-		else if (field == MuiWindowInteractionStateField.CycleChainRequests)
-			offset = MuiWindowInteractionStateRecord.CycleChainRequestsOffset;
-		else
+		address = APTR.Null;
+		var skips = field switch
 		{
-			offset = 0;
-			return false;
-		}
-		return true;
+			MuiWindowInteractionStateField.Magic => 0u,
+			MuiWindowInteractionStateField.SnapshotFlags => 1u,
+			MuiWindowInteractionStateField.SnapshotRequests => 2u,
+			MuiWindowInteractionStateField.CycleChainHead => 3u,
+			MuiWindowInteractionStateField.CycleChainCount => 4u,
+			MuiWindowInteractionStateField.CycleChainRequests => 5u,
+			_ => uint.MaxValue,
+		};
+		if (skips == uint.MaxValue) return false;
+		for (var i = 0u; i < skips; i++)
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiWindowInteractionStateRecord.FieldSize, out _)) return false;
+		return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiWindowInteractionStateRecord.FieldSize, out address);
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -125,12 +126,11 @@ internal static class MuiWindowInteractionStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record,
-				MuiWindowInteractionStateRecord.Size)) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, MuiWindowInteractionStateRecord.FieldSize);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+			MuiWindowInteractionStateRecord.Size, out var structCursor) ||
+			!TryTakeField(ref platform, ref structCursor, cursor.Field, out address))
+			return false;
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -160,31 +160,33 @@ internal static class MuiWindowInteractionStateFieldCursorCodec
 }
 
 // Struct-first guest-memory adapter. Snapshot flags, request counters, and
-// cycle-chain topology remain named semantic fields; this bounded adapter is
-// the sole fixed-layout translation for the guest record.
+// cycle-chain topology remain named semantic fields; typed selection walks the
+// packed struct. The numeric overload remains a compatibility bridge for older
+// callers that carry an ABI offset.
 internal static class MuiWindowInteractionStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiWindowInteractionStateField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiWindowInteractionStateField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (field == MuiWindowInteractionStateField.Magic)
-			offset = MuiWindowInteractionStateRecord.MagicOffset;
-		else if (field == MuiWindowInteractionStateField.SnapshotFlags)
-			offset = MuiWindowInteractionStateRecord.SnapshotFlagsOffset;
-		else if (field == MuiWindowInteractionStateField.SnapshotRequests)
-			offset = MuiWindowInteractionStateRecord.SnapshotRequestsOffset;
-		else if (field == MuiWindowInteractionStateField.CycleChainHead)
-			offset = MuiWindowInteractionStateRecord.CycleChainHeadOffset;
-		else if (field == MuiWindowInteractionStateField.CycleChainCount)
-			offset = MuiWindowInteractionStateRecord.CycleChainCountOffset;
-		else if (field == MuiWindowInteractionStateField.CycleChainRequests)
-			offset = MuiWindowInteractionStateRecord.CycleChainRequestsOffset;
-		else
+		address = APTR.Null;
+		var skips = field switch
 		{
-			offset = 0;
-			return false;
-		}
-		return true;
+			MuiWindowInteractionStateField.Magic => 0u,
+			MuiWindowInteractionStateField.SnapshotFlags => 1u,
+			MuiWindowInteractionStateField.SnapshotRequests => 2u,
+			MuiWindowInteractionStateField.CycleChainHead => 3u,
+			MuiWindowInteractionStateField.CycleChainCount => 4u,
+			MuiWindowInteractionStateField.CycleChainRequests => 5u,
+			_ => uint.MaxValue,
+		};
+		if (skips == uint.MaxValue) return false;
+		for (var i = 0u; i < skips; i++)
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiWindowInteractionStateRecord.FieldSize, out _)) return false;
+		return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiWindowInteractionStateRecord.FieldSize, out address);
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -192,8 +194,10 @@ internal static class MuiWindowInteractionStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		return TryResolve(field, out var offset) &&
-			TryGetAddress(ref platform, record, offset, out address);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiWindowInteractionStateRecord.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address)) return false;
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

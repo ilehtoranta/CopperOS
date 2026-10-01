@@ -67,27 +67,28 @@ internal struct MuiWindowVisualStateFieldCursor
 
 internal static class MuiWindowVisualStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiWindowVisualStateField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiWindowVisualStateField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (field == MuiWindowVisualStateField.Magic)
-			offset = MuiWindowVisualStateRecord.MagicOffset;
-		else if (field == MuiWindowVisualStateField.NoMenus)
-			offset = MuiWindowVisualStateRecord.NoMenusOffset;
-		else if (field == MuiWindowVisualStateField.HasAlpha)
-			offset = MuiWindowVisualStateRecord.HasAlphaOffset;
-		else if (field == MuiWindowVisualStateField.Opacity)
-			offset = MuiWindowVisualStateRecord.OpacityOffset;
-		else if (field == MuiWindowVisualStateField.FancyDrawing)
-			offset = MuiWindowVisualStateRecord.FancyDrawingOffset;
-		else if (field == MuiWindowVisualStateField.MenuAction)
-			offset = MuiWindowVisualStateRecord.MenuActionOffset;
-		else
+		address = APTR.Null;
+		var skips = field switch
 		{
-			offset = 0;
-			return false;
-		}
-		return true;
+			MuiWindowVisualStateField.Magic => 0u,
+			MuiWindowVisualStateField.NoMenus => 1u,
+			MuiWindowVisualStateField.HasAlpha => 2u,
+			MuiWindowVisualStateField.Opacity => 3u,
+			MuiWindowVisualStateField.FancyDrawing => 4u,
+			MuiWindowVisualStateField.MenuAction => 5u,
+			_ => uint.MaxValue,
+		};
+		if (skips == uint.MaxValue) return false;
+		for (var i = 0u; i < skips; i++)
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiWindowVisualStateRecord.FieldSize, out _)) return false;
+		return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiWindowVisualStateRecord.FieldSize, out address);
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -95,12 +96,11 @@ internal static class MuiWindowVisualStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiWindowVisualStateRecord.Size))
+		if (!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+			MuiWindowVisualStateRecord.Size, out var structCursor) ||
+			!TryTakeField(ref platform, ref structCursor, cursor.Field, out address))
 			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, MuiWindowVisualStateRecord.FieldSize);
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -130,30 +130,33 @@ internal static class MuiWindowVisualStateFieldCursorCodec
 }
 
 // Struct-first guest-memory adapter. Visual policy values remain named
-// semantic fields; this bounded adapter owns their fixed guest slots.
+// semantic fields; typed field selection walks the packed struct. The numeric
+// overload remains a compatibility bridge for older callers that carry an ABI
+// offset.
 internal static class MuiWindowVisualStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiWindowVisualStateField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiWindowVisualStateField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (field == MuiWindowVisualStateField.Magic)
-			offset = MuiWindowVisualStateRecord.MagicOffset;
-		else if (field == MuiWindowVisualStateField.NoMenus)
-			offset = MuiWindowVisualStateRecord.NoMenusOffset;
-		else if (field == MuiWindowVisualStateField.HasAlpha)
-			offset = MuiWindowVisualStateRecord.HasAlphaOffset;
-		else if (field == MuiWindowVisualStateField.Opacity)
-			offset = MuiWindowVisualStateRecord.OpacityOffset;
-		else if (field == MuiWindowVisualStateField.FancyDrawing)
-			offset = MuiWindowVisualStateRecord.FancyDrawingOffset;
-		else if (field == MuiWindowVisualStateField.MenuAction)
-			offset = MuiWindowVisualStateRecord.MenuActionOffset;
-		else
+		address = APTR.Null;
+		var skips = field switch
 		{
-			offset = 0;
-			return false;
-		}
-		return true;
+			MuiWindowVisualStateField.Magic => 0u,
+			MuiWindowVisualStateField.NoMenus => 1u,
+			MuiWindowVisualStateField.HasAlpha => 2u,
+			MuiWindowVisualStateField.Opacity => 3u,
+			MuiWindowVisualStateField.FancyDrawing => 4u,
+			MuiWindowVisualStateField.MenuAction => 5u,
+			_ => uint.MaxValue,
+		};
+		if (skips == uint.MaxValue) return false;
+		for (var i = 0u; i < skips; i++)
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiWindowVisualStateRecord.FieldSize, out _)) return false;
+		return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiWindowVisualStateRecord.FieldSize, out address);
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -161,8 +164,10 @@ internal static class MuiWindowVisualStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		return TryResolve(field, out var offset) &&
-			TryGetAddress(ref platform, record, offset, out address);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiWindowVisualStateRecord.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address)) return false;
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

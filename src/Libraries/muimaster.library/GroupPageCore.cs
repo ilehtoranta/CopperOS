@@ -83,20 +83,20 @@ internal struct MuiGroupPageStateFieldCursor
 // for compatibility callers and adapter-focused tests.
 internal static class MuiGroupPageStateMemoryCodec
 {
-	private static bool TryResolve(MuiGroupPageStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiGroupPageStateField field,
+		out uint index)
 	{
 		if (field == MuiGroupPageStateField.Cookie)
-			offset = MuiGroupPageState.CookieOffset;
+			index = 0;
 		else if (field == MuiGroupPageStateField.Active)
-			offset = MuiGroupPageState.ActiveOffset;
+			index = 1;
 		else if (field == MuiGroupPageStateField.Changes)
-			offset = MuiGroupPageState.ChangesOffset;
+			index = 2;
 		else if (field == MuiGroupPageStateField.LastSelector)
-			offset = MuiGroupPageState.LastSelectorOffset;
+			index = 3;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -104,14 +104,35 @@ internal static class MuiGroupPageStateMemoryCodec
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiGroupPageStateField field, out APTR address)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiGroupPageStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiGroupPageStateFieldCursor cursor, out APTR address, out uint fieldSize)
+	where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiGroupPageState.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiGroupPageState.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiGroupPageState.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiGroupPageState.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiGroupPageState.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -157,8 +178,13 @@ internal static class MuiGroupPageStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiGroupPageStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiGroupPageStateMemoryCodec.TryGetAddress(ref platform, cursor.Record,
-			cursor.Field, out address);
+		TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiGroupPageStateFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGroupPageStateMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiGroupPageStateField field, out uint value)

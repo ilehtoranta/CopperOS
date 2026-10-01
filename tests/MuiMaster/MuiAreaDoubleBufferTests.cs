@@ -29,8 +29,23 @@ public sealed class MuiAreaDoubleBufferTests
 		cursor.Record = address;
 		cursor.Field = MuiAreaDoubleBufferStateField.Generation;
 		Assert.True(MuiAreaDoubleBufferStateFieldCursorCodec.TryGetAddress(
-			ref platform, cursor, out var generationAddress));
+				ref platform, cursor, out var generationAddress));
 		Assert.Equal(address.Raw + 8, generationAddress.Raw);
+		Assert.True(MuiAreaDoubleBufferStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedGenerationAddress, out var typedGenerationSize));
+		Assert.Equal(generationAddress, typedGenerationAddress);
+		Assert.Equal(MuiAreaDoubleBufferStateRecord.FieldSize, typedGenerationSize);
+		Assert.True(MuiAreaDoubleBufferStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryGenerationAddress, out var memoryGenerationSize));
+		Assert.Equal(typedGenerationAddress, memoryGenerationAddress);
+		Assert.Equal(typedGenerationSize, memoryGenerationSize);
+		cursor.Field = (MuiAreaDoubleBufferStateField)255;
+		Assert.False(MuiAreaDoubleBufferStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiAreaDoubleBufferStateField.Generation;
+		Assert.False(MuiAreaDoubleBufferStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 		Assert.False(MuiAreaDoubleBufferStateRecordCodec.TryRead(ref platform,
 			APTR.FromPointer(0x20FFFu), out _));
 	}
@@ -169,8 +184,8 @@ public sealed class MuiAreaDoubleBufferTests
 		var sourceRastPort = APTR.FromPointer(0x1400);
 		var targetRenderInfo = APTR.FromPointer(0x1500);
 		var targetRastPort = APTR.FromPointer(0x1600);
-		platform.WriteUInt32(renderInfo, 20, sourceRastPort.Raw);
-		platform.WriteUInt32(targetRenderInfo, 20, targetRastPort.Raw);
+		WriteRenderInfo(ref platform, renderInfo, sourceRastPort);
+		WriteRenderInfo(ref platform, targetRenderInfo, targetRastPort);
 		platform.DoubleBufferCapabilityAvailable = true;
 		platform.DoubleBufferTargetRenderInfo = targetRenderInfo;
 		platform.DoubleBufferTargetRastPort = targetRastPort;
@@ -217,8 +232,8 @@ public sealed class MuiAreaDoubleBufferTests
 		var sourceRastPort = APTR.FromPointer(0x1400);
 		var targetRenderInfo = APTR.FromPointer(0x1500);
 		var targetRastPort = APTR.FromPointer(0x1600);
-		platform.WriteUInt32(renderInfo, 20, sourceRastPort.Raw);
-		platform.WriteUInt32(targetRenderInfo, 20, targetRastPort.Raw);
+		WriteRenderInfo(ref platform, renderInfo, sourceRastPort);
+		WriteRenderInfo(ref platform, targetRenderInfo, targetRastPort);
 		platform.DoubleBufferCapabilityAvailable = true;
 		platform.DoubleBufferTargetRenderInfo = targetRenderInfo;
 		platform.DoubleBufferTargetRastPort = targetRastPort;
@@ -246,7 +261,7 @@ public sealed class MuiAreaDoubleBufferTests
 			rectangleClass, APTR.Null);
 		var renderInfo = APTR.FromPointer(0x1300);
 		var sourceRastPort = APTR.FromPointer(0x1400);
-		platform.WriteUInt32(renderInfo, 20, sourceRastPort.Raw);
+		WriteRenderInfo(ref platform, renderInfo, sourceRastPort);
 		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, rectangle,
 			renderInfo));
 		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, rectangle, 0, 0,
@@ -261,6 +276,70 @@ public sealed class MuiAreaDoubleBufferTests
 		Assert.Equal(sourceRastPort, platform.LastBeginUpdateLayer);
 	}
 
+	[Fact]
+	public void DoubleBufferRejectsTargetRenderInfoForDifferentRastPort()
+	{
+		var platform = CreatePlatform(out var rectangleClass);
+		var rectangle = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			rectangleClass, APTR.Null);
+		var renderInfo = APTR.FromPointer(0x1300);
+		var sourceRastPort = APTR.FromPointer(0x1400);
+		var targetRenderInfo = APTR.FromPointer(0x1500);
+		var targetRastPort = APTR.FromPointer(0x1600);
+		WriteRenderInfo(ref platform, renderInfo, sourceRastPort);
+		WriteRenderInfo(ref platform, targetRenderInfo,
+			APTR.FromPointer(0x1700));
+		platform.DoubleBufferCapabilityAvailable = true;
+		platform.DoubleBufferTargetRenderInfo = targetRenderInfo;
+		platform.DoubleBufferTargetRastPort = targetRastPort;
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, rectangle,
+			renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, rectangle, 0,
+			0, 12, 8));
+		Assert.True(MuiAreaDoubleBufferPacketCore.Set(ref platform, State,
+			rectangle, 1));
+
+		Assert.False(MuiCommonControlCore.DrawControl(ref platform, State,
+			rectangle, 0));
+		Assert.Equal(1u, platform.DoubleBufferBeginCount);
+		Assert.Equal(1u, platform.DoubleBufferEndCount);
+		Assert.False(platform.LastDoubleBufferEndCompleted);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			rectangle, MuiAreaDoubleBufferCore.RenderInfoAttribute, out var restored));
+		Assert.Equal(renderInfo.Raw, restored);
+	}
+
+	[Fact]
+	public void DoubleBufferRejectsTruncatedTargetRenderInfoRecord()
+	{
+		var platform = CreatePlatform(out var rectangleClass);
+		var rectangle = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			rectangleClass, APTR.Null);
+		var renderInfo = APTR.FromPointer(0x1300);
+		var sourceRastPort = APTR.FromPointer(0x1400);
+		var targetRenderInfo = APTR.FromPointer(0x20FF0);
+		var targetRastPort = APTR.FromPointer(0x1600);
+		WriteRenderInfo(ref platform, renderInfo, sourceRastPort);
+		platform.DoubleBufferCapabilityAvailable = true;
+		platform.DoubleBufferTargetRenderInfo = targetRenderInfo;
+		platform.DoubleBufferTargetRastPort = targetRastPort;
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, rectangle,
+			renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, rectangle, 0,
+			0, 12, 8));
+		Assert.True(MuiAreaDoubleBufferPacketCore.Set(ref platform, State,
+			rectangle, 1));
+
+		Assert.False(MuiCommonControlCore.DrawControl(ref platform, State,
+			rectangle, 0));
+		Assert.Equal(1u, platform.DoubleBufferBeginCount);
+		Assert.Equal(1u, platform.DoubleBufferEndCount);
+		Assert.False(platform.LastDoubleBufferEndCompleted);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			rectangle, MuiAreaDoubleBufferCore.RenderInfoAttribute, out var restored));
+		Assert.Equal(renderInfo.Raw, restored);
+	}
+
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR areaClass)
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -271,5 +350,13 @@ public sealed class MuiAreaDoubleBufferTests
 		areaClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State, name,
 			APTR.Null, 0, APTR.FromPointer(1), false);
 		return platform;
+	}
+
+	private static void WriteRenderInfo(ref MuiHeadlessTestPlatform platform,
+		APTR address, APTR rastPort)
+	{
+		var record = default(MuiDrawingRenderInfoRecord);
+		record.RastPort = rastPort;
+		Assert.True(MuiDrawingRenderInfoCodec.Write(ref platform, address, record));
 	}
 }

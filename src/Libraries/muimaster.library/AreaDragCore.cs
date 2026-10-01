@@ -32,14 +32,6 @@ internal struct MuiAreaDragState
 {
 	internal const uint Size = 32;
 	internal const uint FieldSize = 4;
-	internal const uint MagicOffset = 0;
-	internal const uint SourceOffset = 4;
-	internal const uint TargetOffset = 8;
-	internal const uint LastXOffset = 12;
-	internal const uint LastYOffset = 16;
-	internal const uint QualifierOffset = 20;
-	internal const uint EventFlagsOffset = 24;
-	internal const uint FlagsOffset = 28;
 	internal const uint ActiveFlag = 1;
 	internal const uint DroppedFlag = 2;
 	internal const uint ReportedFlag = 4;
@@ -76,37 +68,60 @@ internal struct MuiAreaDragStateFieldCursor
 
 // The fixed state record owns its packed positions in this bounded adapter.
 // Live drag lifecycle code uses this codec directly; the typed cursor below
-// remains only for compatibility callers and adapter-focused tests.
+// remains available for compatibility callers and adapter-focused tests.
 internal static class MuiAreaDragStateMemoryCodec
 {
-	private static bool TryResolve(MuiAreaDragStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiAreaDragStateField field,
+		out uint index)
 	{
-		offset = field switch
+		if (field == MuiAreaDragStateField.Magic) index = 0;
+		else if (field == MuiAreaDragStateField.Source) index = 1;
+		else if (field == MuiAreaDragStateField.Target) index = 2;
+		else if (field == MuiAreaDragStateField.LastX) index = 3;
+		else if (field == MuiAreaDragStateField.LastY) index = 4;
+		else if (field == MuiAreaDragStateField.Qualifier) index = 5;
+		else if (field == MuiAreaDragStateField.EventFlags) index = 6;
+		else if (field == MuiAreaDragStateField.Flags) index = 7;
+		else
 		{
-			MuiAreaDragStateField.Magic => MuiAreaDragState.MagicOffset,
-			MuiAreaDragStateField.Source => MuiAreaDragState.SourceOffset,
-			MuiAreaDragStateField.Target => MuiAreaDragState.TargetOffset,
-			MuiAreaDragStateField.LastX => MuiAreaDragState.LastXOffset,
-			MuiAreaDragStateField.LastY => MuiAreaDragState.LastYOffset,
-			MuiAreaDragStateField.Qualifier => MuiAreaDragState.QualifierOffset,
-			MuiAreaDragStateField.EventFlags => MuiAreaDragState.EventFlagsOffset,
-			MuiAreaDragStateField.Flags => MuiAreaDragState.FlagsOffset,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			index = uint.MaxValue;
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiAreaDragStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiAreaDragStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaDragStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiAreaDragState.Size) &&
-			platform.IsMapped(address, MuiAreaDragState.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiAreaDragState.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiAreaDragState.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiAreaDragState.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -168,8 +183,13 @@ internal static class MuiAreaDragStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaDragStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiAreaDragStateMemoryCodec.TryGetAddress(ref platform, cursor.Record,
-			cursor.Field, out address);
+		TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaDragStateFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAreaDragStateMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiAreaDragStateField field, out uint value)

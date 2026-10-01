@@ -9,10 +9,20 @@ using System.Runtime.InteropServices;
 
 namespace CopperOS.MuiMaster;
 
-public interface IMuiExecCapability
+// Class registries need ordinary owned allocations, not Exec pools or any
+// object, task or graphical capability. Keep that native boundary explicit.
+public interface IMuiAllocationCapability
 {
 	APTR Allocate(uint byteSize, uint flags);
 	void Free(APTR address, uint byteSize);
+}
+
+public interface IMuiAllocationPlatform : IMuiGuestMemory, IMuiAllocationCapability
+{
+}
+
+public interface IMuiExecCapability : IMuiAllocationCapability
+{
 	// MorphOS Listtree ConstructHook/DestructHook receives a standard Exec
 	// memory-pool handle in A2. The handle is opaque to MUI; the native provider
 	// owns its pool header and the pooled allocation policy.
@@ -22,15 +32,19 @@ public interface IMuiExecCapability
 	void FreePooled(APTR pool, APTR address, uint byteSize);
 }
 
-public interface IMuiBoopsiCapability
+public interface IMuiBoopsiObjectLifetimeCapability
 {
 	APTR NewObject(APTR classPointer, APTR tagList);
+	void DisposeObject(APTR obj);
+}
+
+public interface IMuiBoopsiCapability : IMuiBoopsiObjectLifetimeCapability
+{
 	uint DoMethod(APTR obj, APTR message);
 	// Deliver a method directly through the supplied BOOPSI class, matching
 	// MorphOS CoerceMethod() semantics. The class pointer is an opaque guest
 	// IClass*; the platform owns dispatcher resolution.
 	uint CoerceMethod(APTR classPointer, APTR obj, APTR message);
-	void DisposeObject(APTR obj);
 }
 
 // MorphOS MUI object persistence seam for MUIM_Export/MUIM_Import. The MUI
@@ -83,6 +97,9 @@ public struct MuiDoubleBufferRenderRequest
 	public int TargetWidth;
 	public int TargetHeight;
 	public uint Flags;
+	// Native providers own this bitmap until EndMuiDoubleBuffer. Keeping the
+	// handle in the request makes the per-draw resource lease explicit.
+	public APTR TargetBitmap;
 }
 
 public interface IMuiDoubleBufferCapability
@@ -439,6 +456,15 @@ public interface IMuiAslCapability
 	void FreeRequest(APTR requester);
 }
 
+// Narrow requester-service boundary used by the resident ASL vectors. Keeping
+// this separate from IMuiServicePlatform lets the native entrypoints use the
+// same named AslServiceCore records without importing the whole headless/UI
+// capability aggregate.
+public interface IMuiAslServicePlatform : IMuiGuestMemory,
+	IMuiAllocationCapability, IMuiAslCapability
+{
+}
+
 // MG09 requester capability for the synchronous MUI_RequestA and
 // MUI_RequestObjectA entry points. Title and gadget strings remain caller-owned
 // guest pointers. The service validates the caller's format/vector and, when a
@@ -447,12 +473,47 @@ public interface IMuiAslCapability
 // their caller-owned pointer. No host formatter is implied by this seam.
 // RequestObject is separate from the ASL Request overload because it models
 // MUI's object-backed requester path rather than an ASL requester handle.
-public interface IMuiRequesterCapability
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+public struct MuiRequesterCallRecord
 {
-	int Request(APTR application, APTR window, uint flags, APTR title,
-		APTR gadgets, APTR format, APTR parameters);
-	int RequestObject(APTR application, APTR window, uint flags, APTR title,
-		APTR gadgets, APTR obj, APTR format, APTR parameters);
+	public APTR Application;
+	public APTR Window;
+	public uint Flags;
+	public APTR Title;
+	public APTR Gadgets;
+	public APTR Object;
+	public APTR Format;
+	public APTR Parameters;
+}
+
+public interface IMuiRequesterServicePlatform : IMuiAllocationPlatform
+{
+	int Request(MuiRequesterCallRecord request);
+}
+
+public interface IMuiRequesterCapability : IMuiRequesterServicePlatform
+{
+	int RequestObject(MuiRequesterCallRecord request, out bool consumeReference);
+	// MUI_RequestObjectA consumes one object reference when its requester
+	// closes. The native provider performs that release through OM_RELEASE;
+	// headless providers use the same capability to model the lifetime.
+	bool ReleaseObject(APTR obj);
+}
+
+// Resolves a MUI Window object to the Intuition Window passed to a native
+// system requester. Kept separate from the general requester capability so
+// host-side requester services do not gain an Intuition dependency.
+internal interface IMuiRequesterWindowCapability
+{
+	bool TryGetNativeWindow(APTR muiWindow, out APTR intuitionWindow);
+}
+
+// Application-backed RequestA uses the owning application's public title when
+// the caller leaves the requester title NULL. Keep the native GetAttr query
+// behind a small value-type capability so the policy remains host-testable.
+internal interface IMuiRequesterApplicationTitleCapability
+{
+	bool TryGetApplicationTitle(APTR application, out APTR title);
 }
 
 public interface IMuiTimerCapability
@@ -487,9 +548,10 @@ public interface IMuiLibraryLoaderCapability
 //      takes the library base as an explicit argument (Null for private classes)
 //      so the platform can bind the A6 register-delivery contract to the
 //      created class.  MUI creates the dispatcher hook itself; no h_Data is exposed.
-//   * A public class published by an opened "mui/<id>" library must be resolved
-//      back to its struct IClass* after OpenLibrary succeeds.  ResolvePublicClass
-//      performs exactly that lookup and never allocates.
+//   * An opened "mui/<id>" library supplies MCC_Query(0), which returns a
+//      MUI_CustomClass*, not a published IClass*. ResolveExternalClass uses the
+//      already-opened library and extracts the Class field through that typed
+//      public record. No Intuition AddClass publication is assumed.
 //
 // This capability is deliberately kept apart from the frozen aggregate so the
 // frozen headless/layout/application interfaces are preserved unchanged.
@@ -506,10 +568,11 @@ public interface IMuiCustomClassCapability
 	// Release a class created by MakeCustomClass.  Returns success.
 	bool FreeCustomClass(APTR classPointer);
 
-	// Resolve the public struct IClass* published under `classId` by a
-	// previously opened "mui/<classId>" library, or Null when no public class of
-	// that exact (case-sensitive) id is present.
-	APTR ResolvePublicClass(APTR classId);
+	// Resolve the struct IClass* supplied by MCC_Query(0) of the already-opened
+	// `library` for this exact (case-sensitive) class id. The provider validates
+	// and decodes its returned MUI_CustomClass record; it never treats the
+	// returned record itself as an IClass* or assumes public class registration.
+	APTR ResolveExternalClass(APTR library, APTR classId);
 }
 
 // MG09-only clip-region capability. The frozen IMuiLayersCapability models
@@ -550,6 +613,16 @@ public interface IMuiPenCapability
 	// Resolve the black-box `penSpec` into the generated MUI_RGBColor block at
 	// `rgbColor`. Returns success.
 	bool GetRGBColor(APTR renderInfo, APTR penSpec, APTR rgbColor);
+}
+
+// Narrow drawing-service boundary used by the native public drawing vectors.
+// Keeping the record/clip/pen seam separate from the full service aggregate
+// lets the resident vectors borrow only guest memory, Exec allocation, layers,
+// and graphics capabilities. Every boundary remains a value-type contract;
+// no managed object or exception path is part of the native ABI.
+public interface IMuiDrawingServicePlatform : IMuiAllocationPlatform,
+	IMuiLayersCapability, IMuiRegionCapability, IMuiPenCapability
+{
 }
 
 // MG09 class-service platform.  Aggregates the frozen headless surface with the
@@ -661,22 +734,43 @@ public interface IMuiDatatypeCapability
 // aggregate additionally carries the external BOOPSI loader and datatypes
 // picture seams used by the additive Boopsi.mui / Dtpic.mui external wrapper.
 public interface IMuiServicePlatform : IMuiHeadlessPlatform,
-	IMuiLibraryLoaderCapability, IMuiCustomClassCapability, IMuiAslCapability,
-	IMuiRequesterCapability, IMuiLayersCapability, IMuiRegionCapability,
-	IMuiPenCapability, IMuiProcessCapability, IMuiExternalBoopsiCapability,
+	IMuiClassServicePlatform, IMuiAslServicePlatform,
+	IMuiRequesterCapability, IMuiDrawingServicePlatform,
+	IMuiProcessCapability, IMuiExternalBoopsiCapability,
 	IMuiDatatypeCapability, IMuiInputCapability, IMuiKeyadjustInputCapability
 {
 }
 
 
 
-public interface IMuiBoopsiClassCapability : IMuiBoopsiCapability
+// Publication and class allocation have no object-dispatch prerequisite.
+// Native providers implement these operations against actual IClass records
+// and Intuition, independently of the broader headless object platform.
+public interface IMuiBoopsiClassRegistryCapability
 {
 	APTR MakeClass(APTR classId, APTR superClass, ushort instanceSize,
 		APTR dispatcher);
 	bool AddClass(APTR classPointer);
 	bool RemoveClass(APTR classPointer);
 	bool FreeClass(APTR classPointer);
+}
+
+public interface IMuiClassRegistryPlatform : IMuiAllocationPlatform,
+	IMuiBoopsiClassRegistryCapability
+{
+}
+
+// Exactly the class-service dependencies: guest memory, ordinary allocations,
+// class registry operations, provider-library leases and custom-class binding.
+// Creating an object is deliberately not a prerequisite for acquiring a class.
+public interface IMuiClassServicePlatform : IMuiClassRegistryPlatform,
+	IMuiLibraryLoaderCapability, IMuiCustomClassCapability
+{
+}
+
+public interface IMuiBoopsiClassCapability : IMuiBoopsiCapability,
+	IMuiBoopsiClassRegistryCapability
+{
 	uint DoSuperMethod(APTR classPointer, APTR obj, APTR message);
 	APTR InstanceData(APTR classPointer, APTR obj);
 	bool RetainObject(APTR obj);
@@ -688,7 +782,7 @@ public interface IMuiTaskCapability
 	uint CurrentTaskToken();
 }
 
-public interface IMuiHeadlessPlatform : IMuiGuestMemory, IMuiExecCapability,
+public interface IMuiHeadlessPlatform : IMuiClassRegistryPlatform, IMuiExecCapability,
 	IMuiBoopsiClassCapability, IMuiCallbackCapability, IMuiTaskCapability,
 	IMuiDirectoryCapability, IMuiObjectPersistenceCapability, IMuiDosCapability,
 	IMuiShortHelpCapability, IMuiDragImageCapability,

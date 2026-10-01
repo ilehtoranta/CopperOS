@@ -114,7 +114,7 @@ internal static class Program
             .Append(Path.Combine(executor, "CopperOS.Commands.Exe2ArcNativeExecution.csproj"))
             .Append(Path.Combine(probe, "CopperOS.Commands.Exe2ArcNativeRoot.csproj"))
             .Append(Path.Combine(root, "tests", "Commands.NativeExecution", "HunkImage.cs"))
-            .Append(Path.Combine(root, "src", "Commands", "Exe2ArcHeaderProbe.cs"))
+            .Append(Path.Combine(root, "src", "Commands", "Exe2Arc", "Exe2ArcHeaderProbe.cs"))
             .Append(Path.Combine(root, "CopperOS.Portable.props"));
         return files.Order(StringComparer.Ordinal).Select(p => new AuditFile(Path.GetFullPath(p), Hash(p))).ToArray();
     }

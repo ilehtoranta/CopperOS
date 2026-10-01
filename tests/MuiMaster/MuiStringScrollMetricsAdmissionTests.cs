@@ -78,6 +78,19 @@ public sealed class MuiStringScrollMetricsAdmissionTests
 			ref platform, recordAddress, MuiStringScrollMetricsStateField.Left,
 			out var typedLeftAddress));
 		Assert.Equal(0x1D94u, typedLeftAddress.Raw);
+		var leftCursor = new MuiStringScrollMetricsStateFieldCursor
+		{
+			Record = recordAddress,
+			Field = MuiStringScrollMetricsStateField.Left,
+		};
+		Assert.True(MuiStringScrollMetricsStateFieldCursorCodec.TryGetAddress(ref platform,
+			leftCursor, out var cursorLeftAddress, out var cursorFieldSize));
+		Assert.Equal(typedLeftAddress, cursorLeftAddress);
+		Assert.Equal(MuiStringScrollMetricsStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiStringScrollMetricsStateRecordMemoryCodec.TryGetAddress(ref platform,
+			leftCursor, out var memoryLeftAddress, out var memoryFieldSize));
+		Assert.Equal(cursorLeftAddress, memoryLeftAddress);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiStringScrollMetricsStateRecordMemoryCodec.TryReadUInt32(
 			ref platform, recordAddress, MuiStringScrollMetricsStateField.Height,
 			out var typedHeight));
@@ -114,6 +127,13 @@ public sealed class MuiStringScrollMetricsAdmissionTests
 			ref platform, APTR.Null, (uint)0, out _));
 		Assert.False(MuiStringScrollMetricsStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
+		leftCursor.Field = (MuiStringScrollMetricsStateField)255;
+		Assert.False(MuiStringScrollMetricsStateFieldCursorCodec.TryGetAddress(ref platform,
+			leftCursor, out _, out _));
+		leftCursor.Record = APTR.Null;
+		leftCursor.Field = MuiStringScrollMetricsStateField.Left;
+		Assert.False(MuiStringScrollMetricsStateFieldCursorCodec.TryGetAddress(ref platform,
+			leftCursor, out _, out _));
 	}
 
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR stringClass,

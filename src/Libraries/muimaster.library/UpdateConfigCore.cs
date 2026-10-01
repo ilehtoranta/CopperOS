@@ -198,37 +198,52 @@ internal struct MuiUpdateConfigPacketFieldCursor
 
 internal static class MuiUpdateConfigPacketFieldMemoryCodec
 {
-	private static bool TryResolve(MuiUpdateConfigPacketField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiUpdateConfigPacketField field,
+		out uint index)
 	{
-		if (field == MuiUpdateConfigPacketField.MethodId)
+		if (field == MuiUpdateConfigPacketField.MethodId) index = 0;
+		else if (field == MuiUpdateConfigPacketField.CfgId) index = 1;
+		else if (field == MuiUpdateConfigPacketField.RedrawCount) index = 2;
+		else
 		{
-			offset = MuiUpdateConfigMessage.MethodIdOffset;
-			return true;
+			index = uint.MaxValue;
+			return false;
 		}
-		if (field == MuiUpdateConfigPacketField.CfgId)
-		{
-			offset = MuiUpdateConfigMessage.CfgIdOffset;
-			return true;
-		}
-		if (field == MuiUpdateConfigPacketField.RedrawCount)
-		{
-			offset = MuiUpdateConfigMessage.RedrawCountOffset;
-			return true;
-		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR message, MuiUpdateConfigPacketField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiUpdateConfigPacketFieldCursor);
+		cursor.Message = message;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiUpdateConfigPacketFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || message.IsNull ||
-			message.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Message,
+				MuiUpdateConfigHeader.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				4, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = 4;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -261,8 +276,14 @@ internal static class MuiUpdateConfigPacketFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiUpdateConfigPacketFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiUpdateConfigPacketFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
 		=> MuiUpdateConfigPacketFieldMemoryCodec.TryGetAddress(ref platform,
-			cursor.Message, cursor.Field, out address);
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR message, MuiUpdateConfigPacketField field, out uint value)

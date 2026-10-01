@@ -58,60 +58,50 @@ internal static class MuiCollectionBasicMessageMemoryCodec
 		return false;
 	}
 
-	private static bool TryResolve(MuiCollectionBasicPacketKind packet,
-		MuiCollectionBasicField field, out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiCollectionBasicPacketKind packet,
+		MuiCollectionBasicField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
+		address = APTR.Null;
+		uint fieldIndex;
 		switch (packet)
 		{
 			case MuiCollectionBasicPacketKind.Method:
-				if (field == MuiCollectionBasicField.MethodId)
-				{
-					offset = MuiCollectionMethodMessage.MethodIdOffset;
-					return true;
-				}
+				if (field != MuiCollectionBasicField.MethodId) return false;
+				fieldIndex = 0;
 				break;
 			case MuiCollectionBasicPacketKind.GetEntry:
-				if (field == MuiCollectionBasicField.MethodId)
+				fieldIndex = field switch
 				{
-					offset = MuiCollectionGetEntryMessage.MethodIdOffset;
-					return true;
-				}
-				if (field == MuiCollectionBasicField.Position)
-				{
-					offset = MuiCollectionGetEntryMessage.PositionOffset;
-					return true;
-				}
-				if (field == MuiCollectionBasicField.Storage)
-				{
-					offset = MuiCollectionGetEntryMessage.StorageOffset;
-					return true;
-				}
+					MuiCollectionBasicField.MethodId => 0,
+					MuiCollectionBasicField.Position => 1,
+					MuiCollectionBasicField.Storage => 2,
+					_ => uint.MaxValue,
+				};
 				break;
 			case MuiCollectionBasicPacketKind.Select:
-				if (field == MuiCollectionBasicField.MethodId)
+				fieldIndex = field switch
 				{
-					offset = MuiCollectionSelectMessage.MethodIdOffset;
-					return true;
-				}
-				if (field == MuiCollectionBasicField.Position)
-				{
-					offset = MuiCollectionSelectMessage.PositionOffset;
-					return true;
-				}
-				if (field == MuiCollectionBasicField.Select)
-				{
-					offset = MuiCollectionSelectMessage.SelectOffset;
-					return true;
-				}
-				if (field == MuiCollectionBasicField.Storage)
-				{
-					offset = MuiCollectionSelectMessage.StorageOffset;
-					return true;
-				}
+					MuiCollectionBasicField.MethodId => 0,
+					MuiCollectionBasicField.Position => 1,
+					MuiCollectionBasicField.Select => 2,
+					MuiCollectionBasicField.Storage => 3,
+					_ => uint.MaxValue,
+				};
 				break;
+			default:
+				return false;
 		}
-		offset = 0;
-		return false;
+		if (fieldIndex == uint.MaxValue) return false;
+		if (fieldIndex > 0 && !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, MuiCollectionMethodMessage.FieldSize, out _)) return false;
+		if (fieldIndex > 1 && !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, MuiCollectionMethodMessage.FieldSize, out _)) return false;
+		if (fieldIndex > 2 && !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, MuiCollectionMethodMessage.FieldSize, out _)) return false;
+		return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiCollectionMethodMessage.FieldSize, out address);
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -126,13 +116,12 @@ internal static class MuiCollectionBasicMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(packet, field, out var offset) ||
-			!TryGetPacketSize(packet, out var packetSize) ||
-			message.IsNull || message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(message, packetSize))
-			return false;
-		address = APTR.FromPointer(message.Raw + offset);
-		return platform.IsMapped(address, MuiCollectionMethodMessage.FieldSize);
+		if (!TryGetPacketSize(packet, out var packetSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, message, packetSize,
+				out var guestCursor) ||
+			!TryTakeField(ref platform, ref guestCursor, packet, field,
+				out address)) return false;
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

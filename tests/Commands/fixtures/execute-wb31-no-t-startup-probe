@@ -1,0 +1,8 @@
+; Disposable WB 3.1 Execute probe without a T: assignment.
+FailAt 1
+Echo "BEGIN" >S:Shell-Startup
+Echo ".KEY filename" >RAM:execute-probe
+Echo "Echo <filename> >S:Shell-Startup" >>RAM:execute-probe
+C:Execute RAM:execute-probe fallback
+Echo "END" >>S:Shell-Startup
+EndCLI >NIL:

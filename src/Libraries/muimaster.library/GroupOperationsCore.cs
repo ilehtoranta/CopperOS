@@ -117,17 +117,16 @@ internal static class MuiGroupOrderingMethodHeaderCodec
 
 internal static class MuiGroupOrderingPacketMemoryCodec
 {
-	private static bool TryResolve(MuiGroupOrderingPacketKind packet,
-		MuiGroupOrderingPacketField field, out uint offset, out uint size,
+	private static bool TryResolveFieldIndex(MuiGroupOrderingPacketKind packet,
+		MuiGroupOrderingPacketField field, out uint index, out uint size,
 		out uint fieldSize)
 	{
-		offset = 0;
+		index = 0;
 		size = 0;
 		fieldSize = 0;
 		if (packet == MuiGroupOrderingPacketKind.Header)
 		{
 			if (field != MuiGroupOrderingPacketField.MethodId) return false;
-			offset = MuiGroupOrderingMethodMessage.MethodIdOffset;
 			size = MuiGroupOrderingMethodMessage.Size;
 			fieldSize = MuiGroupOrderingMethodMessage.FieldSize;
 			return true;
@@ -137,11 +136,11 @@ internal static class MuiGroupOrderingPacketMemoryCodec
 			size = MuiGroupMoveMemberMessage.Size;
 			fieldSize = MuiGroupMoveMemberMessage.FieldSize;
 			if (field == MuiGroupOrderingPacketField.MethodId)
-				offset = MuiGroupMoveMemberMessage.MethodIdOffset;
+				index = 0;
 			else if (field == MuiGroupOrderingPacketField.Object)
-				offset = MuiGroupMoveMemberMessage.ObjectOffset;
+				index = 1;
 			else if (field == MuiGroupOrderingPacketField.Position)
-				offset = MuiGroupMoveMemberMessage.PositionOffset;
+				index = 2;
 			else return false;
 			return true;
 		}
@@ -150,11 +149,11 @@ internal static class MuiGroupOrderingPacketMemoryCodec
 			size = MuiGroupReorderMessage.Size;
 			fieldSize = MuiGroupReorderMessage.FieldSize;
 			if (field == MuiGroupOrderingPacketField.MethodId)
-				offset = MuiGroupReorderMessage.MethodIdOffset;
+				index = 0;
 			else if (field == MuiGroupOrderingPacketField.After)
-				offset = MuiGroupReorderMessage.AfterOffset;
+				index = 1;
 			else if (field == MuiGroupOrderingPacketField.Objects)
-				offset = MuiGroupReorderMessage.ObjectsOffset;
+				index = 2;
 			else return false;
 			return true;
 		}
@@ -163,11 +162,32 @@ internal static class MuiGroupOrderingPacketMemoryCodec
 			size = MuiGroupSortMessage.Size;
 			fieldSize = MuiGroupSortMessage.FieldSize;
 			if (field == MuiGroupOrderingPacketField.MethodId)
-				offset = MuiGroupSortMessage.MethodIdOffset;
+				index = 0;
 			else if (field == MuiGroupOrderingPacketField.Objects)
-				offset = MuiGroupSortMessage.ObjectsOffset;
+				index = 1;
 			else return false;
 			return true;
+		}
+		return false;
+	}
+
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiGroupOrderingPacketKind packet,
+		MuiGroupOrderingPacketField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolveFieldIndex(packet, field, out var index, out _, out _))
+			return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGroupOrderingMethodMessage.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				return true;
+			}
 		}
 		return false;
 	}
@@ -180,12 +200,11 @@ internal static class MuiGroupOrderingPacketMemoryCodec
 	{
 		address = APTR.Null;
 		fieldSize = 0;
-		if (!TryResolve(packet, field, out var offset, out var packetSize,
+		if (!TryResolveFieldIndex(packet, field, out _, out var packetSize,
 			out fieldSize) || message.IsNull ||
-			message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(message, packetSize)) return false;
-		address = APTR.FromPointer(message.Raw + offset);
-		return platform.IsMapped(address, fieldSize);
+			!MuiGuestStructCursor.TryCreate(ref platform, message, packetSize,
+				out var cursor)) return false;
+		return TryTakeField(ref platform, ref cursor, packet, field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

@@ -64,10 +64,14 @@ internal static class MuiGroupLayoutHookStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiGroupLayoutHookStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiGroupLayoutHookStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiGroupLayoutHookStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGroupLayoutHookStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiGroupLayoutHookStateField field, out uint value)
@@ -90,16 +94,16 @@ internal static class MuiGroupLayoutHookStateFieldCursorCodec
 // semantic record; this bounded adapter owns fixed guest-layout translation.
 internal static class MuiGroupLayoutHookStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiGroupLayoutHookStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiGroupLayoutHookStateField field,
+		out uint index)
 	{
 		if (field == MuiGroupLayoutHookStateField.Magic)
-			offset = MuiGroupLayoutHookStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiGroupLayoutHookStateField.Hook)
-			offset = MuiGroupLayoutHookStateRecord.HookOffset;
+			index = 1;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -109,12 +113,34 @@ internal static class MuiGroupLayoutHookStateRecordMemoryCodec
 		APTR record, MuiGroupLayoutHookStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiGroupLayoutHookStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiGroupLayoutHookStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
-			MuiGroupLayoutHookStateRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiGroupLayoutHookStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiGroupLayoutHookStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiGroupLayoutHookStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiGroupLayoutHookStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

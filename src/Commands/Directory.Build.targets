@@ -1,0 +1,88 @@
+<Project>
+  <!--
+    A command project sets CopperOSCommandName (the C: file name) and
+    CopperSharpEntry. `dotnet publish` then compiles that one entry to a HUNK
+    and copies it to $(CopperOSCDirectory)<CopperOSCommandName>.
+  -->
+  <PropertyGroup Condition="'$(CopperOSCommandName)' != ''">
+    <!-- One C: binary per command: MC68000 runs on every Kickstart 3.1 machine. -->
+    <CopperSharpCpu Condition="'$(CopperSharpCpu)' == ''">68000</CopperSharpCpu>
+    <CopperSharpOutputFormat>hunk</CopperSharpOutputFormat>
+    <!-- Match the qualified native receipts (artifacts/cc10-*): resident, fatal exceptions. -->
+    <CopperSharpRuntimeProfile Condition="'$(CopperSharpRuntimeProfile)' == ''">resident</CopperSharpRuntimeProfile>
+    <CopperSharpExceptionMode Condition="'$(CopperSharpExceptionMode)' == ''">yolo</CopperSharpExceptionMode>
+    <!-- Image, .map and .framework.json stay in the publish directory; only the
+         executable is copied into the C: directory. -->
+    <CopperSharpOutputPath Condition="'$(CopperSharpOutputPath)' == ''">$(PublishDir)$(CopperOSCommandName)</CopperSharpOutputPath>
+    <CopperOSCDirectory Condition="'$(CopperOSCDirectory)' == ''">$(CopperOSCommandsRoot)..\..\out\C\</CopperOSCDirectory>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(CopperOSIsHostCommandModel)' != 'true'">
+    <Compile Remove="Host\**" />
+  </ItemGroup>
+
+  <Import Project="$(CopperSharp68kRoot)\Sdk\Sdk\Sdk.targets"
+          Condition="'$(CopperOSIsHostCommandModel)' != 'true' and Exists('$(CopperSharp68kRoot)\Sdk\Sdk\Sdk.targets')" />
+
+  <!-- Sdk.targets points this at its NuGet payload unconditionally; use the
+       compiler built from the same local tree instead. Must follow the import. -->
+  <PropertyGroup Condition="'$(CopperOSCommandName)' != ''">
+    <CopperSharpCompilerAssembly Condition="'$(CopperOSCompilerAssembly)' == ''">$(CopperSharp68kRoot)\Compiler.Cli\bin\Release\net10.0\CopperSharp.Compiler.Cli.dll</CopperSharpCompilerAssembly>
+    <CopperSharpCompilerAssembly Condition="'$(CopperOSCompilerAssembly)' != ''">$(CopperOSCompilerAssembly)</CopperSharpCompilerAssembly>
+  </PropertyGroup>
+
+  <Target Name="CopperOSCheckCommandToolchain"
+          BeforeTargets="PrepareCopperSharpPublishManifest"
+          Condition="'$(CopperOSCommandName)' != ''">
+    <Error Condition="!Exists('$(CopperSharp68kRoot)\Sdk\Sdk\Sdk.targets')"
+           Text="C: commands build against a local CopperSharp68k tree; none found at '$(CopperSharp68kRoot)'. Set CopperSharp68kRoot." />
+    <Error Condition="!Exists('$(CopperSharpCompilerAssembly)')"
+           Text="CopperSharp compiler not built at '$(CopperSharpCompilerAssembly)'. Run: dotnet build &quot;$(CopperSharp68kRoot)\Compiler.Cli\CopperSharp.Compiler.Cli.csproj&quot; -c Release -p:SkipCopperScreenHeadlessProjectReference=true (or tools\Commands\build-c.ps1)." />
+  </Target>
+
+  <!-- The qualifier scripts compile with peephole=disabled and memory=none, and
+       the fixed-point peephole default miscompiles Eval (classic-left-shift-word
+       returns 10). Sdk.targets has no typed property for either, but the
+       compiler's response manifest accepts both keys, so add them to the
+       manifest the SDK just wrote. Set CopperOSPeephole/CopperOSMemory empty to
+       fall back to the compiler defaults. -->
+  <PropertyGroup Condition="'$(CopperOSCommandName)' != ''">
+    <CopperOSPeephole Condition="'$(CopperOSPeephole)' == ''">disabled</CopperOSPeephole>
+    <CopperOSMemory Condition="'$(CopperOSMemory)' == ''">none</CopperOSMemory>
+    <!-- No HUNK_SYMBOL block, like the original C: binaries. Kickstart 3.1's
+         LoadSeg rejects a symbol name longer than 32 longwords (128 bytes)
+         with ERROR_BAD_HUNK, and CopperSharp's mangled names can exceed that
+         (Eval: 36 longwords). The .map file next to each image still holds
+         the symbols. Set CopperOSSymbols=on to keep them. -->
+    <CopperOSSymbols Condition="'$(CopperOSSymbols)' == ''">off</CopperOSSymbols>
+  </PropertyGroup>
+
+  <Target Name="CopperOSExtendPublishManifest"
+          AfterTargets="PrepareCopperSharpPublishManifest"
+          BeforeTargets="CompileCopperSharpPublishedImage"
+          Condition="'$(CopperOSCommandName)' != '' and '$(RuntimeIdentifier)' == 'amiga-m68k'">
+    <ReadLinesFromFile File="$(CopperSharpResponseManifestPath)">
+      <Output TaskParameter="Lines" ItemName="_CopperOSManifestLine" />
+    </ReadLinesFromFile>
+    <ItemGroup>
+      <_CopperOSManifestLine Remove="@(_CopperOSManifestLine)"
+                             Condition="$([System.String]::Copy('%(Identity)').StartsWith('peephole=')) or $([System.String]::Copy('%(Identity)').StartsWith('memory=')) or $([System.String]::Copy('%(Identity)').StartsWith('symbols='))" />
+      <_CopperOSManifestLine Include="peephole=$(CopperOSPeephole)" Condition="'$(CopperOSPeephole)' != ''" />
+      <_CopperOSManifestLine Include="memory=$(CopperOSMemory)" Condition="'$(CopperOSMemory)' != ''" />
+      <_CopperOSManifestLine Include="symbols=$(CopperOSSymbols)" Condition="'$(CopperOSSymbols)' != ''" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(CopperSharpResponseManifestPath)"
+                      Lines="@(_CopperOSManifestLine)"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+  </Target>
+
+  <Target Name="CopperOSCopyToCDirectory"
+          AfterTargets="CompileCopperSharpPublishedImage"
+          Condition="'$(CopperOSCommandName)' != '' and '$(RuntimeIdentifier)' == 'amiga-m68k'">
+    <Copy SourceFiles="$(CopperSharpOutputPath)"
+          DestinationFiles="$(CopperOSCDirectory)$(CopperOSCommandName)"
+          SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="$(CopperOSCommandName) -> $([System.IO.Path]::GetFullPath('$(CopperOSCDirectory)$(CopperOSCommandName)'))" />
+  </Target>
+</Project>

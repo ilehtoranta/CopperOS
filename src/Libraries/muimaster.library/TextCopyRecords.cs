@@ -56,57 +56,32 @@ internal struct MuiTextCopyStateFieldCursor
 
 internal static class MuiTextCopyStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiTextCopyStateField field,
-		out uint offset)
-	{
-		if (field == MuiTextCopyStateField.Magic)
-			offset = MuiTextCopyStateRecord.MagicOffset;
-		else if (field == MuiTextCopyStateField.Copy)
-			offset = MuiTextCopyStateRecord.CopyOffset;
-		else
-		{
-			offset = 0;
-			return false;
-		}
-		return true;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiTextCopyStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
-				cursor.Record, MuiTextCopyStateRecord.Size)) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, MuiTextCopyStateRecord.FieldSize);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiTextCopyStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiTextCopyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiTextCopyStateField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiTextCopyStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiTextCopyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiTextCopyStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		var cursor = default(MuiTextCopyStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
-	}
+		=> MuiTextCopyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
 }
 
 // Struct-first guest-memory adapter. Text consumers use the named copy-policy
@@ -115,16 +90,16 @@ internal static class MuiTextCopyStateFieldCursorCodec
 // compatibility and malformed-state diagnostics.
 internal static class MuiTextCopyStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiTextCopyStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiTextCopyStateField field,
+		out uint index)
 	{
 		if (field == MuiTextCopyStateField.Magic)
-			offset = MuiTextCopyStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiTextCopyStateField.Copy)
-			offset = MuiTextCopyStateRecord.CopyOffset;
+			index = 1;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -134,9 +109,34 @@ internal static class MuiTextCopyStateRecordMemoryCodec
 		APTR record, MuiTextCopyStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiTextCopyStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiTextCopyStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		return TryResolve(field, out var offset) &&
-			TryGetAddress(ref platform, record, offset, out address);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiTextCopyStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiTextCopyStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiTextCopyStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

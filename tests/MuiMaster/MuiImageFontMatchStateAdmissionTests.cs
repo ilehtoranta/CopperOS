@@ -40,6 +40,19 @@ public sealed class MuiImageFontMatchStateAdmissionTests
 			out var typedWidth));
 		Assert.Equal(address.Raw + MuiImageFontMatchStateRecord.WidthOffset,
 			typedWidth.Raw);
+		var widthCursor = new MuiImageFontMatchStateFieldCursor
+		{
+			Record = address,
+			Field = MuiImageFontMatchStateField.Width,
+		};
+		Assert.True(MuiImageFontMatchStateFieldCursorCodec.TryGetAddress(
+			ref platform, widthCursor, out var cursorWidth, out var cursorFieldSize));
+		Assert.Equal(typedWidth, cursorWidth);
+		Assert.Equal(MuiImageFontMatchStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiImageFontMatchStateRecordMemoryCodec.TryGetAddress(
+			ref platform, widthCursor, out var memoryWidth, out var memoryFieldSize));
+		Assert.Equal(cursorWidth, memoryWidth);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiImageFontMatchStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiImageFontMatchStateField.Height, 720));
 		Assert.True(MuiImageFontMatchStateRecordMemoryCodec.TryReadUInt32(
@@ -56,6 +69,13 @@ public sealed class MuiImageFontMatchStateAdmissionTests
 			ref platform, address, MuiImageFontMatchStateRecord.Size, out _));
 		Assert.False(MuiImageFontMatchStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, (uint)0, out _));
+		widthCursor.Field = (MuiImageFontMatchStateField)255;
+		Assert.False(MuiImageFontMatchStateFieldCursorCodec.TryGetAddress(
+			ref platform, widthCursor, out _, out _));
+		widthCursor.Record = APTR.Null;
+		widthCursor.Field = MuiImageFontMatchStateField.Width;
+		Assert.False(MuiImageFontMatchStateFieldCursorCodec.TryGetAddress(
+			ref platform, widthCursor, out _, out _));
 		Assert.False(MuiImageFontMatchStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

@@ -76,26 +76,25 @@ internal static class MuiGroupGridSpecFieldCursorCodec
 // adapter is the only place that turns those positions into guest addresses.
 internal static class MuiGroupGridSpecMemoryCodec
 {
-	private static bool TryResolve(MuiGroupGridSpecField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiGroupGridSpecField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		offset = field switch
+		address = APTR.Null;
+		var selected = (uint)field;
+		if (selected > (uint)MuiGroupGridSpecField.VerticalCenter) return false;
+		for (var index = 0u; index <= selected; index++)
 		{
-			MuiGroupGridSpecField.Columns => MuiGroupGridSpec.ColumnsOffset,
-			MuiGroupGridSpecField.Rows => MuiGroupGridSpec.RowsOffset,
-			MuiGroupGridSpecField.HorizontalSpacing =>
-				MuiGroupGridSpec.HorizontalSpacingOffset,
-			MuiGroupGridSpecField.VerticalSpacing =>
-				MuiGroupGridSpec.VerticalSpacingOffset,
-			MuiGroupGridSpecField.SameWidth => MuiGroupGridSpec.SameWidthOffset,
-			MuiGroupGridSpecField.SameHeight => MuiGroupGridSpec.SameHeightOffset,
-			MuiGroupGridSpecField.HorizontalCenter =>
-				MuiGroupGridSpec.HorizontalCenterOffset,
-			MuiGroupGridSpecField.VerticalCenter =>
-				MuiGroupGridSpec.VerticalCenterOffset,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGroupGridSpec.FieldSize, out var candidate)) return false;
+			if (index == selected)
+			{
+				address = candidate;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -103,11 +102,9 @@ internal static class MuiGroupGridSpecMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiGroupGridSpec.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiGroupGridSpec.FieldSize);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiGroupGridSpec.Size, out var cursor)) return false;
+		return TryTakeField(ref platform, ref cursor, field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

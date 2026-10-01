@@ -84,23 +84,26 @@ internal static class MuiApplicationCommandsStateFieldCursorCodec
 }
 
 // Fixed application command-state records are read and written as named
-// values. Keep the packed guest positions in this bounded ABI adapter;
-// production state consumers do not select numeric slots directly.
+// values. The bounded cursor walks the complete packed struct before selecting
+// a field; offset constants remain ABI documentation/compatibility aliases.
 internal static class MuiApplicationCommandsStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiApplicationCommandsStateField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiApplicationCommandsStateField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		switch (field)
+		address = APTR.Null;
+		if (field == MuiApplicationCommandsStateField.Magic)
+			return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiApplicationCommandsStateRecord.FieldSize, out address);
+		if (field == MuiApplicationCommandsStateField.Table)
 		{
-			case MuiApplicationCommandsStateField.Magic:
-				offset = MuiApplicationCommandsStateRecord.MagicOffset;
-				return true;
-			case MuiApplicationCommandsStateField.Table:
-				offset = MuiApplicationCommandsStateRecord.TableOffset;
-				return true;
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiApplicationCommandsStateRecord.FieldSize, out _)) return false;
+			return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiApplicationCommandsStateRecord.FieldSize, out address);
 		}
-		offset = 0;
 		return false;
 	}
 
@@ -109,12 +112,11 @@ internal static class MuiApplicationCommandsStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiApplicationCommandsStateRecord.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address))
 			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiApplicationCommandsStateRecord.Size) &&
-			platform.IsMapped(address, MuiApplicationCommandsStateRecord.FieldSize);
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

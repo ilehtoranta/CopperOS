@@ -34,6 +34,8 @@ public struct MuiControlFontResolutionRecord
 {
 	public const uint Size = 20;
 	public const uint FieldSize = 4;
+	// ABI/documentation aliases only. Field access advances the named record
+	// with MuiGuestStructCursor below.
 	public const uint MagicOffset = 0;
 	public const uint PresentOffset = 4;
 	public const uint InheritedOffset = 8;
@@ -57,27 +59,61 @@ internal enum MuiControlFontResolutionRecordField : byte
 	Font,
 }
 
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiControlFontResolutionRecordFieldCursor
+{
+	internal APTR Record;
+	internal MuiControlFontResolutionRecordField Field;
+}
+
+internal static class MuiControlFontResolutionRecordFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiControlFontResolutionRecordFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiControlFontResolutionRecordFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiControlFontResolutionRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiControlFontResolutionRecordField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiControlFontResolutionRecordMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiControlFontResolutionRecordField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiControlFontResolutionRecordMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
+}
+
 // Struct-first adapter for the effective-font projection. The resolver and
 // callers exchange a named record; this bounded layer alone translates its
 // five 68k LONG fields in guest memory.
 internal static class MuiControlFontResolutionRecordMemoryCodec
 {
-	private static bool TryResolve(MuiControlFontResolutionRecordField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(
+		MuiControlFontResolutionRecordField field, out uint index)
 	{
 		if (field == MuiControlFontResolutionRecordField.Magic)
-			offset = MuiControlFontResolutionRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiControlFontResolutionRecordField.Present)
-			offset = MuiControlFontResolutionRecord.PresentOffset;
+			index = 1;
 		else if (field == MuiControlFontResolutionRecordField.Inherited)
-			offset = MuiControlFontResolutionRecord.InheritedOffset;
+			index = 2;
 		else if (field == MuiControlFontResolutionRecordField.Depth)
-			offset = MuiControlFontResolutionRecord.DepthOffset;
+			index = 3;
 		else if (field == MuiControlFontResolutionRecordField.Font)
-			offset = MuiControlFontResolutionRecord.FontOffset;
+			index = 4;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -87,12 +123,34 @@ internal static class MuiControlFontResolutionRecordMemoryCodec
 		APTR record, MuiControlFontResolutionRecordField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiControlFontResolutionRecordFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiControlFontResolutionRecordFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiControlFontResolutionRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiControlFontResolutionRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiControlFontResolutionRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiControlFontResolutionRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiControlFontResolutionRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

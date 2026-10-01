@@ -23,6 +23,28 @@ public sealed class MuiGroupLayoutHookStructAdapterTests
 			address, out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.Hook, decoded.Hook);
+		var hookCursor = new MuiGroupLayoutHookStateFieldCursor
+		{
+			Record = address,
+			Field = MuiGroupLayoutHookStateField.Hook,
+		};
+		Assert.True(MuiGroupLayoutHookStateFieldCursorCodec.TryGetAddress(
+			ref platform, hookCursor, out var cursorHookAddress,
+			out var cursorFieldSize));
+		Assert.Equal(APTR.FromPointer(0x3D04), cursorHookAddress);
+		Assert.Equal(MuiGroupLayoutHookStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiGroupLayoutHookStateRecordMemoryCodec.TryGetAddress(
+			ref platform, hookCursor, out var memoryHookAddress,
+			out var memoryFieldSize));
+		Assert.Equal(cursorHookAddress, memoryHookAddress);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
+		hookCursor.Field = (MuiGroupLayoutHookStateField)255;
+		Assert.False(MuiGroupLayoutHookStateFieldCursorCodec.TryGetAddress(
+			ref platform, hookCursor, out _, out _));
+		hookCursor.Record = APTR.Null;
+		hookCursor.Field = MuiGroupLayoutHookStateField.Hook;
+		Assert.False(MuiGroupLayoutHookStateFieldCursorCodec.TryGetAddress(
+			ref platform, hookCursor, out _, out _));
 
 		var crossingEnd = APTR.FromPointer(0x30FFD);
 		Assert.False(MuiGroupLayoutHookStateRecordCodec.WriteRecord(ref platform,

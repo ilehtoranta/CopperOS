@@ -48,34 +48,17 @@ internal struct MuiRectanglePresentationStateFieldCursor
 
 internal static class MuiRectanglePresentationStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiRectanglePresentationStateField field,
-		out uint offset)
-	{
-		if (field == MuiRectanglePresentationStateField.Magic)
-			offset = MuiRectanglePresentationStateRecord.MagicOffset;
-		else if (field == MuiRectanglePresentationStateField.HorizontalBar)
-			offset = MuiRectanglePresentationStateRecord.HorizontalBarOffset;
-		else if (field == MuiRectanglePresentationStateField.VerticalBar)
-			offset = MuiRectanglePresentationStateRecord.VerticalBarOffset;
-		else
-		{
-			offset = 0;
-			return false;
-		}
-		return true;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiRectanglePresentationStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
-			cursor.Record, MuiRectanglePresentationStateRecord.Size)) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, MuiRectanglePresentationStateRecord.FieldSize);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiRectanglePresentationStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiRectanglePresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiRectanglePresentationStateField field, out uint value)
@@ -107,18 +90,18 @@ internal static class MuiRectanglePresentationStateFieldCursorCodec
 // fixed guest-layout translation is bounded to this adapter.
 internal static class MuiRectanglePresentationStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiRectanglePresentationStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiRectanglePresentationStateField field,
+		out uint index)
 	{
 		if (field == MuiRectanglePresentationStateField.Magic)
-			offset = MuiRectanglePresentationStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiRectanglePresentationStateField.HorizontalBar)
-			offset = MuiRectanglePresentationStateRecord.HorizontalBarOffset;
+			index = 1;
 		else if (field == MuiRectanglePresentationStateField.VerticalBar)
-			offset = MuiRectanglePresentationStateRecord.VerticalBarOffset;
+			index = 2;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -128,9 +111,34 @@ internal static class MuiRectanglePresentationStateRecordMemoryCodec
 		APTR record, MuiRectanglePresentationStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiRectanglePresentationStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiRectanglePresentationStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		return TryResolve(field, out var offset) &&
-			TryGetAddress(ref platform, record, offset, out address);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiRectanglePresentationStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiRectanglePresentationStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiRectanglePresentationStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

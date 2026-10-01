@@ -64,10 +64,14 @@ internal static class MuiSleepStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiSleepStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiSleepStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiSleepStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiSleepStateRecordMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiSleepStateField field, out uint value)
@@ -91,38 +95,57 @@ internal static class MuiSleepStateFieldCursorCodec
 // available only to legacy callers and malformed-state diagnostics.
 internal static class MuiSleepStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiSleepStateField field, out uint offset)
+	private static bool TryResolveFieldIndex(MuiSleepStateField field,
+		out uint index)
 	{
-		switch (field)
+		if (field == MuiSleepStateField.Magic)
+			index = 0;
+		else if (field == MuiSleepStateField.Depth)
+			index = 1;
+		else if (field == MuiSleepStateField.SavedDisabled)
+			index = 2;
+		else if (field == MuiSleepStateField.Request)
+			index = 3;
+		else
 		{
-			case MuiSleepStateField.Magic:
-				offset = MuiSleepStateRecord.MagicOffset;
-				return true;
-			case MuiSleepStateField.Depth:
-				offset = MuiSleepStateRecord.DepthOffset;
-				return true;
-			case MuiSleepStateField.SavedDisabled:
-				offset = MuiSleepStateRecord.SavedDisabledOffset;
-				return true;
-			case MuiSleepStateField.Request:
-				offset = MuiSleepStateRecord.RequestOffset;
-				return true;
+			index = uint.MaxValue;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiSleepStateField field, out APTR address)
+	where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiSleepStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiSleepStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiSleepStateRecord.Size) &&
-			platform.IsMapped(address, MuiSleepStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiSleepStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiSleepStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiSleepStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

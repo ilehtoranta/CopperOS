@@ -10,6 +10,17 @@ $latest = Join-Path $repo "tests\Commands.NativeRoot\bin\$Configuration\net10.0\
 $latestBefore = if (Test-Path -LiteralPath $latest) { (Get-FileHash -LiteralPath $latest -Algorithm SHA256).Hash } else { $null }
 $results = @()
 
+function Convert-HexToBytes([string]$hex) {
+    $fromHex = [Convert].GetMethod('FromHexString', [Type[]]@([string]))
+    if ($null -ne $fromHex) { return [Convert]::FromHexString($hex) }
+    if (($hex.Length % 2) -ne 0) { throw 'Hex fixture must contain an even number of characters.' }
+    $bytes = [byte[]]::new($hex.Length / 2)
+    for ($index = 0; $index -lt $bytes.Length; $index++) {
+        $bytes[$index] = [Convert]::ToByte($hex.Substring($index * 2, 2), 16)
+    }
+    return $bytes
+}
+
 foreach ($scenario in @('bootstrap-failure', 'source-drift', 'source-inventory-drift')) {
     $fixture = Join-Path $testDirectory $scenario
     $compilerFixture = Join-Path $fixture 'CopperSharp68k'
@@ -35,7 +46,17 @@ foreach ($scenario in @('bootstrap-failure', 'source-drift', 'source-inventory-d
 </Project>
 "@ | Set-Content -LiteralPath (Join-Path $compilerFixture 'Compiler.Cli\CopperSharp.Compiler.Cli.csproj') -Encoding utf8
 
-    $output = @(& pwsh -NoLogo -NoProfile -File $qualifier -Configuration $Configuration -CopperSharpRoot $compilerFixture 2>&1)
+    # The child qualifier must fail for these scenarios. Temporarily allow
+    # its stderr stream through so PowerShell returns the durable receipt and
+    # exit code to the assertions below instead of terminating the harness.
+    $savedErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = @(& pwsh -NoLogo -NoProfile -File $qualifier -Configuration $Configuration -CopperSharpRoot $compilerFixture 2>&1)
+    }
+    finally {
+        $ErrorActionPreference = $savedErrorActionPreference
+    }
     $exitCode = $LASTEXITCODE
     $output | Set-Content -LiteralPath (Join-Path $fixture 'qualifier.log') -Encoding utf8
     $attemptLine = @($output | ForEach-Object ToString | Where-Object { $_.StartsWith('Qualification attempt: ') })
@@ -77,7 +98,7 @@ $guardResults = & {
     $errors = $null
     $ast = [Management.Automation.Language.Parser]::ParseFile($qualifier, [ref]$tokens, [ref]$errors)
     if ($errors.Count -ne 0) { throw 'The qualification script has parser errors.' }
-    $requiredFunctions = @('Get-FileIdentity', 'Copy-BoundInput', 'Assert-BoundFiles', 'Assert-InputBinding', 'Assert-FrameworkClosure',
+    $requiredFunctions = @('Convert-BytesToHex', 'Get-BytesSha256Hex', 'Get-FileIdentity', 'Copy-BoundInput', 'Assert-BoundFiles', 'Assert-InputBinding', 'Assert-FrameworkClosure',
         'Read-CommandHunkWord', 'Read-CommandHunkForTailAudit', 'Get-CommandMapMetric', 'Assert-NativeHelperClosure')
     foreach ($name in $requiredFunctions) {
         $definition = @($ast.FindAll({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] }, $true) |
@@ -184,7 +205,7 @@ $guardResults = & {
     }
     function New-TailFixture {
         [ordered]@{
-            Code = [Convert]::FromHexString('48E73832518F600A48E73832518F60024E752002508F4CDF4C1C4E75646F732E6C69627261727900')
+            Code = Convert-HexToBytes '48E73832518F600A48E73832518F60024E752002508F4CDF4C1C4E75646F732E6C69627261727900'
             Symbols = @(
                 @{ Name = 'CopperOS.Commands.Native.NativeCommandIo::ReadOnce'; Offset = 0; Size = 8 },
                 @{ Name = 'CopperOS.Commands.Native.NativeCommandIo::WriteOnce'; Offset = 8; Size = 8 },
@@ -286,7 +307,7 @@ $guardResults = & {
             }
             'tail-byte-corruption' { $fixture.Code[21] = 0x87; $expectedMessage = 'tail is absent' }
             'tail-duplicate-bytes' {
-                $fixture.Code = [Convert]::FromHexString('2002508F4CDF4C1C4E75') + $fixture.Code
+                $fixture.Code = (Convert-HexToBytes '2002508F4CDF4C1C4E75') + $fixture.Code
                 $fixture.CodeBoundary += 10
                 foreach ($symbol in $fixture.Symbols) { $symbol.Offset += 10 }
                 $expectedMessage = 'tail is absent, duplicated'
@@ -319,7 +340,7 @@ $guardResults = & {
         }
         elseif ($scenario -eq 'tail-extra-hunk-record') {
             $image = [IO.File]::ReadAllBytes($written.Path)
-            [IO.File]::WriteAllBytes($written.Path, $image + [Convert]::FromHexString('000003E9000000014E750000000003F2'))
+            [IO.File]::WriteAllBytes($written.Path, $image + (Convert-HexToBytes '000003E9000000014E750000000003F2'))
             $expectedMessage = 'unexpected, repeated or trailing HUNK record'
         }
         $failureMessage = $null

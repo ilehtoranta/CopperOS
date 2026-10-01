@@ -39,48 +39,33 @@ internal struct MuiPopSpecialistFieldCursor
 // members without exposing numeric positions to dispatch code.
 internal static class MuiPopSpecialistMessageMemoryCodec
 {
-	private static bool TryResolve(MuiPopSpecialistPacketKind packet,
-		MuiPopSpecialistField field, out uint offset, out uint size)
+	private static bool TryResolveFieldIndex(MuiPopSpecialistPacketKind packet,
+		MuiPopSpecialistField field, out uint index, out uint recordSize)
 	{
-		switch (packet)
+		index = uint.MaxValue;
+		recordSize = 0;
+		if (packet == MuiPopSpecialistPacketKind.Method &&
+			field == MuiPopSpecialistField.MethodId)
 		{
-			case MuiPopSpecialistPacketKind.Method:
-				size = MuiPopSpecialistMethodMessage.Size;
-				if (field == MuiPopSpecialistField.MethodId)
-					offset = MuiPopSpecialistMethodMessage.MethodIdOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
-			case MuiPopSpecialistPacketKind.Get:
-				size = MuiPopSpecialistGetMessage.Size;
-				if (field == MuiPopSpecialistField.MethodId)
-					offset = MuiPopSpecialistGetMessage.MethodIdOffset;
-				else if (field == MuiPopSpecialistField.Attribute)
-					offset = MuiPopSpecialistGetMessage.AttributeOffset;
-				else if (field == MuiPopSpecialistField.Storage)
-					offset = MuiPopSpecialistGetMessage.StorageOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
-			case MuiPopSpecialistPacketKind.Set:
-				size = MuiPopSpecialistSetMessage.Size;
-				if (field == MuiPopSpecialistField.MethodId)
-					offset = MuiPopSpecialistSetMessage.MethodIdOffset;
-				else if (field == MuiPopSpecialistField.Attribute)
-					offset = MuiPopSpecialistSetMessage.AttributeOffset;
-				else if (field == MuiPopSpecialistField.Value)
-					offset = MuiPopSpecialistSetMessage.ValueOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
-			case MuiPopSpecialistPacketKind.Close:
-				size = MuiPopSpecialistCloseMessage.Size;
-				if (field == MuiPopSpecialistField.MethodId)
-					offset = MuiPopSpecialistCloseMessage.MethodIdOffset;
-				else if (field == MuiPopSpecialistField.Result)
-					offset = MuiPopSpecialistCloseMessage.ResultOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
+			index = 0; recordSize = MuiPopSpecialistMethodMessage.Size; return true;
 		}
-		offset = 0;
-		size = 0;
+		if (packet == MuiPopSpecialistPacketKind.Get)
+		{
+			if (field == MuiPopSpecialistField.MethodId) { index = 0; recordSize = MuiPopSpecialistGetMessage.Size; return true; }
+			if (field == MuiPopSpecialistField.Attribute) { index = 1; recordSize = MuiPopSpecialistGetMessage.Size; return true; }
+			if (field == MuiPopSpecialistField.Storage) { index = 2; recordSize = MuiPopSpecialistGetMessage.Size; return true; }
+		}
+		else if (packet == MuiPopSpecialistPacketKind.Set)
+		{
+			if (field == MuiPopSpecialistField.MethodId) { index = 0; recordSize = MuiPopSpecialistSetMessage.Size; return true; }
+			if (field == MuiPopSpecialistField.Attribute) { index = 1; recordSize = MuiPopSpecialistSetMessage.Size; return true; }
+			if (field == MuiPopSpecialistField.Value) { index = 2; recordSize = MuiPopSpecialistSetMessage.Size; return true; }
+		}
+		else if (packet == MuiPopSpecialistPacketKind.Close)
+		{
+			if (field == MuiPopSpecialistField.MethodId) { index = 0; recordSize = MuiPopSpecialistCloseMessage.Size; return true; }
+			if (field == MuiPopSpecialistField.Result) { index = 1; recordSize = MuiPopSpecialistCloseMessage.Size; return true; }
+		}
 		return false;
 	}
 
@@ -89,12 +74,33 @@ internal static class MuiPopSpecialistMessageMemoryCodec
 		MuiPopSpecialistField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		return TryGetAddress(ref platform, message, packet, field,
+			out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR message, MuiPopSpecialistPacketKind packet,
+		MuiPopSpecialistField field, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(packet, field, out var offset, out var size) ||
-			message.IsNull || message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(message, size)) return false;
-		address = APTR.FromPointer(message.Raw + offset);
-		return platform.IsMapped(address, MuiPopSpecialistMethodMessage.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(packet, field, out var index,
+			out var recordSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, message, recordSize,
+				out var cursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 4,
+				out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = 4;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -130,6 +136,12 @@ internal static class MuiPopSpecialistFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiPopSpecialistMessageMemoryCodec.TryGetAddress(ref platform,
 			cursor.Message, cursor.Packet, cursor.Field, out address);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiPopSpecialistFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiPopSpecialistMessageMemoryCodec.TryGetAddress(ref platform,
+			cursor.Message, cursor.Packet, cursor.Field, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR message, MuiPopSpecialistPacketKind packet,

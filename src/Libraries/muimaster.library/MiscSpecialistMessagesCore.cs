@@ -52,92 +52,63 @@ internal struct MuiMiscSpecialistFieldCursor
 // without exposing numeric positions to dispatch code.
 internal static class MuiMiscSpecialistMessageMemoryCodec
 {
-	private static bool TryResolve(MuiMiscSpecialistPacketKind packet,
-		MuiMiscSpecialistField field, out uint offset, out uint size)
+	private static bool TryResolveFieldIndex(MuiMiscSpecialistPacketKind packet,
+		MuiMiscSpecialistField field, out uint index, out uint recordSize)
 	{
+		index = 0;
+		recordSize = 0;
 		switch (packet)
 		{
 			case MuiMiscSpecialistPacketKind.Method:
-				size = MuiMiscSpecialistMethodMessage.Size;
-				if (field == MuiMiscSpecialistField.MethodId)
-					offset = MuiMiscSpecialistMethodMessage.MethodIdOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
+				recordSize = MuiMiscSpecialistMethodMessage.Size;
+				if (field == MuiMiscSpecialistField.MethodId) { index = 0; return true; }
+				break;
 			case MuiMiscSpecialistPacketKind.Lifecycle:
-				size = MuiMiscLifecycleMessage.Size;
-				if (field == MuiMiscSpecialistField.MethodId)
-					offset = MuiMiscLifecycleMessage.MethodIdOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
+				recordSize = MuiMiscLifecycleMessage.Size;
+				if (field == MuiMiscSpecialistField.MethodId) { index = 0; return true; }
+				break;
 			case MuiMiscSpecialistPacketKind.Get:
-				size = MuiMiscSpecialistGetMessage.Size;
-				if (field == MuiMiscSpecialistField.MethodId)
-					offset = MuiMiscSpecialistGetMessage.MethodIdOffset;
-				else if (field == MuiMiscSpecialistField.Attribute)
-					offset = MuiMiscSpecialistGetMessage.AttributeOffset;
-				else if (field == MuiMiscSpecialistField.Storage)
-					offset = MuiMiscSpecialistGetMessage.StorageOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
+				recordSize = MuiMiscSpecialistGetMessage.Size;
+				if (field == MuiMiscSpecialistField.MethodId) { index = 0; return true; }
+				if (field == MuiMiscSpecialistField.Attribute) { index = 1; return true; }
+				if (field == MuiMiscSpecialistField.Storage) { index = 2; return true; }
+				break;
 			case MuiMiscSpecialistPacketKind.Set:
-				size = MuiMiscSpecialistSetMessage.Size;
-				if (field == MuiMiscSpecialistField.MethodId)
-					offset = MuiMiscSpecialistSetMessage.MethodIdOffset;
-				else if (field == MuiMiscSpecialistField.Attribute)
-					offset = MuiMiscSpecialistSetMessage.AttributeOffset;
-				else if (field == MuiMiscSpecialistField.Value)
-					offset = MuiMiscSpecialistSetMessage.ValueOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
+				recordSize = MuiMiscSpecialistSetMessage.Size;
+				if (field == MuiMiscSpecialistField.MethodId) { index = 0; return true; }
+				if (field == MuiMiscSpecialistField.Attribute) { index = 1; return true; }
+				if (field == MuiMiscSpecialistField.Value) { index = 2; return true; }
+				break;
 			case MuiMiscSpecialistPacketKind.Pointer:
-				size = MuiMiscSpecialistPointerMessage.Size;
-				if (field == MuiMiscSpecialistField.MethodId)
-					offset = MuiMiscSpecialistPointerMessage.MethodIdOffset;
-				else if (field == MuiMiscSpecialistField.Pointer)
-					offset = MuiMiscSpecialistPointerMessage.PointerOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
+				recordSize = MuiMiscSpecialistPointerMessage.Size;
+				if (field == MuiMiscSpecialistField.MethodId) { index = 0; return true; }
+				if (field == MuiMiscSpecialistField.Pointer) { index = 1; return true; }
+				break;
 			case MuiMiscSpecialistPacketKind.Pair:
-				size = MuiMiscSpecialistPairMessage.Size;
-				if (field == MuiMiscSpecialistField.MethodId)
-					offset = MuiMiscSpecialistPairMessage.MethodIdOffset;
-				else if (field == MuiMiscSpecialistField.First)
-					offset = MuiMiscSpecialistPairMessage.FirstOffset;
-				else if (field == MuiMiscSpecialistField.Second)
-					offset = MuiMiscSpecialistPairMessage.SecondOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
+				recordSize = MuiMiscSpecialistPairMessage.Size;
+				if (field == MuiMiscSpecialistField.MethodId) { index = 0; return true; }
+				if (field == MuiMiscSpecialistField.First) { index = 1; return true; }
+				if (field == MuiMiscSpecialistField.Second) { index = 2; return true; }
+				break;
 			case MuiMiscSpecialistPacketKind.HandleInput:
-				size = MuiMiscHandleInputMessage.Size;
-				if (field == MuiMiscSpecialistField.MethodId)
-					offset = MuiMiscHandleInputMessage.MethodIdOffset;
-				else if (field == MuiMiscSpecialistField.IntuiMessage)
-					offset = MuiMiscHandleInputMessage.IntuiMessageOffset;
-				else if (field == MuiMiscSpecialistField.MuiKey)
-					offset = MuiMiscHandleInputMessage.MuiKeyOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
+				recordSize = MuiMiscHandleInputMessage.Size;
+				if (field == MuiMiscSpecialistField.MethodId) { index = 0; return true; }
+				if (field == MuiMiscSpecialistField.IntuiMessage) { index = 1; return true; }
+				if (field == MuiMiscSpecialistField.MuiKey) { index = 2; return true; }
+				break;
 			case MuiMiscSpecialistPacketKind.RegisterGadget:
-				size = MuiMiscSpecialistRegisterGadgetMessage.Size;
-				if (field == MuiMiscSpecialistField.MethodId)
-					offset = MuiMiscSpecialistRegisterGadgetMessage.MethodIdOffset;
-				else if (field == MuiMiscSpecialistField.Gadget)
-					offset = MuiMiscSpecialistRegisterGadgetMessage.GadgetOffset;
-				else if (field == MuiMiscSpecialistField.Id)
-					offset = MuiMiscSpecialistRegisterGadgetMessage.IdOffset;
-				else if (field == MuiMiscSpecialistField.Parameters)
-					offset = MuiMiscSpecialistRegisterGadgetMessage.ParametersOffset;
-				else if (field == MuiMiscSpecialistField.Title)
-					offset = MuiMiscSpecialistRegisterGadgetMessage.TitleOffset;
-				else if (field == MuiMiscSpecialistField.Attribute)
-					offset = MuiMiscSpecialistRegisterGadgetMessage.AttributeOffset;
-				else if (field == MuiMiscSpecialistField.Label)
-					offset = MuiMiscSpecialistRegisterGadgetMessage.LabelOffset;
-				else { offset = 0; size = 0; return false; }
-				return true;
+				recordSize = MuiMiscSpecialistRegisterGadgetMessage.Size;
+				if (field == MuiMiscSpecialistField.MethodId) { index = 0; return true; }
+				if (field == MuiMiscSpecialistField.Gadget) { index = 1; return true; }
+				if (field == MuiMiscSpecialistField.Id) { index = 2; return true; }
+				if (field == MuiMiscSpecialistField.Parameters) { index = 3; return true; }
+				if (field == MuiMiscSpecialistField.Title) { index = 4; return true; }
+				if (field == MuiMiscSpecialistField.Attribute) { index = 5; return true; }
+				if (field == MuiMiscSpecialistField.Label) { index = 6; return true; }
+				break;
 		}
-		offset = 0;
-		size = 0;
+		index = uint.MaxValue;
+		recordSize = 0;
 		return false;
 	}
 
@@ -146,12 +117,53 @@ internal static class MuiMiscSpecialistMessageMemoryCodec
 		MuiMiscSpecialistField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiMiscSpecialistFieldCursor);
+		cursor.Message = message;
+		cursor.Packet = packet;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMiscSpecialistFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(packet, field, out var offset, out var size) ||
-			message.IsNull || message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(message, size)) return false;
-		address = APTR.FromPointer(message.Raw + offset);
-		return platform.IsMapped(address, MuiMiscSpecialistMethodMessage.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Packet, cursor.Field, out var index,
+			out var recordSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Message,
+				recordSize, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiMiscSpecialistMethodMessage.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiMiscSpecialistMethodMessage.FieldSize;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMiscSpecialistFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR message, MuiMiscSpecialistPacketKind packet,
+		MuiMiscSpecialistField field, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiMiscSpecialistFieldCursor);
+		cursor.Message = message;
+		cursor.Packet = packet;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out fieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -185,8 +197,15 @@ internal static class MuiMiscSpecialistFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiMiscSpecialistFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiMiscSpecialistMessageMemoryCodec.TryGetAddress(ref platform,
-			cursor.Message, cursor.Packet, cursor.Field, out address);
+		MuiMiscSpecialistMessageMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMiscSpecialistFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiMiscSpecialistMessageMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR message, MuiMiscSpecialistPacketKind packet,
@@ -478,8 +497,8 @@ internal static class MuiMiscSpecialistMethodHeaderCodec
 }
 
 // Shared fixed-packet boundary for the Misc specialist family. The public
-// records remain the consumer-facing shape; only this adapter knows the
-// packed guest offsets and mapping checks. Both standalone and object-aware
+// records remain the consumer-facing shape; only this adapter owns their
+// typed cursor traversal and mapping checks. Both standalone and object-aware
 // dispatchers use this codec so their ABI validation cannot drift apart.
 internal static class MuiMiscSpecialistMessageCodec
 {

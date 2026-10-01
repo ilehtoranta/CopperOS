@@ -207,16 +207,19 @@ public sealed class MuiDirlistVolumelistTests
 		cursor.Packet = MuiDirlistPacketKind.Set;
 		cursor.Field = MuiDirlistField.MethodId;
 		Assert.True(MuiDirlistFieldCursorCodec.TryGetAddress(ref platform,
-			cursor, out var address));
+			cursor, out var address, out var fieldSize));
 		Assert.Equal(0x2A00u, address.Raw);
+		Assert.Equal(4u, fieldSize);
 		cursor.Field = MuiDirlistField.Attribute;
 		Assert.True(MuiDirlistFieldCursorCodec.TryGetAddress(ref platform,
-			cursor, out address));
+			cursor, out address, out fieldSize));
 		Assert.Equal(0x2A04u, address.Raw);
+		Assert.Equal(4u, fieldSize);
 		cursor.Field = MuiDirlistField.Value;
 		Assert.True(MuiDirlistFieldCursorCodec.TryGetAddress(ref platform,
-			cursor, out address));
+			cursor, out address, out fieldSize));
 		Assert.Equal(0x2A08u, address.Raw);
+		Assert.Equal(4u, fieldSize);
 
 		Assert.True(MuiDirlistFieldCursorCodec.TryWriteUInt32(ref platform,
 			packet, MuiDirlistPacketKind.GetEntry, MuiDirlistField.Position,
@@ -262,6 +265,25 @@ public sealed class MuiDirlistVolumelistTests
 			packet, MuiDirlistPacketKind.Set, (MuiDirlistField)255, out _));
 		Assert.False(MuiDirlistMessageMemoryCodec.TryGetAddress(ref platform,
 			APTR.Null, MuiDirlistPacketKind.Set, MuiDirlistField.Value, out _));
+	}
+
+	[Fact]
+	public void DirlistPacketOffsetBridgeUsesNamedUlongCodec()
+	{
+		var platform = CreatePlatform(out _, out _, out _);
+		var packet = APTR.FromPointer(0x2AC0);
+		Assert.True(MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiDirlistSetMessage.Size, MuiDirlistSetMessage.ValueOffset,
+			0xF1020304u));
+		Assert.True(MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform,
+			packet, MuiDirlistSetMessage.Size, MuiDirlistSetMessage.ValueOffset,
+			out var value));
+		Assert.Equal(0xF1020304u, value);
+		Assert.False(MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform,
+			packet, MuiDirlistSetMessage.Size, MuiDirlistSetMessage.Size, out _));
+		Assert.False(MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.Null, MuiDirlistSetMessage.Size,
+			MuiDirlistSetMessage.ValueOffset, 1));
 	}
 
 	[Fact]
@@ -450,8 +472,9 @@ public sealed class MuiDirlistVolumelistTests
 		cursor.Record = MuiDirlistRecordKind.ByteTotal;
 		cursor.Field = MuiDirlistRecordField.Low;
 		Assert.True(MuiDirlistRecordFieldCursorCodec.TryGetAddress(ref platform,
-			cursor, out var fieldAddress));
+			cursor, out var fieldAddress, out var fieldSize));
 		Assert.Equal(0x2C04u, fieldAddress.Raw);
+		Assert.Equal(4u, fieldSize);
 		cursor.Record = MuiDirlistRecordKind.EntryWire;
 		cursor.Field = MuiDirlistRecordField.CommentOffset;
 		Assert.True(MuiDirlistRecordFieldCursorCodec.TryGetAddress(ref platform,

@@ -26,6 +26,20 @@ public sealed class MuiAreaShortHelpMessageStructAdapterTests
 			checkAddress, MuiAreaShortHelpPacketKind.Check,
 			MuiAreaShortHelpMessageField.Help, out var helpAddress));
 		Assert.Equal(APTR.FromPointer(0x3004), helpAddress);
+		var cursor = new MuiAreaShortHelpMessageFieldCursor
+		{
+			Message = checkAddress,
+			Packet = MuiAreaShortHelpPacketKind.Check,
+			Field = MuiAreaShortHelpMessageField.Help,
+		};
+		Assert.True(MuiAreaShortHelpMessageFieldCursorCodec.TryGetAddress(
+			ref platform, cursor, out var typedHelpAddress, out var typedHelpSize));
+		Assert.Equal(helpAddress, typedHelpAddress);
+		Assert.Equal(MuiAreaCheckShortHelpMessage.FieldSize, typedHelpSize);
+		Assert.True(MuiAreaShortHelpMessageMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryHelpAddress, out var memoryHelpSize));
+		Assert.Equal(typedHelpAddress, memoryHelpAddress);
+		Assert.Equal(typedHelpSize, memoryHelpSize);
 		Assert.True(MuiAreaShortHelpMessageCodec.TryReadCheck(ref platform,
 			checkAddress, out var decodedCheck));
 		Assert.Equal(check.Help, decodedCheck.Help);
@@ -67,6 +81,13 @@ public sealed class MuiAreaShortHelpMessageStructAdapterTests
 		Assert.False(MuiAreaShortHelpMessageMemoryCodec.TryGetAddress(ref platform,
 			APTR.Null, MuiAreaShortHelpPacketKind.Delete,
 			MuiAreaShortHelpMessageField.Help, out _));
+		cursor.Field = (MuiAreaShortHelpMessageField)255;
+		Assert.False(MuiAreaShortHelpMessageFieldCursorCodec.TryGetAddress(
+			ref platform, cursor, out _, out _));
+		cursor.Message = APTR.Null;
+		cursor.Field = MuiAreaShortHelpMessageField.Help;
+		Assert.False(MuiAreaShortHelpMessageFieldCursorCodec.TryGetAddress(
+			ref platform, cursor, out _, out _));
 	}
 
 	[Fact]

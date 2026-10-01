@@ -26,6 +26,21 @@ public sealed class MuiControlFontResolutionRecordTests
 			ref platform, address, MuiControlFontResolutionRecordField.Font,
 			out var fontField));
 		Assert.Equal(APTR.FromPointer(0x2810), fontField);
+		var fontCursor = new MuiControlFontResolutionRecordFieldCursor
+		{
+			Record = address,
+			Field = MuiControlFontResolutionRecordField.Font,
+		};
+		Assert.True(MuiControlFontResolutionRecordFieldCursorCodec.TryGetAddress(
+			ref platform, fontCursor, out var cursorFontField,
+			out var fieldSize));
+		Assert.Equal(fontField, cursorFontField);
+		Assert.Equal(MuiControlFontResolutionRecord.FieldSize, fieldSize);
+		Assert.True(MuiControlFontResolutionRecordMemoryCodec.TryGetAddress(
+			ref platform, fontCursor, out var memoryCursorField,
+			out var memoryFieldSize));
+		Assert.Equal(cursorFontField, memoryCursorField);
+		Assert.Equal(fieldSize, memoryFieldSize);
 		Assert.True(MuiControlFontResolutionRecordMemoryCodec.TryReadUInt32(
 			ref platform, address, MuiControlFontResolutionRecordField.Inherited,
 			out var inherited));
@@ -42,5 +57,8 @@ public sealed class MuiControlFontResolutionRecordTests
 		Assert.False(MuiControlFontResolutionRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiControlFontResolutionRecordField.Magic,
 			out _));
+		fontCursor.Record = APTR.Null;
+		Assert.False(MuiControlFontResolutionRecordFieldCursorCodec.TryGetAddress(
+			ref platform, fontCursor, out _, out _));
 	}
 }

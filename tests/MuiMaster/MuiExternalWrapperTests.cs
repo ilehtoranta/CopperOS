@@ -517,6 +517,39 @@ public sealed class MuiExternalWrapperTests
 	}
 
 	[Fact]
+	public void BoopsiGeometryFieldTransferPreservesNamedRecordSiblings()
+	{
+		var p = NewPlatform();
+		var instance = APTR.FromPointer(0x2500);
+		var initial = new MuiExternalBoopsiGeometryState
+		{
+			MinWidth = 1,
+			MinHeight = 2,
+			MaxWidth = 3,
+			MaxHeight = 4,
+			TagWindow = 5,
+			TagScreen = 6,
+			TagDrawInfo = 7,
+		};
+
+		Assert.True(MuiExternalBoopsiGeometryCodec.Write(ref p, instance, initial));
+		Assert.True(MuiExternalBoopsiGeometryFieldMemoryCodec.TryWrite(ref p,
+			instance, MuiExternalBoopsiGeometryField.TagDrawInfo, 0xF1020304u));
+		Assert.True(MuiExternalBoopsiGeometryFieldMemoryCodec.TryRead(ref p,
+			instance, MuiExternalBoopsiGeometryField.TagDrawInfo, out var tag));
+		Assert.Equal(0xF1020304u, tag);
+		Assert.True(MuiExternalBoopsiGeometryCodec.TryRead(ref p, instance,
+			out var decoded));
+		Assert.Equal(initial.MinWidth, decoded.MinWidth);
+		Assert.Equal(initial.MinHeight, decoded.MinHeight);
+		Assert.Equal(initial.MaxWidth, decoded.MaxWidth);
+		Assert.Equal(initial.MaxHeight, decoded.MaxHeight);
+		Assert.Equal(initial.TagWindow, decoded.TagWindow);
+		Assert.Equal(initial.TagScreen, decoded.TagScreen);
+		Assert.Equal(0xF1020304u, decoded.TagDrawInfo);
+	}
+
+	[Fact]
 	public void BoopsiGeometryFieldCursorUsesNamedBoundary()
 	{
 		var p = NewPlatform();
@@ -847,6 +880,36 @@ public sealed class MuiExternalWrapperTests
 	}
 
 	[Fact]
+	public void BoopsiResourceFieldTransferPreservesNamedRecordSiblings()
+	{
+		var p = NewPlatform();
+		var instance = APTR.FromPointer(0x2600);
+		var initial = new MuiExternalBoopsiResourceState
+		{
+			PrivateClass = APTR.FromPointer(1),
+			ClassId = APTR.FromPointer(2),
+			OpenedClass = APTR.FromPointer(3),
+			BoopsiObject = APTR.FromPointer(4),
+			CreationTags = APTR.FromPointer(5),
+		};
+
+		Assert.True(MuiExternalBoopsiResourceCodec.Write(ref p, instance, initial));
+		Assert.True(MuiExternalBoopsiResourceFieldMemoryCodec.TryWrite(ref p,
+			instance, MuiExternalBoopsiResourceField.OpenedClass,
+			APTR.FromPointer(9)));
+		Assert.True(MuiExternalBoopsiResourceFieldMemoryCodec.TryRead(ref p,
+			instance, MuiExternalBoopsiResourceField.OpenedClass, out var opened));
+		Assert.Equal(9u, opened.Raw);
+		Assert.True(MuiExternalBoopsiResourceCodec.TryRead(ref p, instance,
+			out var decoded));
+		Assert.Equal(initial.PrivateClass, decoded.PrivateClass);
+		Assert.Equal(initial.ClassId, decoded.ClassId);
+		Assert.Equal(9u, decoded.OpenedClass.Raw);
+		Assert.Equal(initial.BoopsiObject, decoded.BoopsiObject);
+		Assert.Equal(initial.CreationTags, decoded.CreationTags);
+	}
+
+	[Fact]
 	public void ExternalScratchStateCodecUsesNamedFields()
 	{
 		var p = NewPlatform();
@@ -902,6 +965,48 @@ public sealed class MuiExternalWrapperTests
 		Assert.Equal(Instance.Raw + 80u, address.Raw);
 		Assert.False(MuiExternalScratchFieldMemoryCodec.TryGetAddress(ref p,
 			Instance, (MuiExternalScratchField)0xFF, out _));
+	}
+
+	[Fact]
+	public void ScratchFieldTransferPreservesNamedRecordSiblings()
+	{
+		var p = NewPlatform();
+		var initial = new MuiExternalScratchState
+		{
+			RememberBuffer = APTR.FromPointer(1),
+			RememberCount = 2,
+			WorkBuffer = APTR.FromPointer(3),
+		};
+
+		Assert.True(MuiExternalScratchStateCodec.Write(ref p, Instance, initial));
+		Assert.True(MuiExternalScratchFieldMemoryCodec.TryWrite(ref p, Instance,
+			MuiExternalScratchField.RememberCount, 9));
+		Assert.True(MuiExternalScratchFieldMemoryCodec.TryRead(ref p, Instance,
+			MuiExternalScratchField.RememberCount, out var count));
+		Assert.Equal(9u, count);
+		Assert.True(MuiExternalScratchStateCodec.TryRead(ref p, Instance,
+			out var decoded));
+		Assert.Equal(initial.RememberBuffer, decoded.RememberBuffer);
+		Assert.Equal(9u, decoded.RememberCount);
+		Assert.Equal(initial.WorkBuffer, decoded.WorkBuffer);
+	}
+
+	[Fact]
+	public void ScratchFieldMemoryCodecUsesBoundedStructCursor()
+	{
+		var p = NewPlatform();
+		Assert.True(MuiExternalScratchFieldMemoryCodec.TryGetAddress(ref p,
+			Instance, MuiExternalScratchField.RememberBuffer, out var remember));
+		Assert.Equal(Instance.Raw + 72u, remember.Raw);
+		Assert.True(MuiExternalScratchFieldMemoryCodec.TryGetAddress(ref p,
+			Instance, MuiExternalScratchField.RememberCount, out var count));
+		Assert.Equal(Instance.Raw + 76u, count.Raw);
+		Assert.True(MuiExternalScratchFieldMemoryCodec.TryGetAddress(ref p,
+			Instance, MuiExternalScratchField.WorkBuffer, out var work));
+		Assert.Equal(Instance.Raw + 80u, work.Raw);
+		Assert.False(MuiExternalScratchFieldMemoryCodec.TryGetAddress(ref p,
+			APTR.FromPointer(0x00050FF8), MuiExternalScratchField.WorkBuffer,
+			out _));
 	}
 
 	[Fact]
@@ -972,6 +1077,42 @@ public sealed class MuiExternalWrapperTests
 		Assert.Equal(Instance.Raw + 116u, address.Raw);
 		Assert.False(MuiExternalDtpicFieldMemoryCodec.TryGetAddress(ref p,
 			Instance, (MuiExternalDtpicField)0xFF, out _));
+	}
+
+	[Fact]
+	public void DtpicFieldTransferPreservesNamedRecordSiblings()
+	{
+		var p = NewPlatform();
+		var initial = new MuiExternalDtpicState
+		{
+			CallerName = APTR.FromPointer(1),
+			OwnedName = APTR.FromPointer(2),
+			OwnedNameSize = 3,
+			PictureObject = APTR.FromPointer(4),
+			Alpha = 5,
+			MinWidth = 6,
+			MinHeight = 7,
+			PicWidth = 8,
+			PicHeight = 9,
+		};
+
+		Assert.True(MuiExternalDtpicStateCodec.Write(ref p, Instance, initial));
+		Assert.True(MuiExternalDtpicFieldMemoryCodec.TryWrite(ref p, Instance,
+			MuiExternalDtpicField.PicHeight, 10));
+		Assert.True(MuiExternalDtpicFieldMemoryCodec.TryRead(ref p, Instance,
+			MuiExternalDtpicField.PicHeight, out var height));
+		Assert.Equal(10u, height);
+		Assert.True(MuiExternalDtpicStateCodec.TryRead(ref p, Instance,
+			out var decoded));
+		Assert.Equal(initial.CallerName, decoded.CallerName);
+		Assert.Equal(initial.OwnedName, decoded.OwnedName);
+		Assert.Equal(initial.OwnedNameSize, decoded.OwnedNameSize);
+		Assert.Equal(initial.PictureObject, decoded.PictureObject);
+		Assert.Equal(initial.Alpha, decoded.Alpha);
+		Assert.Equal(initial.MinWidth, decoded.MinWidth);
+		Assert.Equal(initial.MinHeight, decoded.MinHeight);
+		Assert.Equal(initial.PicWidth, decoded.PicWidth);
+		Assert.Equal(10u, decoded.PicHeight);
 	}
 
 	[Fact]

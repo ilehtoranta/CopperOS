@@ -90,8 +90,16 @@ internal static class MuiWindowEventReuseStateFieldCursorCodec
 		MuiWindowEventReuseStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiWindowEventReuseStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		return MuiWindowEventReuseStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
+			cursor, out address, out fieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -116,47 +124,63 @@ internal static class MuiWindowEventReuseStateFieldCursorCodec
 // event-message/input capabilities and the signed key value.
 internal static class MuiWindowEventReuseStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiWindowEventReuseStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiWindowEventReuseStateField field,
+		out uint index)
 	{
-		switch (field)
+		if (field == MuiWindowEventReuseStateField.Magic)
+			index = 0;
+		else if (field == MuiWindowEventReuseStateField.ContextActive)
+			index = 1;
+		else if (field == MuiWindowEventReuseStateField.Pending)
+			index = 2;
+		else if (field == MuiWindowEventReuseStateField.EventMessage)
+			index = 3;
+		else if (field == MuiWindowEventReuseStateField.InputEvent)
+			index = 4;
+		else if (field == MuiWindowEventReuseStateField.EventClass)
+			index = 5;
+		else if (field == MuiWindowEventReuseStateField.MuiKey)
+			index = 6;
+		else
 		{
-			case MuiWindowEventReuseStateField.Magic:
-				offset = MuiWindowEventReuseStateRecord.MagicOffset;
-				return true;
-			case MuiWindowEventReuseStateField.ContextActive:
-				offset = MuiWindowEventReuseStateRecord.ContextActiveOffset;
-				return true;
-			case MuiWindowEventReuseStateField.Pending:
-				offset = MuiWindowEventReuseStateRecord.PendingOffset;
-				return true;
-			case MuiWindowEventReuseStateField.EventMessage:
-				offset = MuiWindowEventReuseStateRecord.EventMessageOffset;
-				return true;
-			case MuiWindowEventReuseStateField.InputEvent:
-				offset = MuiWindowEventReuseStateRecord.InputEventOffset;
-				return true;
-			case MuiWindowEventReuseStateField.EventClass:
-				offset = MuiWindowEventReuseStateRecord.EventClassOffset;
-				return true;
-			case MuiWindowEventReuseStateField.MuiKey:
-				offset = MuiWindowEventReuseStateRecord.MuiKeyOffset;
-				return true;
+			index = uint.MaxValue;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiWindowEventReuseStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiWindowEventReuseStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiWindowEventReuseStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
-			MuiWindowEventReuseStateRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiWindowEventReuseStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiWindowEventReuseStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiWindowEventReuseStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiWindowEventReuseStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

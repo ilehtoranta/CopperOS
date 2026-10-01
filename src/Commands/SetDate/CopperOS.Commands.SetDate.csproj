@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>CopperOS.Commands.SetDate</AssemblyName>
+    <RootNamespace>CopperOS.Commands</RootNamespace>
+    <RuntimeIdentifier>amiga-m68k</RuntimeIdentifier>
+    <CopperOSCommandName>SetDate</CopperOSCommandName>
+    <CopperSharpEntry>CopperOS.Commands.Entries.SetDateEntry::Main</CopperSharpEntry>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Common\CopperOS.Commands.Common.csproj" />
+  </ItemGroup>
+</Project>

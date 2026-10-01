@@ -4,22 +4,22 @@
   </PropertyGroup>
   <Import Project="..\..\CopperOS.Portable.props" />
   <PropertyGroup>
+    <CopperOSReferenceSdkAmigaSupport>true</CopperOSReferenceSdkAmigaSupport>
     <AssemblyName>CopperOS.Commands.QuoteNativeRoot</AssemblyName>
     <RootNamespace>CopperOS.Commands.QuoteNativeRoot</RootNamespace>
     <ImplicitUsings>false</ImplicitUsings>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CopperSharp.Sdk.Amiga.Support" Version="$(CopperSharpSdkAmigaVersion)" />
-    <Compile Include="..\..\src\Commands\QuoteReadItemFormatter.cs" Link="QuoteReadItemFormatter.cs" />
-    <Compile Include="..\..\src\Commands\QuoteHexFormatter.cs" Link="QuoteHexFormatter.cs" />
-    <Compile Include="..\..\src\Commands\QuoteUriFormatter.cs" Link="QuoteUriFormatter.cs" />
-    <Compile Include="..\..\src\Commands\QuoteBase64Formatter.cs" Link="QuoteBase64Formatter.cs" />
-    <Compile Include="..\..\src\Commands\QuoteForwardPipeline.cs" Link="QuoteForwardPipeline.cs" />
-    <Compile Include="..\..\src\Commands\QuoteReversePipeline.cs" Link="QuoteReversePipeline.cs" />
-    <Compile Include="..\..\src\Commands\QuoteRuleParser.cs" Link="QuoteRuleParser.cs" />
-    <Compile Include="..\..\src\Commands\Native\NativeCommandArguments.cs" Link="NativeCommandArguments.cs" />
-    <Compile Include="..\..\src\Commands\Native\NativeCommandStartup.cs" Link="NativeCommandStartup.cs" />
-    <Compile Include="..\..\src\Commands\Native\NativeMorphOSQuoteCommand.cs" Link="NativeMorphOSQuoteCommand.cs" />
+    <Compile Include="..\..\src\Commands\Quote\QuoteReadItemFormatter.cs" Link="QuoteReadItemFormatter.cs" />
+    <Compile Include="..\..\src\Commands\Quote\QuoteHexFormatter.cs" Link="QuoteHexFormatter.cs" />
+    <Compile Include="..\..\src\Commands\Quote\QuoteUriFormatter.cs" Link="QuoteUriFormatter.cs" />
+    <Compile Include="..\..\src\Commands\Quote\QuoteBase64Formatter.cs" Link="QuoteBase64Formatter.cs" />
+    <Compile Include="..\..\src\Commands\Quote\QuoteForwardPipeline.cs" Link="QuoteForwardPipeline.cs" />
+    <Compile Include="..\..\src\Commands\Quote\QuoteReversePipeline.cs" Link="QuoteReversePipeline.cs" />
+    <Compile Include="..\..\src\Commands\Quote\QuoteRuleParser.cs" Link="QuoteRuleParser.cs" />
+    <Compile Include="..\..\src\Commands\Common\NativeCommandArguments.cs" Link="NativeCommandArguments.cs" />
+    <Compile Include="..\..\src\Commands\Common\NativeCommandStartup.cs" Link="NativeCommandStartup.cs" />
+    <Compile Include="..\..\src\Commands\Quote\Native\NativeMorphOSQuoteCommand.cs" Link="NativeMorphOSQuoteCommand.cs" />
   </ItemGroup>
 </Project>

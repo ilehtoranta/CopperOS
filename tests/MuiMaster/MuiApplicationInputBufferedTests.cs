@@ -195,7 +195,11 @@ public sealed class MuiApplicationInputBufferedTests
 		Assert.Equal(3u, returnAfter.ReturnId);
 
 		var inputAddress = APTR.FromPointer(0x1440);
-		var input = new MuiApplicationInputMessage { MethodId = 4, SignalStorage = 5 };
+		var input = new MuiApplicationInputMessage
+		{
+			MethodId = 4,
+			SignalStorage = APTR.FromPointer(5),
+		};
 		Assert.True(MuiApplicationInputMessageCodec.WriteStructural(ref platform,
 			inputAddress, input));
 		Assert.True(MuiApplicationInputPacketRecordMemoryCodec.TryWriteUInt32(
@@ -204,7 +208,7 @@ public sealed class MuiApplicationInputBufferedTests
 		Assert.True(MuiApplicationInputMessageCodec.TryReadStructural(ref platform,
 			inputAddress, out var inputAfter));
 		Assert.Equal(input.MethodId, inputAfter.MethodId);
-		Assert.Equal(6u, inputAfter.SignalStorage);
+		Assert.Equal(APTR.FromPointer(6), inputAfter.SignalStorage);
 
 		var bufferedAddress = APTR.FromPointer(0x1480);
 		Assert.True(MuiApplicationInputBufferedMessageCodec.WriteStructural(ref platform,

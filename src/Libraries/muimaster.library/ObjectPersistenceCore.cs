@@ -268,7 +268,7 @@ public static class MuiObjectPersistenceCore
 		uint kind) where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (MuiStoreCore.DataspaceLength(ref platform, state, dataspace,
-			objectId) != MuiGuestUlongStorage.Size) return false;
+			objectId) != (int)MuiGuestUlongStorage.Size) return false;
 		var data = MuiStoreCore.DataspaceFind(ref platform, state, dataspace,
 			objectId);
 		if (data.IsNull || !MuiGuestUlongStorageCodec.TryRead(ref platform, data,

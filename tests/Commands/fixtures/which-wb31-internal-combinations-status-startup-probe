@@ -1,0 +1,22 @@
+; Disposable WB 3.1 Which internal switch-combination status probe.
+FailAt 255
+Path C:
+Echo "BEGIN" >S:Shell-Startup
+C:Which CD >>S:Shell-Startup
+Echo "DEFAULT RC=$RC RESULT2=$Result2" >>S:Shell-Startup
+C:Which CD NORES >>S:Shell-Startup
+Echo "NORES RC=$RC RESULT2=$Result2" >>S:Shell-Startup
+C:Which CD RES >>S:Shell-Startup
+Echo "RES RC=$RC RESULT2=$Result2" >>S:Shell-Startup
+C:Which CD ALL >>S:Shell-Startup
+Echo "ALL RC=$RC RESULT2=$Result2" >>S:Shell-Startup
+C:Which CD NORES RES >>S:Shell-Startup
+Echo "NORES-RES RC=$RC RESULT2=$Result2" >>S:Shell-Startup
+C:Which CD NORES ALL >>S:Shell-Startup
+Echo "NORES-ALL RC=$RC RESULT2=$Result2" >>S:Shell-Startup
+C:Which CD RES ALL >>S:Shell-Startup
+Echo "RES-ALL RC=$RC RESULT2=$Result2" >>S:Shell-Startup
+C:Which CD NORES RES ALL >>S:Shell-Startup
+Echo "NORES-RES-ALL RC=$RC RESULT2=$Result2" >>S:Shell-Startup
+Echo "END" >>S:Shell-Startup
+EndCLI >NIL:

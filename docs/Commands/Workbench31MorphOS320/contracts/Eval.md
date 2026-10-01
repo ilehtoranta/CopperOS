@@ -178,6 +178,20 @@ candidate therefore accepts a successfully evaluated prefix and leaves its
 unrecognized suffix unconsumed. It still rejects a missing right operand after
 a recognized operator. `2 ** 3` outputs `0` and `2 pow 3` outputs `2`; these
 are recorded parser boundaries, not generalized into a caret or exponent rule.
+The candidate now matches two fresh original-guest pairs: `C:Eval 2^3` outputs
+`2\n`, and `C:Eval 2 + 3 ^ 4` outputs `5\n`. Both comparisons agree on
+output bytes, return 0, and caller post-System IoErr 0. These cases cover
+only captured caret-prefix behavior, not general exponentiation arithmetic.
+
+A sixth [leading-zero capture](../reference-captures/eval-wb31-leading-zero-20260928.json)
+uses five fresh disposable guests. `C:Eval 08 + 1`, `C:Eval 08`, `C:Eval 08+1`,
+and `C:Eval 09+1` each output `0\n`; `C:Eval 010` outputs `8\n`. All five
+return 0 and leave caller post-System IoErr at 0. This supports a Workbench
+prefix parse that stops after the leading zero when 8/9 follows, separately
+from MorphOS's source-defined whole-token consumption. These original captures
+are now paired with the candidate for all five invocations; those results are
+listed below and remain case-level evidence, not a complete classic numeric
+grammar.
 
 ## Public APIs, purity and required fixtures
 
@@ -305,11 +319,12 @@ external targets. The reports still record the `nullable-values` runtime feature
 caused by the public SDK `DOS.Open` return type used for `TO`; that remains a
 static purity-audit gap.
 
-Each resident HUNK executes through Copper68k 1.4.0 in a 19-case supplied-vector
+Each resident HUNK executes through Copper68k 1.4.0 in a 20-case supplied-vector
 fixture. The fixture exercises default decimal, `OP`/`VALUE2/M` reconstruction,
-five lowercase two-letter operator prefixes, HEX, LFORMAT precedence, `TO`
-open/write/close, malformed expression, ReadArgs failure, allocation failure,
-repeated runs, and two same-image interleavings.
+five lowercase two-letter operator prefixes, the MorphOS `08`/`09` whole-token
+behavior, HEX, LFORMAT precedence, `TO` open/write/close, malformed expression,
+ReadArgs failure, allocation failure, repeated runs, and two same-image
+interleavings.
 Every CPU records one image load, zero shared-image writes, balanced DOS/Exec and
 RDArgs resources, and the expected output bytes. It deliberately supplies
 post-ReadArgs vectors through test-only DOS gateways; it is not a real DOS parser,
@@ -318,7 +333,7 @@ comparison. These remain private compiler artifacts, not packaged command files,
 and do not close pure/resident qualification.
 
 Run [`qualify_eval_native_entry.ps1`](D:/Koodit/GIT/CopperOS/tools/Commands/qualify_eval_native_entry.ps1)
-to rebuild the three resident HUNKs, run all 57 supplied-vector executions, and
+to rebuild the three resident HUNKs, run all 60 supplied-vector executions, and
 write a hash-bound qualification receipt. The script intentionally permits only
 the currently audited `nullable-values` runtime feature; a new feature fails the
 gate rather than being silently accepted.
@@ -330,25 +345,47 @@ gate rather than being silently accepted.
 resident enum comparison. This matters because the first shared-body test
 observed that compiler path using the MorphOS template despite the Workbench
 enum value. The isolated classic entry uses the 5-slot Workbench template and
-the captured classic evaluator/LFORMAT candidate. Its resident HUNK output is:
+the captured classic evaluator/LFORMAT candidate. The refreshed resident HUNK
+output is:
 
 | CPU | Bytes | SHA-256 |
 | --- | ---: | --- |
-| 68000 | 17,052 | `333bd96d8d8d39962397dd6527f2ed0365d0c7de67fd8227b9ecacae55cc6ab1` |
-| 68020 | 17,212 | `613a8f5e4214e19ff497f3e5fd6ff7adf8ba6bf7f4f0fdee12b83f1b56fb6079` |
-| 68040 | 16,836 | `79c1ace154246b2349851e1ff293503e5e4576872f9ffc19b6fc922b71d798ce` |
+| 68000 | 12,368 | `c1ac17a1981b16c16156f07a18349b68f5dac80122af702c3b4d2af399dbbaf9` |
+| 68020 | 12,540 | `5f59d1bdf537ed590d8258e930cbececf8aea3e0690bc60fab024e2f12bcdede` |
+| 68040 | 12,152 | `9b079b229bd45387b4be84fefbd460890188c04f985adab28e0fdcc9539b5e93` |
 
 [`qualify_eval_wb31_native_entry.ps1`](D:/Koodit/GIT/CopperOS/tools/Commands/qualify_eval_wb31_native_entry.ps1)
-rebuilds this matrix and executes 12 supplied post-ReadArgs vectors per CPU:
-captured left-to-right arithmetic and operand reconstruction, X/O formatting,
-TO, the current caret rejection, parser/allocation failures, repeats, and two
-interleaved callers. The reports have zero managed allocation sites, fatal
+rebuilds this matrix and executes 37 supplied post-ReadArgs vectors per CPU.
+The candidate fixtures now cover the exact original-captured arithmetic,
+parentheses, unary minus, `0x`/`#x`/octal literals, `/`, `%`, `mod`, bitwise
+operators, shifts, complement, `%n`, and the measured low-digit X/x/O formats,
+along with TO, caret-prefix behavior, the captured `2*`/`2**3` zero results,
+`08`/`09`, parser/allocation failures, repeats, and two interleaved callers. The reports
+have zero managed allocation sites, fatal
 machine-fault sites, helpers and external targets; each retains the audited
-`nullable-values` feature through the TO result. All 36 executions used one
+`nullable-values` feature through the TO result. All 111 executions used one
 loaded image per CPU and reported zero shared-image writes. The DOS gateway
 supplies decoded slots, so this does not prove actual ReadArgs, the original
-caret outcome, real filesystem I/O, original command parity, or final P/purity
+caret outcome, real filesystem I/O, full original command parity, or final P/purity
 approval.
+
+The refreshed Workbench receipt is
+`artifacts/cc10-eval-wb31-native-20260928-incomplete-multiply-v1/qualification.json`.
+These added vectors turn prior original-only captures into candidate execution
+coverage; they are not paired original/candidate guest comparisons.
+
+This Workbench build uses the compiler's `--symbols off` option. The symbols-on
+version of the same Eval root was rejected by original DOS as `bad loadfile
+hunk` (return 10, caller IoErr 235). The symbols-off build is a plain, loadable
+CODE HUNK. Its original/candidate guest pairs now match exactly for
+`C:Eval 08 + 1` and `C:Eval 010`, including output bytes, return, and caller
+post-System IoErr: `0\n`/0/0 and `8\n`/0/0 respectively. Receipts are
+`artifacts/workbench31-guest-eval-08-candidate-symbols-off-20260928-v1/effect-comparison.json`
+and
+`artifacts/workbench31-guest-eval-010-candidate-symbols-off-20260928-v1/effect-comparison.json`.
+These prove only those two cases. The HUNK remains a private resident-root test
+artifact; it has not passed the release manifest, disk-image packaging, full
+option/behavior, or P/resident lifecycle gates.
 
 - [ ] Capture native 50.7 behavior and reconcile every source-dependent case.
 - [ ] Freeze the classic width, format, grammar and errors independently.
@@ -390,3 +427,101 @@ Each HUNK reports 92 reachable methods, only the previously audited
 This closes only the candidate's bounded lexer slice: the DOS parser and
 original 3.20 binary were not executed, and PURE/resident lifecycle, licensing,
 packaging, and guest differential gates remain open.
+
+## 2026-09-28 MorphOS leading-zero lexer edge
+
+The source-hash-verified `evalParser.y` has a distinct path for `08`/`09`:
+after declining its hex/octal cases, the lexer calls `sscanf(..., "%lli")`,
+then consumes the rest of the decimal-looking token with `isdigit`. The
+base-detecting conversion reads the initial zero as an octal zero, then the
+whole token allows expression evaluation to continue. MorphOS source-shaped
+`08 + 1` therefore evaluates to 1. Workbench's original binary instead returns
+0 for `08 + 1`, `08`, `08+1`, and `09+1`; its `010` control returns 8. The
+Workbench evaluator now stops after the leading zero for `08`/`09`, while the
+MorphOS evaluator consumes the digit run. Focused portable tests pass 50/50.
+
+The refreshed resident-entry receipt is
+`artifacts/cc10-eval-morphos-native-20260928-leading-zero-v1/qualification.json`.
+It passes 20 supplied post-ReadArgs vectors per CPU (60 total) for 68000/020/040;
+each HUNK has 92 reachable methods and retains only `nullable-values`, while
+the fixture reports no leaks or shared-image writes. The 68000/020/040 HUNK
+SHA-256 values are
+`81093d0b22ad42b2f6302e8bfb1836aa0e236bcb545770af1e99e5d4a0bee556`,
+`bcc7a87514bac87e95c8543a36f01d53c5b0f71c7b2562dbca1f2234ff2991f3`, and
+`d52a6cff0aa94aa4f807e0e954fb3d5953d27a5ef63e20bc9bf3a0423ec34119`.
+This is source-derived candidate evidence only; the original MorphOS binary,
+real DOS `ReadArgs`, full grammar, guest parity, and PURE/resident admission
+remain open.
+
+## 2026-09-28 Workbench symbol-free candidate guest pairs
+
+The Workbench resident-entry qualifier now compiles with `--symbols off` and
+records `hunkSymbols: off` in its receipt. The resulting candidate HUNK is
+byte-identical to the symbol-free experimental HUNK that original Workbench
+successfully loaded; the symbols-on form of this Eval root returned
+`bad loadfile hunk` before entering the command. This is a result for this
+artifact, not a general rule about every HUNK symbol table.
+
+The original/candidate guest comparator reports `captured-case-equal` with
+`allObservedFieldsEqual: true` for eighteen cases:
+
+| Invocation | Exact output |
+| --- | --- |
+| `C:Eval 08 + 1` | `0\n` |
+| `C:Eval 010` | `8\n` |
+| `C:Eval 20-5*2` | `30\n` |
+| `C:Eval 1+(2*3)` | `7\n` |
+| `C:Eval 1\|2&4` | `0\n` |
+| `C:Eval 6 xor 3` | `5\n` |
+| `C:Eval ~1` | `-2\n` |
+| `C:Eval 20/5` | `4\n` |
+| `C:Eval 1 lsh 4` | `16\n` |
+| `C:Eval 16 rsh 2` | `4\n` |
+| `C:Eval 9 LFORMAT="p=%o2"` | `p=11` (no trailing LF) |
+| `C:Eval 6 eqv 3` | `-6\n` |
+| `C:Eval 20 mod 6` | `2\n` |
+| `C:Eval 2^3` | `2\n` |
+| `C:Eval 2 + 3 ^ 4` | `5\n` |
+| `C:Eval 2+` | `2\n` |
+| `C:Eval 2*` | `0\n` |
+| `C:Eval 2 ** 3` | `0\n` |
+
+Every pair also matches return 0 and caller post-System `IoErr` 0. The first
+fifteen pairs use the earlier symbols-off HUNK; the final three cases use the
+refreshed HUNK listed above. The three added leading-zero pairs also use the
+earlier loadable symbols-off HUNK, SHA-256
+`5d51031ab980e334e5cd2064974d7ed9eeeabbf524a2558bdb2f7a09ce51f74e`. Their
+hash-bound comparison receipts are:
+
+- `artifacts/workbench31-guest-eval-08-candidate-symbols-off-20260928-v1/effect-comparison.json`
+- `artifacts/workbench31-guest-eval-010-candidate-symbols-off-20260928-v1/effect-comparison.json`
+- `artifacts/workbench31-guest-eval-20minus5times2-candidate-symbols-off-20260928-v1/effect-comparison.json`
+- `artifacts/workbench31-guest-eval-paren-candidate-20260928-v2/effect-comparison.json`
+- `artifacts/workbench31-guest-eval-bitwise-stream-candidate-20260928-v1/effect-comparison.json`
+- `artifacts/workbench31-guest-eval-xor-candidate-20260928-v1/effect-comparison.json`
+- `artifacts/workbench31-guest-eval-complement-candidate-20260928-v1/effect-comparison.json`
+- `artifacts/workbench31-guest-eval-divide-candidate-20260928-v1/effect-comparison.json`
+- `artifacts/workbench31-guest-eval-left-shift-candidate-20260928-v1/effect-comparison.json`
+- `artifacts/workbench31-guest-eval-right-shift-candidate-20260928-v1/effect-comparison.json`
+- `artifacts/workbench31-guest-eval-lformat-octal-width-candidate-20260928-v1/effect-comparison.json`
+- `artifacts/workbench31-guest-eval-eqv-candidate-20260928-v2/effect-comparison.json`
+- `artifacts/workbench31-guest-eval-mod-candidate-20260928-v2/effect-comparison.json`
+- `artifacts/workbench31-guest-eval-caret-candidate-20260928-v1/effect-comparison.json`
+- `artifacts/workbench31-guest-eval-caret-after-add-candidate-20260928-v1/effect-comparison.json`
+- `artifacts/workbench31-guest-eval-trailing-star-candidate-20260928-v2/effect-comparison.json`
+- `artifacts/workbench31-guest-eval-double-star-candidate-20260928-v2/effect-comparison.json`
+- `artifacts/workbench31-guest-eval-trailing-plus-candidate-20260928-v2/effect-comparison.json`
+- `artifacts/workbench31-guest-eval-08-alone-candidate-symbols-off-20260928-v2/effect-comparison.json`
+- `artifacts/workbench31-guest-eval-08plus1-no-spaces-candidate-symbols-off-20260928-v2/effect-comparison.json`
+- `artifacts/workbench31-guest-eval-09plus1-no-spaces-candidate-symbols-off-20260928-v2/effect-comparison.json`
+
+Three further fresh pairs now match `C:Eval 08`, `C:Eval 08+1`, and
+`C:Eval 09+1`. Each emits `0\n`; return and caller post-System `IoErr` are
+both zero. Their receipts are included in the case list above.
+
+There are 21 distinct invocation cases and 23 passing comparison receipts:
+`C:Eval 08 + 1` has a duplicate passing capture, while `C:Eval 2+` matches
+both HUNK identities. The table counts each invocation case once. These
+comparisons establish only the listed captured cases. Other captured examples,
+diagnostics, the complete ReadArgs/option contract, resident/PURE admission,
+licensing and production packaging remain unfinished.

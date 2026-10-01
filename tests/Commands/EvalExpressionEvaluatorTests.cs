@@ -27,7 +27,9 @@ public sealed class EvalExpressionEvaluatorTests
     [InlineData("-7 % 3", -1L)]
     [InlineData("-1 lsh 63", long.MinValue)]
     [InlineData("#x10 + 010", 24L)]
-    [InlineData("08 + 1", 9L)]
+    [InlineData("08 + 1", 1L)]
+    [InlineData("09 + 1", 1L)]
+    [InlineData("08", 0L)]
     [InlineData("'A + 1", 66L)]
     [InlineData("0xffffffffffffffff", -1L)]
     [InlineData("9 M 4", 1L)]
@@ -89,6 +91,67 @@ public sealed class EvalExpressionEvaluatorTests
         Assert.False(EvalExpressionEvaluator.TryEvaluate(ref memory,
             new APTR(8), 1, out _, out var unmappedStatus));
         Assert.Equal(EvalExpressionStatus.Malformed, unmappedStatus);
+    }
+
+    [Theory]
+    [InlineData("08 + 1")]
+    [InlineData("09 + 1")]
+    public void Keeps_workbench_leading_zero_prefix_behavior_separate_from_morphos_lexer(
+        string text)
+    {
+        var memory = new TestMemory(256); var source = new APTR(8);
+        Encoding.Latin1.GetBytes(text).CopyTo(memory.Bytes.AsSpan((int)source.Raw));
+
+        Assert.True(EvalExpressionEvaluator.TryEvaluateWorkbench31Arithmetic(
+            ref memory, source, (uint)text.Length, out var value, out var status));
+        Assert.Equal(EvalExpressionStatus.Success, status);
+        Assert.Equal(0L, value);
+    }
+
+    [Theory]
+    [InlineData("1+2*3+4", 13L)]
+    [InlineData("20-5*2", 30L)]
+    [InlineData("1+(2*3)", 7L)]
+    [InlineData("-2+3", 1L)]
+    [InlineData("0x10", 16L)]
+    [InlineData("#x10", 16L)]
+    [InlineData("010", 8L)]
+    [InlineData("20/5", 4L)]
+    [InlineData("20%6", 2L)]
+    [InlineData("20 mod 6", 2L)]
+    [InlineData("1|2&4", 0L)]
+    [InlineData("6 xor 3", 5L)]
+    [InlineData("6 eqv 3", -6L)]
+    [InlineData("1 lsh 4", 16L)]
+    [InlineData("16 rsh 2", 4L)]
+    [InlineData("~1", -2L)]
+    [InlineData("2^3", 2L)]
+    [InlineData("2*", 0L)]
+    [InlineData("2**3", 0L)]
+    public void Evaluates_only_the_original_observed_workbench31_subset(
+        string text, long expected)
+    {
+        var memory = new TestMemory(256); var source = new APTR(8);
+        Encoding.Latin1.GetBytes(text).CopyTo(memory.Bytes.AsSpan((int)source.Raw));
+
+        Assert.True(EvalExpressionEvaluator.TryEvaluateWorkbench31Arithmetic(
+            ref memory, source, (uint)text.Length, out var actual, out var status));
+        Assert.Equal(EvalExpressionStatus.Success, status);
+        Assert.Equal(expected, actual);
+    }
+
+    [Theory]
+    [InlineData("2*foo")]
+    [InlineData("2*+3")]
+    public void Keeps_unobserved_nonstar_multiplication_suffixes_malformed(
+        string text)
+    {
+        var memory = new TestMemory(256); var source = new APTR(8);
+        Encoding.Latin1.GetBytes(text).CopyTo(memory.Bytes.AsSpan((int)source.Raw));
+
+        Assert.False(EvalExpressionEvaluator.TryEvaluateWorkbench31Arithmetic(
+            ref memory, source, (uint)text.Length, out _, out var status));
+        Assert.Equal(EvalExpressionStatus.Malformed, status);
     }
 
     private struct TestMemory(int size) : IAmigaGuestMemory

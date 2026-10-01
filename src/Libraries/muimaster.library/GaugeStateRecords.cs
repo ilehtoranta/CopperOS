@@ -59,10 +59,13 @@ internal static class MuiGaugeStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiGaugeStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiGaugeStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiGaugeStateFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGaugeStateRecordMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiGaugeStateField field, out uint value)
@@ -87,41 +90,58 @@ internal static class MuiGaugeStateFieldCursorCodec
 // malformed-state diagnostics.
 internal static class MuiGaugeStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiGaugeStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiGaugeStateField field,
+		out uint index)
 	{
-		switch (field)
+		if (field == MuiGaugeStateField.Magic)
+			index = 0;
+		else if (field == MuiGaugeStateField.Maximum)
+			index = 1;
+		else if (field == MuiGaugeStateField.Current)
+			index = 2;
+		else if (field == MuiGaugeStateField.Divide)
+			index = 3;
+		else if (field == MuiGaugeStateField.Horizontal)
+			index = 4;
+		else
 		{
-			case MuiGaugeStateField.Magic:
-				offset = MuiGaugeStateRecord.MagicOffset;
-				return true;
-			case MuiGaugeStateField.Maximum:
-				offset = MuiGaugeStateRecord.MaximumOffset;
-				return true;
-			case MuiGaugeStateField.Current:
-				offset = MuiGaugeStateRecord.CurrentOffset;
-				return true;
-			case MuiGaugeStateField.Divide:
-				offset = MuiGaugeStateRecord.DivideOffset;
-				return true;
-			case MuiGaugeStateField.Horizontal:
-				offset = MuiGaugeStateRecord.HorizontalOffset;
-				return true;
+			index = uint.MaxValue;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiGaugeStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiGaugeStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiGaugeStateFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
-			MuiGaugeStateRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiGaugeStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiGaugeStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiGaugeStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiGaugeStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

@@ -95,10 +95,14 @@ internal static class MuiGroupLayoutPolicyFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiGroupLayoutPolicyFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiGroupLayoutPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Address, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiGroupLayoutPolicyFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGroupLayoutPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiGroupLayoutPolicyField field, out uint value)
@@ -121,26 +125,26 @@ internal static class MuiGroupLayoutPolicyFieldCursorCodec
 // semantic record; this bounded adapter owns fixed guest-layout translation.
 internal static class MuiGroupLayoutPolicyStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiGroupLayoutPolicyField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiGroupLayoutPolicyField field,
+		out uint index)
 	{
 		if (field == MuiGroupLayoutPolicyField.Magic)
-			offset = MuiGroupLayoutPolicyStateRecord.MagicOffset;
+			index = 0;
 		else if (field == MuiGroupLayoutPolicyField.Horizontal)
-			offset = MuiGroupLayoutPolicyStateRecord.HorizontalOffset;
+			index = 1;
 		else if (field == MuiGroupLayoutPolicyField.HorizontalSpacing)
-			offset = MuiGroupLayoutPolicyStateRecord.HorizontalSpacingOffset;
+			index = 2;
 		else if (field == MuiGroupLayoutPolicyField.VerticalSpacing)
-			offset = MuiGroupLayoutPolicyStateRecord.VerticalSpacingOffset;
+			index = 3;
 		else if (field == MuiGroupLayoutPolicyField.SameWidth)
-			offset = MuiGroupLayoutPolicyStateRecord.SameWidthOffset;
+			index = 4;
 		else if (field == MuiGroupLayoutPolicyField.SameHeight)
-			offset = MuiGroupLayoutPolicyStateRecord.SameHeightOffset;
+			index = 5;
 		else if (field == MuiGroupLayoutPolicyField.PageMode)
-			offset = MuiGroupLayoutPolicyStateRecord.PageModeOffset;
+			index = 6;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -150,12 +154,34 @@ internal static class MuiGroupLayoutPolicyStateRecordMemoryCodec
 		APTR record, MuiGroupLayoutPolicyField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiGroupLayoutPolicyFieldCursor);
+		cursor.Address = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiGroupLayoutPolicyFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiGroupLayoutPolicyStateRecord.Size) &&
-			platform.IsMapped(address, MuiGroupLayoutPolicyStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Address,
+				MuiGroupLayoutPolicyStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiGroupLayoutPolicyStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiGroupLayoutPolicyStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

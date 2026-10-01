@@ -31,6 +31,21 @@ public sealed class MuiAreaControlCharTests
 		Assert.True(MuiAreaControlCharStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out var characterAddress));
 		Assert.Equal(address.Raw + 4, characterAddress.Raw);
+		Assert.True(MuiAreaControlCharStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedCharacterAddress, out var typedCharacterSize));
+		Assert.Equal(characterAddress, typedCharacterAddress);
+		Assert.Equal(MuiAreaControlCharStateRecord.FieldSize, typedCharacterSize);
+		Assert.True(MuiAreaControlCharStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryCharacterAddress, out var memoryCharacterSize));
+		Assert.Equal(typedCharacterAddress, memoryCharacterAddress);
+		Assert.Equal(typedCharacterSize, memoryCharacterSize);
+		cursor.Field = (MuiAreaControlCharStateField)255;
+		Assert.False(MuiAreaControlCharStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiAreaControlCharStateField.Character;
+		Assert.False(MuiAreaControlCharStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 		Assert.False(MuiAreaControlCharStateRecordCodec.TryRead(ref platform,
 			APTR.FromPointer(0x21000u), out _));
 	}

@@ -47,9 +47,22 @@ public sealed class MuiSpecialistHookMessageStructAdapterTests
 		Assert.True(MuiSpecialistHookMessageFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out var compatibilityFieldAddress));
 		Assert.Equal(fieldAddress.Raw, compatibilityFieldAddress.Raw);
+		Assert.True(MuiSpecialistHookMessageFieldCursorCodec.TryGetAddress(
+			ref platform, cursor, out var sizedFieldAddress, out var fieldSize));
+		Assert.Equal(fieldAddress, sizedFieldAddress);
+		Assert.Equal(MuiSpecialistHookMessage.FieldSize, fieldSize);
+		Assert.True(MuiSpecialistHookMessageRecordMemoryCodec.TryGetAddress(
+			ref platform, cursor, out var memoryFieldAddress,
+			out var memoryFieldSize));
+		Assert.Equal(fieldAddress, memoryFieldAddress);
+		Assert.Equal(MuiSpecialistHookMessage.FieldSize, memoryFieldSize);
 		cursor.Field = (MuiSpecialistHookMessageField)255;
 		Assert.False(MuiSpecialistHookMessageFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out _));
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiSpecialistHookMessageField.MethodId;
+		Assert.False(MuiSpecialistHookMessageFieldCursorCodec.TryGetAddress(
+			ref platform, cursor, out _, out _));
 		Assert.False(MuiSpecialistHookMessageCodec.TryRead(ref platform,
 			APTR.FromPointer(0x20FF5), out _));
 	}

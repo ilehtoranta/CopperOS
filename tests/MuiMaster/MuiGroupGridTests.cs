@@ -157,8 +157,13 @@ public sealed class MuiGroupGridTests
 			Field = MuiGroupGridStateField.VerticalCenter,
 		};
 		Assert.True(MuiGroupGridStateFieldCursorCodec.TryGetAddress(ref platform,
-			cursor, out var fieldAddress));
+			cursor, out var fieldAddress, out var fieldSize));
 		Assert.Equal(APTR.FromPointer(0x3020), fieldAddress);
+		Assert.Equal(MuiGroupGridStateRecord.FieldSize, fieldSize);
+		Assert.True(MuiGroupGridStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryFieldAddress, out var memoryFieldSize));
+		Assert.Equal(fieldAddress, memoryFieldAddress);
+		Assert.Equal(fieldSize, memoryFieldSize);
 		Assert.True(MuiGroupGridStateFieldCursorCodec.TryWriteUInt32(ref platform,
 			address, MuiGroupGridStateField.Columns, 2));
 		Assert.True(MuiGroupGridStateFieldCursorCodec.TryReadUInt32(ref platform,
@@ -166,11 +171,14 @@ public sealed class MuiGroupGridTests
 		Assert.Equal(2u, columns);
 		cursor.Field = unchecked((MuiGroupGridStateField)255);
 		Assert.False(MuiGroupGridStateFieldCursorCodec.TryGetAddress(ref platform,
-			cursor, out _));
+			cursor, out _, out _));
 		cursor.Address = APTR.FromPointer(0xFFFFFFF0u);
 		cursor.Field = MuiGroupGridStateField.VerticalCenter;
 		Assert.False(MuiGroupGridStateFieldCursorCodec.TryGetAddress(ref platform,
-			cursor, out _));
+			cursor, out _, out _));
+		cursor.Address = APTR.Null;
+		Assert.False(MuiGroupGridStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 
 		var expected = new MuiGroupGridStateRecord
 		{

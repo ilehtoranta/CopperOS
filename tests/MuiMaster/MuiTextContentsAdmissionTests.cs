@@ -87,6 +87,22 @@ public sealed class MuiTextContentsAdmissionTests
 		};
 		Assert.True(MuiTextContentsStateRecordCodec.Write(ref platform, address,
 			record));
+		var fieldCursor = new MuiTextContentsStateFieldCursor
+		{
+			Record = address,
+			Field = MuiTextContentsStateField.Contents,
+		};
+		Assert.True(MuiTextContentsStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out var cursorContentsAddress));
+		Assert.Equal(0x1D04u, cursorContentsAddress.Raw);
+		Assert.True(MuiTextContentsStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out var typedCursorContentsAddress, out var typedCursorFieldSize));
+		Assert.Equal(cursorContentsAddress, typedCursorContentsAddress);
+		Assert.Equal(MuiTextContentsStateRecord.FieldSize, typedCursorFieldSize);
+		Assert.True(MuiTextContentsStateRecordMemoryCodec.TryGetAddress(ref platform,
+			fieldCursor, out var memoryCursorContentsAddress, out var memoryCursorFieldSize));
+		Assert.Equal(typedCursorContentsAddress, memoryCursorContentsAddress);
+		Assert.Equal(typedCursorFieldSize, memoryCursorFieldSize);
 		Assert.True(MuiTextContentsStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiTextContentsStateField.Contents,
 			out var typedContentsAddress));
@@ -109,6 +125,13 @@ public sealed class MuiTextContentsAdmissionTests
 		Assert.Equal(MuiTextContentsStateRecord.Cookie, typedMagic);
 		Assert.False(MuiTextContentsStateRecordMemoryCodec.TryReadUInt32(
 			ref platform, address, (MuiTextContentsStateField)255, out _));
+		fieldCursor.Field = (MuiTextContentsStateField)255;
+		Assert.False(MuiTextContentsStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
+		fieldCursor.Record = APTR.Null;
+		fieldCursor.Field = MuiTextContentsStateField.Contents;
+		Assert.False(MuiTextContentsStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
 		Assert.True(MuiTextContentsStateRecordCodec.TryReadStructural(ref platform,
 			address, out var typedUpdated));
 		Assert.Equal(MuiTextContentsStateRecord.Cookie, typedUpdated.Magic);

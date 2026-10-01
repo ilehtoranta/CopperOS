@@ -80,18 +80,23 @@ internal static class MuiVolumelistModeFieldCursorCodec
 	// place that projects them into guest addresses.
 	internal static class MuiVolumelistModeStateRecordMemoryCodec
 	{
-		private static bool TryResolve(MuiVolumelistModeField field,
-			out uint offset)
+		private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+			ref MuiGuestStructCursor cursor, MuiVolumelistModeField field,
+			out APTR address)
+			where TPlatform : struct, IMuiGuestMemory
 		{
-			offset = field switch
+			address = APTR.Null;
+			if (field == MuiVolumelistModeField.Magic)
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiVolumelistModeStateRecord.FieldSize, out address);
+			if (field == MuiVolumelistModeField.ExampleMode)
 			{
-				MuiVolumelistModeField.Magic =>
-					MuiVolumelistModeStateRecord.MagicOffset,
-				MuiVolumelistModeField.ExampleMode =>
-					MuiVolumelistModeStateRecord.ExampleModeOffset,
-				_ => uint.MaxValue,
-			};
-			return offset != uint.MaxValue;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiVolumelistModeStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiVolumelistModeStateRecord.FieldSize, out address);
+			}
+			return false;
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -99,13 +104,11 @@ internal static class MuiVolumelistModeFieldCursorCodec
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			fieldAddress = APTR.Null;
-			if (!TryResolve(field, out var offset) || address.IsNull ||
-				address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(address, MuiVolumelistModeStateRecord.Size))
+			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiVolumelistModeStateRecord.Size, out var cursor) ||
+				!TryTakeField(ref platform, ref cursor, field, out fieldAddress))
 				return false;
-			fieldAddress = APTR.FromPointer(address.Raw + offset);
-			return platform.IsMapped(fieldAddress,
-				MuiVolumelistModeStateRecord.FieldSize);
+			return true;
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

@@ -54,10 +54,25 @@ public sealed class MuiGaugeInfoTextAdmissionTests
 		Assert.Equal(value.InfoText, structural.InfoText);
 		Assert.True(MuiGaugeInfoTextStateRecordCodec.TryRead(ref platform, address,
 			out _));
+		var infoTextCursor = new MuiGaugeInfoTextStateFieldCursor
+		{
+			Record = address,
+			Field = MuiGaugeInfoTextStateField.InfoText,
+		};
 		Assert.True(MuiGaugeInfoTextStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiGaugeInfoTextStateField.InfoText,
 			out var infoTextField));
 		Assert.Equal(address.Raw + 4, infoTextField.Raw);
+		Assert.True(MuiGaugeInfoTextStateFieldCursorCodec.TryGetAddress(
+			ref platform, infoTextCursor, out var cursorInfoTextField,
+			out var cursorFieldSize));
+		Assert.Equal(infoTextField, cursorInfoTextField);
+		Assert.Equal(MuiGaugeInfoTextStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiGaugeInfoTextStateRecordMemoryCodec.TryGetAddress(
+			ref platform, infoTextCursor, out var memoryInfoTextField,
+			out var memoryFieldSize));
+		Assert.Equal(cursorInfoTextField, memoryInfoTextField);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiGaugeInfoTextStateRecordMemoryCodec.TryReadUInt32(
 			ref platform, address, MuiGaugeInfoTextStateField.InfoText,
 			out var infoTextRaw));
@@ -84,6 +99,13 @@ public sealed class MuiGaugeInfoTextAdmissionTests
 			ref platform, address, MuiGaugeInfoTextStateRecord.Size, out _));
 		Assert.False(MuiGaugeInfoTextStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, (uint)0, out _));
+		infoTextCursor.Field = (MuiGaugeInfoTextStateField)0xFF;
+		Assert.False(MuiGaugeInfoTextStateFieldCursorCodec.TryGetAddress(
+			ref platform, infoTextCursor, out _, out _));
+		infoTextCursor.Record = APTR.Null;
+		infoTextCursor.Field = MuiGaugeInfoTextStateField.InfoText;
+		Assert.False(MuiGaugeInfoTextStateFieldCursorCodec.TryGetAddress(
+			ref platform, infoTextCursor, out _, out _));
 		Assert.False(MuiGaugeInfoTextStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

@@ -5,6 +5,626 @@ namespace CopperOS.Commands.Tests;
 
 public sealed class ShellScriptEngineTests
 {
+    [Fact]
+    public void Interactive_prompt_is_preflighted_then_emitted_as_literal_segments()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptPromptText = "CopperOS> ";
+        var frame = InitializeFrame(ref platform,
+            ShellScriptFrameFlags.Active | ShellScriptFrameFlags.Interactive);
+        var workspace = CreateWorkspace();
+
+        var status = ShellScriptEngine.Step(ref platform, frame,
+            in workspace, out _);
+
+        Assert.Equal(ShellScriptStepStatus.EndOfFile, status);
+        Assert.Equal("CopperOS> ", platform.Store.OutputText);
+        Assert.Equal(0, platform.Store.PromptWriteCount);
+    }
+
+    [Fact]
+    public void Interactive_prompt_with_unmatched_backtick_emits_no_partial_prefix()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptPromptText = "prefix `Echo value suffix";
+        var frame = InitializeFrame(ref platform,
+            ShellScriptFrameFlags.Active | ShellScriptFrameFlags.Interactive);
+        var workspace = CreateWorkspace();
+
+        var status = ShellScriptEngine.Step(ref platform, frame,
+            in workspace, out _);
+
+        Assert.Equal(ShellScriptStepStatus.PlatformFailure, status);
+        Assert.Equal(string.Empty, platform.Store.OutputText);
+        Assert.Equal(1, platform.Store.PromptWriteCount);
+    }
+
+	[Fact]
+	public void Interactive_prompt_executes_backtick_command_and_captures_its_output()
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.ScriptPromptText = "prefix `Echo value` suffix";
+		var frame = InitializeFrame(ref platform,
+			ShellScriptFrameFlags.Active | ShellScriptFrameFlags.Interactive);
+		var workspace = CreatePromptWorkspace();
+
+		var run = ShellScriptEngine.Run(ref platform, frame, in workspace, 8);
+
+		Assert.Equal(ShellScriptStepStatus.EndOfFile, run.Status);
+		Assert.Equal("prefix value\n suffix", platform.Store.OutputText);
+		Assert.Equal(0, platform.Store.PromptWriteCount);
+		Assert.Equal(1, platform.Store.ScriptDeleteCount);
+	}
+
+	[Fact]
+	public void Interactive_prompt_continues_after_malformed_backtick_command()
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.ScriptPromptText = "prefix `Echo \"unterminated` suffix";
+		var frame = InitializeFrame(ref platform,
+			ShellScriptFrameFlags.Active | ShellScriptFrameFlags.Interactive);
+		var workspace = CreatePromptWorkspace();
+
+		var run = ShellScriptEngine.Run(ref platform, frame, in workspace, 8);
+
+		Assert.Equal(ShellScriptStepStatus.EndOfFile, run.Status);
+		Assert.Equal("prefix  suffix", platform.Store.OutputText);
+		Assert.Equal(0, platform.Store.PromptWriteCount);
+		Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+			out var frameState));
+		Assert.Equal((int)ShellCommandResult.Error, frameState.LastResult);
+	}
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Final_async_error_survives_EOF_and_runner_cleanup_before_Shell_child_exit(bool completesDuringLaunch)
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptText = "external\n; trailing comment\n\n";
+        platform.Store.ScriptExternalPending = true;
+        platform.Store.ScriptChildCompletesDuringLaunch = completesDuringLaunch;
+        platform.Store.ContinuationResult = (int)ShellCommandResult.Warn;
+        platform.Store.ContinuationIoError = (int)DOS.Error.ObjectNotFound;
+        platform.Store.ContinuationReleaseClearsRecord = true;
+        var frame = InitializeFrame(ref platform);
+        var workspace = CreateWorkspace();
+        Assert.Equal(ShellScriptStepStatus.Waiting,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        platform.Store.ContinuationObservedState = ShellProcessContinuationState.Completed;
+        var run = ShellScriptEngine.Run(ref platform, frame, in workspace, 8);
+        Assert.Equal(ShellScriptStepStatus.EndOfFile, run.Status);
+        Assert.Equal((int)ShellCommandResult.Warn, run.Result);
+        Assert.Equal(0, platform.Store.CommandIoError);
+        Assert.Equal((int)DOS.Error.ObjectNotFound, platform.Store.PublishedDiagnostics.IoError);
+
+        Assert.True(ShellScriptCompletionDiagnostics.TryCapture(ref platform,
+            new APTR(8), in run, out var captured));
+        // Model runner close/free/unbind operations clearing the current error.
+        platform.Store.CommandIoError = (int)DOS.Error.DiskFull;
+        Assert.True(platform.TryBeginCommandDiagnostics(new APTR(8)));
+        Assert.True(platform.TryPublishCommandDiagnostics(new APTR(8), in captured));
+        Assert.True(platform.TryCaptureCommandDiagnostics(new APTR(8), run.Result,
+            out var nativeExitSnapshot));
+        Assert.Equal((int)ShellCommandResult.Warn, nativeExitSnapshot.ReturnCode);
+        Assert.Equal((int)DOS.Error.ObjectNotFound, nativeExitSnapshot.IoError);
+    }
+
+    [Fact]
+	public void Synchronous_ReadArgs_error_reaches_the_default_failure_limit()
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.ScriptText = "Stack bad\nEcho must-not-run\n";
+		var frame = InitializeFrame(ref platform);
+		var workspace = CreateWorkspace();
+		var run = ShellScriptEngine.Run(ref platform, frame, in workspace, 4);
+		Assert.Equal(ShellScriptStepStatus.FailureLimitExceeded, run.Status);
+		Assert.Equal((int)ShellCommandResult.Error, run.Result);
+		Assert.Equal(1u, run.Steps);
+		Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+			out var frameState));
+		Assert.Equal(2u, frameState.CurrentLine);
+		Assert.Equal((int)DOS.Error.BadNumber, platform.Store.CommandIoError);
+		Assert.True(ShellScriptCompletionDiagnostics.TryCapture(ref platform,
+			new APTR(8), in run, out var captured));
+        Assert.True(platform.TryBeginCommandDiagnostics(new APTR(8)));
+        Assert.True(platform.TryPublishCommandDiagnostics(new APTR(8), in captured));
+		Assert.Equal((int)DOS.Error.BadNumber, platform.Store.CommandIoError);
+	}
+
+	[Fact]
+	public void Conditional_and_runs_the_right_command_before_advancing_the_script()
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.ScriptText = "Echo alpha && Echo beta\n";
+		var frame = InitializeFrame(ref platform);
+		var workspace = CreateWorkspace();
+
+		Assert.Equal(ShellScriptStepStatus.Executed,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+		Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+			out var deferred));
+		Assert.Equal(ShellScriptDeferredCommandKind.ConditionalAnd,
+			deferred.DeferredCommand.Kind);
+		Assert.Equal(1u, deferred.CurrentLine);
+
+		Assert.Equal(ShellScriptStepStatus.Executed,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+		Assert.Equal("alpha\nbeta\n", platform.Store.OutputText);
+		Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+			out var completed));
+		Assert.Equal(ShellScriptDeferredCommandKind.None,
+			completed.DeferredCommand.Kind);
+		Assert.Equal(2u, completed.CurrentLine);
+	}
+
+	[Fact]
+	public void Output_concatenation_runs_both_commands_on_the_inherited_stream()
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.ScriptText = "Echo alpha || Echo beta\n";
+		var frame = InitializeFrame(ref platform);
+		var workspace = CreateWorkspace();
+
+		Assert.Equal(ShellScriptStepStatus.Executed,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+		Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+			out var deferred));
+		Assert.Equal(ShellScriptDeferredCommandKind.OutputConcatenation,
+			deferred.DeferredCommand.Kind);
+		Assert.Equal(1u, deferred.CurrentLine);
+		Assert.Equal("alpha\n", platform.Store.OutputText);
+
+		Assert.Equal(ShellScriptStepStatus.Executed,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+		Assert.Equal("alpha\nbeta\n", platform.Store.OutputText);
+		Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+			out var completed));
+		Assert.Equal(ShellScriptDeferredCommandKind.None,
+			completed.DeferredCommand.Kind);
+		Assert.Equal(2u, completed.CurrentLine);
+	}
+
+	[Fact]
+	public void Output_concatenation_runs_right_command_after_left_failure()
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.ScriptText = "Stack invalid || Echo after\n";
+		var frame = InitializeFrame(ref platform);
+		var workspace = CreateWorkspace();
+
+		Assert.Equal(ShellScriptStepStatus.Executed,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+		Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+			out var deferred));
+		Assert.Equal((int)ShellCommandResult.Error, deferred.LastResult);
+		Assert.Equal(ShellScriptDeferredCommandKind.OutputConcatenation,
+			deferred.DeferredCommand.Kind);
+
+		Assert.Equal(ShellScriptStepStatus.Executed,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+		Assert.Equal("after\n", platform.Store.OutputText);
+		Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+			out var completed));
+		Assert.Equal((int)ShellCommandResult.Ok, completed.LastResult);
+		Assert.Equal(2u, completed.CurrentLine);
+	}
+
+	[Fact]
+	public void Unimplemented_pipe_is_not_dispatched_as_arguments()
+	{
+		const string script = "Echo before | Echo after\n";
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.ScriptText = script;
+		var frame = InitializeFrame(ref platform);
+		var workspace = CreateWorkspace();
+
+		var status = ShellScriptEngine.Step(ref platform, frame,
+			in workspace, out var step);
+
+		Assert.Equal(ShellScriptStepStatus.UnsupportedOperator, status);
+		Assert.Equal(ShellInternalCommand.Unknown, step.Command);
+		Assert.Equal((int)ShellCommandResult.Error, step.CommandResult);
+		Assert.Equal(string.Empty, platform.Store.OutputText);
+		Assert.Equal(0, platform.Store.ReadArgsAttemptCount);
+		Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+			out var state));
+		Assert.Equal(2u, state.CurrentLine);
+		Assert.Equal((int)ShellCommandResult.Error, state.LastResult);
+	}
+
+	[Fact]
+	public void Output_concatenation_waits_for_external_command_before_continuing()
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.ScriptText = "external || Echo after\n";
+		platform.Store.ScriptExternalPending = true;
+		platform.Store.ContinuationResult = 20;
+		platform.Store.ContinuationReleaseClearsRecord = true;
+		var frame = InitializeFrame(ref platform);
+		var workspace = CreateWorkspace();
+
+		Assert.Equal(ShellScriptStepStatus.Waiting,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+		Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+			out var pending));
+		Assert.Equal(ShellScriptDeferredCommandKind.OutputConcatenation,
+			pending.DeferredCommand.Kind);
+
+		platform.Store.ContinuationObservedState =
+			ShellProcessContinuationState.Completed;
+		Assert.Equal(ShellScriptStepStatus.Executed,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+		Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+			out var resumed));
+		Assert.Equal(1u, resumed.CurrentLine);
+		Assert.Equal(ShellScriptDeferredCommandKind.OutputConcatenation,
+			resumed.DeferredCommand.Kind);
+
+		Assert.Equal(ShellScriptStepStatus.Executed,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+		Assert.Equal("after\n", platform.Store.OutputText);
+		Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+			out var completed));
+		Assert.Equal(2u, completed.CurrentLine);
+	}
+
+	[Theory]
+	[InlineData(5, ShellScriptStepStatus.Executed, 1u, "after\n")]
+	[InlineData(20, ShellScriptStepStatus.FailureLimitExceeded, 2u, "")]
+	public void Conditional_and_waits_for_external_result_before_deciding(
+		int childResult, ShellScriptStepStatus expectedStatus,
+		uint expectedLine, string expectedOutput)
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.ScriptText = "external && Echo after\n";
+		platform.Store.ScriptExternalPending = true;
+		platform.Store.ContinuationResult = childResult;
+		platform.Store.ContinuationReleaseClearsRecord = true;
+		var frame = InitializeFrame(ref platform);
+		var workspace = CreateWorkspace();
+
+		Assert.Equal(ShellScriptStepStatus.Waiting,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+		Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+			out var pending));
+		Assert.Equal(ShellScriptDeferredCommandKind.ConditionalAnd,
+			pending.DeferredCommand.Kind);
+
+		platform.Store.ContinuationObservedState =
+			ShellProcessContinuationState.Completed;
+		Assert.Equal(expectedStatus,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+		Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+			out var completed));
+		Assert.Equal(expectedLine, completed.CurrentLine);
+		if (childResult < 10)
+			Assert.Equal(ShellScriptStepStatus.Executed,
+				ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+		Assert.Equal(expectedOutput, platform.Store.OutputText);
+	}
+
+	[Fact]
+	public void Failat_raises_the_frame_limit_and_allows_an_error_below_it()
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.ScriptText = "Failat 11\nStack bad\nEcho reached\n";
+		var frame = InitializeFrame(ref platform);
+		var workspace = CreateWorkspace();
+
+		var run = ShellScriptEngine.Run(ref platform, frame, in workspace, 5);
+
+		Assert.Equal(ShellScriptStepStatus.EndOfFile, run.Status);
+		Assert.Equal((int)ShellCommandResult.Ok, run.Result);
+		Assert.Equal(11u, platform.Store.FailureLimit);
+		Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+			out var frameState));
+		Assert.Equal(11u, frameState.FailureLimit);
+	}
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("; empty script\n\n")]
+    [InlineData("Stack 4096\n")]
+    public void Successful_script_exit_does_not_inherit_previous_CLI_error(string script)
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptText = script;
+        platform.Store.PublishedDiagnostics = new ShellCommandDiagnostics
+        {
+            ReturnCode = (int)ShellCommandResult.Error,
+            IoError = (int)DOS.Error.BadNumber,
+        };
+        var frame = InitializeFrame(ref platform);
+        var workspace = CreateWorkspace();
+        var run = ShellScriptEngine.Run(ref platform, frame, in workspace, 5);
+        Assert.Equal(ShellScriptStepStatus.EndOfFile, run.Status);
+        Assert.Equal(0, run.Result);
+        Assert.True(ShellScriptCompletionDiagnostics.TryCapture(ref platform,
+            new APTR(8), in run, out var captured));
+        Assert.Equal(0, captured.ReturnCode);
+        Assert.Equal(0, captured.IoError);
+    }
+
+    [Fact]
+    public void Non_EOF_failure_uses_fresh_error_before_cleanup_not_prior_CLI_result()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.CommandIoError = (int)DOS.Error.DiskFull;
+        platform.Store.PublishedDiagnostics = new ShellCommandDiagnostics
+        {
+            ReturnCode = (int)ShellCommandResult.Error,
+            IoError = (int)DOS.Error.BadNumber,
+        };
+        var run = new ShellScriptRunResult(ShellScriptStepStatus.PlatformFailure,
+            (int)ShellCommandResult.Error, 1);
+        Assert.True(ShellScriptCompletionDiagnostics.TryCapture(ref platform,
+            new APTR(8), in run, out var captured));
+        Assert.Equal((int)DOS.Error.DiskFull, captured.IoError);
+        Assert.True(platform.TryBeginCommandDiagnostics(new APTR(8)));
+        Assert.True(platform.TryPublishCommandDiagnostics(new APTR(8), in captured));
+        Assert.Equal((int)DOS.Error.DiskFull, platform.Store.CommandIoError);
+    }
+
+    [Fact]
+    public void EOF_result_mismatch_does_not_attach_an_unrelated_published_error()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.PublishedDiagnostics = new ShellCommandDiagnostics
+        {
+            ReturnCode = (int)ShellCommandResult.Error,
+            IoError = (int)DOS.Error.BadNumber,
+        };
+        var run = new ShellScriptRunResult(ShellScriptStepStatus.EndOfFile,
+            (int)ShellCommandResult.Warn, 1);
+        Assert.True(ShellScriptCompletionDiagnostics.TryCapture(ref platform,
+            new APTR(8), in run, out var captured));
+        Assert.Equal((int)ShellCommandResult.Warn, captured.ReturnCode);
+        Assert.Equal(0, captured.IoError);
+    }
+
+    [Fact]
+    public void Pending_script_does_not_capture_a_final_process_outcome()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        var run = new ShellScriptRunResult(ShellScriptStepStatus.Waiting, 0, 1);
+        Assert.False(ShellScriptCompletionDiagnostics.TryCapture(ref platform,
+            new APTR(8), in run, out _));
+    }
+
+    [Fact]
+    public void Child_already_completed_when_launch_returns_is_collected_on_next_step()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptText = "external\nEcho after\n";
+        platform.Store.ScriptExternalPending = true;
+        platform.Store.ScriptChildCompletesDuringLaunch = true;
+        platform.Store.ContinuationResult = 5;
+        platform.Store.ContinuationIoError = (int)DOS.Error.ObjectNotFound;
+        platform.Store.ContinuationReleaseClearsRecord = true;
+        var frame = InitializeFrame(ref platform);
+        var workspace = CreateWorkspace();
+        Assert.Equal(ShellScriptStepStatus.Waiting,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out var completed));
+        Assert.Equal(5, completed.CommandResult);
+        Assert.Equal(1, platform.Store.ContinuationReleaseCount);
+        Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame, out var current));
+        Assert.True(current.PendingCommand.IsNull);
+        Assert.Equal(5, current.LastResult);
+        Assert.Equal(5, platform.Store.PublishedDiagnostics.ReturnCode);
+        Assert.Equal((int)DOS.Error.ObjectNotFound,
+            platform.Store.PublishedDiagnostics.IoError);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Child_saved_secondary_error_reaches_Why_after_acknowledgement(bool completesDuringLaunch)
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptText = "external\nWhy\n";
+        platform.Store.ScriptExternalPending = true;
+        platform.Store.ScriptChildCompletesDuringLaunch = completesDuringLaunch;
+        platform.Store.ScriptCommandIoError = (int)DOS.Error.BadNumber;
+        platform.Store.ContinuationResult = (int)ShellCommandResult.Warn;
+        platform.Store.ContinuationIoError = (int)DOS.Error.ObjectNotFound;
+        platform.Store.ContinuationReleaseClearsRecord = true;
+        var frame = InitializeFrame(ref platform);
+        var workspace = CreateWorkspace();
+
+        Assert.Equal(ShellScriptStepStatus.Waiting,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(0, platform.Store.DiagnosticsPublishCount);
+        platform.Store.CommandIoError = (int)DOS.Error.DiskFull;
+        platform.Store.ContinuationObservedState = ShellProcessContinuationState.Completed;
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal((int)DOS.Error.ObjectNotFound,
+            platform.Store.PublishedDiagnostics.IoError);
+        Assert.Equal((int)ShellCommandResult.Warn,
+            platform.Store.PublishedDiagnostics.ReturnCode);
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal((int)DOS.Error.ObjectNotFound, platform.Store.LastWhyDiagnostics.IoError);
+        Assert.Equal((int)ShellCommandResult.Warn, platform.Store.LastWhyDiagnostics.ReturnCode);
+        Assert.Equal(1, platform.Store.ContinuationReleaseCount);
+    }
+
+    [Fact]
+    public void Failed_child_diagnostics_read_does_not_acknowledge_or_advance()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptText = "external\n";
+        platform.Store.ScriptExternalPending = true;
+        var frame = InitializeFrame(ref platform);
+        var workspace = CreateWorkspace();
+        Assert.Equal(ShellScriptStepStatus.Waiting,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        platform.Store.ContinuationObservedState = ShellProcessContinuationState.Completed;
+        platform.Store.ContinuationDiagnosticsFailure = true;
+        Assert.Equal(ShellScriptStepStatus.PlatformFailure,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(0, platform.Store.ContinuationReleaseCount);
+        Assert.Equal(0, platform.Store.DiagnosticsPublishCount);
+        Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame, out var pending));
+        Assert.True(pending.PendingCommand.IsNotNull);
+        Assert.Equal(0u, pending.CurrentOffset);
+        platform.Store.ContinuationDiagnosticsFailure = false;
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(1, platform.Store.ContinuationReleaseCount);
+    }
+
+    [Fact]
+    public void Frame_registration_failure_does_not_invent_child_failure_after_publication()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptText = "external\n";
+        platform.Store.ScriptExternalPending = true;
+        platform.Store.ScriptCorruptFrameAfterLaunch = true;
+        var frame = InitializeFrame(ref platform);
+        var workspace = CreateWorkspace();
+        Assert.Equal(ShellScriptStepStatus.PlatformFailure,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.True(ShellProcessContinuationCodec.TryRead(ref platform,
+            platform.Store.ScriptExternalContinuation, out var child));
+        Assert.Equal(ShellProcessContinuationState.Running, child.State);
+        Assert.Equal(0, platform.Store.ContinuationReleaseCount);
+    }
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public void Failed_command_diagnostics_reach_Why_after_redirection_cleanup(bool redirect)
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.ScriptText = redirect ? "Stack bad >out\nWhy\n" :
+			"Stack bad\nWhy\n";
+		platform.Store.FailureLimit = 11;
+		var frame = InitializeFrame(ref platform);
+		var workspace = CreateDiagnosticWorkspace();
+
+		Assert.Equal(ShellScriptStepStatus.Executed,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out var failed));
+		Assert.Equal((int)ShellCommandResult.Error, failed.CommandResult);
+		Assert.Equal((int)DOS.Error.BadNumber, platform.Store.PublishedDiagnostics.IoError);
+		Assert.Equal((int)ShellCommandResult.Error,
+			platform.Store.PublishedDiagnostics.ReturnCode);
+		Assert.Equal(redirect ? 1 : 0, platform.Store.RedirectionCloseCount);
+		Assert.Equal(ShellScriptStepStatus.Executed,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+		Assert.Equal((int)DOS.Error.BadNumber, platform.Store.LastWhyDiagnostics.IoError);
+		Assert.Equal((int)ShellCommandResult.Error, platform.Store.LastWhyDiagnostics.ReturnCode);
+	}
+
+	[Fact]
+	public void Successful_command_clears_stale_error_in_published_diagnostics()
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.ScriptText = "Stack 4096\n";
+		platform.Store.CommandIoError = (int)DOS.Error.ObjectNotFound;
+		var frame = InitializeFrame(ref platform);
+		var workspace = CreateWorkspace();
+
+		Assert.Equal(ShellScriptStepStatus.Executed,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out var result));
+		Assert.Equal((int)ShellCommandResult.Ok, result.CommandResult);
+		Assert.Equal(0, platform.Store.PublishedDiagnostics.ReturnCode);
+		Assert.Equal(0, platform.Store.PublishedDiagnostics.IoError);
+		Assert.Equal(0, platform.Store.CommandIoError);
+	}
+
+	[Fact]
+	public void First_cleanup_failure_survives_later_successful_closes()
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.ScriptText = "Echo hello <in >out *>err\nWhy\n";
+		platform.Store.FailureLimit = 11;
+		platform.Store.RedirectionCloseFailAt = 1;
+		var frame = InitializeFrame(ref platform);
+		var workspace = CreateDiagnosticWorkspace();
+
+		Assert.Equal(ShellScriptStepStatus.Executed,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out var result));
+		Assert.Equal(3, platform.Store.RedirectionCloseCount);
+		Assert.Equal((int)ShellCommandResult.Error, result.CommandResult);
+		Assert.Equal((int)DOS.Error.DiskFull, platform.Store.PublishedDiagnostics.IoError);
+		Assert.Equal(ShellScriptStepStatus.Executed,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+		Assert.Equal((int)DOS.Error.DiskFull, platform.Store.LastWhyDiagnostics.IoError);
+	}
+
+	[Fact]
+	public void Pending_child_does_not_publish_its_parents_diagnostic_state()
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.ScriptText = "external\n";
+		platform.Store.ScriptExternalPending = true;
+		platform.Store.ScriptCommandIoError = (int)DOS.Error.DiskFull;
+		var frame = InitializeFrame(ref platform);
+		var workspace = CreateWorkspace();
+
+		Assert.Equal(ShellScriptStepStatus.Waiting,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+		Assert.Equal(0, platform.Store.DiagnosticsPublishCount);
+		platform.Store.ContinuationObservedState = ShellProcessContinuationState.Completed;
+		platform.Store.ContinuationResult = (int)ShellCommandResult.Error;
+		Assert.Equal(ShellScriptStepStatus.FailureLimitExceeded,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+		Assert.Equal(1, platform.Store.DiagnosticsPublishCount);
+		Assert.Equal(0, platform.Store.PublishedDiagnostics.IoError);
+	}
+
+	[Fact]
+	public void Nonzero_result_without_a_fresh_error_does_not_reuse_previous_failure()
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.ScriptText = "Stack bad\nStack 0\n";
+		platform.Store.FailureLimit = 11;
+		var frame = InitializeFrame(ref platform);
+		var workspace = CreateWorkspace();
+		Assert.Equal(ShellScriptStepStatus.Executed,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+		Assert.Equal((int)DOS.Error.BadNumber, platform.Store.PublishedDiagnostics.IoError);
+		Assert.Equal(ShellScriptStepStatus.Executed,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out var invalidStack));
+		Assert.Equal((int)ShellCommandResult.Error, invalidStack.CommandResult);
+		Assert.Equal((int)ShellCommandResult.Error, platform.Store.PublishedDiagnostics.ReturnCode);
+		Assert.Equal(0, platform.Store.PublishedDiagnostics.IoError);
+	}
+
+	[Fact]
+	public void Blank_line_and_eof_leave_previous_public_diagnostics_unchanged()
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.ScriptText = "\n";
+		platform.Store.PublishedDiagnostics = new ShellCommandDiagnostics
+		{
+			ReturnCode = (int)ShellCommandResult.Error,
+			IoError = (int)DOS.Error.BadNumber,
+		};
+		var frame = InitializeFrame(ref platform);
+		var workspace = CreateWorkspace();
+		Assert.Equal(ShellScriptStepStatus.Empty,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+		Assert.Equal(ShellScriptStepStatus.EndOfFile,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+		Assert.Equal(0, platform.Store.DiagnosticsPublishCount);
+		Assert.Equal((int)ShellCommandResult.Error, platform.Store.PublishedDiagnostics.ReturnCode);
+		Assert.Equal((int)DOS.Error.BadNumber, platform.Store.PublishedDiagnostics.IoError);
+	}
+
+	private static ShellScriptStepWorkspace CreateDiagnosticWorkspace()
+	{
+		var command = CreateCommandWorkspace();
+		var redirection = new ShellRedirectionWorkspace(new APTR(1600), 256,
+			new APTR(1900), 64, new APTR(2000), 64, new APTR(2100), 64);
+		return new ShellScriptStepWorkspace(new APTR(1100), 256,
+			new APTR(1400), 64, in command, in redirection);
+	}
+
 	[Fact]
 	public void Start_initializes_the_guest_frame_before_running_startup_script()
 	{
@@ -294,10 +914,14 @@ public sealed class ShellScriptEngineTests
         Assert.Equal(ShellScriptStepStatus.Executed, status);
         Assert.Equal(ShellInternalCommand.Unknown, second.Command);
         Assert.Equal("external command", platform.Store.LastScriptExternalCommand);
+        Assert.Equal("external", platform.Store.LastScriptCommandName);
+        Assert.Equal("command", platform.Store.LastScriptArgumentTail);
         Assert.Equal(1, platform.Store.ScriptExecuteCount);
         Assert.Equal(1, platform.Store.ScriptLookupCount);
         Assert.Equal(ShellScriptLookupKind.CommandPath,
             platform.Store.LastScriptLookupKind);
+        Assert.Equal(ShellScriptLookupOrigin.CommandPath,
+            platform.Store.LastScriptLookupOrigin);
 
         status = ShellScriptEngine.Step(
             ref platform, frame, in workspace, out var eof);
@@ -731,6 +1355,27 @@ public sealed class ShellScriptEngineTests
     }
 
     [Fact]
+    public void Key_expansion_replaces_shell_number_placeholder()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.AcceptScriptKeyTemplate = true;
+        APTR template = platform.Store.PutAt(3600, "filename");
+        platform.WriteUInt8(template, 8, 0);
+        platform.Clear(new APTR(template.Raw + 9),
+            ShellScriptKeyExpansion.TemplateBufferCapacity - 9);
+        APTR source = platform.Store.PutAt(1100, "Echo <$$>");
+
+        Assert.True(ShellScriptKeyExpansion.TryInitializeDirectiveState(
+            ref platform, template, 8));
+        Assert.True(ShellScriptKeyExpansion.TryExpand(ref platform, source,
+            9, APTR.Null, 0, template, 8, new APTR(1000), 96,
+            2_147_483_647u, new APTR(1600), 256, out var length));
+        Assert.Equal(15u, length);
+        Assert.Equal("Echo 2147483647", platform.Store.ReadText(
+            new APTR(1600), length));
+    }
+
+    [Fact]
     public void Bra_and_ket_change_the_substitution_delimiters()
     {
         EchoCommandTests.TestShellPlatform platform = new();
@@ -992,6 +1637,8 @@ public sealed class ShellScriptEngineTests
         Assert.Equal("residentcmd", platform.Store.LastScriptLookupName);
         Assert.Equal(ShellScriptLookupKind.Resident,
             platform.Store.LastScriptLookupKind);
+        Assert.Equal(ShellScriptLookupOrigin.Resident,
+            platform.Store.LastScriptLookupOrigin);
         Assert.Equal("SYS:Libs/residentcmd",
             platform.Store.LastScriptResolvedPath);
     }
@@ -1128,13 +1775,34 @@ public sealed class ShellScriptEngineTests
     private static ShellScriptStepWorkspace CreateWorkspace()
     {
         ShellCommandWorkspace command = CreateCommandWorkspace();
-        return new ShellScriptStepWorkspace(
+        var workspace = new ShellScriptStepWorkspace(
             new APTR(1100),
             256,
             new APTR(1400),
             64,
             in command);
+		workspace.PromptTemplate = new APTR(5000);
+		workspace.PromptTemplateCapacity = 256;
+		workspace.PromptCapturePath = new APTR(5300);
+		workspace.PromptCapturePathCapacity = 512;
+		return workspace;
     }
+
+	private static ShellScriptStepWorkspace CreatePromptWorkspace()
+	{
+		var command = CreateCommandWorkspace();
+		var redirection = new ShellRedirectionWorkspace(new APTR(1500), 1024,
+			new APTR(2600), 256, new APTR(2900), 256, new APTR(3200), 256);
+		var alias = new ShellScriptAliasWorkspace(new APTR(3500), 1024);
+		var lookup = new ShellScriptLookupWorkspace(new APTR(4600), 256);
+		var workspace = new ShellScriptStepWorkspace(new APTR(1100), 256,
+			new APTR(1400), 64, in command, in redirection, in alias, in lookup);
+		workspace.PromptTemplate = new APTR(5000);
+		workspace.PromptTemplateCapacity = 256;
+		workspace.PromptCapturePath = new APTR(5300);
+		workspace.PromptCapturePathCapacity = 512;
+		return workspace;
+	}
 
     private static ShellCommandWorkspace CreateCommandWorkspace() =>
         new(

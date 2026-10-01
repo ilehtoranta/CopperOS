@@ -18,6 +18,19 @@ public sealed class MuiAreaResizeTests
 			packet, MuiAreaResizeMessageField.Flags, out var flagsAddress));
 		Assert.Equal(packet.Raw + MuiAreaInitResizeMessage.FlagsOffset,
 			flagsAddress.Raw);
+		var cursor = new MuiAreaResizeMessageFieldCursor
+		{
+			Message = packet,
+			Field = MuiAreaResizeMessageField.Flags,
+		};
+		Assert.True(MuiAreaResizeMessageFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedFlagsAddress, out var typedFlagsSize));
+		Assert.Equal(flagsAddress, typedFlagsAddress);
+		Assert.Equal(MuiAreaInitResizeMessage.FieldSize, typedFlagsSize);
+		Assert.True(MuiAreaResizeMessageMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryFlagsAddress, out var memoryFlagsSize));
+		Assert.Equal(typedFlagsAddress, memoryFlagsAddress);
+		Assert.Equal(typedFlagsSize, memoryFlagsSize);
 		Assert.True(MuiAreaResizeMessageCodec.TryReadInit(ref platform, packet,
 			out var init));
 		Assert.Equal(MuiAreaResizeMessageCodec.InitResize, init.MethodId);
@@ -41,6 +54,9 @@ public sealed class MuiAreaResizeTests
 			APTR.Null, 1));
 		Assert.False(MuiAreaResizeMessageCodec.TryReadInit(ref platform,
 			APTR.FromPointer(0x20FFCu), out _));
+		cursor.Message = APTR.Null;
+		Assert.False(MuiAreaResizeMessageFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 	}
 
 	[Fact]
@@ -130,6 +146,17 @@ public sealed class MuiAreaResizeTests
 			ref platform, cursor, out var fieldAddress));
 		Assert.Equal(address.Raw + MuiAreaResizeStateRecord.GenerationOffset,
 			fieldAddress.Raw);
+		Assert.True(MuiAreaResizeStateFieldCursorCodec.TryGetAddress(
+			ref platform, cursor, out var typedFieldAddress, out var typedFieldSize));
+		Assert.Equal(fieldAddress, typedFieldAddress);
+		Assert.Equal(MuiAreaResizeStateRecord.FieldSize, typedFieldSize);
+		Assert.True(MuiAreaResizeStateMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryFieldAddress, out var memoryFieldSize));
+		Assert.Equal(typedFieldAddress, memoryFieldAddress);
+		Assert.Equal(typedFieldSize, memoryFieldSize);
+		cursor.Record = APTR.Null;
+		Assert.False(MuiAreaResizeStateFieldCursorCodec.TryGetAddress(
+			ref platform, cursor, out _, out _));
 		Assert.False(MuiAreaResizeStateMemoryCodec.TryGetAddress(ref platform,
 			APTR.FromPointer(0x20FFFu), MuiAreaResizeStateField.Generation,
 			out _));

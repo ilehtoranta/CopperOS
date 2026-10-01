@@ -85,6 +85,22 @@ public sealed class MuiTextCopyAdmissionTests
 			Copy = 1,
 		};
 		Assert.True(MuiTextCopyStateRecordCodec.Write(ref platform, address, record));
+		var fieldCursor = new MuiTextCopyStateFieldCursor
+		{
+			Record = address,
+			Field = MuiTextCopyStateField.Copy,
+		};
+		Assert.True(MuiTextCopyStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out var cursorCopyAddress));
+		Assert.Equal(0x1D24u, cursorCopyAddress.Raw);
+		Assert.True(MuiTextCopyStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out var typedCursorCopyAddress, out var typedCursorFieldSize));
+		Assert.Equal(cursorCopyAddress, typedCursorCopyAddress);
+		Assert.Equal(MuiTextCopyStateRecord.FieldSize, typedCursorFieldSize);
+		Assert.True(MuiTextCopyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			fieldCursor, out var memoryCursorCopyAddress, out var memoryCursorFieldSize));
+		Assert.Equal(typedCursorCopyAddress, memoryCursorCopyAddress);
+		Assert.Equal(typedCursorFieldSize, memoryCursorFieldSize);
 		Assert.True(MuiTextCopyStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, MuiTextCopyStateField.Copy, out var typedCopyAddress));
 		Assert.Equal(0x1D24u, typedCopyAddress.Raw);
@@ -104,6 +120,13 @@ public sealed class MuiTextCopyAdmissionTests
 		Assert.Equal(MuiTextCopyStateRecord.Cookie, typedMagic);
 		Assert.False(MuiTextCopyStateRecordMemoryCodec.TryReadUInt32(ref platform,
 			address, (MuiTextCopyStateField)255, out _));
+		fieldCursor.Field = (MuiTextCopyStateField)255;
+		Assert.False(MuiTextCopyStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
+		fieldCursor.Record = APTR.Null;
+		fieldCursor.Field = MuiTextCopyStateField.Copy;
+		Assert.False(MuiTextCopyStateFieldCursorCodec.TryGetAddress(ref platform,
+			fieldCursor, out _, out _));
 		Assert.True(MuiTextCopyStateRecordCodec.TryReadStructural(ref platform,
 			address, out var typedUpdated));
 		Assert.Equal(MuiTextCopyStateRecord.Cookie, typedUpdated.Magic);

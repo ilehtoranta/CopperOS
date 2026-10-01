@@ -55,51 +55,80 @@ internal struct MuiGroupChangeRecordFieldCursor
 }
 
 // The fixed Group change packet and state records own their packed positions
-// in this bounded adapter. Live consumers use it directly; the typed cursor
-// remains only for compatibility callers and adapter-focused tests.
+// in this bounded adapter. Every typed field address walks the complete named
+// record with a guest struct cursor; no caller supplies a numeric offset.
 internal static class MuiGroupChangeRecordMemoryCodec
 {
-	private static bool TryResolve(MuiGroupChangeRecordKind record,
-		MuiGroupChangeRecordField field, out uint offset, out uint size)
+	private static bool TryResolveFieldIndex(MuiGroupChangeRecordKind record,
+		MuiGroupChangeRecordField field, out uint index, out uint size)
 	{
-		offset = 0;
+		index = 0;
 		size = 0;
 		switch (record)
 		{
 			case MuiGroupChangeRecordKind.Message:
 				size = MuiGroupChangeMessage.Size;
-				offset = field == MuiGroupChangeRecordField.MethodId ?
-					MuiGroupChangeMessage.MethodIdOffset :
-					uint.MaxValue;
-				break;
+				return field == MuiGroupChangeRecordField.MethodId;
 			case MuiGroupChangeRecordKind.ExitChange2:
 				size = MuiGroupExitChange2Message.Size;
-				offset = field switch
+				if (field == MuiGroupChangeRecordField.MethodId)
 				{
-					MuiGroupChangeRecordField.MethodId =>
-						MuiGroupExitChange2Message.MethodIdOffset,
-					MuiGroupChangeRecordField.Flags =>
-						MuiGroupExitChange2Message.FlagsOffset,
-					_ => uint.MaxValue,
-				};
-				break;
+					index = 0;
+					return true;
+				}
+				if (field == MuiGroupChangeRecordField.Flags)
+				{
+					index = 1;
+					return true;
+				}
+				return false;
 			case MuiGroupChangeRecordKind.State:
 				size = MuiGroupChangeState.Size;
-				offset = field switch
+				if (field == MuiGroupChangeRecordField.Cookie)
 				{
-					MuiGroupChangeRecordField.Cookie =>
-						MuiGroupChangeState.CookieOffset,
-					MuiGroupChangeRecordField.Depth =>
-						MuiGroupChangeState.DepthOffset,
-					MuiGroupChangeRecordField.ExitFlags =>
-						MuiGroupChangeState.ExitFlagsOffset,
-					MuiGroupChangeRecordField.ExitRequests =>
-						MuiGroupChangeState.ExitRequestsOffset,
-					_ => uint.MaxValue,
-				};
-				break;
+					index = 0;
+					return true;
+				}
+				if (field == MuiGroupChangeRecordField.Depth)
+				{
+					index = 1;
+					return true;
+				}
+				if (field == MuiGroupChangeRecordField.ExitFlags)
+				{
+					index = 2;
+					return true;
+				}
+				if (field == MuiGroupChangeRecordField.ExitRequests)
+				{
+					index = 3;
+					return true;
+				}
+				return false;
+			default:
+				return false;
 		}
-		return offset != uint.MaxValue;
+	}
+
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiGroupChangeRecordKind record,
+		MuiGroupChangeRecordField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolveFieldIndex(record, field, out var index, out _))
+			return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGroupChangeMessage.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -108,11 +137,10 @@ internal static class MuiGroupChangeRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(record, field, out var offset, out var size) ||
-			recordAddress.IsNull || recordAddress.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(recordAddress, size)) return false;
-		address = APTR.FromPointer(recordAddress.Raw + offset);
-		return platform.IsMapped(address, MuiGroupChangeMessage.FieldSize);
+		if (!TryResolveFieldIndex(record, field, out _, out var size) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, recordAddress, size,
+				out var cursor)) return false;
+		return TryTakeField(ref platform, ref cursor, record, field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -121,11 +149,39 @@ internal static class MuiGroupChangeRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, address, record, field,
-			out var fieldAddress))
-			return false;
-		value = platform.ReadUInt32(fieldAddress, 0);
-		return true;
+		switch (record)
+		{
+			case MuiGroupChangeRecordKind.Message:
+				if (field != MuiGroupChangeRecordField.MethodId ||
+					!MuiGroupChangeMessageCodec.TryReadRecord(ref platform, address,
+						out var message)) return false;
+				value = message.MethodId;
+				return true;
+			case MuiGroupChangeRecordKind.ExitChange2:
+				if (!MuiGroupExitChange2MessageCodec.TryReadRecord(ref platform,
+					address, out var exit2)) return false;
+				if (field == MuiGroupChangeRecordField.MethodId)
+					value = exit2.MethodId;
+				else if (field == MuiGroupChangeRecordField.Flags)
+					value = exit2.Flags;
+				else return false;
+				return true;
+			case MuiGroupChangeRecordKind.State:
+				if (!MuiGroupChangeStateCodec.TryReadRecord(ref platform, address,
+					out var state)) return false;
+				if (field == MuiGroupChangeRecordField.Cookie)
+					value = state.Cookie;
+				else if (field == MuiGroupChangeRecordField.Depth)
+					value = state.Depth;
+				else if (field == MuiGroupChangeRecordField.ExitFlags)
+					value = state.ExitFlags;
+				else if (field == MuiGroupChangeRecordField.ExitRequests)
+					value = state.ExitRequests;
+				else return false;
+				return true;
+			default:
+				return false;
+		}
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -133,11 +189,42 @@ internal static class MuiGroupChangeRecordMemoryCodec
 		MuiGroupChangeRecordField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, address, record, field,
-			out var fieldAddress))
-			return false;
-		platform.WriteUInt32(fieldAddress, 0, value);
-		return true;
+		switch (record)
+		{
+			case MuiGroupChangeRecordKind.Message:
+				if (field != MuiGroupChangeRecordField.MethodId ||
+					!MuiGroupChangeMessageCodec.TryReadRecord(ref platform, address,
+						out var message)) return false;
+				message.MethodId = value;
+				return MuiGroupChangeMessageCodec.WriteRecord(ref platform, address,
+					message);
+			case MuiGroupChangeRecordKind.ExitChange2:
+				if (!MuiGroupExitChange2MessageCodec.TryReadRecord(ref platform,
+					address, out var exit2)) return false;
+				if (field == MuiGroupChangeRecordField.MethodId)
+					exit2.MethodId = value;
+				else if (field == MuiGroupChangeRecordField.Flags)
+					exit2.Flags = value;
+				else return false;
+				return MuiGroupExitChange2MessageCodec.WriteRecord(ref platform,
+					address, exit2);
+			case MuiGroupChangeRecordKind.State:
+				if (!MuiGroupChangeStateCodec.TryReadRecord(ref platform, address,
+					out var state)) return false;
+				if (field == MuiGroupChangeRecordField.Cookie)
+					state.Cookie = value;
+				else if (field == MuiGroupChangeRecordField.Depth)
+					state.Depth = value;
+				else if (field == MuiGroupChangeRecordField.ExitFlags)
+					state.ExitFlags = value;
+				else if (field == MuiGroupChangeRecordField.ExitRequests)
+					state.ExitRequests = value;
+				else return false;
+				return MuiGroupChangeStateCodec.WriteRecord(ref platform, address,
+					state);
+			default:
+				return false;
+		}
 	}
 }
 

@@ -67,27 +67,28 @@ internal struct MuiWindowControlStateFieldCursor
 
 internal static class MuiWindowControlStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiWindowControlStateField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiWindowControlStateField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (field == MuiWindowControlStateField.Magic)
-			offset = MuiWindowControlStateRecord.MagicOffset;
-		else if (field == MuiWindowControlStateField.Id)
-			offset = MuiWindowControlStateRecord.IdOffset;
-		else if (field == MuiWindowControlStateField.DisableKeys)
-			offset = MuiWindowControlStateRecord.DisableKeysOffset;
-		else if (field == MuiWindowControlStateField.VisibleOnMaximize)
-			offset = MuiWindowControlStateRecord.VisibleOnMaximizeOffset;
-		else if (field == MuiWindowControlStateField.IsSubWindow)
-			offset = MuiWindowControlStateRecord.IsSubWindowOffset;
-		else if (field == MuiWindowControlStateField.NeedsMouseObject)
-			offset = MuiWindowControlStateRecord.NeedsMouseObjectOffset;
-		else
+		address = APTR.Null;
+		var skips = field switch
 		{
-			offset = 0;
-			return false;
-		}
-		return true;
+			MuiWindowControlStateField.Magic => 0u,
+			MuiWindowControlStateField.Id => 1u,
+			MuiWindowControlStateField.DisableKeys => 2u,
+			MuiWindowControlStateField.VisibleOnMaximize => 3u,
+			MuiWindowControlStateField.IsSubWindow => 4u,
+			MuiWindowControlStateField.NeedsMouseObject => 5u,
+			_ => uint.MaxValue,
+		};
+		if (skips == uint.MaxValue) return false;
+		for (var i = 0u; i < skips; i++)
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiWindowControlStateRecord.FieldSize, out _)) return false;
+		return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiWindowControlStateRecord.FieldSize, out address);
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -95,12 +96,11 @@ internal static class MuiWindowControlStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiWindowControlStateRecord.Size))
+		if (!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+			MuiWindowControlStateRecord.Size, out var structCursor) ||
+			!TryTakeField(ref platform, ref structCursor, cursor.Field, out address))
 			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, MuiWindowControlStateRecord.FieldSize);
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -130,31 +130,33 @@ internal static class MuiWindowControlStateFieldCursorCodec
 }
 
 // Struct-first guest-memory adapter. The named control record remains the
-// semantic API; this bounded boundary is the only place that translates its
-// fixed guest representation into byte addresses.
+// semantic API; typed field selection walks the packed struct. The numeric
+// overload remains a compatibility bridge for older callers that already
+// carry an ABI offset.
 internal static class MuiWindowControlStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiWindowControlStateField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiWindowControlStateField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (field == MuiWindowControlStateField.Magic)
-			offset = MuiWindowControlStateRecord.MagicOffset;
-		else if (field == MuiWindowControlStateField.Id)
-			offset = MuiWindowControlStateRecord.IdOffset;
-		else if (field == MuiWindowControlStateField.DisableKeys)
-			offset = MuiWindowControlStateRecord.DisableKeysOffset;
-		else if (field == MuiWindowControlStateField.VisibleOnMaximize)
-			offset = MuiWindowControlStateRecord.VisibleOnMaximizeOffset;
-		else if (field == MuiWindowControlStateField.IsSubWindow)
-			offset = MuiWindowControlStateRecord.IsSubWindowOffset;
-		else if (field == MuiWindowControlStateField.NeedsMouseObject)
-			offset = MuiWindowControlStateRecord.NeedsMouseObjectOffset;
-		else
+		address = APTR.Null;
+		var skips = field switch
 		{
-			offset = 0;
-			return false;
-		}
-		return true;
+			MuiWindowControlStateField.Magic => 0u,
+			MuiWindowControlStateField.Id => 1u,
+			MuiWindowControlStateField.DisableKeys => 2u,
+			MuiWindowControlStateField.VisibleOnMaximize => 3u,
+			MuiWindowControlStateField.IsSubWindow => 4u,
+			MuiWindowControlStateField.NeedsMouseObject => 5u,
+			_ => uint.MaxValue,
+		};
+		if (skips == uint.MaxValue) return false;
+		for (var i = 0u; i < skips; i++)
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiWindowControlStateRecord.FieldSize, out _)) return false;
+		return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiWindowControlStateRecord.FieldSize, out address);
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -162,8 +164,10 @@ internal static class MuiWindowControlStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		return TryResolve(field, out var offset) &&
-			TryGetAddress(ref platform, record, offset, out address);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiWindowControlStateRecord.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address)) return false;
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

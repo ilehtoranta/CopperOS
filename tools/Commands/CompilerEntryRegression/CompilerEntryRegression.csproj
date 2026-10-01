@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsTestProject>true</IsTestProject>
+    <AssemblyName>CopperSharp.Compiler.Tests</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.5.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
+    <PackageReference Include="Copper68k" Version="1.4.0" />
+    <ProjectReference Include="../../../../CopperSharp68k/Compiler/CopperSharp.Compiler.csproj" />
+    <ProjectReference Include="../../../../CopperSharp68k/Targets.Amiga/CopperSharp.Targets.Amiga.csproj" />
+    <ProjectReference Include="../../../../CopperSharp68k/Sdk.Amiga/CopperSharp.Sdk.Amiga.csproj" />
+    <Compile Include="../../../../CopperSharp68k/Compiler.Tests/PromotedLocalEntryArgumentTests.cs" Link="PromotedLocalEntryArgumentTests.cs" />
+    <Compile Include="../../../../CopperSharp68k/Compiler.Tests/TestBus.cs" Link="TestBus.cs" />
+  </ItemGroup>
+</Project>

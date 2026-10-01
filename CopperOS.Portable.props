@@ -18,4 +18,13 @@
   <ItemGroup Condition="'$(CopperOSUseLocalCopperSharp)' != 'true' or !Exists('$(CopperSharp68kRoot)\Sdk.Amiga\CopperSharp.Sdk.Amiga.csproj')">
     <PackageReference Include="CopperSharp.Sdk.Amiga" Version="$(CopperSharpSdkAmigaVersion)" />
   </ItemGroup>
+
+  <!-- Opt-in: projects that also need the Support assembly set
+       CopperOSReferenceSdkAmigaSupport=true and get the same local/package swap. -->
+  <ItemGroup Condition="'$(CopperOSReferenceSdkAmigaSupport)' == 'true' and '$(CopperOSUseLocalCopperSharp)' == 'true' and Exists('$(CopperSharp68kRoot)\Sdk.Amiga.Support\CopperSharp.Sdk.Amiga.Support.csproj')">
+    <ProjectReference Include="$(CopperSharp68kRoot)\Sdk.Amiga.Support\CopperSharp.Sdk.Amiga.Support.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(CopperOSReferenceSdkAmigaSupport)' == 'true' and ('$(CopperOSUseLocalCopperSharp)' != 'true' or !Exists('$(CopperSharp68kRoot)\Sdk.Amiga.Support\CopperSharp.Sdk.Amiga.Support.csproj'))">
+    <PackageReference Include="CopperSharp.Sdk.Amiga.Support" Version="$(CopperSharpSdkAmigaVersion)" />
+  </ItemGroup>
 </Project>

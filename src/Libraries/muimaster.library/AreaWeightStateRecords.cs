@@ -21,8 +21,6 @@ internal struct MuiAreaWeightStateRecord
 {
 	internal const uint Size = 8;
 	internal const uint FieldSize = 4;
-	internal const uint MagicOffset = 0;
-	internal const uint WeightOffset = 4;
 	internal const uint Cookie = 0x41574754u; // 'AWGT'
 
 	internal uint Magic;
@@ -62,10 +60,13 @@ internal static class MuiAreaWeightStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaWeightStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiAreaWeightStateRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaWeightStateFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiAreaWeightStateRecordMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiAreaWeightStateField field, out uint value)
@@ -84,21 +85,19 @@ internal static class MuiAreaWeightStateFieldCursorCodec
 	}
 }
 
-// Fixed Area weight state is transferred as a named record. Numeric guest
-// positions are confined to this ABI adapter; the compatibility cursor above
-// remains available only to legacy callers and malformed-state diagnostics.
+// Fixed Area weight state is transferred as a named record. The typed cursor
+// is the canonical address path; the enum overload below is only a bounded
+// compatibility adapter for existing callers.
 internal static class MuiAreaWeightStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiAreaWeightStateField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiAreaWeightStateField field,
+		out uint index)
 	{
-		if (field == MuiAreaWeightStateField.Magic)
-			offset = MuiAreaWeightStateRecord.MagicOffset;
-		else if (field == MuiAreaWeightStateField.Weight)
-			offset = MuiAreaWeightStateRecord.WeightOffset;
+		if (field == MuiAreaWeightStateField.Magic) index = 0;
+		else if (field == MuiAreaWeightStateField.Weight) index = 1;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -108,13 +107,33 @@ internal static class MuiAreaWeightStateRecordMemoryCodec
 		APTR record, MuiAreaWeightStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiAreaWeightStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaWeightStateFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiAreaWeightStateRecord.Size) &&
-			platform.IsMapped(address, MuiAreaWeightStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+			MuiAreaWeightStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiAreaWeightStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiAreaWeightStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

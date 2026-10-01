@@ -120,8 +120,14 @@ internal static class MuiAreaGeometryStateFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaGeometryStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaGeometryStateFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
 		=> MuiAreaGeometryStateRecordMemoryCodec.TryGetFieldAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
+			cursor.Record, cursor.Field, out address, out fieldSize);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiAreaGeometryStateField field, out uint value)
@@ -154,33 +160,6 @@ internal static class MuiAreaGeometryStateFieldCursorCodec
 // compatibility and malformed-state diagnostics.
 internal static class MuiAreaGeometryStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiAreaGeometryStateField field,
-		out uint offset, out uint recordSize)
-	{
-		recordSize = MuiAreaGeometryStateRecord.Size;
-		if (field == MuiAreaGeometryStateField.Magic)
-			offset = MuiAreaGeometryStateRecord.MagicOffset;
-		else if (field == MuiAreaGeometryStateField.Left)
-			offset = MuiAreaGeometryStateRecord.LeftOffset;
-		else if (field == MuiAreaGeometryStateField.Top)
-			offset = MuiAreaGeometryStateRecord.TopOffset;
-		else if (field == MuiAreaGeometryStateField.Width)
-			offset = MuiAreaGeometryStateRecord.WidthOffset;
-		else if (field == MuiAreaGeometryStateField.Height)
-			offset = MuiAreaGeometryStateRecord.HeightOffset;
-		else if (field == MuiAreaGeometryStateField.Right)
-			offset = MuiAreaGeometryStateRecord.RightOffset;
-		else if (field == MuiAreaGeometryStateField.Bottom)
-			offset = MuiAreaGeometryStateRecord.BottomOffset;
-		else
-		{
-			offset = 0;
-			recordSize = 0;
-			return false;
-		}
-		return true;
-	}
-
 	private static bool TryGetAddressByOffset<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
@@ -201,16 +180,53 @@ internal static class MuiAreaGeometryStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 		=> TryGetAddressByOffset(ref platform, record, offset, out address);
 
+	private static bool TryResolveFieldIndex(MuiAreaGeometryStateField field,
+		out uint index)
+	{
+		if (field == MuiAreaGeometryStateField.Magic) index = 0;
+		else if (field == MuiAreaGeometryStateField.Left) index = 1;
+		else if (field == MuiAreaGeometryStateField.Top) index = 2;
+		else if (field == MuiAreaGeometryStateField.Width) index = 3;
+		else if (field == MuiAreaGeometryStateField.Height) index = 4;
+		else if (field == MuiAreaGeometryStateField.Right) index = 5;
+		else if (field == MuiAreaGeometryStateField.Bottom) index = 6;
+		else
+		{
+			index = uint.MaxValue;
+			return false;
+		}
+		return true;
+	}
+
 	internal static bool TryGetFieldAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiAreaGeometryStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		return TryGetFieldAddress(ref platform, record, field, out address, out _);
+	}
+
+	internal static bool TryGetFieldAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAreaGeometryStateField field, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset, out var recordSize) ||
-			record.IsNull || record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, recordSize)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiAreaGeometryStateRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, record,
+				MuiAreaGeometryStateRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiAreaGeometryStateRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiAreaGeometryStateRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -220,8 +236,8 @@ internal static class MuiAreaGeometryStateRecordMemoryCodec
 		value = 0;
 		if (!TryGetAddressByOffset(ref platform, record, offset, out var address))
 			return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+			out value);
 	}
 
 	internal static bool TryReadFieldUInt32<TPlatform>(ref TPlatform platform,
@@ -277,8 +293,7 @@ internal static class MuiAreaGeometryStateRecordMemoryCodec
 	{
 		if (!TryGetAddressByOffset(ref platform, record, offset, out var address))
 			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		return MuiGuestUlongStorageCodec.WriteValue(ref platform, address, value);
 	}
 
 	internal static bool TryWriteFieldUInt32<TPlatform>(ref TPlatform platform,

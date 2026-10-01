@@ -93,6 +93,19 @@ public sealed class MuiStringSpellCheckingAdmissionTests
 			ref platform, recordAddress,
 			MuiStringSpellCheckingStateField.Enabled, out var enabledAddress));
 		Assert.Equal(0x1D44u, enabledAddress.Raw);
+		var enabledCursor = new MuiStringSpellCheckingStateFieldCursor
+		{
+			Record = recordAddress,
+			Field = MuiStringSpellCheckingStateField.Enabled,
+		};
+		Assert.True(MuiStringSpellCheckingStateFieldCursorCodec.TryGetAddress(ref platform,
+			enabledCursor, out var cursorEnabledAddress, out var cursorFieldSize));
+		Assert.Equal(enabledAddress, cursorEnabledAddress);
+		Assert.Equal(MuiStringSpellCheckingStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiStringSpellCheckingStateRecordMemoryCodec.TryGetAddress(ref platform,
+			enabledCursor, out var memoryEnabledAddress, out var memoryFieldSize));
+		Assert.Equal(cursorEnabledAddress, memoryEnabledAddress);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiStringSpellCheckingStateRecordMemoryCodec.TryReadUInt32(
 			ref platform, recordAddress,
 			MuiStringSpellCheckingStateField.Enabled, out var enabled));
@@ -114,6 +127,13 @@ public sealed class MuiStringSpellCheckingAdmissionTests
 			ref platform, APTR.Null, MuiStringSpellCheckingStateField.Magic, out _));
 		Assert.False(MuiStringSpellCheckingStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
+		enabledCursor.Field = (MuiStringSpellCheckingStateField)255;
+		Assert.False(MuiStringSpellCheckingStateFieldCursorCodec.TryGetAddress(ref platform,
+			enabledCursor, out _, out _));
+		enabledCursor.Record = APTR.Null;
+		enabledCursor.Field = MuiStringSpellCheckingStateField.Enabled;
+		Assert.False(MuiStringSpellCheckingStateFieldCursorCodec.TryGetAddress(ref platform,
+			enabledCursor, out _, out _));
 	}
 
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR stringClass)

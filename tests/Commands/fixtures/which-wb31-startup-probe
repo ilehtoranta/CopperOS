@@ -1,0 +1,8 @@
+; Disposable WB 3.1 Which probe. Output is retained in S:Shell-Startup.
+FailAt 20
+Echo "BEGIN" >S:Shell-Startup
+C:Which Execute >>S:Shell-Startup
+C:Which C:Execute >>S:Shell-Startup
+C:Which CopperOSMissingCommand >>S:Shell-Startup
+Echo "END" >>S:Shell-Startup
+EndCLI >NIL:

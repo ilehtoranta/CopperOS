@@ -301,6 +301,24 @@ These source-shaped results do not establish MorphOS guest parity, full
 diagnostic coverage, PID numbering/reuse/liveness, PURE/resident lifecycle,
 rights clearance, or package admission.
 
+## 2026-09-28 Workbench question-mark and unknown-switch parsing
+
+Fresh original/candidate guest pairs confirm the classic Workbench `ReadArgs`
+behavior for two parser edges:
+
+| Invocation | Exact output | Return | Caller IoErr | Comparison |
+| --- | --- | ---: | ---: | --- |
+| `C:Break ?` | `PROCESS/A/N,ALL/S,C/S,D/S,E/S,F/S: required argument missing\nC:Break failed returncode 20\n` (90 bytes) | 20 | 116 | [`comparison.json`](../../../../artifacts/workbench31-guest-command-break-help-candidate-20260928-v1/comparison.json) |
+| `C:Break 1 Z` | `wrong number of arguments\nC:Break failed returncode 20\n` (55 bytes) | 20 | 118 | [`comparison.json`](../../../../artifacts/workbench31-guest-command-break-unknown-switch-candidate-20260928-v1/comparison.json) |
+
+The first case does not enter an extended-help mode: DOS reports the missing
+mandatory PROCESS argument with the captured template text. Both pairs match
+exactly for raw output, return and caller post-System IoErr. These two cases
+exercise parser failures before target resolution; the comparison does not
+sample a task effect. MorphOS extended-help guest parity, other parser/error
+forms, full target coverage, PURE/resident lifecycle, rights and package gates
+remain open.
+
 ## Required gates
 
 - [ ] Capture both profile help/parser behavior, aliases, exact diagnostics,

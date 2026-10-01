@@ -19,6 +19,15 @@ public sealed class MuiCollectionRecordMessageStructAdapterTests
 			out var entryPool));
 		Assert.Equal(0x3500u, entryPool.Entry);
 		Assert.Equal(0x3600u, entryPool.Pool);
+		Assert.True(MuiCollectionRecordMessageMemoryCodec.TryWriteUInt32(
+			ref platform, entryPoolAddress, MuiCollectionRecordPacketKind.EntryPool,
+			MuiCollectionRecordField.Entry, 0x3510));
+		Assert.True(MuiCollectionRecordMessageCodec.TryReadEntryPool(ref platform,
+			entryPoolAddress, MuiCollectionRecordMessageCodec.Construct,
+			out entryPool));
+		Assert.Equal(MuiCollectionRecordMessageCodec.Construct, entryPool.MethodId);
+		Assert.Equal(0x3510u, entryPool.Entry);
+		Assert.Equal(0x3600u, entryPool.Pool);
 
 		var displayAddress = APTR.FromPointer(0x3040);
 		Assert.True(MuiCollectionRecordMessageCodec.WriteDisplay(ref platform,
@@ -30,6 +39,15 @@ public sealed class MuiCollectionRecordMessageStructAdapterTests
 			ref platform, displayAddress, MuiCollectionRecordPacketKind.Display,
 			MuiCollectionRecordField.Row, out var rowAddress));
 		Assert.Equal(APTR.FromPointer(0x304C), rowAddress);
+		Assert.True(MuiCollectionRecordMessageMemoryCodec.TryWriteUInt32(
+			ref platform, displayAddress, MuiCollectionRecordPacketKind.Display,
+			MuiCollectionRecordField.Row, 4));
+		Assert.True(MuiCollectionRecordMessageCodec.TryReadDisplay(ref platform,
+			displayAddress, out display));
+		Assert.Equal(MuiCollectionRecordMessageCodec.Display, display.MethodId);
+		Assert.Equal(0x3500u, display.Entry);
+		Assert.Equal(0x3700u, display.Array);
+		Assert.Equal(4u, display.Row);
 
 		var compareAddress = APTR.FromPointer(0x3080);
 		Assert.True(MuiCollectionRecordMessageCodec.WriteCompare(ref platform,
@@ -37,6 +55,15 @@ public sealed class MuiCollectionRecordMessageStructAdapterTests
 		Assert.True(MuiCollectionRecordMessageCodec.TryReadCompare(ref platform,
 			compareAddress, out var compare));
 		Assert.Equal(0x3510u, compare.Entry2);
+		Assert.True(MuiCollectionRecordMessageMemoryCodec.TryWriteUInt32(
+			ref platform, compareAddress, MuiCollectionRecordPacketKind.Compare,
+			MuiCollectionRecordField.Column, 5));
+		Assert.True(MuiCollectionRecordMessageCodec.TryReadCompare(ref platform,
+			compareAddress, out compare));
+		Assert.Equal(MuiCollectionRecordMessageCodec.Compare, compare.MethodId);
+		Assert.Equal(0x3500u, compare.Entry1);
+		Assert.Equal(0x3510u, compare.Entry2);
+		Assert.Equal(5u, compare.Column);
 
 		var testPosAddress = APTR.FromPointer(0x30C0);
 		Assert.True(MuiCollectionRecordMessageCodec.WriteTestPos(ref platform,
@@ -46,6 +73,21 @@ public sealed class MuiCollectionRecordMessageStructAdapterTests
 		Assert.Equal(8u, testPos.X);
 		Assert.Equal(9u, testPos.Y);
 		Assert.Equal(0x3800u, testPos.Result);
+		Assert.True(MuiCollectionRecordMessageMemoryCodec.TryWriteUInt32(
+			ref platform, testPosAddress, MuiCollectionRecordPacketKind.TestPos,
+			MuiCollectionRecordField.Result, 0x3810));
+		Assert.True(MuiCollectionRecordMessageCodec.TryReadTestPos(ref platform,
+			testPosAddress, out testPos));
+		Assert.Equal(MuiCollectionRecordMessageCodec.TestPos, testPos.MethodId);
+		Assert.Equal(8u, testPos.X);
+		Assert.Equal(9u, testPos.Y);
+		Assert.Equal(0x3810u, testPos.Result);
+		Assert.False(MuiCollectionRecordMessageMemoryCodec.TryReadUInt32(ref platform,
+			displayAddress, MuiCollectionRecordPacketKind.Display,
+			(MuiCollectionRecordField)255, out _));
+		Assert.False(MuiCollectionRecordMessageMemoryCodec.TryWriteUInt32(ref platform,
+			displayAddress, MuiCollectionRecordPacketKind.Compare,
+			MuiCollectionRecordField.Array, 1));
 
 		Assert.False(MuiCollectionRecordMessageMemoryCodec.TryGetAddress(
 			ref platform, APTR.FromPointer(0x20FF4),

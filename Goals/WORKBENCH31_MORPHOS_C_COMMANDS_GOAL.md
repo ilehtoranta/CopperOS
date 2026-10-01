@@ -1183,6 +1183,15 @@ with no invented help strings or unverified option list presented as exact.
   routed into the prompt-capture mock; and compound Echo examples avoid using
   `FIRST/K/N` as a literal message.
 
+- Current-worktree regression and native-foundation refresh (2026-09-28): the
+  complete `tests/Commands` suite passes 843 cases with no failures or skips.
+  The startup, argument-boundary, and I/O foundation probes then pass all 264
+  supplied instruction-level vectors across 68000/020/040, with one shared
+  image per CPU, no leaked resources, and zero shared-image writes. Receipt:
+  `tests/Commands.NativeRoot/bin/Release/net10.0/qualification/3e1bbbbf271c43288b90a1ec8a141256/qualification.json`.
+  The run uses mocked DOS vectors; original Kickstart, CopperStart, real DOS
+  parsing/I/O, minimum-stack, PURE/resident admission, and shipping remain open.
+
 **Exit:** an evidence-based baseline and dependency map. Existing behavior is
 reused; compile-only and partial Shell results are not reclassified as shipping.
 
@@ -1323,13 +1332,15 @@ exactly one implementation owner in CC10-CC38.
 - [ ] Commands: `Execute`, `CLI`, `Which`, `Eval`, `Quote`, `PathPart`.
 - Progress slice: Workbench 3.1 `Eval` has a separate literal-template resident
   entry using the captured five-slot candidate. The current three-CPU receipt
-  passes twelve supplied vectors per CPU (36 total), covering arithmetic,
+  passes 37 supplied vectors per CPU (111 total), covering arithmetic,
   operand reconstruction, formatting, `TO`, caret handling, parser/allocation
   failures, repeats, and interleaving, with 63 reachable methods and no
   managed allocation sites, fatal sites, helpers, or external targets. The
   bounded body retains the audited `nullable-values` feature for `TO`; real
   DOS parsing, original behavior, complete classic semantics, PURE/resident
-  admission, packaging, and differential evidence remain open.
+  admission, packaging, and full-command differential evidence remain open;
+  eighteen case-level Workbench guest pairs now match. Three refreshed-HUNK
+  comparisons cover the plus-prefix and both captured multiplication cases.
 - Progress slice: MorphOS `Eval` has been requalified through its resident entry
   on 68000/020/040. The latest receipt passes nineteen supplied vectors per CPU
   (57 total), covering the bounded expression, numeric/LFORMAT, `TO`, diagnostics,
@@ -1338,7 +1349,7 @@ exactly one implementation owner in CC10-CC38.
   methods and no managed allocation sites, fatal sites, helpers, or external
   targets. The audited `nullable-values` feature remains on `TO`; real DOS and
   filesystem behavior, complete 50.7 semantics, original comparison,
-  PURE/resident admission, packaging, and differential evidence remain open.
+  PURE/resident admission, packaging, and full-command differential evidence remain open;
 - Progress slice: MorphOS `Which` now calls public DOS `FindVar(...,LV_ALIAS)`
   through the six-slot `FILE/A,NOALIAS/S,ALIAS/S,NORES/S,RES/S,ALL/S` candidate
   boundary. Its three-CPU resident qualification passes 85 supplied vectors
@@ -1440,7 +1451,7 @@ exactly one implementation owner in CC10-CC38.
   with 27 reachable methods and no managed runtime, external native targets,
   exception regions, fatal fault sites, leaks or shared-image writes. Exact
   Workbench output/diagnostics, packed correspondence, PURE/resident lifecycle,
-  licensing, packaging, and differential evidence remain open.
+  licensing, packaging, and full-command differential evidence remain open.
 - Progress slice (2026-09-20): Workbench 3.1 `Info` now has an explicit
   missing-DOS boundary in its separate DOS 36 resident syntax-candidate entry
   using the observed `DEVICE` template and classic mounted-disk headers/status
@@ -1818,7 +1829,7 @@ admission remain open.
   total), with 43 reachable methods and no managed runtime, external native
   targets, exception regions, fatal fault sites, leaks, or shared-image writes.
 Exact Workbench diagnostics, recursion/link policy, original parity,
-PURE/resident lifecycle, packaging, and differential evidence remain open.
+PURE/resident lifecycle, packaging, and full-command differential evidence remain open.
 - Progress slice: MorphOS 3.20 `Delete` has a bounded resident frontend using
   its five-slot source grammar and shared public-DOS matcher/protection/delete
   worker. The three-CPU receipt passes eight supplied vectors per CPU with
@@ -5148,3 +5159,17 @@ inventory was regenerated and `extract`, `verify`, and `verify-media` all pass
 against the current plan and private media. This creates a concrete next
 implementation tranche while keeping CC18 and the full 0/200-command,
 0/246-profile shipping counts open.
+
+## 2026-09-28 implementation checkpoint - CC10 Workbench Eval leading-zero parity
+
+Three additional original/candidate Workbench guest pairs match exactly for
+`C:Eval 08`, `C:Eval 08+1`, and `C:Eval 09+1`. Each emits bytes `30 0A`, returns
+0, and leaves caller post-System IoErr at 0. The symbol-free candidate HUNK is
+bound to SHA-256
+`5d51031ab980e334e5cd2064974d7ed9eeeabbf524a2558bdb2f7a09ce51f74e`.
+Together with the previously recorded cases, 21 distinct bounded Workbench Eval
+invocation cases now match across two symbols-off HUNK identities (23 passing receipts include a duplicate `08 + 1` capture and a `2+` comparison on both HUNK identities). This adds
+captured-case evidence only: the complete evaluator,
+ReadArgs behavior, diagnostics, PURE/resident lifecycle, licensing, package
+admission, and all shipping gates remain open; shipping remains 0/200 commands
+and 0/246 profiles.

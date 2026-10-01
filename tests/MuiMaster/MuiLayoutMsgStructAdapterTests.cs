@@ -38,6 +38,15 @@ public sealed class MuiLayoutMsgStructAdapterTests
 			MUI_LayoutMsgField.Height, out var heightField, out var heightSize));
 		Assert.Equal(APTR.FromPointer(0x2918), heightField);
 		Assert.Equal(4u, heightSize);
+		var typedCursor = new MUI_LayoutMsgFieldCursor
+		{
+			Record = address,
+			Field = MUI_LayoutMsgField.Private6,
+		};
+		Assert.True(MUI_LayoutMsgFieldCursorCodec.TryGetAddress(ref platform,
+			typedCursor, out var private6Field, out var private6Size));
+		Assert.Equal(APTR.FromPointer(0x2920), private6Field);
+		Assert.Equal(4u, private6Size);
 		Assert.True(MUI_LayoutMsgMemoryCodec.TryGetAddress(ref platform, address,
 			MUI_LayoutMsgField.MinWidth, out var minWidthField, out var minWidthSize));
 		Assert.Equal(APTR.FromPointer(0x2908), minWidthField);
@@ -61,5 +70,12 @@ public sealed class MuiLayoutMsgStructAdapterTests
 			APTR.FromPointer(0x30FF0), MUI_LayoutMsgField.Height, out _, out _));
 		Assert.False(MUI_LayoutMsgMemoryCodec.TryGetAddress(ref platform, APTR.Null,
 			MUI_LayoutMsgField.Type, out _, out _));
+		typedCursor.Field = (MUI_LayoutMsgField)255;
+		Assert.False(MUI_LayoutMsgFieldCursorCodec.TryGetAddress(ref platform,
+			typedCursor, out _, out _));
+		typedCursor.Record = APTR.Null;
+		typedCursor.Field = MUI_LayoutMsgField.Type;
+		Assert.False(MUI_LayoutMsgFieldCursorCodec.TryGetAddress(ref platform,
+			typedCursor, out _, out _));
 	}
 }

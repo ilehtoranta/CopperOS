@@ -24,6 +24,19 @@ public sealed class MuiAreaDragPolicyStructAdapterTests
 			ref platform, address, MuiAreaDragPolicyStateField.Dropable,
 			out var dropableAddress));
 		Assert.Equal(0x3508u, dropableAddress.Raw);
+		var cursor = new MuiAreaDragPolicyStateFieldCursor
+		{
+			Record = address,
+			Field = MuiAreaDragPolicyStateField.Dropable,
+		};
+		Assert.True(MuiAreaDragPolicyStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedDropableAddress, out var typedDropableSize));
+		Assert.Equal(dropableAddress, typedDropableAddress);
+		Assert.Equal(MuiAreaDragPolicyStateRecord.FieldSize, typedDropableSize);
+		Assert.True(MuiAreaDragPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryDropableAddress, out var memoryDropableSize));
+		Assert.Equal(typedDropableAddress, memoryDropableAddress);
+		Assert.Equal(typedDropableSize, memoryDropableSize);
 		Assert.True(MuiAreaDragPolicyStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiAreaDragPolicyStateField.Draggable, 0));
 		Assert.True(MuiAreaDragPolicyStateRecordCodec.TryReadStructural(ref platform,
@@ -33,6 +46,13 @@ public sealed class MuiAreaDragPolicyStructAdapterTests
 			ref platform, address, (MuiAreaDragPolicyStateField)255, out _));
 		Assert.False(MuiAreaDragPolicyStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiAreaDragPolicyStateField.Magic, out _));
+		cursor.Field = (MuiAreaDragPolicyStateField)255;
+		Assert.False(MuiAreaDragPolicyStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiAreaDragPolicyStateField.Magic;
+		Assert.False(MuiAreaDragPolicyStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 		Assert.False(MuiAreaDragPolicyStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

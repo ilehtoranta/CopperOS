@@ -42,6 +42,8 @@ internal struct MuiMakeObjectParameterRecord
 {
 	internal const uint Size = 16;
 	internal const uint FieldSize = 4;
+	// Compatibility aliases retained for callers that still inspect the wire
+	// layout. The live cursor adapter walks this record declaration instead.
 	internal const uint FirstOffset = 0;
 	internal const uint SecondOffset = 4;
 	internal const uint ThirdOffset = 8;
@@ -51,6 +53,20 @@ internal struct MuiMakeObjectParameterRecord
 	internal uint Second;
 	internal uint Third;
 	internal uint Fourth;
+}
+
+// Internal construction plan for one MUIO_* form. Keeping the type-specific
+// parameters together prevents callers from splitting the decoded varargs
+// record into positional scalar arguments between validation and TagItem
+// generation.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiMakeObjectBuildShapeRecord
+{
+	internal uint Type;
+	internal MuiMakeObjectParameterRecord Parameters;
+	internal uint ClassKind;
+	internal uint TagCount; // Maximum emitted count, including optional tags.
+	internal uint PreParseKind;
 }
 
 internal enum MuiMakeObjectParameterField : byte
@@ -77,6 +93,14 @@ internal static class MuiMakeObjectParameterFieldCursorCodec
 			cursor.Base, cursor.Field, MuiMakeObjectParameterRecord.Size,
 			out address);
 
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMakeObjectParameterFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiMakeObjectParameterMemoryCodec.TryGetAddress(ref platform,
+			cursor.Base, cursor.Field, MuiMakeObjectParameterRecord.Size,
+			out address, out fieldSize);
+
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR parameters, MuiMakeObjectParameterField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
@@ -89,31 +113,47 @@ internal static class MuiMakeObjectParameterFieldCursorCodec
 // short object form does not require bytes beyond its actual vector.
 internal static class MuiMakeObjectParameterMemoryCodec
 {
-	private static bool TryResolve(MuiMakeObjectParameterField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiMakeObjectParameterField field,
+		out uint index)
 	{
-		offset = field switch
-		{
-			MuiMakeObjectParameterField.First => MuiMakeObjectParameterRecord.FirstOffset,
-			MuiMakeObjectParameterField.Second => MuiMakeObjectParameterRecord.SecondOffset,
-			MuiMakeObjectParameterField.Third => MuiMakeObjectParameterRecord.ThirdOffset,
-			MuiMakeObjectParameterField.Fourth => MuiMakeObjectParameterRecord.FourthOffset,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+		if (field == MuiMakeObjectParameterField.First) index = 0;
+		else if (field == MuiMakeObjectParameterField.Second) index = 1;
+		else if (field == MuiMakeObjectParameterField.Third) index = 2;
+		else if (field == MuiMakeObjectParameterField.Fourth) index = 3;
+		else { index = uint.MaxValue; return false; }
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR parameters, MuiMakeObjectParameterField field, uint availableBytes,
-		out APTR address) where TPlatform : struct, IMuiGuestMemory
+		out APTR address) where TPlatform : struct, IMuiGuestMemory =>
+		TryGetAddress(ref platform, parameters, field, availableBytes,
+			out address, out _);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR parameters, MuiMakeObjectParameterField field, uint availableBytes,
+		out APTR address, out uint fieldSize) where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || parameters.IsNull ||
-			availableBytes < offset || availableBytes - offset <
-			MuiMakeObjectParameterRecord.FieldSize ||
-			parameters.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(parameters.Raw + offset);
-		return platform.IsMapped(address, MuiMakeObjectParameterRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(field, out var index) || parameters.IsNull)
+			return false;
+		var requiredBytes = (index + 1) * MuiMakeObjectParameterRecord.FieldSize;
+		if (availableBytes < requiredBytes ||
+			!MuiGuestStructCursor.TryCreate(ref platform, parameters, requiredBytes,
+				out var cursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiMakeObjectParameterRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiMakeObjectParameterRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -162,10 +202,33 @@ internal static class MuiMakeObjectParameterCodec
 		}
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	// Native qualification fixtures also need to build a caller-owned prefix.
+	// Keep that exchange on the same complete named record as the reader so a
+	// test or ABI adapter never has to reproduce parameter offsets.
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR parameters, uint count, MuiMakeObjectParameterRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (count == 0) return true;
+		if (count > 4 || !MuiGuestStructCursor.TryCreate(ref platform,
+			parameters, count * MuiMakeObjectParameterRecord.FieldSize,
+			out var cursor)) return false;
+		if (!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.First)) return false;
+		if (count > 1 && !MuiGuestStructCursor.TryWriteUInt32(ref platform,
+			ref cursor, record.Second)) return false;
+		if (count > 2 && !MuiGuestStructCursor.TryWriteUInt32(ref platform,
+			ref cursor, record.Third)) return false;
+		if (count > 3 && !MuiGuestStructCursor.TryWriteUInt32(ref platform,
+			ref cursor, record.Fourth)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
 }
 
 // Fixed GadTools NewMenu entry as it crosses the guest-memory boundary. The
-// parser consumes this named record; only this codec knows the packed offsets.
+// parser consumes this named record; field access follows its declaration
+// order and preserves the packed byte/word/long widths.
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiNewMenuRecord
 {
@@ -173,6 +236,8 @@ internal struct MuiNewMenuRecord
 	internal const uint ByteFieldSize = 1;
 	internal const uint WordFieldSize = 2;
 	internal const uint LongFieldSize = 4;
+	// Compatibility aliases retained for callers that still inspect the wire
+	// layout. The live cursor adapter walks this record declaration instead.
 	internal const uint TypeOffset = 0;
 	internal const uint PaddingOffset = 1;
 	internal const uint LabelOffset = 2;
@@ -239,25 +304,19 @@ internal static class MuiNewMenuFieldCursorCodec
 // the only place that projects those positions into guest memory.
 internal static class MuiNewMenuRecordMemoryCodec
 {
-	private static bool TryResolve(MuiNewMenuField field, out uint offset,
+	private static bool TryResolveField(MuiNewMenuField field, out uint index,
 		out uint fieldSize)
 	{
-		offset = field switch
-		{
-			MuiNewMenuField.Type => MuiNewMenuRecord.TypeOffset,
-			MuiNewMenuField.Padding => MuiNewMenuRecord.PaddingOffset,
-			MuiNewMenuField.Label => MuiNewMenuRecord.LabelOffset,
-			MuiNewMenuField.CommandKey => MuiNewMenuRecord.CommandKeyOffset,
-			MuiNewMenuField.Flags => MuiNewMenuRecord.FlagsOffset,
-			MuiNewMenuField.MutualExclude => MuiNewMenuRecord.MutualExcludeOffset,
-			MuiNewMenuField.UserData => MuiNewMenuRecord.UserDataOffset,
-			_ => uint.MaxValue,
-		};
-		fieldSize = field == MuiNewMenuField.Type ||
-			field == MuiNewMenuField.Padding ? MuiNewMenuRecord.ByteFieldSize :
-			field == MuiNewMenuField.Flags ? MuiNewMenuRecord.WordFieldSize :
-			MuiNewMenuRecord.LongFieldSize;
-		return offset != uint.MaxValue;
+		fieldSize = MuiNewMenuRecord.LongFieldSize;
+		if (field == MuiNewMenuField.Type) { index = 0; fieldSize = MuiNewMenuRecord.ByteFieldSize; }
+		else if (field == MuiNewMenuField.Padding) { index = 1; fieldSize = MuiNewMenuRecord.ByteFieldSize; }
+		else if (field == MuiNewMenuField.Label) index = 2;
+		else if (field == MuiNewMenuField.CommandKey) index = 3;
+		else if (field == MuiNewMenuField.Flags) { index = 4; fieldSize = MuiNewMenuRecord.WordFieldSize; }
+		else if (field == MuiNewMenuField.MutualExclude) index = 5;
+		else if (field == MuiNewMenuField.UserData) index = 6;
+		else { index = uint.MaxValue; fieldSize = 0; return false; }
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -266,11 +325,24 @@ internal static class MuiNewMenuRecordMemoryCodec
 	{
 		address = APTR.Null;
 		fieldSize = 0;
-		if (!TryResolve(field, out var offset, out fieldSize) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiNewMenuRecord.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, fieldSize);
+		if (!TryResolveField(field, out var index, out fieldSize) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, record,
+				MuiNewMenuRecord.Size, out var cursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			uint width;
+			if (current < 2) width = MuiNewMenuRecord.ByteFieldSize;
+			else if (current == 4) width = MuiNewMenuRecord.WordFieldSize;
+			else width = MuiNewMenuRecord.LongFieldSize;
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, width,
+				out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -372,6 +444,84 @@ internal struct MuiNewMenuCursor
 	internal uint Index;
 }
 
+// Temporary native menu-construction vectors contain only object pointers.
+// Keep their four-byte wire element named and bounded so menu planning never
+// exposes an ad-hoc pointer offset to the construction code.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiNativeMenuObjectPointerRecord
+{
+	internal const uint Size = 4;
+	internal APTR Object;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiNativeMenuObjectVectorCursor
+{
+	internal const uint MaximumEntries = MuiNewMenuCursor.MaximumEntries;
+	internal APTR Base;
+	internal uint Index;
+}
+
+internal static class MuiNativeMenuObjectVectorCodec
+{
+	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+		MuiNativeMenuObjectVectorCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		return TryGetRecordAddress(ref platform, cursor.Base, cursor.Index,
+			MuiNativeMenuObjectVectorCursor.MaximumEntries,
+			MuiNativeMenuObjectPointerRecord.Size, out address);
+	}
+
+	internal static bool TryGetRecordAddress<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, uint maximumEntries, uint recordSize,
+		out APTR address) where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (vector.IsNull || index >= maximumEntries || recordSize == 0 ||
+			index == uint.MaxValue || index + 1 > uint.MaxValue / recordSize)
+			return false;
+		var byteSize = (index + 1) * recordSize;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, vector, byteSize,
+			out var cursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				recordSize, out var candidate)) return false;
+			if (current == index) address = candidate;
+		}
+		return address.IsNotNull && cursor.Remaining == 0;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiNativeMenuObjectVectorCursor cursor, out APTR value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = APTR.Null;
+		if (!TryGetEntry(ref platform, cursor, out var address) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiNativeMenuObjectPointerRecord.Size, out var recordCursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref recordCursor,
+				out var raw) || !MuiGuestStructCursor.IsComplete(recordCursor))
+			return false;
+		value = APTR.FromPointer(raw);
+		return true;
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiNativeMenuObjectVectorCursor cursor, APTR value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetEntry(ref platform, cursor, out var address) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiNativeMenuObjectPointerRecord.Size, out var recordCursor))
+			return false;
+		return MuiGuestStructCursor.TryWriteUInt32(ref platform, ref recordCursor,
+			value.Raw) && MuiGuestStructCursor.IsComplete(recordCursor);
+	}
+}
+
 // Struct-first guest-memory adapter for caller-owned NewMenu vectors.
 // Complete 20-byte records and the MorphOS 256-entry bound are admitted here;
 // the typed cursor remains a compatibility wrapper for existing callers.
@@ -380,15 +530,9 @@ internal static class MuiNewMenuVectorMemoryCodec
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 		APTR vector, uint index, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (vector.IsNull || index >= MuiNewMenuCursor.MaximumEntries ||
-			index > (uint.MaxValue - vector.Raw) / MuiNewMenuRecord.Size) return false;
-		var offset = index * MuiNewMenuRecord.Size;
-		if (vector.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(vector.Raw + offset);
-		return platform.IsMapped(address, MuiNewMenuRecord.Size);
-	}
+		=> MuiNativeMenuObjectVectorCodec.TryGetRecordAddress(ref platform,
+			vector, index, MuiNewMenuCursor.MaximumEntries,
+			MuiNewMenuRecord.Size, out address);
 }
 
 // Production vector bridge. Each caller-owned NewMenu slot is admitted by
@@ -510,6 +654,7 @@ public static class MuiMakeObjectServiceCore
 	private const uint NumericFormat = 0x804263E9;
 	private const uint StringMaxLen = 0x80424984;
 	private const uint MenuTitle = 0x8042A0E3;
+	private const uint FamilyChild = 0x8042C696;
 	private const uint MenuEnabled = 0x8042ED48;
 	private const uint MenuitemTitle = 0x804218BE;
 	private const uint MenuitemShortcut = 0x80422030;
@@ -561,6 +706,9 @@ public static class MuiMakeObjectServiceCore
 	private const uint ClassMenuitem = 11;
 	private const uint ClassNameStorage = MuiMakeObjectClassNameRecord.Size;
 	private const uint TagStorage = 88; // ten TagItems plus TAG_DONE
+	private const uint NativeRectangleTagCapacity = 3; // two tags plus TAG_DONE
+	private const uint NativeRectangleTagStorage =
+		NativeRectangleTagCapacity * MuiAslTagItemRecord.Size;
 	private const uint MaximumCString = 4096;
 
 	public static APTR MakeObjectA<TPlatform>(ref TPlatform platform, APTR state,
@@ -574,12 +722,8 @@ public static class MuiMakeObjectServiceCore
 			return MakeMenustripNM(ref platform, state, parameterRecord.First,
 				parameterRecord.Second);
 
-		uint classKind;
-		uint tagCount;
-		uint preParseKind = 0;
-		if (!BuildShape(type, parameterRecord.First, parameterRecord.Second,
-			parameterRecord.Third, parameterRecord.Fourth, out classKind,
-			out tagCount, out preParseKind)) return APTR.Null;
+		if (!TryBuildShape(type, parameterRecord, out var shape))
+			return APTR.Null;
 
 		if ((type == MUIO_Button || type == MUIO_Label ||
 				type == MUIO_BarTitle || type == MUIO_Cycle ||
@@ -614,7 +758,7 @@ public static class MuiMakeObjectServiceCore
 			ReleaseTemporary(ref platform, className, tags, preParse);
 			return APTR.Null;
 		}
-		if (preParseKind != 0)
+		if (shape.PreParseKind != 0)
 		{
 			preParse = MuiHeadlessMemory.Allocate(ref platform,
 				MuiMakeObjectPreParseRecord.Size);
@@ -625,7 +769,7 @@ public static class MuiMakeObjectServiceCore
 			}
 			var preParseRecord = default(MuiMakeObjectPreParseRecord);
 			preParseRecord.Escape = 0x1B;
-			preParseRecord.Command = preParseKind == 1 ? (byte)'c' : (byte)'l';
+			preParseRecord.Command = shape.PreParseKind == 1 ? (byte)'c' : (byte)'l';
 			if (!MuiMakeObjectPreParseRecordCodec.Write(ref platform, preParse,
 				preParseRecord))
 			{
@@ -634,10 +778,8 @@ public static class MuiMakeObjectServiceCore
 			}
 		}
 
-		if (!WriteClassName(ref platform, className, classKind) ||
-			!WriteTags(ref platform, tags, type, parameterRecord.First,
-				parameterRecord.Second, parameterRecord.Third,
-				parameterRecord.Fourth, preParse))
+		if (!WriteClassName(ref platform, className, shape.ClassKind) ||
+			!WriteTags(ref platform, tags, shape, preParse))
 		{
 			ReleaseTemporary(ref platform, className, tags, preParse);
 			return APTR.Null;
@@ -647,14 +789,146 @@ public static class MuiMakeObjectServiceCore
 		var obj = classRecord.IsNull ? APTR.Null :
 			MuiCommonControlCore.CreateControl(ref platform, state, classRecord,
 				tags);
-		if (obj.IsNotNull && classKind == ClassMenuitem &&
-			AttachMenuSpecialist(ref platform, state, classKind, obj).IsNull)
+		if (obj.IsNotNull && shape.ClassKind == ClassMenuitem &&
+			AttachMenuSpecialist(ref platform, state, shape.ClassKind, obj).IsNull)
 		{
 			MuiHeadlessObjectCore.DisposeObject(ref platform, state, obj);
 			obj = APTR.Null;
 		}
 		ReleaseTemporary(ref platform, className, tags, preParse);
 		return obj;
+	}
+
+	// First native public-vector MakeObjectA slice. MorphOS's simple rectangle,
+	// text and menu forms can be bridged without pulling the full service aggregate
+	// into the resident library. The temporary class-name, preparse and TagItem
+	// vectors are complete named records; the public-object core owns the
+	// resulting Intuition object and class lease after this call returns.
+	internal static APTR MakeNativeObjectA(ref MuiNativeClassPlatform platform,
+		APTR serviceState, APTR ownerRoot, APTR publicObjects, uint type,
+		APTR parameters)
+	{
+		if (type != MUIO_HSpace && type != MUIO_VSpace &&
+			type != MUIO_HBar && type != MUIO_VBar && type != MUIO_BarTitle &&
+			type != MUIO_Button && type != MUIO_Label &&
+			type != MUIO_Checkmark && type != MUIO_PopButton &&
+			type != MUIO_Cycle && type != MUIO_Radio &&
+			type != MUIO_Slider && type != MUIO_String &&
+			type != MUIO_NumericButton && type != MUIO_Menuitem &&
+			type != MUIO_MenustripNM)
+			return APTR.Null;
+		if (!ParameterCount(type, out var parameterCount) ||
+			!MuiMakeObjectParameterCodec.TryRead(ref platform, parameters,
+				parameterCount, out var parameterRecord)) return APTR.Null;
+		if (type == MUIO_MenustripNM)
+			return MakeNativeMenustripNMStruct(ref platform, serviceState, ownerRoot,
+				publicObjects, parameterRecord.First, parameterRecord.Second);
+
+		if (!TryBuildShape(type, parameterRecord, out var shape) ||
+			(shape.ClassKind != ClassRectangle && shape.ClassKind != ClassText &&
+				shape.ClassKind != ClassImage && shape.ClassKind != ClassCycle &&
+				shape.ClassKind != ClassRadio && shape.ClassKind != ClassSlider &&
+				shape.ClassKind != ClassString &&
+				shape.ClassKind != ClassNumericbutton &&
+				shape.ClassKind != ClassMenuitem))
+			return APTR.Null;
+		if ((type == MUIO_BarTitle || type == MUIO_Button || type == MUIO_Label ||
+			type == MUIO_Cycle || type == MUIO_Radio || type == MUIO_Slider ||
+			type == MUIO_String || type == MUIO_NumericButton) &&
+			!ValidCString(ref platform, parameterRecord.First)) return APTR.Null;
+		if (type == MUIO_Menuitem &&
+			!ValidMenuitemLabel(ref platform, parameterRecord.First)) return APTR.Null;
+		if (type == MUIO_Menuitem && parameterRecord.Second != 0 &&
+			!ValidCString(ref platform, parameterRecord.Second)) return APTR.Null;
+		if (type == MUIO_Menuitem &&
+			(parameterRecord.Third & ~(NewMenuCheckit | NewMenuChecked | NewMenuToggle |
+				NewMenuItemDisabled | NewMenuCommandString |
+				MUIO_MenuitemCopyStrings)) != 0) return APTR.Null;
+
+		var className = platform.Allocate(ClassNameStorage,
+			MuiHeadlessLayout.AllocationFlags);
+		if (className.IsNull) return APTR.Null;
+		var tagStorage = shape.ClassKind == ClassRectangle ? NativeRectangleTagStorage :
+			TagStorage;
+		var tags = platform.Allocate(tagStorage,
+			MuiHeadlessLayout.AllocationFlags);
+		if (tags.IsNull)
+		{
+			platform.Free(className, ClassNameStorage);
+			return APTR.Null;
+		}
+		var preParse = APTR.Null;
+		if (shape.PreParseKind != 0)
+		{
+			preParse = platform.Allocate(MuiMakeObjectPreParseRecord.Size,
+				MuiHeadlessLayout.AllocationFlags);
+			if (preParse.IsNull)
+			{
+				platform.Free(tags, tagStorage);
+				platform.Free(className, ClassNameStorage);
+				return APTR.Null;
+			}
+			var preParseRecord = default(MuiMakeObjectPreParseRecord);
+			preParseRecord.Escape = 0x1B;
+			preParseRecord.Command = shape.PreParseKind == 1 ? (byte)'c' : (byte)'l';
+			if (!MuiMakeObjectPreParseRecordCodec.Write(ref platform, preParse,
+				preParseRecord))
+			{
+				platform.Free(preParse, MuiMakeObjectPreParseRecord.Size);
+				platform.Free(tags, tagStorage);
+				platform.Free(className, ClassNameStorage);
+				return APTR.Null;
+			}
+		}
+
+		if (!WriteClassName(ref platform, className, shape.ClassKind) ||
+			!WriteNativeObjectTags(ref platform, tags, shape, preParse))
+		{
+			if (preParse.IsNotNull) platform.Free(preParse,
+				MuiMakeObjectPreParseRecord.Size);
+			platform.Free(tags, tagStorage);
+			platform.Free(className, ClassNameStorage);
+			return APTR.Null;
+		}
+
+		var result = MuiNativePublicObjectCore.NewObject(ref platform,
+			serviceState, ownerRoot, publicObjects, className, tags,
+			NativeClassId(shape.ClassKind));
+		if (preParse.IsNotNull) platform.Free(preParse,
+			MuiMakeObjectPreParseRecord.Size);
+		platform.Free(tags, tagStorage);
+		platform.Free(className, ClassNameStorage);
+		return result;
+	}
+
+	private static APTR NativeClassId(uint classKind)
+	{
+		return classKind switch
+		{
+			ClassText => APTR.FromPointer(CString.ToUInt32(
+				CString.FromLiteral("Text.mui"))),
+			ClassRectangle => APTR.FromPointer(CString.ToUInt32(
+				CString.FromLiteral("Rectangle.mui"))),
+			ClassImage => APTR.FromPointer(CString.ToUInt32(
+				CString.FromLiteral("Image.mui"))),
+			ClassCycle => APTR.FromPointer(CString.ToUInt32(
+				CString.FromLiteral("Cycle.mui"))),
+			ClassRadio => APTR.FromPointer(CString.ToUInt32(
+				CString.FromLiteral("Radio.mui"))),
+			ClassSlider => APTR.FromPointer(CString.ToUInt32(
+				CString.FromLiteral("Slider.mui"))),
+			ClassString => APTR.FromPointer(CString.ToUInt32(
+				CString.FromLiteral("String.mui"))),
+			ClassNumericbutton => APTR.FromPointer(CString.ToUInt32(
+				CString.FromLiteral("Numericbutton.mui"))),
+			ClassMenustrip => APTR.FromPointer(CString.ToUInt32(
+				CString.FromLiteral("Menustrip.mui"))),
+			ClassMenu => APTR.FromPointer(CString.ToUInt32(
+				CString.FromLiteral("Menu.mui"))),
+			ClassMenuitem => APTR.FromPointer(CString.ToUInt32(
+				CString.FromLiteral("Menuitem.mui"))),
+			_ => APTR.Null
+		};
 	}
 
 	private static bool ParameterCount(uint type, out uint count)
@@ -691,13 +965,13 @@ public static class MuiMakeObjectServiceCore
 		}
 	}
 
-	private static bool BuildShape(uint type, uint p0, uint p1, uint p2,
-		uint p3,
-		out uint classKind, out uint tagCount, out uint preParseKind)
+	internal static bool TryBuildShape(uint type,
+		MuiMakeObjectParameterRecord parameters,
+		out MuiMakeObjectBuildShapeRecord shape)
 	{
-		classKind = 0;
-		tagCount = 0;
-		preParseKind = 0;
+		shape = default;
+		shape.Type = type;
+		shape.Parameters = parameters;
 		switch (type)
 		{
 			case MUIO_HSpace:
@@ -705,64 +979,67 @@ public static class MuiMakeObjectServiceCore
 			case MUIO_HBar:
 			case MUIO_VBar:
 			case MUIO_BarTitle:
-				classKind = ClassRectangle;
-				tagCount = type == MUIO_HBar || type == MUIO_VBar ? 2u : 1u;
+				shape.ClassKind = ClassRectangle;
+				shape.TagCount = type == MUIO_HBar || type == MUIO_VBar ? 2u : 1u;
 				return true;
 			case MUIO_Button:
-				classKind = ClassText;
-				tagCount = 6;
-				preParseKind = 1;
+				shape.ClassKind = ClassText;
+				// MUIA_ControlChar is added when the label has an underscore key.
+				shape.TagCount = 7;
+				shape.PreParseKind = 1;
 				return true;
 			case MUIO_Checkmark:
-				classKind = ClassImage;
-				tagCount = 8;
+				shape.ClassKind = ClassImage;
+				shape.TagCount = 8;
 				return true;
 			case MUIO_PopButton:
-				classKind = ClassImage;
-				tagCount = 6;
+				shape.ClassKind = ClassImage;
+				shape.TagCount = 6;
 				return true;
 			case MUIO_Cycle:
-				classKind = ClassCycle;
-				tagCount = 5;
+				shape.ClassKind = ClassCycle;
+				shape.TagCount = 5;
 				return true;
 			case MUIO_Radio:
-				classKind = ClassRadio;
-				tagCount = 2;
+				shape.ClassKind = ClassRadio;
+				shape.TagCount = 2;
 				return true;
 			case MUIO_Slider:
-				classKind = ClassSlider;
-				tagCount = 3;
+				shape.ClassKind = ClassSlider;
+				shape.TagCount = 3;
 				return true;
 			case MUIO_String:
-				classKind = ClassString;
-				tagCount = 3;
+				shape.ClassKind = ClassString;
+				shape.TagCount = 3;
 				return true;
 			case MUIO_Menuitem:
-				classKind = ClassMenuitem;
-				tagCount = 8u + ((p2 & NewMenuCommandString) != 0 ? 1u : 0u);
+				shape.ClassKind = ClassMenuitem;
+				shape.TagCount = 8u + ((parameters.Third &
+					NewMenuCommandString) != 0 ? 1u : 0u);
 				return true;
 			case MUIO_NumericButton:
-				classKind = ClassNumericbutton;
-				tagCount = 4;
+				shape.ClassKind = ClassNumericbutton;
+				shape.TagCount = 4;
 				return true;
 			case MUIO_Label:
-				var flags = p1;
+				var flags = parameters.Second;
 				if ((flags & ~LabelKnownFlags) != 0 ||
 					(flags & LabelSingleFrame) != 0 &&
 					(flags & LabelDoubleFrame) != 0 ||
 					(flags & LabelLeftAligned) != 0 &&
 					(flags & LabelCentered) != 0) return false;
-				classKind = ClassText;
-				tagCount = 2;
+				shape.ClassKind = ClassText;
+				shape.TagCount = 2;
 				if ((flags & LabelSingleFrame) != 0 ||
-					(flags & LabelDoubleFrame) != 0) tagCount++;
+					(flags & LabelDoubleFrame) != 0) shape.TagCount++;
 				if ((flags & LabelLeftAligned) != 0 ||
-					(flags & LabelCentered) != 0) { tagCount++; preParseKind =
+					(flags & LabelCentered) != 0) { shape.TagCount++;
+					shape.PreParseKind =
 					(flags & LabelCentered) != 0 ? 1u : 2u; }
-				if ((flags & LabelFreeVert) != 0) tagCount++;
-				if ((flags & LabelTiny) != 0) tagCount++;
-				if ((flags & 0xFF) != 0) tagCount += 2;
-				return tagCount <= 8;
+				if ((flags & LabelFreeVert) != 0) shape.TagCount++;
+				if ((flags & LabelTiny) != 0) shape.TagCount++;
+				if ((flags & 0xFF) != 0) shape.TagCount += 2;
+				return shape.TagCount <= 8;
 			default:
 				return false;
 		}
@@ -839,108 +1116,129 @@ public static class MuiMakeObjectServiceCore
 	}
 
 	private static bool WriteTags<TPlatform>(ref TPlatform platform, APTR tags,
-		uint type, uint p0, uint p1, uint p2, uint p3, APTR preParse)
+		MuiMakeObjectBuildShapeRecord shape, APTR preParse)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		uint index = 0;
-		if (type == MUIO_HSpace) AddTag(ref platform, tags, ref index,
-			FixWidth, p0);
-		else if (type == MUIO_VSpace) AddTag(ref platform, tags, ref index,
-			FixHeight, p0);
-		else if (type == MUIO_HBar)
+		if (shape.Type == MUIO_HSpace) AddTag(ref platform, tags, ref index,
+			FixWidth, shape.Parameters.First);
+		else if (shape.Type == MUIO_VSpace) AddTag(ref platform, tags, ref index,
+			FixHeight, shape.Parameters.First);
+		else if (shape.Type == MUIO_HBar)
 		{
 			AddTag(ref platform, tags, ref index, RectangleHBar, 1);
-			AddTag(ref platform, tags, ref index, FixHeight, p0);
+			AddTag(ref platform, tags, ref index, FixHeight,
+				shape.Parameters.First);
 		}
-		else if (type == MUIO_VBar)
+		else if (shape.Type == MUIO_VBar)
 		{
 			AddTag(ref platform, tags, ref index, RectangleVBar, 1);
-			AddTag(ref platform, tags, ref index, FixWidth, p0);
+			AddTag(ref platform, tags, ref index, FixWidth,
+				shape.Parameters.First);
 		}
-		else if (type == MUIO_BarTitle) AddTag(ref platform, tags, ref index,
-			RectangleBarTitle, p0);
-		else if (type == MUIO_Button)
-			return WriteButtonTagRecords(ref platform, tags, p0, preParse);
-		else if (type == MUIO_Checkmark)
+		else if (shape.Type == MUIO_BarTitle) AddTag(ref platform, tags, ref index,
+			RectangleBarTitle, shape.Parameters.First);
+		else if (shape.Type == MUIO_Button)
+			return WriteButtonTagRecords(ref platform, tags, shape, preParse);
+		else if (shape.Type == MUIO_Checkmark)
 		{
 			AddTag(ref platform, tags, ref index, Frame, ImageButtonFrame);
 			AddTag(ref platform, tags, ref index, InputMode, InputModeToggle);
 			AddTag(ref platform, tags, ref index, ImageSpec, CheckmarkImage);
 			AddTag(ref platform, tags, ref index, ImageFreeVert, 1);
-			AddTag(ref platform, tags, ref index, Selected, p0);
+			AddTag(ref platform, tags, ref index, Selected,
+				shape.Parameters.First);
 			AddTag(ref platform, tags, ref index, Background, ButtonBackground);
 			AddTag(ref platform, tags, ref index, ShowSelState, 0);
 		}
-		else if (type == MUIO_PopButton)
+		else if (shape.Type == MUIO_PopButton)
 		{
 			AddTag(ref platform, tags, ref index, Frame, ImageButtonFrame);
 			AddTag(ref platform, tags, ref index, Background, ButtonBackground);
-			AddTag(ref platform, tags, ref index, ImageSpec, p0);
+			AddTag(ref platform, tags, ref index, ImageSpec,
+				shape.Parameters.First);
 			AddTag(ref platform, tags, ref index, InputMode, InputModeRelVerify);
 			AddTag(ref platform, tags, ref index, ImageFreeVert, 1);
 			AddTag(ref platform, tags, ref index, ImageFreeHoriz, 0);
 		}
-		else if (type == MUIO_Cycle)
+		else if (shape.Type == MUIO_Cycle)
 		{
 			AddTag(ref platform, tags, ref index, Frame, ButtonFrame);
 			AddTag(ref platform, tags, ref index, Font, ButtonFont);
-			AddTag(ref platform, tags, ref index, CycleEntries, p1);
-			var key = ControlCharFromCString(ref platform, p0);
+			AddTag(ref platform, tags, ref index, CycleEntries,
+				shape.Parameters.Second);
+			var key = ControlCharFromCString(ref platform,
+				shape.Parameters.First);
 			if (key != 0) AddTag(ref platform, tags, ref index, ControlChar, key);
 			AddTag(ref platform, tags, ref index, CycleChain, 1);
 		}
-		else if (type == MUIO_Radio)
+		else if (shape.Type == MUIO_Radio)
 		{
-			AddTag(ref platform, tags, ref index, RadioEntries, p1);
-			var key = ControlCharFromCString(ref platform, p0);
+			AddTag(ref platform, tags, ref index, RadioEntries,
+				shape.Parameters.Second);
+			var key = ControlCharFromCString(ref platform,
+				shape.Parameters.First);
 			if (key != 0) AddTag(ref platform, tags, ref index, ControlChar, key);
 		}
-		else if (type == MUIO_Slider)
+		else if (shape.Type == MUIO_Slider)
 		{
-			AddTag(ref platform, tags, ref index, NumericMin, p1);
-			AddTag(ref platform, tags, ref index, NumericMax, p2);
-			var key = ControlCharFromCString(ref platform, p0);
+			AddTag(ref platform, tags, ref index, NumericMin,
+				shape.Parameters.Second);
+			AddTag(ref platform, tags, ref index, NumericMax,
+				shape.Parameters.Third);
+			var key = ControlCharFromCString(ref platform,
+				shape.Parameters.First);
 			if (key != 0) AddTag(ref platform, tags, ref index, ControlChar, key);
 		}
-		else if (type == MUIO_String)
+		else if (shape.Type == MUIO_String)
 		{
 			AddTag(ref platform, tags, ref index, Frame, 4);
-			AddTag(ref platform, tags, ref index, StringMaxLen, p1);
-			var key = ControlCharFromCString(ref platform, p0);
+			AddTag(ref platform, tags, ref index, StringMaxLen,
+				shape.Parameters.Second);
+			var key = ControlCharFromCString(ref platform,
+				shape.Parameters.First);
 			if (key != 0) AddTag(ref platform, tags, ref index, ControlChar, key);
 		}
-		else if (type == MUIO_NumericButton)
+		else if (shape.Type == MUIO_NumericButton)
 		{
-			AddTag(ref platform, tags, ref index, NumericMin, p1);
-			AddTag(ref platform, tags, ref index, NumericMax, p2);
-			if (p3 != 0) AddTag(ref platform, tags, ref index, NumericFormat, p3);
-			var key = ControlCharFromCString(ref platform, p0);
+			AddTag(ref platform, tags, ref index, NumericMin,
+				shape.Parameters.Second);
+			AddTag(ref platform, tags, ref index, NumericMax,
+				shape.Parameters.Third);
+			if (shape.Parameters.Fourth != 0) AddTag(ref platform, tags,
+				ref index, NumericFormat, shape.Parameters.Fourth);
+			var key = ControlCharFromCString(ref platform,
+				shape.Parameters.First);
 			if (key != 0) AddTag(ref platform, tags, ref index, ControlChar, key);
 		}
-		else if (type == MUIO_Menuitem)
+		else if (shape.Type == MUIO_Menuitem)
 		{
 			// CopyStrings is an init-only latch and must precede the title and
 			// shortcut tags so their setters take ownership during OM_NEW.
 			AddTag(ref platform, tags, ref index, MenuitemCopyStrings,
-				(p2 & MUIO_MenuitemCopyStrings) != 0 ? 1u : 0u);
-			AddTag(ref platform, tags, ref index, MenuitemTitle, p0);
-			AddTag(ref platform, tags, ref index, MenuitemShortcut, p1);
+				(shape.Parameters.Third & MUIO_MenuitemCopyStrings) != 0 ? 1u : 0u);
+			AddTag(ref platform, tags, ref index, MenuitemTitle,
+				shape.Parameters.First);
+			AddTag(ref platform, tags, ref index, MenuitemShortcut,
+				shape.Parameters.Second);
 			AddTag(ref platform, tags, ref index, MenuitemCheckit,
-				(p2 & NewMenuCheckit) != 0 ? 1u : 0u);
+				(shape.Parameters.Third & NewMenuCheckit) != 0 ? 1u : 0u);
 			AddTag(ref platform, tags, ref index, MenuitemChecked,
-				(p2 & NewMenuChecked) != 0 ? 1u : 0u);
+				(shape.Parameters.Third & NewMenuChecked) != 0 ? 1u : 0u);
 			AddTag(ref platform, tags, ref index, MenuitemToggle,
-				(p2 & NewMenuToggle) != 0 ? 1u : 0u);
+				(shape.Parameters.Third & NewMenuToggle) != 0 ? 1u : 0u);
 			AddTag(ref platform, tags, ref index, MenuitemEnabled,
-				(p2 & NewMenuItemDisabled) == 0 ? 1u : 0u);
-			if ((p2 & NewMenuCommandString) != 0)
+				(shape.Parameters.Third & NewMenuItemDisabled) == 0 ? 1u : 0u);
+			if ((shape.Parameters.Third & NewMenuCommandString) != 0)
 				AddTag(ref platform, tags, ref index, MenuitemCommandString, 1);
-			AddTag(ref platform, tags, ref index, UserData, p3);
+			AddTag(ref platform, tags, ref index, UserData,
+				shape.Parameters.Fourth);
 		}
-		else if (type == MUIO_Label)
+		else if (shape.Type == MUIO_Label)
 		{
-			var flags = p1;
-			AddTag(ref platform, tags, ref index, TextContents, p0);
+			var flags = shape.Parameters.Second;
+			AddTag(ref platform, tags, ref index, TextContents,
+				shape.Parameters.First);
 			if ((flags & LabelSingleFrame) != 0)
 				AddTag(ref platform, tags, ref index, Frame, TextFrame);
 			else if ((flags & LabelDoubleFrame) != 0)
@@ -964,19 +1262,745 @@ public static class MuiMakeObjectServiceCore
 		return true;
 	}
 
+	private static bool WriteNativeRectangleTags<TPlatform>(ref TPlatform platform,
+		APTR tags, MuiMakeObjectBuildShapeRecord shape)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var index = 0u;
+		if (shape.Type == MUIO_HSpace)
+			AddTag(ref platform, tags, ref index, FixWidth,
+				shape.Parameters.First);
+		else if (shape.Type == MUIO_VSpace)
+			AddTag(ref platform, tags, ref index, FixHeight,
+				shape.Parameters.First);
+		else if (shape.Type == MUIO_HBar)
+		{
+			AddTag(ref platform, tags, ref index, RectangleHBar, 1);
+			AddTag(ref platform, tags, ref index, FixHeight,
+				shape.Parameters.First);
+		}
+		else if (shape.Type == MUIO_VBar)
+		{
+			AddTag(ref platform, tags, ref index, RectangleVBar, 1);
+			AddTag(ref platform, tags, ref index, FixWidth,
+				shape.Parameters.First);
+		}
+		else if (shape.Type == MUIO_BarTitle)
+			AddTag(ref platform, tags, ref index, RectangleBarTitle,
+				shape.Parameters.First);
+		else return false;
+		WriteTagDone(ref platform, tags, index);
+		return true;
+	}
+
+	private static bool WriteNativeObjectTags<TPlatform>(ref TPlatform platform,
+		APTR tags, MuiMakeObjectBuildShapeRecord shape, APTR preParse)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (shape.ClassKind == ClassRectangle)
+			return WriteNativeRectangleTags(ref platform, tags, shape);
+		return WriteTags(ref platform, tags, shape, preParse);
+	}
+
+	// Native menu construction is deliberately tag-first.  MUIA_Family_Child
+	// is supplied while each Family object is born, so this route never needs a
+	// raw BOOPSI DoMethodA import or an invented method address.  The named
+	// pointer vectors below are only temporary planning storage; all durable
+	// ownership is represented by MuiNativePublicObjectBinding.Parent.
+	private static APTR MakeNativeMenustripNMStruct(
+		ref MuiNativeClassPlatform platform, APTR serviceState, APTR ownerRoot,
+		APTR publicObjects, uint newMenuRaw, uint flags)
+	{
+		var newMenu = APTR.FromPointer(newMenuRaw);
+		if (ValidateNewMenuCode(ref platform, newMenu, flags) != 0)
+			return APTR.Null;
+
+		var vectorBytes = MuiNativeMenuObjectVectorCursor.MaximumEntries *
+			MuiNativeMenuObjectPointerRecord.Size;
+		var menuObjects = platform.Allocate(vectorBytes,
+			MuiHeadlessLayout.AllocationFlags);
+		var menuItemObjects = platform.Allocate(vectorBytes,
+			MuiHeadlessLayout.AllocationFlags);
+		var itemObjects = platform.Allocate(vectorBytes,
+			MuiHeadlessLayout.AllocationFlags);
+		var pendingObjects = platform.Allocate(vectorBytes,
+			MuiHeadlessLayout.AllocationFlags);
+		if (menuObjects.IsNull || menuItemObjects.IsNull || itemObjects.IsNull ||
+			pendingObjects.IsNull)
+		{
+			FreeNativeMenuVectors(ref platform, vectorBytes, menuObjects,
+				menuItemObjects, itemObjects, pendingObjects);
+			return APTR.Null;
+		}
+
+		uint menuCount = 0;
+		uint menuItemCount = 0;
+		uint itemCount = 0;
+		uint entryIndex = 0;
+		var reachedEnd = false;
+		while (entryIndex < MuiNewMenuCursor.MaximumEntries)
+		{
+			if (!MuiNewMenuVectorCodec.TryRead(ref platform, newMenu, entryIndex,
+				out var titleRecord) ||
+				!MuiNewMenuTypeRecordCodec.TryClassify(titleRecord.Type,
+					out var titleKind))
+				return FailNativeMenustripNM(ref platform, serviceState, ownerRoot,
+					publicObjects, vectorBytes, menuObjects, menuItemObjects,
+					itemObjects, pendingObjects, menuCount, menuItemCount,
+					itemCount, 0, APTR.Null);
+			if (titleKind == MuiNewMenuEntryKind.End)
+			{
+				reachedEnd = true;
+				break;
+			}
+			if (titleKind == MuiNewMenuEntryKind.Ignored)
+			{
+				entryIndex++;
+				continue;
+			}
+			if (titleKind != MuiNewMenuEntryKind.Title)
+				return FailNativeMenustripNM(ref platform, serviceState, ownerRoot,
+					publicObjects, vectorBytes, menuObjects, menuItemObjects,
+					itemObjects, pendingObjects, menuCount, menuItemCount,
+					itemCount, 0, APTR.Null);
+
+			// Locate the end of this title's segment before constructing any
+			// object.  A segment consists of Item/Sub records and ignored slots;
+			// the next title or NM_END begins the next segment.
+			var segmentEnd = entryIndex + 1;
+			while (segmentEnd < MuiNewMenuCursor.MaximumEntries)
+			{
+				if (!MuiNewMenuVectorCodec.TryRead(ref platform, newMenu, segmentEnd,
+					out var segmentRecord) ||
+					!MuiNewMenuTypeRecordCodec.TryClassify(segmentRecord.Type,
+						out var segmentKind))
+					return FailNativeMenustripNM(ref platform, serviceState,
+						ownerRoot, publicObjects, vectorBytes, menuObjects,
+						menuItemObjects, itemObjects, pendingObjects, menuCount,
+						menuItemCount, itemCount, 0, APTR.Null);
+				if (segmentKind == MuiNewMenuEntryKind.End ||
+					segmentKind == MuiNewMenuEntryKind.Title) break;
+				if (segmentKind != MuiNewMenuEntryKind.Ignored &&
+					segmentKind != MuiNewMenuEntryKind.Item &&
+					segmentKind != MuiNewMenuEntryKind.Sub)
+					return FailNativeMenustripNM(ref platform, serviceState,
+						ownerRoot, publicObjects, vectorBytes, menuObjects,
+						menuItemObjects, itemObjects, pendingObjects, menuCount,
+						menuItemCount, itemCount, 0, APTR.Null);
+				segmentEnd++;
+			}
+			if (segmentEnd >= MuiNewMenuCursor.MaximumEntries)
+				return FailNativeMenustripNM(ref platform, serviceState, ownerRoot,
+					publicObjects, vectorBytes, menuObjects, menuItemObjects,
+					itemObjects, pendingObjects, menuCount, menuItemCount,
+					itemCount, 0, APTR.Null);
+
+			var menuItemStart = menuItemCount;
+			var blockStart = entryIndex + 1;
+			while (blockStart < segmentEnd)
+			{
+				if (!MuiNewMenuVectorCodec.TryRead(ref platform, newMenu, blockStart,
+					out var itemRecord) ||
+					!MuiNewMenuTypeRecordCodec.TryClassify(itemRecord.Type,
+						out var itemKind))
+					return FailNativeMenustripNM(ref platform, serviceState,
+						ownerRoot, publicObjects, vectorBytes, menuObjects,
+						menuItemObjects, itemObjects, pendingObjects, menuCount,
+						menuItemCount, itemCount, 0, APTR.Null);
+				if (itemKind == MuiNewMenuEntryKind.Ignored)
+				{
+					blockStart++;
+					continue;
+				}
+				if (itemKind != MuiNewMenuEntryKind.Item)
+					return FailNativeMenustripNM(ref platform, serviceState,
+						ownerRoot, publicObjects, vectorBytes, menuObjects,
+						menuItemObjects, itemObjects, pendingObjects, menuCount,
+						menuItemCount, itemCount, 0, APTR.Null);
+
+				var blockEnd = blockStart + 1;
+				while (blockEnd < segmentEnd)
+				{
+					if (!MuiNewMenuVectorCodec.TryRead(ref platform, newMenu,
+						blockEnd, out var blockRecord) ||
+						!MuiNewMenuTypeRecordCodec.TryClassify(blockRecord.Type,
+							out var blockKind))
+						return FailNativeMenustripNM(ref platform, serviceState,
+							ownerRoot, publicObjects, vectorBytes, menuObjects,
+							menuItemObjects, itemObjects, pendingObjects, menuCount,
+							menuItemCount, itemCount, 0, APTR.Null);
+					if (blockKind == MuiNewMenuEntryKind.Ignored ||
+						blockKind == MuiNewMenuEntryKind.Sub)
+					{
+						blockEnd++;
+						continue;
+					}
+					if (blockKind == MuiNewMenuEntryKind.Item) break;
+					return FailNativeMenustripNM(ref platform, serviceState,
+						ownerRoot, publicObjects, vectorBytes, menuObjects,
+						menuItemObjects, itemObjects, pendingObjects, menuCount,
+						menuItemCount, itemCount, 0, APTR.Null);
+				}
+
+				uint pendingCount = 0;
+				var subIndex = blockEnd;
+				while (subIndex > blockStart + 1)
+				{
+					subIndex--;
+					if (!MuiNewMenuVectorCodec.TryRead(ref platform, newMenu,
+						subIndex, out var subRecord) ||
+						!MuiNewMenuTypeRecordCodec.TryClassify(subRecord.Type,
+							out var subKind))
+						return FailNativeMenustripNM(ref platform, serviceState,
+							ownerRoot, publicObjects, vectorBytes, menuObjects,
+							menuItemObjects, itemObjects, pendingObjects, menuCount,
+							menuItemCount, itemCount, pendingCount, APTR.Null);
+					if (subKind == MuiNewMenuEntryKind.Ignored) continue;
+					if (subKind != MuiNewMenuEntryKind.Sub ||
+						pendingCount >= MuiNativeMenuObjectVectorCursor.MaximumEntries ||
+						!ResolveMenuItemStrings(ref platform, subRecord.Label,
+							subRecord.CommandKey, flags, out var subLabel,
+							out var subShortcut))
+						return FailNativeMenustripNM(ref platform, serviceState,
+							ownerRoot, publicObjects, vectorBytes, menuObjects,
+							menuItemObjects, itemObjects, pendingObjects, menuCount,
+							menuItemCount, itemCount, pendingCount, APTR.Null);
+				var subTags = MakeNativeMenuTags(ref platform, subLabel,
+					subShortcut, subRecord.Flags, subRecord.MutualExclude,
+					subRecord.UserData, pendingObjects, 0);
+				if (subTags.IsNull)
+					return FailNativeMenustripNM(ref platform, serviceState,
+						ownerRoot, publicObjects, vectorBytes, menuObjects,
+						menuItemObjects, itemObjects, pendingObjects, menuCount,
+						menuItemCount, itemCount, pendingCount, APTR.Null);
+				var subObject = CreateNativeMenuObjectStruct(ref platform,
+					serviceState, ownerRoot, publicObjects, ClassMenuitem, subTags);
+				var subTagBytes = NativeMenuItemTagBytes(0);
+				platform.Free(subTags, subTagBytes);
+				var subObjectCursor = NativeMenuObjectCursor(itemObjects, itemCount);
+				if (subObject.IsNull || !MuiNativeMenuObjectVectorCodec.TryWrite(
+					ref platform, subObjectCursor, subObject))
+				{
+					if (subObject.IsNotNull) platform.DisposeObject(subObject);
+					return FailNativeMenustripNM(ref platform, serviceState,
+						ownerRoot, publicObjects, vectorBytes, menuObjects,
+						menuItemObjects, itemObjects, pendingObjects, menuCount,
+						menuItemCount, itemCount, pendingCount, APTR.Null);
+				}
+				itemCount++;
+				var pendingObjectCursor = NativeMenuObjectCursor(pendingObjects,
+					pendingCount);
+				if (!MuiNativeMenuObjectVectorCodec.TryWrite(ref platform,
+					pendingObjectCursor, subObject))
+					return FailNativeMenustripNM(ref platform, serviceState,
+						ownerRoot, publicObjects, vectorBytes, menuObjects,
+						menuItemObjects, itemObjects, pendingObjects, menuCount,
+						menuItemCount, itemCount, pendingCount, APTR.Null);
+				pendingCount++;
+				}
+
+				if (!ResolveMenuItemStrings(ref platform, itemRecord.Label,
+					itemRecord.CommandKey, flags, out var itemLabel,
+					out var itemShortcut))
+					return FailNativeMenustripNM(ref platform, serviceState,
+						ownerRoot, publicObjects, vectorBytes, menuObjects,
+						menuItemObjects, itemObjects, pendingObjects, menuCount,
+						menuItemCount, itemCount, pendingCount, APTR.Null);
+				var itemTags = MakeNativeMenuTags(ref platform, itemLabel,
+					itemShortcut, itemRecord.Flags, itemRecord.MutualExclude,
+					itemRecord.UserData, pendingObjects, pendingCount);
+				if (itemTags.IsNull)
+					return FailNativeMenustripNM(ref platform, serviceState,
+						ownerRoot, publicObjects, vectorBytes, menuObjects,
+						menuItemObjects, itemObjects, pendingObjects, menuCount,
+						menuItemCount, itemCount, pendingCount, APTR.Null);
+				var itemObject = CreateNativeMenuObjectStruct(ref platform,
+					serviceState, ownerRoot, publicObjects, ClassMenuitem, itemTags);
+				var itemTagBytes = NativeMenuItemTagBytes(pendingCount);
+				platform.Free(itemTags, itemTagBytes);
+				if (itemObject.IsNull || itemCount >=
+					MuiNativeMenuObjectVectorCursor.MaximumEntries ||
+						!MuiNativeMenuObjectVectorCodec.TryWrite(ref platform,
+							NativeMenuObjectCursor(itemObjects, itemCount), itemObject))
+				{
+					if (itemObject.IsNotNull) platform.DisposeObject(itemObject);
+					return FailNativeMenustripNM(ref platform, serviceState,
+						ownerRoot, publicObjects, vectorBytes, menuObjects,
+						menuItemObjects, itemObjects, pendingObjects, menuCount,
+						menuItemCount, itemCount, pendingCount, APTR.Null);
+				}
+				itemCount++;
+				if (menuItemCount >= MuiNativeMenuObjectVectorCursor.MaximumEntries ||
+					!MuiNativeMenuObjectVectorCodec.TryWrite(ref platform,
+						NativeMenuObjectCursor(menuItemObjects, menuItemCount), itemObject))
+					return FailNativeMenustripNM(ref platform, serviceState,
+						ownerRoot, publicObjects, vectorBytes, menuObjects,
+						menuItemObjects, itemObjects, pendingObjects, menuCount,
+						menuItemCount, itemCount, pendingCount, APTR.Null);
+				menuItemCount++;
+				pendingCount = 0;
+				blockStart = blockEnd;
+			}
+
+			if (menuCount >= MuiNativeMenuObjectVectorCursor.MaximumEntries)
+				return FailNativeMenustripNM(ref platform, serviceState, ownerRoot,
+					publicObjects, vectorBytes, menuObjects, menuItemObjects,
+					itemObjects, pendingObjects, menuCount, menuItemCount,
+					itemCount, 0, APTR.Null);
+			var menuTags = MakeNativeMenuContainerTags(ref platform,
+				titleRecord.Label, titleRecord.UserData, titleRecord.Flags,
+				menuItemObjects, menuItemStart, menuItemCount - menuItemStart);
+			if (menuTags.IsNull)
+				return FailNativeMenustripNM(ref platform, serviceState, ownerRoot,
+					publicObjects, vectorBytes, menuObjects, menuItemObjects,
+					itemObjects, pendingObjects, menuCount, menuItemCount,
+					itemCount, 0, APTR.Null);
+			var menuObject = CreateNativeMenuObjectStruct(ref platform,
+				serviceState, ownerRoot, publicObjects, ClassMenu, menuTags);
+			platform.Free(menuTags, NativeMenuContainerTagBytes(
+				menuItemCount - menuItemStart));
+				if (menuObject.IsNull || !MuiNativeMenuObjectVectorCodec.TryWrite(
+					ref platform, NativeMenuObjectCursor(menuObjects, menuCount),
+					menuObject))
+			{
+				if (menuObject.IsNotNull) platform.DisposeObject(menuObject);
+				return FailNativeMenustripNM(ref platform, serviceState, ownerRoot,
+					publicObjects, vectorBytes, menuObjects, menuItemObjects,
+					itemObjects, pendingObjects, menuCount, menuItemCount,
+					itemCount, 0, APTR.Null);
+			}
+			menuCount++;
+			entryIndex = segmentEnd;
+		}
+
+		if (!reachedEnd)
+			return FailNativeMenustripNM(ref platform, serviceState, ownerRoot,
+				publicObjects, vectorBytes, menuObjects, menuItemObjects,
+				itemObjects, pendingObjects, menuCount, menuItemCount,
+				itemCount, 0, APTR.Null);
+		var stripTags = MakeNativeMenustripTags(ref platform, menuObjects,
+			menuCount);
+		if (stripTags.IsNull)
+			return FailNativeMenustripNM(ref platform, serviceState, ownerRoot,
+				publicObjects, vectorBytes, menuObjects, menuItemObjects,
+				itemObjects, pendingObjects, menuCount, menuItemCount,
+				itemCount, 0, APTR.Null);
+		var stripObject = CreateNativeMenuObjectStruct(ref platform,
+			serviceState, ownerRoot, publicObjects, ClassMenustrip, stripTags);
+		platform.Free(stripTags, NativeMenustripTagBytes(menuCount));
+		if (stripObject.IsNull)
+			return FailNativeMenustripNM(ref platform, serviceState, ownerRoot,
+				publicObjects, vectorBytes, menuObjects, menuItemObjects,
+				itemObjects, pendingObjects, menuCount, menuItemCount,
+				itemCount, 0, APTR.Null);
+		FreeNativeMenuVectors(ref platform, vectorBytes, menuObjects,
+			menuItemObjects, itemObjects, pendingObjects);
+		return stripObject;
+	}
+
+	private static APTR MakeNativeMenuTags(ref MuiNativeClassPlatform platform,
+		uint label, uint shortcut, ushort flags, uint mutualExclude,
+		uint userData, APTR childVector, uint childCount)
+	{
+		var bytes = NativeMenuItemTagBytes(childCount);
+		var tags = bytes == 0 ? APTR.Null : platform.Allocate(bytes,
+			MuiHeadlessLayout.AllocationFlags);
+		if (tags.IsNull) return APTR.Null;
+		var index = 0u;
+		if (!TryNativeTag(ref platform, tags, ref index, MenuitemTitle, label) ||
+			!TryNativeTag(ref platform, tags, ref index, MenuitemShortcut, shortcut) ||
+			!TryNativeTag(ref platform, tags, ref index, UserData, userData) ||
+			!TryNativeTag(ref platform, tags, ref index, MenuitemExclude,
+				mutualExclude) ||
+			!TryNativeTag(ref platform, tags, ref index, MenuitemCheckit,
+				(flags & NewMenuCheckit) != 0 ? 1u : 0u) ||
+			!TryNativeTag(ref platform, tags, ref index, MenuitemChecked,
+				(flags & NewMenuChecked) != 0 ? 1u : 0u) ||
+			!TryNativeTag(ref platform, tags, ref index, MenuitemToggle,
+				(flags & NewMenuToggle) != 0 ? 1u : 0u) ||
+			!TryNativeTag(ref platform, tags, ref index, MenuitemCommandString,
+				(flags & NewMenuCommandString) != 0 ? 1u : 0u) ||
+			!TryNativeTag(ref platform, tags, ref index, MenuitemEnabled,
+				(flags & NewMenuItemDisabled) == 0 ? 1u : 0u))
+		{
+			platform.Free(tags, bytes);
+			return APTR.Null;
+		}
+		if (!TryNativeTagChildren(ref platform, tags, ref index, childVector,
+			childCount) || !TryNativeTagDone(ref platform, tags, ref index))
+		{
+			platform.Free(tags, bytes);
+			return APTR.Null;
+		}
+		return tags;
+	}
+
+	private static APTR MakeNativeMenuContainerTags(
+		ref MuiNativeClassPlatform platform, uint label, uint userData,
+		ushort flags, APTR childVector, uint childStart, uint childCount)
+	{
+		var bytes = NativeMenuContainerTagBytes(childCount);
+		var tags = bytes == 0 ? APTR.Null : platform.Allocate(bytes,
+			MuiHeadlessLayout.AllocationFlags);
+		if (tags.IsNull) return APTR.Null;
+		var index = 0u;
+		if (!TryNativeTag(ref platform, tags, ref index, MenuTitle, label) ||
+			!TryNativeTag(ref platform, tags, ref index, UserData, userData) ||
+			!TryNativeTag(ref platform, tags, ref index, MenuEnabled,
+				(flags & NewMenuMenuDisabled) == 0 ? 1u : 0u) ||
+			!TryNativeTagChildren(ref platform, tags, ref index, childVector,
+				childCount, childStart) ||
+			!TryNativeTagDone(ref platform, tags, ref index))
+		{
+			platform.Free(tags, bytes);
+			return APTR.Null;
+		}
+		return tags;
+	}
+
+	private static APTR MakeNativeMenustripTags(
+		ref MuiNativeClassPlatform platform, APTR childVector, uint childCount)
+	{
+		var bytes = NativeMenustripTagBytes(childCount);
+		var tags = bytes == 0 ? APTR.Null : platform.Allocate(bytes,
+			MuiHeadlessLayout.AllocationFlags);
+		if (tags.IsNull) return APTR.Null;
+		var index = 0u;
+		if (!TryNativeTagChildren(ref platform, tags, ref index, childVector,
+			childCount, 0) || !TryNativeTagDone(ref platform, tags, ref index))
+		{
+			platform.Free(tags, bytes);
+			return APTR.Null;
+		}
+		return tags;
+	}
+
+	private static APTR CreateNativeMenuObjectStruct(
+		ref MuiNativeClassPlatform platform, APTR serviceState, APTR ownerRoot,
+		APTR publicObjects, uint classKind, APTR tags)
+	{
+		var classId = NativeClassId(classKind);
+		return classId.IsNull ? APTR.Null : MuiNativePublicObjectCore.NewObject(
+			ref platform, serviceState, ownerRoot, publicObjects, classId, tags,
+			classId);
+	}
+
+	private static MuiNativeMenuObjectVectorCursor NativeMenuObjectCursor(
+		APTR baseAddress, uint index)
+	{
+		var cursor = default(MuiNativeMenuObjectVectorCursor);
+		cursor.Base = baseAddress;
+		cursor.Index = index;
+		return cursor;
+	}
+
+	private static bool TryNativeTag<TPlatform>(ref TPlatform platform,
+		APTR tags, ref uint index, uint tag, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var item = default(MuiAslTagItemRecord);
+		item.Tag = tag;
+		item.Data = value;
+		var cursor = default(MuiAslTagItemCursor);
+		cursor.Base = tags;
+		cursor.Index = index;
+		if (!MuiAslTagItemVectorCodec.TryWrite(ref platform, cursor, item))
+			return false;
+		index++;
+		return true;
+	}
+
+	private static bool TryNativeTagDone<TPlatform>(ref TPlatform platform,
+		APTR tags, ref uint index) where TPlatform : struct, IMuiGuestMemory =>
+		TryNativeTag(ref platform, tags, ref index, MuiAslTagListCore.TagDone, 0);
+
+	private static bool TryNativeTagChildren<TPlatform>(ref TPlatform platform,
+		APTR tags, ref uint index, APTR childVector, uint childCount,
+		uint childStart = 0) where TPlatform : struct, IMuiGuestMemory
+	{
+		if (childVector.IsNull || childStart >
+			MuiNativeMenuObjectVectorCursor.MaximumEntries ||
+			childCount > MuiNativeMenuObjectVectorCursor.MaximumEntries - childStart)
+			return childCount == 0;
+		for (var childIndex = 0u; childIndex < childCount; childIndex++)
+		{
+			if (!MuiNativeMenuObjectVectorCodec.TryRead(ref platform,
+				NativeMenuObjectCursor(childVector, childStart + childIndex),
+				out var child) || child.IsNull ||
+				!TryNativeTag(ref platform, tags, ref index, FamilyChild,
+					child.Raw)) return false;
+		}
+		return true;
+	}
+
+	private static uint NativeMenuItemTagBytes(uint childCount) =>
+		NativeMenuTagBytes(9u, childCount);
+	private static uint NativeMenuContainerTagBytes(uint childCount) =>
+		NativeMenuTagBytes(3u, childCount);
+	private static uint NativeMenustripTagBytes(uint childCount) =>
+		NativeMenuTagBytes(0, childCount);
+
+	private static uint NativeMenuTagBytes(uint baseValues, uint childCount)
+	{
+		if (childCount > MuiNativeMenuObjectVectorCursor.MaximumEntries ||
+			baseValues > uint.MaxValue - childCount - 1) return 0;
+		var valueCount = baseValues + childCount + 1; // TAG_DONE
+		return valueCount > uint.MaxValue / MuiAslTagItemRecord.Size
+			? 0 : valueCount * MuiAslTagItemRecord.Size;
+	}
+
+	private static void FreeNativeMenuVectors(ref MuiNativeClassPlatform platform,
+		uint bytes, APTR menuObjects, APTR menuItemObjects, APTR itemObjects,
+		APTR pendingObjects)
+	{
+		if (menuObjects.IsNotNull) platform.Free(menuObjects, bytes);
+		if (menuItemObjects.IsNotNull) platform.Free(menuItemObjects, bytes);
+		if (itemObjects.IsNotNull) platform.Free(itemObjects, bytes);
+		if (pendingObjects.IsNotNull) platform.Free(pendingObjects, bytes);
+	}
+
+	private static APTR FailNativeMenustripNM(
+		ref MuiNativeClassPlatform platform, APTR serviceState, APTR ownerRoot,
+		APTR publicObjects, uint vectorBytes, APTR menuObjects,
+		APTR menuItemObjects, APTR itemObjects, APTR pendingObjects,
+		uint menuCount, uint menuItemCount, uint itemCount, uint pendingCount,
+		APTR strip)
+	{
+		if (strip.IsNotNull)
+			MuiNativePublicObjectCore.DisposeObject(ref platform, serviceState,
+				ownerRoot, publicObjects, strip);
+		DisposeNativeMenuVector(ref platform, serviceState, ownerRoot,
+			publicObjects, itemObjects, itemCount);
+		DisposeNativeMenuVector(ref platform, serviceState, ownerRoot,
+			publicObjects, pendingObjects, pendingCount);
+		DisposeNativeMenuVector(ref platform, serviceState, ownerRoot,
+			publicObjects, menuItemObjects, menuItemCount);
+		DisposeNativeMenuVector(ref platform, serviceState, ownerRoot,
+			publicObjects, menuObjects, menuCount);
+		FreeNativeMenuVectors(ref platform, vectorBytes, menuObjects,
+			menuItemObjects, itemObjects, pendingObjects);
+		return APTR.Null;
+	}
+
+	private static void DisposeNativeMenuVector(ref MuiNativeClassPlatform platform,
+		APTR serviceState, APTR ownerRoot, APTR publicObjects, APTR vector,
+		uint count)
+	{
+		for (var index = 0u; index < count; index++)
+		{
+			if (MuiNativeMenuObjectVectorCodec.TryRead(ref platform,
+				NativeMenuObjectCursor(vector, index),
+				out var value) && value.IsNotNull)
+				MuiNativePublicObjectCore.DisposeObject(ref platform, serviceState,
+					ownerRoot, publicObjects, value);
+		}
+	}
+
+	// Native MUIO_MenustripNM construction mirrors the validated headless
+	// NewMenu traversal, but every node is a real Intuition object. Child
+	// relationships are sent through MUIM_Family_AddTail and recorded in the
+	// public binding registry so the returned strip owns the complete tree.
+	private static APTR MakeNativeMenustripNM(
+		ref MuiNativeClassPlatform platform, APTR serviceState, APTR ownerRoot,
+		APTR publicObjects, uint newMenuRaw, uint flags)
+	{
+		var newMenu = APTR.FromPointer(newMenuRaw);
+		if (ValidateNewMenuCode(ref platform, newMenu, flags) != 0)
+			return APTR.Null;
+
+		var strip = CreateNativeMenuObject(ref platform, serviceState, ownerRoot,
+			publicObjects, ClassMenustrip, APTR.Null);
+		if (strip.IsNull) return APTR.Null;
+		var menu = APTR.Null;
+		var menuItem = APTR.Null;
+		var cursor = default(MuiNewMenuCursor);
+		cursor.Base = newMenu;
+		cursor.Index = 0;
+		for (var index = 0u; index < MuiNewMenuCursor.MaximumEntries; index++)
+		{
+			if (!MuiNewMenuVectorCodec.TryRead(ref platform, cursor,
+				out var record))
+			{
+				DisposeNativeMenuTree(ref platform, serviceState, ownerRoot,
+					publicObjects, strip);
+				return APTR.Null;
+			}
+			if (!MuiNewMenuTypeRecordCodec.TryClassify(record.Type,
+				out var entryKind))
+			{
+				DisposeNativeMenuTree(ref platform, serviceState, ownerRoot,
+					publicObjects, strip);
+				return APTR.Null;
+			}
+			if (entryKind == MuiNewMenuEntryKind.End) return strip;
+			if (entryKind == MuiNewMenuEntryKind.Ignored)
+			{
+				if (index + 1 < MuiNewMenuCursor.MaximumEntries &&
+					!MuiNewMenuVectorCodec.TryAdvance(ref cursor, 1))
+				{
+					DisposeNativeMenuTree(ref platform, serviceState, ownerRoot,
+						publicObjects, strip);
+					return APTR.Null;
+				}
+				continue;
+			}
+			if (entryKind == MuiNewMenuEntryKind.ImageItem ||
+				entryKind == MuiNewMenuEntryKind.ImageSub ||
+				entryKind == MuiNewMenuEntryKind.ImageUnsupported)
+			{
+				DisposeNativeMenuTree(ref platform, serviceState, ownerRoot,
+					publicObjects, strip);
+				return APTR.Null;
+			}
+
+			if (entryKind == MuiNewMenuEntryKind.Title)
+			{
+				var tags = platform.Allocate(TagStorage,
+					MuiHeadlessLayout.AllocationFlags);
+				if (tags.IsNull || !WriteNativeMenuTitleTags(ref platform, tags,
+					record.Label, record.UserData, record.Flags))
+				{
+					if (tags.IsNotNull) platform.Free(tags, TagStorage);
+					DisposeNativeMenuTree(ref platform, serviceState, ownerRoot,
+						publicObjects, strip);
+					return APTR.Null;
+				}
+				menu = CreateNativeMenuObject(ref platform, serviceState, ownerRoot,
+					publicObjects, ClassMenu, tags);
+				platform.Free(tags, TagStorage);
+				if (menu.IsNull || !MuiNativePublicObjectCore.SetParent(ref platform,
+					ownerRoot, publicObjects, strip, menu, 0))
+				{
+					if (menu.IsNotNull) MuiNativePublicObjectCore.DisposeObject(ref platform,
+						serviceState, ownerRoot, publicObjects, menu);
+					DisposeNativeMenuTree(ref platform, serviceState, ownerRoot,
+						publicObjects, strip);
+					return APTR.Null;
+				}
+				menuItem = APTR.Null;
+			}
+			else
+			{
+				if (!ResolveMenuItemStrings(ref platform, record.Label,
+					record.CommandKey, flags, out var label, out var shortcut))
+				{
+					DisposeNativeMenuTree(ref platform, serviceState, ownerRoot,
+						publicObjects, strip);
+					return APTR.Null;
+				}
+				var tags = platform.Allocate(TagStorage,
+					MuiHeadlessLayout.AllocationFlags);
+				if (tags.IsNull || !WriteNativeMenuItemTags(ref platform, tags,
+					label, shortcut, record.Flags, record.MutualExclude,
+					record.UserData))
+				{
+					if (tags.IsNotNull) platform.Free(tags, TagStorage);
+					DisposeNativeMenuTree(ref platform, serviceState, ownerRoot,
+						publicObjects, strip);
+					return APTR.Null;
+				}
+				var item = CreateNativeMenuObject(ref platform, serviceState, ownerRoot,
+					publicObjects, ClassMenuitem, tags);
+				platform.Free(tags, TagStorage);
+				var parent = entryKind == MuiNewMenuEntryKind.Sub ? menuItem : menu;
+				if (item.IsNull || parent.IsNull ||
+					!MuiNativePublicObjectCore.SetParent(ref platform, ownerRoot,
+						publicObjects, parent, item, 0))
+				{
+					if (item.IsNotNull) MuiNativePublicObjectCore.DisposeObject(ref platform,
+						serviceState, ownerRoot, publicObjects, item);
+					DisposeNativeMenuTree(ref platform, serviceState, ownerRoot,
+						publicObjects, strip);
+					return APTR.Null;
+				}
+				if (entryKind == MuiNewMenuEntryKind.Item) menuItem = item;
+			}
+			if (index + 1 < MuiNewMenuCursor.MaximumEntries &&
+				!MuiNewMenuVectorCodec.TryAdvance(ref cursor, 1))
+			{
+				DisposeNativeMenuTree(ref platform, serviceState, ownerRoot,
+					publicObjects, strip);
+				return APTR.Null;
+			}
+		}
+		DisposeNativeMenuTree(ref platform, serviceState, ownerRoot,
+			publicObjects, strip);
+		return APTR.Null;
+	}
+
+	private static APTR CreateNativeMenuObject(
+		ref MuiNativeClassPlatform platform, APTR serviceState, APTR ownerRoot,
+		APTR publicObjects, uint classKind, APTR tags)
+	{
+		var classId = NativeClassId(classKind);
+		return classId.IsNull ? APTR.Null : MuiNativePublicObjectCore.NewObject(
+			ref platform, serviceState, ownerRoot, publicObjects, classId, tags,
+			classId);
+	}
+
+	private static bool WriteNativeMenuTitleTags<TPlatform>(ref TPlatform platform,
+		APTR tags, uint label, uint userData, ushort flags)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var index = 0u;
+		AddTag(ref platform, tags, ref index, MenuTitle, label);
+		AddTag(ref platform, tags, ref index, UserData, userData);
+		AddTag(ref platform, tags, ref index, MenuEnabled,
+			(flags & NewMenuMenuDisabled) == 0 ? 1u : 0u);
+		WriteTagDone(ref platform, tags, index);
+		return true;
+	}
+
+	private static bool WriteNativeMenuItemTags<TPlatform>(ref TPlatform platform,
+		APTR tags, uint label, uint shortcut, ushort flags, uint mutualExclude,
+		uint userData) where TPlatform : struct, IMuiGuestMemory
+	{
+		var index = 0u;
+		AddTag(ref platform, tags, ref index, MenuitemTitle, label);
+		AddTag(ref platform, tags, ref index, MenuitemShortcut, shortcut);
+		AddTag(ref platform, tags, ref index, UserData, userData);
+		AddTag(ref platform, tags, ref index, MenuitemExclude, mutualExclude);
+		AddTag(ref platform, tags, ref index, MenuitemCheckit,
+			(flags & NewMenuCheckit) != 0 ? 1u : 0u);
+		AddTag(ref platform, tags, ref index, MenuitemChecked,
+			(flags & NewMenuChecked) != 0 ? 1u : 0u);
+		AddTag(ref platform, tags, ref index, MenuitemToggle,
+			(flags & NewMenuToggle) != 0 ? 1u : 0u);
+		AddTag(ref platform, tags, ref index, MenuitemCommandString,
+			(flags & NewMenuCommandString) != 0 ? 1u : 0u);
+		AddTag(ref platform, tags, ref index, MenuitemEnabled,
+			(flags & NewMenuItemDisabled) == 0 ? 1u : 0u);
+		WriteTagDone(ref platform, tags, index);
+		return true;
+	}
+
+	private static void DisposeNativeMenuTree(
+		ref MuiNativeClassPlatform platform, APTR serviceState, APTR ownerRoot,
+		APTR publicObjects, APTR strip)
+	{
+		if (strip.IsNotNull) MuiNativePublicObjectCore.DisposeObject(ref platform,
+			serviceState, ownerRoot, publicObjects, strip);
+	}
+
 	// Shared generated-TagItem seam for the button form of MUI_MakeObjectA.
 	// Keeping this small typed route separate lets native qualification prove
 	// the generated records without pulling the complete object factory into a
 	// freestanding closure.
 	internal static bool WriteButtonTagRecords<TPlatform>(ref TPlatform platform,
-		APTR tags, uint text, APTR preParse)
+		APTR tags, MuiMakeObjectBuildShapeRecord shape, APTR preParse)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		if (shape.Type != MUIO_Button) return false;
 		var index = 0u;
 		AddTag(ref platform, tags, ref index, Frame, ButtonFrame);
 		AddTag(ref platform, tags, ref index, Font, ButtonFont);
-		AddTag(ref platform, tags, ref index, TextContents, text);
+		AddTag(ref platform, tags, ref index, TextContents,
+			shape.Parameters.First);
 		AddTag(ref platform, tags, ref index, TextPreParse, preParse.Raw);
+		var controlChar = ControlCharFromCString(ref platform,
+			shape.Parameters.First);
+		if (controlChar != 0)
+			AddTag(ref platform, tags, ref index, ControlChar, controlChar);
 		AddTag(ref platform, tags, ref index, InputMode, InputModeRelVerify);
 		AddTag(ref platform, tags, ref index, Background, ButtonBackground);
 		WriteTagDone(ref platform, tags, index);
@@ -1344,8 +2368,7 @@ public static class MuiMakeObjectServiceCore
 				cursor.Index = index + 1;
 				if (!MuiMakeObjectControlCharByteCursorCodec.TryReadByte(
 					ref platform, cursor, out var key) || key == 0) return 0;
-				return key >= (byte)'A' && key <= (byte)'Z' ?
-					unchecked((uint)(key + 32)) : key;
+				return key;
 			}
 		}
 		return 0;

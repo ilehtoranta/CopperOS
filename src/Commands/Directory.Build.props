@@ -1,0 +1,38 @@
+<Project>
+  <!--
+    Shared settings for every project under src/Commands.
+
+    Layout (see README.md):
+      <Command>/*.cs         portable algorithms, compiled natively and into the host model
+      <Command>/Native/*.cs  native bodies (Workbench 3.1 and/or MorphOS); native only
+      <Command>/Entry/*.cs   shipping [M68kEntryPoint]; only in that command's project
+      <Command>/Host/*.cs    Shell-hosted IShellPlatform model; host only (CopperOS.Commands.csproj)
+      Common/                native startup, ReadArgs and I/O helpers shared by all commands
+      Native/                compatibility aggregate (old CopperOS.Commands.Native assembly)
+
+    CopperOS.Commands.csproj (the host model used by tests/Commands) keeps its
+    previous package/Shell wiring; every other project here builds against the
+    local CopperSharp68k tree.
+  -->
+  <PropertyGroup>
+    <CopperOSCommandsRoot>$(MSBuildThisFileDirectory)</CopperOSCommandsRoot>
+    <CopperOSIsHostCommandModel Condition="'$(MSBuildProjectName)' == 'CopperOS.Commands'">true</CopperOSIsHostCommandModel>
+    <CopperOSUseLocalCopperSharp Condition="'$(CopperOSUseLocalCopperSharp)' == '' and '$(CopperOSIsHostCommandModel)' != 'true'">true</CopperOSUseLocalCopperSharp>
+    <CopperOSReferenceSdkAmigaSupport Condition="'$(CopperOSReferenceSdkAmigaSupport)' == '' and '$(CopperOSIsHostCommandModel)' != 'true'">true</CopperOSReferenceSdkAmigaSupport>
+  </PropertyGroup>
+
+  <Import Project="$(MSBuildThisFileDirectory)..\..\CopperOS.Portable.props" />
+
+  <PropertyGroup Condition="'$(CopperOSIsHostCommandModel)' != 'true'">
+    <ImplicitUsings>false</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+  <!-- CopperSharp MSBuild SDK straight from the local tree: amiga-m68k RID graph
+       and host-runtime publish defaults. The matching targets are imported from
+       Directory.Build.targets. -->
+  <Import Project="$(CopperSharp68kRoot)\Sdk\Sdk\Sdk.props"
+          Condition="'$(CopperOSIsHostCommandModel)' != 'true' and Exists('$(CopperSharp68kRoot)\Sdk\Sdk\Sdk.props')" />
+</Project>

@@ -249,8 +249,16 @@ public sealed class MuiHeadlessCollectionTests
 		Assert.True(MuiFamilyMutationMessageCodec.TryGetVectorBase(
 			ref platform, packet, 8, out var vector));
 		Assert.Equal(APTR.FromPointer(0x1208), vector);
+		Assert.True(MuiFamilyMutationMessageCodec.TryGetVectorBase(
+			ref platform, packet, MuiFamilyInlineVectorKind.Reorder,
+			out vector));
+		Assert.Equal(APTR.FromPointer(0x1208), vector);
 		Assert.True(MuiFamilyMutationMessageCodec.TryGetVectorEntry(
 			ref platform, packet, 8, 2, out var entry));
+		Assert.Equal(APTR.FromPointer(0x1210), entry);
+		Assert.True(MuiFamilyMutationMessageCodec.TryGetVectorEntry(
+			ref platform, packet, MuiFamilyInlineVectorKind.Reorder, 2,
+			out entry));
 		Assert.Equal(APTR.FromPointer(0x1210), entry);
 		Assert.False(MuiFamilyMutationMessageCodec.TryGetVectorEntry(
 			ref platform, APTR.Null, 8, 0, out _));
@@ -265,6 +273,7 @@ public sealed class MuiHeadlessCollectionTests
 		var cursor = new MuiFamilyInlineVectorCursor
 		{
 			Message = APTR.FromPointer(0x1200),
+			Kind = MuiFamilyInlineVectorKind.Reorder,
 			ArrayOffset = 8,
 			Index = 2,
 		};
@@ -272,6 +281,9 @@ public sealed class MuiHeadlessCollectionTests
 		Assert.True(MuiFamilyInlineVectorCursorCodec.TryGetEntry(ref platform,
 			cursor, out var address));
 		Assert.Equal(APTR.FromPointer(0x1210), address);
+		cursor.Kind = (MuiFamilyInlineVectorKind)255;
+		Assert.False(MuiFamilyInlineVectorCursorCodec.TryGetEntry(ref platform,
+			cursor, out _));
 		cursor.Message = APTR.FromPointer(0xFFFFFFFC);
 		Assert.False(MuiFamilyInlineVectorCursorCodec.TryGetEntry(ref platform,
 			cursor, out _));
@@ -308,10 +320,18 @@ public sealed class MuiHeadlessCollectionTests
 			message, MuiFamilyReorderMessage.ArrayOffset, 2, out var address));
 		Assert.Equal(APTR.FromPointer(0x1210), address);
 		Assert.True(MuiFamilyInlineVectorMemoryCodec.TryGetEntry(ref platform,
+			message, MuiFamilyInlineVectorKind.Reorder, 2, out address));
+		Assert.Equal(APTR.FromPointer(0x1210), address);
+		Assert.True(MuiFamilyInlineVectorMemoryCodec.TryGetEntry(ref platform,
 			message, MuiFamilySortMessage.ArrayOffset, 1, out address));
+		Assert.Equal(APTR.FromPointer(0x1208), address);
+		Assert.True(MuiFamilyInlineVectorMemoryCodec.TryGetEntry(ref platform,
+			message, MuiFamilyInlineVectorKind.Sort, 1, out address));
 		Assert.Equal(APTR.FromPointer(0x1208), address);
 		Assert.False(MuiFamilyInlineVectorMemoryCodec.TryGetEntry(ref platform,
 			message, 12, 0, out _));
+		Assert.False(MuiFamilyInlineVectorMemoryCodec.TryGetEntry(ref platform,
+			message, (MuiFamilyInlineVectorKind)255, 0, out _));
 		Assert.False(MuiFamilyInlineVectorMemoryCodec.TryGetEntry(ref platform,
 			APTR.FromPointer(0x30FFE), MuiFamilyReorderMessage.ArrayOffset, 0,
 			out _));

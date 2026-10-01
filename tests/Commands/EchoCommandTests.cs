@@ -315,6 +315,53 @@ public sealed class EchoCommandTests
 
         public GuestStore Store;
 
+        public bool TryBeginCommandDiagnostics(APTR cli)
+        {
+            if (cli.IsNull) return false;
+            Store.CommandIoError = 0;
+            return true;
+        }
+
+        public bool TryCaptureCommandDiagnostics(APTR cli, int returnCode,
+            out ShellCommandDiagnostics diagnostics)
+        {
+            diagnostics = new ShellCommandDiagnostics
+            {
+                ReturnCode = returnCode,
+                IoError = returnCode == 0 ? 0 : Store.CommandIoError,
+            };
+            return !cli.IsNull;
+        }
+
+        public bool TryPublishCommandDiagnostics(APTR cli,
+            in ShellCommandDiagnostics diagnostics)
+        {
+            if (cli.IsNull) return false;
+            Store.PublishedDiagnostics = diagnostics;
+            Store.CommandIoError = diagnostics.IoError;
+            Store.DiagnosticsPublishCount++;
+            return true;
+        }
+
+        public bool TryReadContinuationDiagnostics(APTR cli, APTR continuation,
+            out ShellCommandDiagnostics diagnostics)
+        {
+            diagnostics = new ShellCommandDiagnostics
+            {
+                ReturnCode = Store.ContinuationResult,
+                IoError = Store.ContinuationIoError,
+            };
+            return cli.IsNotNull && continuation.IsNotNull &&
+                !Store.ContinuationDiagnosticsFailure;
+        }
+
+        public bool TryReadPublishedCommandDiagnostics(APTR cli,
+            out ShellCommandDiagnostics diagnostics)
+        {
+            diagnostics = Store.PublishedDiagnostics;
+            return cli.IsNotNull;
+        }
+
         public byte ReadUInt8(APTR address, int offset = 0) =>
             Store.Memory[checked((int)address.Raw) + offset];
 
@@ -391,16 +438,43 @@ public sealed class EchoCommandTests
         {
             if (handle.IsNull || Store.ShortWrite)
                 return Store.ShortWrite ? checked((int)length - 1) : -1;
-
+			if (handle.Raw == 21 && Store.RedirectionOutputPath.StartsWith(
+				"T:Prompt.", StringComparison.Ordinal))
+			{
+				for (var index = 0u; index < length; index++)
+					Store.PromptCapture.Add(ReadUInt8(source,
+						unchecked((int)index)));
+				return checked((int)length);
+			}
             Store.Append(source, length);
             return checked((int)length);
         }
+
+		public int Read(BPTR handle, APTR destination, uint length)
+		{
+			if (handle.IsNull || destination.IsNull ||
+				!IsMapped(destination, length)) return -1;
+			if (handle.Raw != 20) return 0;
+			var remaining = Store.PromptCapture.Count -
+				Store.PromptCaptureReadOffset;
+			var count = remaining < length ? remaining : checked((int)length);
+			for (var index = 0; index < count; index++)
+				WriteUInt8(destination, index, Store.PromptCapture[
+					Store.PromptCaptureReadOffset + index]);
+			Store.PromptCaptureReadOffset += count;
+			return count;
+		}
 
         public int WriteByte(BPTR handle, byte value)
         {
             if (handle.IsNull)
                 return -1;
-
+			if (handle.Raw == 21 && Store.RedirectionOutputPath.StartsWith(
+				"T:Prompt.", StringComparison.Ordinal))
+			{
+				Store.PromptCapture.Add(value);
+				return 1;
+			}
             Store.Output.Add(value);
             return 1;
         }
@@ -430,6 +504,18 @@ public sealed class EchoCommandTests
             }
 
             stackBytes = Store.DefaultStack;
+            return true;
+        }
+
+        public bool TryReadCliFailureLimit(APTR cli, out uint failureLimit)
+        {
+            if (cli.IsNull)
+            {
+                failureLimit = 0;
+                return false;
+            }
+
+            failureLimit = Store.FailureLimit;
             return true;
         }
 
@@ -646,14 +732,17 @@ public sealed class EchoCommandTests
             BPTR input,
             BPTR output,
             APTR prompt,
-            uint promptLength)
+            uint promptLength,
+            out ShellAskResponse response)
         {
+            response = default;
             if (cli.IsNull || input.IsNull || output.IsNull ||
                 Store.AskFailure || prompt.IsNull || promptLength == 0 ||
                 !IsMapped(prompt, promptLength))
                 return false;
             Store.AskPrompt = Store.ReadText(prompt, promptLength);
             Store.AskCount++;
+            response.Answer = Store.AskAnswer;
             return true;
         }
 
@@ -775,30 +864,43 @@ public sealed class EchoCommandTests
             APTR cli,
             APTR name,
             uint nameLength,
-            APTR path,
-            uint pathCapacity,
-            out ShellScriptLookupKind kind,
-            out uint pathLength)
+            in ShellScriptLookupWorkspace workspace,
+            out ShellScriptLookupResult lookup)
         {
-            kind = ShellScriptLookupKind.NotFound;
-            pathLength = 0;
+            lookup = default;
             if (cli.IsNull || Store.ScriptLookupFailure || name.IsNull ||
                 nameLength == 0 || !IsMapped(name, nameLength))
                 return false;
             Store.LastScriptLookupName = Store.ReadText(name, nameLength);
             Store.ScriptLookupCount++;
-            kind = Store.ScriptLookupKind;
+            lookup.Kind = Store.ScriptLookupKind;
+            lookup.Origin = Store.ScriptLookupKind switch
+            {
+                ShellScriptLookupKind.Resident =>
+                    ShellScriptLookupOrigin.Resident,
+                ShellScriptLookupKind.ExplicitFile =>
+                    ShellScriptLookupOrigin.ExplicitFile,
+                ShellScriptLookupKind.CurrentDirectory =>
+                    ShellScriptLookupOrigin.CurrentDirectory,
+                ShellScriptLookupKind.CommandPath =>
+                    ShellScriptLookupOrigin.CommandPath,
+                ShellScriptLookupKind.Script => Store.ScriptLookupOrigin,
+                _ => ShellScriptLookupOrigin.None,
+            };
+            lookup.Protection = Store.ScriptLookupKind ==
+                ShellScriptLookupKind.Script ? FileProtection.Script : 0;
+            lookup.ResolvedPath = workspace.Path;
             if (Store.ScriptLookupPath.Length == 0)
                 return true;
             byte[] bytes = System.Text.Encoding.ASCII.GetBytes(
                 Store.ScriptLookupPath);
-            if (path.IsNull || pathCapacity < 2 ||
-                (uint)bytes.Length >= pathCapacity ||
-                !IsMapped(path, pathCapacity))
+            if (workspace.Path.IsNull || workspace.Capacity < 2 ||
+                (uint)bytes.Length >= workspace.Capacity ||
+                !IsMapped(workspace.Path, workspace.Capacity))
                 return false;
-            bytes.CopyTo(Store.Memory, checked((int)path.Raw));
-            WriteUInt8(path, bytes.Length, 0);
-            pathLength = (uint)bytes.Length;
+            bytes.CopyTo(Store.Memory, checked((int)workspace.Path.Raw));
+            WriteUInt8(workspace.Path, bytes.Length, 0);
+            lookup.PathLength = (uint)bytes.Length;
             return true;
         }
 
@@ -852,14 +954,55 @@ public sealed class EchoCommandTests
             return true;
         }
 
+        public bool TryWriteScriptPrompt(APTR cli, BPTR output)
+        {
+            if (cli.IsNull || output.IsNull || Store.PromptFailure)
+                return false;
+            Store.PromptWriteCount++;
+            return true;
+        }
+
+        public bool TryCopyScriptPromptTemplate(APTR cli,
+            APTR destination, uint destinationCapacity,
+            out ShellScriptPromptTemplate template)
+        {
+            template = default;
+            var bytes = System.Text.Encoding.ASCII.GetBytes(
+                Store.ScriptPromptText);
+            if (cli.IsNull || destination.IsNull || Store.PromptFailure ||
+                bytes.Length >= destinationCapacity ||
+                !IsMapped(destination, (uint)bytes.Length + 1))
+                return false;
+            for (var index = 0; index < bytes.Length; index++)
+                WriteUInt8(destination, index, bytes[index]);
+            WriteUInt8(destination, bytes.Length, 0);
+            template.Text = destination;
+            template.Length = (uint)bytes.Length;
+            return true;
+        }
+
+        public bool TryWriteScriptPromptLiteral(APTR cli, BPTR output,
+            in ShellScriptPromptSegment segment)
+        {
+            if (cli.IsNull || output.IsNull || Store.PromptFailure ||
+                segment.Kind != ShellScriptPromptSegmentKind.Literal ||
+                segment.Length > ShellScriptPromptParser.MaximumTemplateLength ||
+                (segment.Length != 0 &&
+                    (segment.Text.IsNull ||
+                     !IsMapped(segment.Text, segment.Length))))
+                return false;
+            for (var index = 0u; index < segment.Length; index++)
+                if (WriteByte(output,
+                    ReadUInt8(segment.Text, unchecked((int)index))) < 0)
+                    return false;
+            return true;
+        }
+
         public bool TryExecuteScriptCommand(
             APTR cli,
             APTR frame,
-            APTR line,
-            uint lineLength,
-            ShellScriptLookupKind lookupKind,
-            APTR resolvedPath,
-            uint resolvedPathLength,
+            in ShellScriptCommandInvocation command,
+            in ShellScriptLookupResult lookup,
             BPTR input,
             BPTR output,
             BPTR error,
@@ -869,25 +1012,43 @@ public sealed class EchoCommandTests
             result = (int)ShellCommandResult.Error;
             continuation = APTR.Null;
             if (cli.IsNull || frame.IsNull || Store.ScriptExecuteFailure ||
-                line.IsNull || !IsMapped(line, lineLength) ||
+                command.Line.IsNull ||
+                !IsMapped(command.Line, command.LineLength) ||
                 input.IsNull || output.IsNull || error.IsNull)
                 return false;
-            Store.LastScriptExternalCommand = Store.ReadText(line, lineLength);
-            Store.LastScriptLookupKind = lookupKind;
-            Store.LastScriptResolvedPath = resolvedPathLength == 0
+            Store.LastScriptExternalCommand = Store.ReadText(command.Line,
+                command.LineLength);
+            Store.LastScriptCommandName = Store.ReadText(command.CommandName,
+                command.CommandNameLength);
+            var arguments = command.Arguments;
+            while (arguments.Length != 0 &&
+                ReadUInt8(arguments.Data, 0) is (byte)' ' or (byte)'\t')
+            {
+                arguments.Data = APTR.FromPointer(arguments.Data.Raw + 1);
+                arguments.Length--;
+            }
+            Store.LastScriptArgumentTail = arguments.Length == 0
                 ? string.Empty
-                : Store.ReadText(resolvedPath, resolvedPathLength);
+                : Store.ReadText(arguments.Data, arguments.Length);
+            Store.LastScriptLookupKind = lookup.Kind;
+            Store.LastScriptLookupOrigin = lookup.Origin;
+            Store.LastScriptProtection = lookup.Protection;
+            Store.LastScriptResolvedPath = lookup.PathLength == 0
+                ? string.Empty
+                : Store.ReadText(lookup.ResolvedPath, lookup.PathLength);
             Store.LastScriptInput = input;
             Store.LastScriptOutput = output;
             Store.LastScriptError = error;
             Store.ScriptExecuteCount++;
             result = Store.ScriptCommandResult;
+            Store.CommandIoError = Store.ScriptCommandIoError;
             if (Store.ScriptExternalPending)
             {
                 continuation = Store.ScriptExternalContinuation.IsNotNull
                     ? Store.ScriptExternalContinuation
                     : new APTR(3600);
                 Store.ScriptExternalContinuation = continuation;
+                Store.LastReleasedContinuation = APTR.Null;
                 var initial = new ShellProcessContinuation
                 {
                     ParentCli = cli,
@@ -901,6 +1062,14 @@ public sealed class EchoCommandTests
                     continuation = APTR.Null;
                     return false;
                 }
+                if (Store.ScriptChildCompletesDuringLaunch)
+                {
+                    if (!ShellProcessContinuationTransitions.TryComplete(ref this,
+                            continuation, Store.ContinuationResult)) return false;
+                    Store.ContinuationObservedState = ShellProcessContinuationState.Completed;
+                }
+                if (Store.ScriptCorruptFrameAfterLaunch)
+                    WriteUInt32(frame, 0, 0);
             }
             return true;
         }
@@ -917,6 +1086,9 @@ public sealed class EchoCommandTests
                 return false;
             Store.RedirectionInputPath = Store.ReadText(path, pathLength);
             Store.RedirectionOpenCount++;
+            if (Store.RedirectionInputPath.StartsWith("T:Prompt.",
+				StringComparison.Ordinal))
+				Store.PromptCaptureReadOffset = 0;
             handle = new BPTR(20);
             return true;
         }
@@ -936,6 +1108,12 @@ public sealed class EchoCommandTests
             Store.RedirectionOutputPath = Store.ReadText(path, pathLength);
             Store.RedirectionOutputAppend = append;
             Store.RedirectionOpenCount++;
+            if (Store.RedirectionOutputPath.StartsWith("T:Prompt.",
+				StringComparison.Ordinal))
+			{
+				Store.PromptCapture.Clear();
+				Store.PromptCaptureReadOffset = 0;
+			}
             handle = new BPTR(21);
             return true;
         }
@@ -957,8 +1135,17 @@ public sealed class EchoCommandTests
                 !IsMapped(path, pathLength + 1)) return false;
             Store.ScriptDeleteCount++;
             Store.LastDeletedScriptPath = Store.ReadText(path, pathLength);
+			if (Store.LastDeletedScriptPath.StartsWith("T:Prompt.",
+				StringComparison.Ordinal))
+				Store.PromptCapture.Clear();
             return !Store.ScriptDeleteFailure;
         }
+
+		public bool TrySetScriptPromptCapture(APTR cli, APTR path,
+			uint pathLength, BPTR input) => cli.IsNotNull && path.IsNotNull &&
+			pathLength != 0 && pathLength < 512 &&
+			IsMapped(path, pathLength + 1) &&
+			ReadUInt8(path, unchecked((int)pathLength)) == 0;
 
         public bool TryCloseScriptRedirection(APTR cli, BPTR handle)
         {
@@ -966,7 +1153,11 @@ public sealed class EchoCommandTests
                 return false;
             Store.RedirectionCloseCount++;
             Store.LastClosedRedirection = handle;
-            return !Store.RedirectionCloseFailure;
+            var failed = Store.RedirectionCloseFailure ||
+                (Store.RedirectionCloseFailAt != 0 &&
+                 Store.RedirectionCloseCount == Store.RedirectionCloseFailAt);
+            Store.CommandIoError = failed ? (int)DOS.Error.DiskFull : 0;
+            return !failed;
         }
 
         public bool TryRunCommand(
@@ -1006,35 +1197,60 @@ public sealed class EchoCommandTests
 
         public bool TryManageResident(
             APTR cli,
-            BPTR output,
-            APTR name,
-            uint nameLength,
-            APTR file,
-            uint fileLength,
-            APTR alias,
-            uint aliasLength,
-            uint remove,
-            uint add,
-            uint replace,
-            uint force,
-            uint system,
-            uint defer)
+            in ShellResidentManagementRequest request)
         {
-            if (cli.IsNull || output.IsNull || Store.ResidentFailure ||
-                (nameLength != 0 && (name.IsNull || !IsMapped(name, nameLength))) ||
-                (fileLength != 0 && (file.IsNull || !IsMapped(file, fileLength))) ||
-                (aliasLength != 0 && (alias.IsNull || !IsMapped(alias, aliasLength))))
+            if (cli.IsNull || request.Output.IsNull || Store.ResidentFailure ||
+                (request.NameLength != 0 && (request.Name.IsNull ||
+                    !IsMapped(request.Name, request.NameLength))) ||
+                (request.FileLength != 0 && (request.File.IsNull ||
+                    !IsMapped(request.File, request.FileLength))) ||
+                (request.AliasLength != 0 && (request.Alias.IsNull ||
+                    !IsMapped(request.Alias, request.AliasLength))))
                 return false;
-            Store.ResidentName = name.IsNull ? string.Empty : Store.ReadText(name, nameLength);
-            Store.ResidentFile = file.IsNull ? string.Empty : Store.ReadText(file, fileLength);
-            Store.ResidentAlias = alias.IsNull ? string.Empty : Store.ReadText(alias, aliasLength);
-            Store.ResidentRemove = remove;
-            Store.ResidentAdd = add;
-            Store.ResidentReplace = replace;
-            Store.ResidentForce = force;
-            Store.ResidentSystem = system;
-            Store.ResidentDefer = defer;
+            Store.ResidentName = request.Name.IsNull ? string.Empty :
+                Store.ReadText(request.Name, request.NameLength);
+            Store.ResidentFile = request.File.IsNull ? string.Empty :
+                Store.ReadText(request.File, request.FileLength);
+            Store.ResidentAlias = request.Alias.IsNull ? string.Empty :
+                Store.ReadText(request.Alias, request.AliasLength);
+            Store.ResidentRemove = request.Remove;
+            Store.ResidentAdd = request.Add;
+            Store.ResidentReplace = request.Replace;
+            Store.ResidentForce = request.Force;
+            Store.ResidentSystem = request.System;
+            Store.ResidentDefer = request.Defer;
             Store.ResidentCount++;
+            return true;
+        }
+
+        public bool TryGetInternalCommandEnabled(APTR cli,
+            uint commandIdentity, out uint enabled)
+        {
+            enabled = 0;
+            if (cli.IsNull || commandIdentity == 0 || commandIdentity > 31)
+                return false;
+            var bit = 1u << unchecked((int)(commandIdentity - 1));
+            enabled = Store.InternalCommandCli == cli &&
+                (Store.DisabledInternalCommandMask & bit) != 0 ? 0u : 1u;
+            return true;
+        }
+
+        public bool TrySetInternalCommandEnabled(APTR cli,
+            uint commandIdentity, uint enabled)
+        {
+            if (cli.IsNull || commandIdentity == 0 || commandIdentity > 31 ||
+                enabled > 1) return false;
+            if (Store.InternalCommandCli != cli)
+            {
+                Store.InternalCommandCli = cli;
+                Store.DisabledInternalCommandMask = 0;
+            }
+            var bit = 1u << unchecked((int)(commandIdentity - 1));
+            if (enabled == 0)
+                Store.DisabledInternalCommandMask |= bit;
+            else
+                Store.DisabledInternalCommandMask &= ~bit;
+            Store.InternalCommandStateChangeCount++;
             return true;
         }
 
@@ -1096,11 +1312,19 @@ public sealed class EchoCommandTests
             uint ownedFlags)
         {
             if (cli.IsNull || continuation.IsNull ||
-                Store.ContinuationReleaseFailure)
+                Store.ContinuationReleaseFailure ||
+                Store.LastReleasedContinuation == continuation)
                 return false;
             Store.LastReleasedContinuation = continuation;
             Store.LastReleasedFlags = ownedFlags;
             Store.ContinuationReleaseCount++;
+            Store.CommandIoError = 0;
+            if (Store.ContinuationReleaseClearsRecord)
+                Clear(continuation, ShellProcessContinuationCodec.Size);
+            else
+                ShellProcessContinuationCodec.TrySetFlags(ref this, continuation,
+                    (ShellProcessContinuationFlags)(ownedFlags |
+                        (uint)ShellProcessContinuationFlags.ResourcesClosed));
             return true;
         }
 
@@ -1136,10 +1360,10 @@ public sealed class EchoCommandTests
                     StringComparison.OrdinalIgnoreCase))
                 return TryReadSingleNumberArgs(argumentText, argumentLength,
                     resultArray, required: false, out rdArgs);
-            if (string.Equals(templateText, "RCLIM/A/N",
+            if (string.Equals(templateText, "RCLIM/N",
                     StringComparison.OrdinalIgnoreCase))
                 return TryReadSingleNumberArgs(argumentText, argumentLength,
-                    resultArray, required: true, out rdArgs);
+                    resultArray, required: false, out rdArgs);
             if (string.Equals(templateText, "RC/N",
                     StringComparison.OrdinalIgnoreCase))
                 return TryReadSingleNumberArgs(argumentText, argumentLength,
@@ -1512,7 +1736,8 @@ public sealed class EchoCommandTests
                 {
                     if (ReadUInt32(resultArray, switchOffset) != 0)
                         return false;
-                    WriteUInt32(resultArray, switchOffset, 1);
+                    WriteUInt32(resultArray, switchOffset,
+                        Store.ResidentSwitchValue);
                     continue;
                 }
                 if (tokenFlags == 0 && (value.Equals("ALIAS",
@@ -2284,7 +2509,10 @@ public sealed class EchoCommandTests
             if (tokenResult != (int)ShellTextTokenResult.Token ||
                 tokenFlags != 0 || !ShellNumberParser.TryParseUnsigned(
                     ref this, token, tokenLength, out var number))
+            {
+                Store.CommandIoError = (int)DOS.Error.BadNumber;
                 return false;
+            }
             tokenResult = ShellTextParser.NextToken(ref this, ref cursor,
                 token, 96, out _, out _);
             if (tokenResult != (int)ShellTextTokenResult.End)
@@ -2671,6 +2899,7 @@ public sealed class EchoCommandTests
             if (output.IsNull || cli.IsNull || Store.WhyFailure)
                 return false;
             Store.WhyCount++;
+            Store.LastWhyDiagnostics = Store.PublishedDiagnostics;
             byte[] bytes = System.Text.Encoding.ASCII.GetBytes(Store.WhyText);
             Store.Output.AddRange(bytes);
             return true;
@@ -2714,14 +2943,15 @@ public sealed class EchoCommandTests
     {
         public readonly byte[] Memory = new byte[8192];
         public readonly List<byte> Output = new();
+		public readonly List<byte> PromptCapture = new();
+		public int PromptCaptureReadOffset;
         public bool ShortWrite;
-        public bool InvalidReadArgsNumberValueAddress;
-        public bool MisalignedReadArgsNumberValueAddress;
-        public bool PathArgsMissingTerminator;
         public string OpenedPath = string.Empty;
         public BPTR ClosedHandle;
         public int DefaultStack = 8192;
         public int RunningStack = 4096;
+        public bool InvalidReadArgsNumberValueAddress;
+        public bool MisalignedReadArgsNumberValueAddress;
         public int WriteStackCount;
         public bool ReadStackFailure;
         public bool WriteStackFailure;
@@ -2730,7 +2960,7 @@ public sealed class EchoCommandTests
         public string LocalVariableListing = string.Empty;
         public int LocalListCount;
         public bool WriteFailureLimitFailure;
-        public uint FailureLimit = 10;
+        public uint FailureLimit = ShellScriptFrameCodec.DefaultFailureLimit;
         public int WriteFailureLimitCount;
         public bool CurrentDirectoryFailure;
         public bool ChangeDirectoryFailure;
@@ -2746,6 +2976,7 @@ public sealed class EchoCommandTests
         public int AliasRemoveCount;
         public bool CommandPathUpdateFailure;
         public bool CommandPathListFailure;
+        public bool PathArgsMissingTerminator;
         public readonly List<string> CommandPathEntries = new();
         public string CommandPathListing = string.Empty;
         public uint CommandPathOperation;
@@ -2765,6 +2996,7 @@ public sealed class EchoCommandTests
         public uint SkipBack;
         public int SkipCount;
         public bool AskFailure;
+        public ShellAskAnswer AskAnswer = ShellAskAnswer.Yes;
         public string AskPrompt = string.Empty;
         public int AskCount;
         public bool IfFailure;
@@ -2792,15 +3024,22 @@ public sealed class EchoCommandTests
         public int ScriptSignalAcknowledgeCount;
         public ShellScriptSignalEvent LastScriptSignal;
         public string ScriptText = string.Empty;
+        public string ScriptPromptText = "%N.%S> ";
         public string LastScriptExternalCommand = string.Empty;
+        public string LastScriptCommandName = string.Empty;
+        public string LastScriptArgumentTail = string.Empty;
         public string LastScriptAliasSource = string.Empty;
         public string ScriptAliasReplacement = string.Empty;
         public int ScriptAliasExpansionCount;
         public ShellScriptLookupKind ScriptLookupKind =
             ShellScriptLookupKind.CommandPath;
+        public ShellScriptLookupOrigin ScriptLookupOrigin =
+            ShellScriptLookupOrigin.CommandPath;
         public string ScriptLookupPath = string.Empty;
         public string LastScriptLookupName = string.Empty;
         public ShellScriptLookupKind LastScriptLookupKind;
+        public ShellScriptLookupOrigin LastScriptLookupOrigin;
+        public FileProtection LastScriptProtection;
         public string LastScriptResolvedPath = string.Empty;
         public int ScriptLookupCount;
         public BPTR LastScriptInput;
@@ -2808,11 +3047,18 @@ public sealed class EchoCommandTests
         public BPTR LastScriptError;
         public int ScriptExecuteCount;
         public int ScriptCommandResult = (int)ShellCommandResult.Ok;
+        public int ScriptCommandIoError;
+        public int CommandIoError;
+        public ShellCommandDiagnostics PublishedDiagnostics;
+        public ShellCommandDiagnostics LastWhyDiagnostics;
+        public int DiagnosticsPublishCount;
         public bool ScriptExternalPending;
+        public bool ScriptChildCompletesDuringLaunch;
         public APTR ScriptExternalContinuation;
         public bool RedirectionInputFailure;
         public bool RedirectionOutputFailure;
         public bool RedirectionCloseFailure;
+        public int RedirectionCloseFailAt;
         public string RedirectionInputPath = string.Empty;
         public string RedirectionOutputPath = string.Empty;
         public uint RedirectionOutputAppend;
@@ -2846,7 +3092,11 @@ public sealed class EchoCommandTests
         public uint ResidentForce;
         public uint ResidentSystem;
         public uint ResidentDefer;
+        public uint ResidentSwitchValue = 1;
         public int ResidentCount;
+        public APTR InternalCommandCli;
+        public uint DisabledInternalCommandMask;
+        public int InternalCommandStateChangeCount;
         public bool ShellLaunchFailure;
         public ShellLaunchKind ShellLaunchKind;
         public BPTR ShellInput;
@@ -2858,6 +3108,10 @@ public sealed class EchoCommandTests
         public ShellProcessContinuationState ContinuationObservedState =
             ShellProcessContinuationState.Running;
         public int ContinuationResult;
+        public int ContinuationIoError;
+        public bool ContinuationDiagnosticsFailure;
+        public bool ContinuationReleaseClearsRecord;
+        public bool ScriptCorruptFrameAfterLaunch;
         public int ContinuationPollCount;
         public bool ContinuationReleaseFailure;
         public APTR LastReleasedContinuation;
@@ -2907,6 +3161,7 @@ public sealed class EchoCommandTests
         public readonly List<uint> FaultCodes = new();
         public uint FaultCount;
         public bool PromptFailure;
+        public int PromptWriteCount;
         public string PromptValue = string.Empty;
         public uint PromptReset;
         public int PromptCount;

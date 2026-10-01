@@ -29,6 +29,19 @@ public sealed class MuiAreaLayoutPolicyStructAdapterTests
 
 		Assert.True(MuiAreaLayoutPolicyStateRecordCodec.WriteRecord(ref platform,
 			address, value));
+		var cursor = new MuiAreaLayoutPolicyFieldCursor
+		{
+			Address = address,
+			Field = MuiAreaLayoutPolicyField.VerticalWeight,
+		};
+		Assert.True(MuiAreaLayoutPolicyFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedWeightAddress, out var typedWeightSize));
+		Assert.Equal(APTR.FromPointer(0x3D2C), typedWeightAddress);
+		Assert.Equal(MuiAreaLayoutPolicyStateRecord.FieldSize, typedWeightSize);
+		Assert.True(MuiAreaLayoutPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryWeightAddress, out var memoryWeightSize));
+		Assert.Equal(typedWeightAddress, memoryWeightAddress);
+		Assert.Equal(typedWeightSize, memoryWeightSize);
 		Assert.True(MuiAreaLayoutPolicyStateRecordCodec.TryReadRecord(ref platform,
 			address, out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
@@ -75,6 +88,15 @@ public sealed class MuiAreaLayoutPolicyStructAdapterTests
 
 		Assert.True(MuiAreaLayoutPolicyStateRecordCodec.WriteRecord(ref platform,
 			address, value));
+		var cursor = new MuiAreaLayoutPolicyFieldCursor
+		{
+			Address = address,
+			Field = MuiAreaLayoutPolicyField.MaxWidth,
+		};
+		Assert.True(MuiAreaLayoutPolicyFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedMaxWidthAddress, out var typedMaxWidthSize));
+		Assert.Equal(APTR.FromPointer(0x4000 + 4 * MuiAreaLayoutPolicyStateRecord.FieldSize), typedMaxWidthAddress);
+		Assert.Equal(MuiAreaLayoutPolicyStateRecord.FieldSize, typedMaxWidthSize);
 		Assert.True(MuiAreaLayoutPolicyStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiAreaLayoutPolicyField.MaxWidth, 0xFEEDBEEFu));
 		Assert.True(MuiAreaLayoutPolicyStateRecordMemoryCodec.TryReadUInt32(

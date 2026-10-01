@@ -3,15 +3,12 @@
 - SPDX-License-Identifier: MIT
 */
 
-using CopperOS.MuiMaster;
+using Amiga;
 
-namespace Amiga;
+namespace CopperOS.MuiMaster;
 
-// The local CopperSharp SDK deliberately omits the broad Layers guest-codec
-// surface from its host assembly. MUI's application-window projection only
-// needs the public Exec List head, so keep this fallback narrow and use the
-// shared named packed Exec List structure rather than exposing a private byte
-// offset to MUI code. The package build receives the SDK Layers codec instead.
+// MUI's bounded application-window projection uses the shared packed Exec
+// List. Its local admission policy belongs to MUI, not the SDK namespace.
 public static class LayersExecListCodec
 {
 	// Keep the historical admission guard: the Layers-facing list projection

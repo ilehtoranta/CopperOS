@@ -1,0 +1,93 @@
+# WinUAE smoke cases for the out/C command set.
+#
+# One case per line:  Name | Command | Arguments
+# Command is the C: file name. Arguments are passed verbatim after the redirections.
+# "SKIP: reason" as the Arguments column records the command without running it.
+#
+# Every case runs as:  C:<Command> <NIL: >>SYS:smoke.log <Arguments>
+# with @@BEGIN/@@END markers around it, so a hang or crash shows as a BEGIN
+# without an END. Cases run in file order and may use files earlier cases made.
+# RAM:smoke/ and SYS:smoke-input.txt are prepared before the first case.
+
+# --- Pure computation and lookup
+eval-add          | Eval          | 1+2
+eval-shift        | Eval          | 1 lsh 4
+which-dir         | Which         | Dir
+pathpart-add      | PathPart      | DIR=SYS:C ADD=Dir
+quote-template    | Quote         | ?
+version-kickstart | Version       |
+version-file      | Version       | SYS:C/Eval
+avail             | Avail         |
+date              | Date          |
+status            | Status        |
+assign-list       | Assign        |
+info-ram          | Info          | RAM:
+info-dh0          | Info          | DH0:
+info              | Info          |
+guessbootdev      | GuessBootDev  |
+check2090         | Check2090     |
+findresident      | FindResident  |
+
+# --- Directory and file reading
+dir-sys           | Dir           | SYS:
+dir-c             | Dir           | SYS:C
+list-c            | List          | SYS:C
+type-input        | Type          | SYS:smoke-input.txt
+type-hex          | Type          | SYS:smoke-input.txt HEX
+search-input      | Search        | SYS:smoke-input.txt copper
+
+# --- File changes, all inside RAM:smoke/
+makedir           | MakeDir       | RAM:smoke/dir1 RAM:smoke/dir2
+copy-file         | Copy          | SYS:smoke-input.txt RAM:smoke/copied
+join-files        | Join          | SYS:smoke-input.txt SYS:smoke-input.txt AS RAM:smoke/joined
+filenote          | FileNote      | RAM:smoke/copied "smoke note"
+protect           | Protect       | RAM:smoke/copied +s
+rename            | Rename        | RAM:smoke/copied RAM:smoke/renamed
+setdate           | SetDate       | RAM:smoke/renamed 01-Jan-94
+touch             | Touch         | RAM:smoke/touched
+makelink          | MakeLink      | RAM:smoke/link RAM:smoke/joined
+list-ram          | List          | RAM:smoke
+delete-file       | Delete        | RAM:smoke/renamed
+delete-dir        | Delete        | RAM:smoke/dir2
+dir-ram-after     | Dir           | RAM:smoke
+
+# --- Volumes, devices and system state (non-destructive)
+relabel-ram       | Relabel       | RAM: SmokeRAM
+addbuffers        | AddBuffers    | RAM: 5
+diskchange        | DiskChange    | DF0:
+lock-status       | Lock          |
+setclock-load     | SetClock      | LOAD
+changetaskpri     | ChangeTaskPri | 0
+break-missing     | Break         | 99
+wait-1s           | Wait          | 1
+mount-noargs      | Mount         |
+binddrivers       | BindDrivers   |
+adddatatypes      | AddDataTypes  |
+setfont-noargs    | SetFont       |
+setkeyboard-noargs| SetKeyboard   |
+iconpos-noargs    | IconPos       |
+extractks-noargs  | ExtractKickstart |
+
+# --- Built from the MorphOS body: may use calls Kickstart 3.1 lacks
+beep              | Beep          |
+devlist           | DevList       |
+diskfree          | DiskFree      |
+doslist           | DosList       |
+liblist           | LibList       |
+modlist           | ModList       |
+portlist          | PortList      |
+reslist           | ResList       |
+tasklist          | TaskList      |
+loadmondrvs       | LoadMonDrvs   |
+waitforlib        | WaitForLib    | exec.library
+waitforport       | WaitForPort   | SmokeNoSuchPort
+exe2arc-noargs    | Exe2Arc       |
+execute-noargs    | Execute       |
+execute-missing   | Execute       | RAM:smoke/no-such-script
+
+# --- Not run
+format            | Format        | SKIP: destroys a volume
+reboot            | Reboot        | SKIP: resets the machine and ends the run
+requestchoice     | RequestChoice | SKIP: waits for a click on a requester
+requestfile       | RequestFile   | SKIP: waits for a click on a requester
+waitfornotify     | WaitForNotification | SKIP: waits indefinitely for a file change

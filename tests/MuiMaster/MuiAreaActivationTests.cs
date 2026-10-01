@@ -265,6 +265,14 @@ public sealed class MuiAreaActivationTests
 		Assert.True(MuiAreaActivationFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out address));
 		Assert.Equal(packet.Raw + 4, address.Raw);
+		Assert.True(MuiAreaActivationFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedAddress, out var typedSize));
+		Assert.Equal(address, typedAddress);
+		Assert.Equal(MuiAreaActivationMessage.FieldSize, typedSize);
+		Assert.True(MuiAreaActivationRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryAddress, out var memorySize));
+		Assert.Equal(typedAddress, memoryAddress);
+		Assert.Equal(typedSize, memorySize);
 
 		Assert.True(MuiAreaActivationFieldCursorCodec.TryWriteUInt32(ref platform,
 			packet, MuiAreaActivationPacketKind.Activation,
@@ -278,11 +286,15 @@ public sealed class MuiAreaActivationTests
 		cursor.Field = MuiAreaActivationField.Flags;
 		Assert.False(MuiAreaActivationFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out _));
+		Assert.False(MuiAreaActivationFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 		cursor.Message = APTR.FromPointer(0xFFFFFFF0u);
 		cursor.Packet = MuiAreaActivationPacketKind.Activation;
 		cursor.Field = MuiAreaActivationField.Flags;
 		Assert.False(MuiAreaActivationFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out _));
+		Assert.False(MuiAreaActivationFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 	}
 
 	[Fact]

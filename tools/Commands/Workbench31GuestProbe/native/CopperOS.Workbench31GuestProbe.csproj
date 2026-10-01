@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <CopperOSUseLocalCopperSharp>true</CopperOSUseLocalCopperSharp>
+  </PropertyGroup>
+  <Import Project="..\..\..\..\CopperOS.Portable.props" />
+  <PropertyGroup>
+    <CopperOSReferenceSdkAmigaSupport>true</CopperOSReferenceSdkAmigaSupport>
+    <AssemblyName>CopperOS.Workbench31GuestProbe</AssemblyName>
+    <RootNamespace>CopperOS.Workbench31GuestProbe</RootNamespace>
+    <ImplicitUsings>false</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\..\..\src\Commands\Common\NativeCommandArguments.cs" Link="NativeCommandArguments.cs" />
+  </ItemGroup>
+</Project>

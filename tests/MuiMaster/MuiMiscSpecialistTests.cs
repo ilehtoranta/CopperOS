@@ -162,6 +162,16 @@ public sealed class MuiMiscSpecialistTests
 	{
 		var p = NewPlatform();
 		var header = APTR.FromPointer(0x2D80);
+		var headerCursor = new MuiMiscRecordFieldCursor
+		{
+			Address = header,
+			Record = MuiMiscRecordKind.Header,
+			Field = MuiMiscRecordField.NotifyCount,
+		};
+		Assert.True(MuiMiscRecordFieldCursorCodec.TryGetAddress(ref p,
+			headerCursor, out var notifyCountAddress, out var notifyCountSize));
+		Assert.Equal(header.Raw + 20u, notifyCountAddress.Raw);
+		Assert.Equal(4u, notifyCountSize);
 		Assert.True(MuiMiscRecordFieldCursorCodec.TryWriteUInt32(ref p, header,
 			MuiMiscRecordKind.Header, MuiMiscRecordField.Magic,
 			MuiMiscSpecialistHeader.Cookie));
@@ -2065,16 +2075,19 @@ public sealed class MuiMiscSpecialistTests
 		cursor.Packet = MuiMiscSpecialistPacketKind.Get;
 		cursor.Field = MuiMiscSpecialistField.MethodId;
 		Assert.True(MuiMiscSpecialistFieldCursorCodec.TryGetAddress(ref p,
-			cursor, out var address));
+			cursor, out var address, out var fieldSize));
 		Assert.Equal(Packet.Raw, address.Raw);
+		Assert.Equal(4u, fieldSize);
 		cursor.Field = MuiMiscSpecialistField.Attribute;
 		Assert.True(MuiMiscSpecialistFieldCursorCodec.TryGetAddress(ref p,
-			cursor, out address));
+			cursor, out address, out fieldSize));
 		Assert.Equal(Packet.Raw + 4, address.Raw);
+		Assert.Equal(4u, fieldSize);
 		cursor.Field = MuiMiscSpecialistField.Storage;
 		Assert.True(MuiMiscSpecialistFieldCursorCodec.TryGetAddress(ref p,
-			cursor, out address));
+			cursor, out address, out fieldSize));
 		Assert.Equal(Packet.Raw + 8, address.Raw);
+		Assert.Equal(4u, fieldSize);
 
 		Assert.True(MuiMiscSpecialistFieldCursorCodec.TryReadUInt32(ref p,
 			Packet, MuiMiscSpecialistPacketKind.RegisterGadget,

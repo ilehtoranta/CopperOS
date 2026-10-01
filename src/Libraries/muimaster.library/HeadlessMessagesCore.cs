@@ -14,6 +14,8 @@ internal struct MuiHeadlessMethodMessage
 {
 	public const uint Size = 4;
 	internal const uint FieldSize = 4;
+	// ABI/documentation alias only. Address lookup below advances the named
+	// one-field record with MuiGuestStructCursor.
 	internal const uint MethodIdOffset = 0;
 	public uint MethodId;
 }
@@ -35,24 +37,22 @@ internal struct MuiHeadlessMethodMessageFieldCursor
 // MuiHeadlessMethodMessage value instead of addressing the selector directly.
 internal static class MuiHeadlessMethodMessageRecordMemoryCodec
 {
-	private static bool TryResolve(MuiHeadlessMethodMessageField field,
-		out uint offset)
-	{
-		offset = field == MuiHeadlessMethodMessageField.MethodId ?
-			MuiHeadlessMethodMessage.MethodIdOffset : uint.MaxValue;
-		return offset != uint.MaxValue;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, MuiHeadlessMethodMessageField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset || !platform.IsMapped(
-			record, MuiHeadlessMethodMessage.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiHeadlessMethodMessage.FieldSize);
+		switch (field)
+		{
+			case MuiHeadlessMethodMessageField.MethodId:
+				break;
+			default:
+				return false;
+		}
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiHeadlessMethodMessage.Size, out var cursor)) return false;
+		return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiHeadlessMethodMessage.FieldSize, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -60,18 +60,17 @@ internal static class MuiHeadlessMethodMessageRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return field == MuiHeadlessMethodMessageField.MethodId &&
+			MuiHeadlessMethodHeaderCodec.TryReadValue(ref platform, record,
+				out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiHeadlessMethodMessageField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		return field == MuiHeadlessMethodMessageField.MethodId &&
+			MuiHeadlessMethodHeaderCodec.WriteValue(ref platform, record, value);
 	}
 }
 
@@ -122,6 +121,8 @@ internal struct MuiHeadlessOmSetMessage
 {
 	internal const uint Size = 12;
 	internal const uint FieldSize = 4;
+	// ABI/documentation aliases only. Field access advances the named packet
+	// with MuiGuestStructCursor below.
 	internal const uint MethodIdOffset = 0;
 	internal const uint AttributesOffset = 4;
 	internal const uint GadgetInfoOffset = 8;
@@ -149,22 +150,30 @@ internal struct MuiHeadlessOmSetFieldCursor
 // place that projects them into guest memory.
 internal static class MuiHeadlessOmSetMessageMemoryCodec
 {
-	private static bool TryResolve(MuiHeadlessOmSetField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiHeadlessOmSetField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
+		address = APTR.Null;
 		switch (field)
 		{
 			case MuiHeadlessOmSetField.MethodId:
-				offset = MuiHeadlessOmSetMessage.MethodIdOffset;
-				return true;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiHeadlessOmSetMessage.FieldSize, out address);
 			case MuiHeadlessOmSetField.Attributes:
-				offset = MuiHeadlessOmSetMessage.AttributesOffset;
-				return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiHeadlessOmSetMessage.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiHeadlessOmSetMessage.FieldSize, out address);
 			case MuiHeadlessOmSetField.GadgetInfo:
-				offset = MuiHeadlessOmSetMessage.GadgetInfoOffset;
-				return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiHeadlessOmSetMessage.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiHeadlessOmSetMessage.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiHeadlessOmSetMessage.FieldSize, out address);
 			default:
-				offset = 0;
 				return false;
 		}
 	}
@@ -174,11 +183,10 @@ internal static class MuiHeadlessOmSetMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiHeadlessOmSetMessage.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiHeadlessOmSetMessage.FieldSize);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiHeadlessOmSetMessage.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address)) return false;
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -228,6 +236,8 @@ internal struct MuiHeadlessOmUpdateMessage
 {
 	internal const uint Size = 16;
 	internal const uint FieldSize = 4;
+	// ABI/documentation aliases only. Field access advances the named packet
+	// with MuiGuestStructCursor below.
 	internal const uint MethodIdOffset = 0;
 	internal const uint AttributesOffset = 4;
 	internal const uint GadgetInfoOffset = 8;
@@ -258,25 +268,39 @@ internal struct MuiHeadlessOmUpdateFieldCursor
 // place that projects them into guest memory.
 internal static class MuiHeadlessOmUpdateMessageMemoryCodec
 {
-	private static bool TryResolve(MuiHeadlessOmUpdateField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiHeadlessOmUpdateField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
+		address = APTR.Null;
 		switch (field)
 		{
 			case MuiHeadlessOmUpdateField.MethodId:
-				offset = MuiHeadlessOmUpdateMessage.MethodIdOffset;
-				return true;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiHeadlessOmUpdateMessage.FieldSize, out address);
 			case MuiHeadlessOmUpdateField.Attributes:
-				offset = MuiHeadlessOmUpdateMessage.AttributesOffset;
-				return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiHeadlessOmUpdateMessage.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiHeadlessOmUpdateMessage.FieldSize, out address);
 			case MuiHeadlessOmUpdateField.GadgetInfo:
-				offset = MuiHeadlessOmUpdateMessage.GadgetInfoOffset;
-				return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiHeadlessOmUpdateMessage.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiHeadlessOmUpdateMessage.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiHeadlessOmUpdateMessage.FieldSize, out address);
 			case MuiHeadlessOmUpdateField.Flags:
-				offset = MuiHeadlessOmUpdateMessage.FlagsOffset;
-				return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiHeadlessOmUpdateMessage.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiHeadlessOmUpdateMessage.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiHeadlessOmUpdateMessage.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiHeadlessOmUpdateMessage.FieldSize, out address);
 			default:
-				offset = 0;
 				return false;
 		}
 	}
@@ -286,11 +310,10 @@ internal static class MuiHeadlessOmUpdateMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiHeadlessOmUpdateMessage.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiHeadlessOmUpdateMessage.FieldSize);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiHeadlessOmUpdateMessage.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address)) return false;
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

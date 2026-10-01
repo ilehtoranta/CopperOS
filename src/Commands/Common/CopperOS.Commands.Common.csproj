@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Native startup, ReadArgs, DOS I/O, DOS-list and process-control helpers
+       shared by the C: commands. -->
+  <PropertyGroup>
+    <AssemblyName>CopperOS.Commands.Common</AssemblyName>
+    <RootNamespace>CopperOS.Commands.Native</RootNamespace>
+  </PropertyGroup>
+</Project>

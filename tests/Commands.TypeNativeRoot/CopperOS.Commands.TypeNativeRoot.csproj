@@ -4,14 +4,19 @@
   </PropertyGroup>
   <Import Project="..\..\CopperOS.Portable.props" />
   <PropertyGroup>
+    <CopperOSReferenceSdkAmigaSupport>true</CopperOSReferenceSdkAmigaSupport>
     <AssemblyName>CopperOS.Commands.TypeNativeRoot</AssemblyName>
     <RootNamespace>CopperOS.Commands.TypeNativeRoot</RootNamespace>
     <ImplicitUsings>false</ImplicitUsings>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CopperSharp.Sdk.Amiga.Support" Version="$(CopperSharpSdkAmigaVersion)" />
-    <Compile Include="..\..\src\Commands\TypeTextFormatter.cs" Link="TypeTextFormatter.cs" />
+    <Compile Include="..\..\src\Commands\Type\TypeTextFormatter.cs" Link="TypeTextFormatter.cs" />
+    <Compile Include="..\..\src\Commands\Common\NativeCommandArguments.cs" Link="NativeCommandArguments.cs" />
+    <Compile Include="..\..\src\Commands\Common\NativeCommandStartup.cs" Link="NativeCommandStartup.cs" />
+    <Compile Include="..\..\src\Commands\Type\Native\NativeMorphOSTypeCommand.cs" Link="NativeMorphOSTypeCommand.cs" />
+    <Compile Include="..\..\src\Commands\Type\Native\NativeWorkbench31TypeCommand.cs" Link="NativeWorkbench31TypeCommand.cs" />
+    <Compile Include="..\..\src\Commands\Type\Native\NativeMorphOSTypeHexIo.cs" Link="NativeMorphOSTypeHexIo.cs" />
+    <Compile Include="..\..\src\Commands\Type\Native\NativeMorphOSTypeTextIo.cs" Link="NativeMorphOSTypeTextIo.cs" />
   </ItemGroup>
 </Project>
-

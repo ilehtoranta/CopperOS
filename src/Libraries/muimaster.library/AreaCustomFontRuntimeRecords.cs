@@ -31,6 +31,7 @@ public struct MuiAreaCustomFontRuntimeRecord
 	public const uint GenerationOffset = 12;
 	public const uint ActiveOffset = 16;
 	public const uint Cookie = 0x41434652u; // 'ACFR'
+	internal const uint ClosingActive = uint.MaxValue;
 
 	public uint Magic;
 	public APTR Font;
@@ -74,10 +75,14 @@ public static class MuiAreaCustomFontRuntimeFieldCursorCodec
 	public static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaCustomFontRuntimeFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiAreaCustomFontRuntimeRecordMemoryCodec.TryGetAddress(ref platform,
-			cursor.Record, cursor.Field, out address);
-	}
+		=> TryGetAddress(ref platform, cursor, out address, out _);
+
+	public static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaCustomFontRuntimeFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiAreaCustomFontRuntimeRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address, out fieldSize);
 
 	public static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiAreaCustomFontRuntimeField field, out uint value)
@@ -96,28 +101,23 @@ public static class MuiAreaCustomFontRuntimeFieldCursorCodec
 	}
 }
 
-// Fixed CustomFont runtime state is transferred as a named record. Numeric
-// guest positions are confined to this ABI adapter; the compatibility cursor
-// above remains available only to legacy callers and malformed-state
-// diagnostics.
+// Fixed CustomFont runtime state is transferred as a named record. The bounded
+// cursor walks the complete packed struct before selecting a field; the
+// compatibility cursor above remains available only to legacy callers and
+// malformed-state diagnostics.
 public static class MuiAreaCustomFontRuntimeRecordMemoryCodec
 {
-	private static bool TryResolve(MuiAreaCustomFontRuntimeField field,
-		out uint offset)
+	private static bool TryResolveFieldIndex(MuiAreaCustomFontRuntimeField field,
+		out uint index)
 	{
-		if (field == MuiAreaCustomFontRuntimeField.Magic)
-			offset = MuiAreaCustomFontRuntimeRecord.MagicOffset;
-		else if (field == MuiAreaCustomFontRuntimeField.Font)
-			offset = MuiAreaCustomFontRuntimeRecord.FontOffset;
-		else if (field == MuiAreaCustomFontRuntimeField.Spec)
-			offset = MuiAreaCustomFontRuntimeRecord.SpecOffset;
-		else if (field == MuiAreaCustomFontRuntimeField.Generation)
-			offset = MuiAreaCustomFontRuntimeRecord.GenerationOffset;
-		else if (field == MuiAreaCustomFontRuntimeField.Active)
-			offset = MuiAreaCustomFontRuntimeRecord.ActiveOffset;
+		if (field == MuiAreaCustomFontRuntimeField.Magic) index = 0;
+		else if (field == MuiAreaCustomFontRuntimeField.Font) index = 1;
+		else if (field == MuiAreaCustomFontRuntimeField.Spec) index = 2;
+		else if (field == MuiAreaCustomFontRuntimeField.Generation) index = 3;
+		else if (field == MuiAreaCustomFontRuntimeField.Active) index = 4;
 		else
 		{
-			offset = 0;
+			index = uint.MaxValue;
 			return false;
 		}
 		return true;
@@ -127,13 +127,34 @@ public static class MuiAreaCustomFontRuntimeRecordMemoryCodec
 		APTR record, MuiAreaCustomFontRuntimeField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiAreaCustomFontRuntimeFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address, out _);
+	}
+
+	public static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaCustomFontRuntimeFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record, MuiAreaCustomFontRuntimeRecord.Size) &&
-			platform.IsMapped(address, MuiAreaCustomFontRuntimeRecord.FieldSize);
+		fieldSize = 0;
+		if (!TryResolveFieldIndex(cursor.Field, out var index) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, cursor.Record,
+				MuiAreaCustomFontRuntimeRecord.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref structCursor,
+				MuiAreaCustomFontRuntimeRecord.FieldSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				fieldSize = MuiAreaCustomFontRuntimeRecord.FieldSize;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -178,8 +199,8 @@ public static class MuiAreaCustomFontRuntimeRecordMemoryCodec
 		value = 0;
 		if (!TryGetAddress(ref platform, record, offset, out var address))
 			return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+			out value);
 	}
 
 	public static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -209,8 +230,7 @@ public static class MuiAreaCustomFontRuntimeRecordMemoryCodec
 	{
 		if (!TryGetAddress(ref platform, record, offset, out var address))
 			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		return MuiGuestUlongStorageCodec.WriteValue(ref platform, address, value);
 	}
 }
 

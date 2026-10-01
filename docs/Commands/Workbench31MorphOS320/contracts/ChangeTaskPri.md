@@ -400,6 +400,68 @@ These source-shaped results do not establish MorphOS guest parity, full
 diagnostic coverage, PID numbering/reuse/liveness, PURE/resident lifecycle,
 rights clearance, or package admission.
 
+## 2026-09-28 explicit PROCESS 0 selector
+
+The released command checks whether the `PROCESS` result slot is present,
+then passes its numeric value to `FindCliProc` and, when eligible, to
+`FindTaskByPID`. The MorphOS Exec SDK documents `FindTaskByPID(0)` as returning
+the current task. The candidate's supplied-DOS fixture now distinguishes this
+case from omitting `PROCESS`: `PROCESS 0` misses `FindCliProc(0)`, calls the
+indirect PID vector with D0 equal to zero while Forbid is active, receives the
+current-task result, and applies priority 4. It passes 15 supplied invocations
+per CPU across 68000/020/040, with 22 reachable methods and no managed runtime
+features/helpers, external targets, exception regions, fatal sites, leaks, or
+shared-image writes. Receipt:
+[`qualification.json`](../../../../artifacts/changetaskpri-morphos-native-20260928-pid-zero-v1/qualification.json).
+The 68000 HUNK SHA-256 is
+`7a33599717a58a75c8d185c2fd07a5f1fc61923068129a36cbf0087663588774`; the
+68020 and 68040 HUNKs share
+`8075a7fc6e1bf185fe87a42926f1e04434504298aac88192251e97ec2c0f644e`.
+See the [MorphOS Exec SDK](https://morphos-team.net/sdk/exec.html) for the
+public `FindTaskByPID` contract.
+
+This is supplied-vector ABI evidence. It does not prove original MorphOS guest
+behavior, exact PID numbering/reuse, task liveness under scheduler changes,
+resident/PURE lifecycle, rights clearance, or package admission.
+
+The Workbench candidate now has the profile counterpart: explicit
+`PROCESS 0` reaches classic `FindCliProc(0)`, reports `Process 0 does not
+exist`, and never calls the MorphOS-only PID slot. Its refreshed resident
+qualification passes 14 supplied invocations per CPU on 68000/020/040, with
+13 reachable methods and no runtime helpers/features, leaks, or shared-image
+writes at
+[`qualification.json`](../../../../artifacts/changetaskpri-wb31-native-20260928-process-zero-v1/qualification.json).
+The 68000 HUNK SHA-256 is
+`14722d2ab7675ff3cda9507f282274edcdb0f92e42ec82b15dcfc228ea5ce7f0`; 020/040
+share `d90746f571b973e04ef6bbdce8a15b29f47910c6d8053296489d31c999d42308`.
+This remains supplied-DOS profile-boundary evidence, not an original Workbench
+guest comparison.
+
+The original Workbench 3.1 guest confirms that explicit `PROCESS 0` is a
+missing CLI number for this command. Original and candidate runs on fresh
+diagnostic derivatives both emit the exact 62-byte stream
+`Process 0 does not exist\nC:ChangeTaskPri failed returncode 20\n`, return 20,
+and leave caller post-System IoErr at 0. The accepted comparison is
+[`comparison-output-result-ierr.json`](../../../../artifacts/workbench31-guest-command-changetaskpri-process-zero-candidate-20260928-v1/comparison-output-result-ierr.json).
+It compares output, return and caller IoErr. The effect-aware projection is
+not claimed because this invocation has no sampled pre-System owner state.
+
+## 2026-09-28 Workbench question-mark and unknown-switch parsing
+
+Fresh original/candidate guest pairs also match for these parser failures:
+
+| Invocation | Exact output | Return | Caller IoErr | Comparison |
+| --- | --- | ---: | ---: | --- |
+| `C:ChangeTaskPri ?` | `PRI=PRIORITY/A/N,PROCESS/K/N: required argument missing\nC:ChangeTaskPri failed returncode 20\n` (93 bytes) | 20 | 116 | [`comparison.json`](../../../../artifacts/workbench31-guest-command-changetaskpri-help-candidate-20260928-v1/comparison.json) |
+| `C:ChangeTaskPri 1 Z` | `wrong number of arguments\nC:ChangeTaskPri failed returncode 20\n` (63 bytes) | 20 | 118 | [`comparison.json`](../../../../artifacts/workbench31-guest-command-changetaskpri-unknown-switch-candidate-20260928-v1/comparison.json) |
+
+As with `Break`, `?` does not select an extended-help path in Workbench 3.1;
+the mandatory PRIORITY argument fails in DOS `ReadArgs`. The unknown extra
+argument is rejected by the same parser. Both comparisons cover raw output,
+return and caller post-System IoErr only; no task-effect claim is made.
+MorphOS extended-help guest parity, other parser forms, target races,
+PURE/resident lifecycle, rights and package admission remain open.
+
 ## Required gates
 
 - [ ] Capture both profile help/parser behavior and exact range/error output.

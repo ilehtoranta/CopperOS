@@ -12,34 +12,28 @@ namespace CopperOS.Shell.Dos;
 /// </summary>
 internal static class DosShellNativeChildCore
 {
-	private const uint ObjectHeaderSize = 28;
 	private const uint MaximumFromLength = 255;
 	private const uint MaximumArgumentLength = 65_535;
 	private const uint MaximumWaitPolls = 4096;
 
-	public static uint RunFromCurrentTask(APTR execBase)
+	public static uint RunFromCurrentTask()
 	{
-		if (execBase.IsNull) return unchecked((uint)ShellCommandResult.Error);
-		var dos = new CopperSharpNativeDosPlatform(execBase);
-		var task = dos.CurrentDosTask;
-		if (task.IsNull || !dos.IsMapped(task, global::Amiga.Process.Size))
+		// Exec creates the task with cleared saved registers, including A6.
+		// Recover ExecBase through its canonical pointer before binding DOS.
+		var dos = new CopperSharpNativeDosPlatform();
+		if (!DosShellNativeBootstrapCodec.TryReadExecBase(ref dos,
+			out var execBase))
 			return unchecked((uint)ShellCommandResult.Error);
-		var cli = APTR.FromPointer(DosProcessCore.Cli(ref dos));
-		if (cli.IsNull || !DosCommandLineInterfaceCodec.IsMapped(ref dos, cli) ||
-			cli.Raw < ObjectHeaderSize)
+		var task = dos.GetCurrentTask(execBase);
+		if (!DosProcessCodec.IsMapped(ref dos, task))
+			return unchecked((uint)ShellCommandResult.Error);
+		var cli = DosProcessCodec.ReadCommandLineInterface(ref dos, task).Address;
+		if (!DosShellNativeChildContextCore.TryGetCliState(ref dos, cli,
+			out var state))
 			return Complete(ref dos, task, unchecked((uint)
 				ShellCommandResult.Error));
-
-		var allocation = APTR.FromPointer(cli.Raw - ObjectHeaderSize);
-		if (!dos.IsMapped(allocation, ObjectHeaderSize) ||
-			dos.ReadUInt32(allocation) != 0x444F_424A ||
-			dos.ReadUInt32(allocation, 20) !=
-			(uint)DosObjectType.CommandLineInterface)
-			return Complete(ref dos, task, unchecked((uint)
-				ShellCommandResult.Error));
-		var state = APTR.FromPointer(dos.ReadUInt32(allocation, 4));
-		if (state.IsNull || dos.ReadUInt32(state) != DosCore.StateMagic ||
-			dos.ReadUInt32(state, 4) != DosCore.StateVersion)
+		dos = new CopperSharpNativeDosPlatform(state.Raw);
+		if (!DosShellNativeContextCore.WriteExecBase(ref dos, state, execBase))
 			return Complete(ref dos, task, unchecked((uint)
 				ShellCommandResult.Error));
 
@@ -58,6 +52,12 @@ internal static class DosShellNativeChildCore
 			if (argumentLength > MaximumArgumentLength)
 				return Complete(ref dos, task, unchecked((uint)
 					ShellCommandResult.Fail));
+			// This entry consumes pr_Arguments directly. Drain only its startup
+			// input prefix before running the text, so System continue-input
+			// resumes the inherited stream without executing the command twice.
+			if (!DosCore.ConsumeProcessArgumentInput(ref dos, state))
+				return Complete(ref dos, task, unchecked((uint)
+					ShellCommandResult.Error));
 			if (argumentLength == 0)
 			{
 				status = ShellScriptExecutionStatus.Completed;
@@ -158,7 +158,7 @@ internal static class DosShellNativeChildCore
 	private static uint Complete(ref CopperSharpNativeDosPlatform dos,
 		APTR task, uint result)
 	{
-		dos.WriteUInt32(task, DosLayout.Process.Result2, result);
+		DosProcessCodec.WriteResult2(ref dos, task, unchecked((int)result));
 		return result;
 	}
 }

@@ -134,8 +134,38 @@ internal static class MuiAreaCustomFontCore
 				block, out var record) ||
 			!MuiAreaCustomFontRuntimeStateAdmission.ValidateLive(ref platform, state,
 				obj, record)) return false;
-		if (record.Active != 0 && record.Font.IsNotNull &&
-			!platform.CloseMuiCustomFont(record.Font)) return false;
+		if (record.Active != 0 && record.Font.IsNotNull)
+		{
+			// The caller serializes this owned storage across the provider call.
+			// Admit the closed-state destinations before irreversible release.
+			if (!MuiAreaCustomFontRuntimeRecordMemoryCodec.TryGetAddress(ref platform,
+				block, MuiAreaCustomFontRuntimeField.Font, out var fontField) ||
+				!MuiAreaCustomFontRuntimeRecordMemoryCodec.TryGetAddress(ref platform,
+					block, MuiAreaCustomFontRuntimeField.Spec, out var specField) ||
+				!MuiAreaCustomFontRuntimeRecordMemoryCodec.TryGetAddress(ref platform,
+					block, MuiAreaCustomFontRuntimeField.Active, out var activeField)) return false;
+			if (!MuiHeadlessObjectCore.TryFindObject(ref platform, state, obj, out var owner) ||
+				owner.IsNull || !MuiHeadlessObjectCodec.TryRead(ref platform, owner, out var ownerValue) ||
+				(ownerValue.Flags & MuiHeadlessObjectCore.ObjectProviderBusy) != 0 ||
+				!MuiHeadlessObjectMemoryCodec.TryGetAddress(ref platform, owner,
+					MuiHeadlessObjectField.Flags, out var ownerFlags)) return false;
+			platform.WriteUInt32(ownerFlags, 0, ownerValue.Flags | MuiHeadlessObjectCore.ObjectProviderBusy);
+			// This transient marker is deliberately not admitted as a live runtime.
+			// Recursive close/open must refuse while the provider owns the call.
+			platform.WriteUInt32(activeField, 0, MuiAreaCustomFontRuntimeRecord.ClosingActive);
+			if (!platform.CloseMuiCustomFont(record.Font))
+			{
+				platform.WriteUInt32(activeField, 0, record.Active);
+				platform.WriteUInt32(ownerFlags, 0,
+					platform.ReadUInt32(ownerFlags, 0) & ~MuiHeadlessObjectCore.ObjectProviderBusy);
+				return false;
+			}
+			platform.WriteUInt32(fontField, 0, 0);
+			platform.WriteUInt32(specField, 0, 0);
+			platform.WriteUInt32(activeField, 0, 0);
+			platform.WriteUInt32(ownerFlags, 0,
+				platform.ReadUInt32(ownerFlags, 0) & ~MuiHeadlessObjectCore.ObjectProviderBusy);
+		}
 		return MuiStoreCore.DataspaceRemove(ref platform, state, obj,
 			RuntimeStateKey);
 	}

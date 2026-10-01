@@ -14,6 +14,7 @@ internal sealed record PathPartEntryCase(string? Directory, string? File,
 {
     public int Result { get; init; } = DOS.RETURN_OK;
     public int IoError { get; init; }
+    public bool ScratchAllocationFailure { get; init; }
 }
 
 internal sealed partial class ProbeFixture
@@ -22,6 +23,20 @@ internal sealed partial class ProbeFixture
 
     private List<object> RunPathPartEntryCases()
     {
+        var longDirectory = new string('d', 1100) + "/leaf";
+        var longFile = "VOL:" + new string('f', 1100);
+        var repeatedPart = new string('a', 20);
+        var manyAdditions = new string[71];
+        manyAdditions[0] = "VOL:";
+        var manyAdditionsOutput = "VOL:";
+        for (var index = 1; index < manyAdditions.Length; index++)
+        {
+            manyAdditions[index] = repeatedPart;
+            if (index > 1) manyAdditionsOutput += "/";
+            manyAdditionsOutput += repeatedPart;
+        }
+        manyAdditionsOutput += "\n";
+
         ProbeCase[] cases =
         [
             PathPart("directory", "VOL:one/two", null, [], "VOL:one\n"),
@@ -30,6 +45,11 @@ internal sealed partial class ProbeFixture
             PathPart("combined", "VOL:one/two", "VOL:one/two",
                 ["VOL:", "one", "two"], "VOL:one\ntwo\nVOL:one/two\n"),
             PathPart("no-mode", null, null, [], ""),
+            PathPart("long-directory", longDirectory, null, [],
+                new string('d', 1100) + "\n"),
+            PathPart("long-file", null, longFile, [], new string('f', 1100) + "\n"),
+            PathPart("many-add-parts", null, null, manyAdditions,
+                manyAdditionsOutput),
             new ProbeCase("readargs-failure", "", DOS.RETURN_ERROR, 118, "")
             {
                 PathPart = new(null, null, [], ""), ParserError = 118
@@ -38,6 +58,14 @@ internal sealed partial class ProbeFixture
                 (int)DOS.Error.NoFreeStore, "")
             {
                 PathPart = new(null, null, [], ""), AllocationFailure = true
+            },
+            new ProbeCase("scratch-allocation-failure", "", DOS.RETURN_FAIL,
+                (int)DOS.Error.NoFreeStore, "")
+            {
+                PathPart = new(null, "VOL:one/two", [], "")
+                {
+                    ScratchAllocationFailure = true
+                }
             },
         ];
         var reports = new List<object>();
@@ -60,6 +88,34 @@ internal sealed partial class ProbeFixture
         PathPart = new PathPartEntryCase(directory, file, additions, output)
     };
 
+    private static uint RequiredScratchBytes(PathPartEntryCase definition)
+    {
+        var requiredBytes = 1u;
+        if (definition.Directory is { } directory)
+        {
+            var separator = directory.LastIndexOf('/');
+            var colon = directory.LastIndexOf(':');
+            var length = separator >= 0 ? separator : colon >= 0 ? colon + 1 : 0;
+            var bytes = (uint)length + 1;
+            if (bytes > requiredBytes) requiredBytes = bytes;
+        }
+        if (definition.File is { } file)
+        {
+            var separator = Math.Max(file.LastIndexOf('/'), file.LastIndexOf(':'));
+            var length = file.Length - separator - 1;
+            var bytes = (uint)length + 1;
+            if (bytes > requiredBytes) requiredBytes = bytes;
+        }
+        if (definition.Additions.Length != 0)
+        {
+            var addBytes = 1u;
+            foreach (var addition in definition.Additions)
+                addBytes += (uint)Encoding.Latin1.GetByteCount(addition) + 1;
+            if (addBytes > requiredBytes) requiredBytes = addBytes;
+        }
+        return requiredBytes;
+    }
+
     private void VerifyPathPartEntry(Invocation invocation)
     {
         var definition = invocation.Definition.PathPart ??
@@ -79,8 +135,9 @@ internal sealed partial class ProbeFixture
             return;
         }
 
-        Require(invocation.Allocations == 2 && invocation.FreeMem == 2,
-            "PathPart must release result and scratch allocations exactly once.");
+        Require(invocation.Allocations == 2 && invocation.FreeMem ==
+            (definition.ScratchAllocationFailure ? 1 : 2),
+            "PathPart result/scratch allocations must be balanced after the requested failure.");
         Require(CountEvent(invocation, "PathPart") == (definition.Directory is null ? 0 : 1) &&
             CountEvent(invocation, "FilePart") == (definition.File is null ? 0 : 1) &&
             CountEvent(invocation, "AddPart") == definition.Additions.Length,
@@ -115,12 +172,23 @@ internal sealed partial class ProbeFixture
                 return 0;
             }
 
-            var rdArgs = Bus.Allocate(invocation, 512, "RDArgs", true);
-            var text = rdArgs + 128;
+            var vectorBytes = definition.Additions.Length == 0 ? 0u :
+                checked((uint)(definition.Additions.Length + 1) * sizeof(uint));
+            var textBytes = 0u;
+            if (definition.Directory is not null)
+                textBytes += (uint)Encoding.Latin1.GetByteCount(definition.Directory) + 1;
+            if (definition.File is not null)
+                textBytes += (uint)Encoding.Latin1.GetByteCount(definition.File) + 1;
+            foreach (var addition in definition.Additions)
+                textBytes += (uint)Encoding.Latin1.GetByteCount(addition) + 1;
+            var rdArgsBytes = checked(64u + vectorBytes + textBytes);
+            var rdArgs = Bus.Allocate(invocation, rdArgsBytes, "RDArgs", true);
+            var vector = rdArgs + 64;
+            var text = vector + vectorBytes;
             uint Put(string value)
             {
                 var bytes = Encoding.Latin1.GetBytes(value);
-                Require(text + (uint)bytes.Length + 1 <= rdArgs + 512,
+                Require(text + (uint)bytes.Length + 1 <= rdArgs + rdArgsBytes,
                     "PathPart fixture RDArgs string storage overflow.");
                 bytes.CopyTo(Bus.Memory.AsSpan((int)text));
                 Bus.Memory[text + (uint)bytes.Length] = 0;
@@ -133,9 +201,6 @@ internal sealed partial class ProbeFixture
             if (definition.File is not null) Bus.Long(results + 4, Put(definition.File));
             if (definition.Additions.Length != 0)
             {
-                var vector = rdArgs + 64;
-                Require(definition.Additions.Length < 12,
-                    "PathPart fixture vector bound exceeded.");
                 for (var index = 0; index < definition.Additions.Length; index++)
                     Bus.Long(vector + (uint)(index * 4), Put(definition.Additions[index]));
                 Bus.Long(vector + (uint)(definition.Additions.Length * 4), 0);
@@ -174,8 +239,8 @@ internal sealed partial class ProbeFixture
             var combined = part.Contains(':') ? part : current.Length == 0 ? part :
                 current.EndsWith(':') || current.EndsWith('/') ? current + part :
                 current + "/" + part;
-            Require(state.D[3] == 1024, "PathPart AddPart capacity ABI differs from its owned buffer.");
-            if (combined.Length + 1 > state.D[3])
+            Require(state.D[3] != 0, "PathPart AddPart received an empty buffer capacity.");
+            if ((uint)combined.Length + 1 > state.D[3])
             {
                 invocation.IoError = (int)DOS.Error.LineTooLong;
                 return 0;

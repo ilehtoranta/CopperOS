@@ -31,6 +31,21 @@ public sealed class MuiAreaCycleChainTests
 		Assert.True(MuiAreaCycleChainStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out var valueAddress));
 		Assert.Equal(address.Raw + 4, valueAddress.Raw);
+		Assert.True(MuiAreaCycleChainStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedValueAddress, out var typedValueSize));
+		Assert.Equal(valueAddress, typedValueAddress);
+		Assert.Equal(MuiAreaCycleChainStateRecord.FieldSize, typedValueSize);
+		Assert.True(MuiAreaCycleChainStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryValueAddress, out var memoryValueSize));
+		Assert.Equal(typedValueAddress, memoryValueAddress);
+		Assert.Equal(typedValueSize, memoryValueSize);
+		cursor.Field = (MuiAreaCycleChainStateField)255;
+		Assert.False(MuiAreaCycleChainStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
+		cursor.Record = APTR.Null;
+		cursor.Field = MuiAreaCycleChainStateField.Value;
+		Assert.False(MuiAreaCycleChainStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out _, out _));
 		Assert.False(MuiAreaCycleChainStateRecordCodec.TryRead(ref platform,
 			APTR.FromPointer(0x21000u), out _));
 	}

@@ -17,6 +17,8 @@ internal struct MuiFamilyDoChildMethodsMessage
 {
 	internal const uint Size = 4;
 	internal const uint FieldSize = 4;
+	// Compatibility metadata for the historical wire position; live address
+	// publication uses MuiGuestStructCursor below.
 	internal const uint MethodIdOffset = 0;
 	internal uint MethodId;
 }
@@ -89,6 +91,14 @@ internal static class MuiFamilyDoChildMethodsMessageStructCodec
 			return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR message, MuiFamilyDoChildMethodsMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiFamilyDoChildMethodsMessage.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) && MuiGuestStructCursor.IsComplete(cursor);
 }
 
 // Struct-first codec for the method-only Family_DoChildMethods header. The
@@ -137,12 +147,11 @@ internal static class MuiFamilyDoChildMethodsMessageMemoryCodec
 	{
 		address = APTR.Null;
 		if (field != MuiFamilyDoChildMethodsPacketField.MethodId ||
-			message.IsNull || !platform.IsMapped(message,
-				MuiFamilyDoChildMethodsMessage.Size)) return false;
-		address = APTR.FromPointer(message.Raw +
-			MuiFamilyDoChildMethodsMessage.MethodIdOffset);
-		return platform.IsMapped(address,
-			MuiFamilyDoChildMethodsMessage.FieldSize);
+			!MuiGuestStructCursor.TryCreate(ref platform, message,
+				MuiFamilyDoChildMethodsMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiFamilyDoChildMethodsMessage.FieldSize, out address)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -150,20 +159,18 @@ internal static class MuiFamilyDoChildMethodsMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, message, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		if (field != MuiFamilyDoChildMethodsPacketField.MethodId) return false;
+		return MuiFamilyDoChildMethodsMethodHeaderCodec.TryReadValue(ref platform,
+			message, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR message, MuiFamilyDoChildMethodsPacketField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, message, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (field != MuiFamilyDoChildMethodsPacketField.MethodId) return false;
+		return MuiFamilyDoChildMethodsMethodHeaderCodec.WriteValue(ref platform,
+			message, value);
 	}
 }
 

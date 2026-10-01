@@ -95,29 +95,46 @@ internal static class MuiApplicationSettingsPanelStateFieldCursorCodec
 	}
 }
 
-// Fixed BuildSettingsPanel result state is transferred as a named record.
-// Numeric guest positions are confined to the bounded ABI adapter; production
-// consumers exchange the declaration-order struct through the sequential
-// cursor below.
+// Fixed BuildSettingsPanel result state is transferred as a named record. The
+// bounded cursor walks the complete packed struct before selecting a field;
+// offset constants remain ABI documentation/compatibility aliases only.
 internal static class MuiApplicationSettingsPanelStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiApplicationSettingsPanelStateField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor,
+		MuiApplicationSettingsPanelStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (field == MuiApplicationSettingsPanelStateField.Magic)
-			offset = MuiApplicationSettingsPanelStateRecord.MagicOffset;
-		else if (field == MuiApplicationSettingsPanelStateField.Number)
-			offset = MuiApplicationSettingsPanelStateRecord.NumberOffset;
-		else if (field == MuiApplicationSettingsPanelStateField.Panel)
-			offset = MuiApplicationSettingsPanelStateRecord.PanelOffset;
-		else if (field == MuiApplicationSettingsPanelStateField.Requests)
-			offset = MuiApplicationSettingsPanelStateRecord.RequestsOffset;
-		else
+		address = APTR.Null;
+		switch (field)
 		{
-			offset = 0;
-			return false;
+			case MuiApplicationSettingsPanelStateField.Magic:
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsPanelStateRecord.FieldSize, out address);
+			case MuiApplicationSettingsPanelStateField.Number:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsPanelStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsPanelStateRecord.FieldSize, out address);
+			case MuiApplicationSettingsPanelStateField.Panel:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsPanelStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSettingsPanelStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsPanelStateRecord.FieldSize, out address);
+			case MuiApplicationSettingsPanelStateField.Requests:
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsPanelStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSettingsPanelStateRecord.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationSettingsPanelStateRecord.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationSettingsPanelStateRecord.FieldSize, out address);
+			default:
+				return false;
 		}
-		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -125,14 +142,11 @@ internal static class MuiApplicationSettingsPanelStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset)
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiApplicationSettingsPanelStateRecord.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address))
 			return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(record,
-			MuiApplicationSettingsPanelStateRecord.Size) &&
-			platform.IsMapped(address,
-				MuiApplicationSettingsPanelStateRecord.FieldSize);
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

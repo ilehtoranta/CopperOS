@@ -12,8 +12,8 @@ namespace CopperOS.MuiMaster;
 // intent bits. Actual rendering remains behind ScheduleRedraw.
 public static class MuiRedrawServiceCore
 {
-	public const uint DrawObject = 0x00000001;
-	public const uint DrawUpdate = 0x00000002;
+	public const uint DrawObject = MuiNativeRedrawMessage.DrawObjectFlag;
+	public const uint DrawUpdate = MuiNativeRedrawMessage.DrawUpdateFlag;
 	private const uint AllowedFlags = DrawObject | DrawUpdate;
 
 	public static bool Redraw<TPlatform>(ref TPlatform platform, APTR state,

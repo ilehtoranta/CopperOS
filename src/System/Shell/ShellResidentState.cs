@@ -36,6 +36,39 @@ public struct ShellResidentEntryState
 }
 
 /// <summary>
+/// Typed request to admit a command into the resident registry. The verified
+/// Pure bit is an admission fact supplied by the trusted registry owner, not
+/// inferred from the filename or from force-loading the command.
+/// </summary>
+public struct ShellResidentAdmission
+{
+    public uint VerifiedPure;
+    public uint Force;
+    public uint System;
+    public uint Deferred;
+    public BPTR Segment;
+    public APTR SegmentOwner;
+}
+
+/// <summary>Typed command-side request for DOS-owned Resident management.</summary>
+public struct ShellResidentManagementRequest
+{
+    public BPTR Output;
+    public APTR Name;
+    public uint NameLength;
+    public APTR File;
+    public uint FileLength;
+    public APTR Alias;
+    public uint AliasLength;
+    public uint Remove;
+    public uint Add;
+    public uint Replace;
+    public uint Force;
+    public uint System;
+    public uint Defer;
+}
+
+/// <summary>
 /// Codec for one guest-resident Resident record. It intentionally does not
 /// own a list head, segment allocation, or command strings.
 /// </summary>
@@ -237,32 +270,30 @@ public static class ShellResidentPolicy
 
     public static bool TryAdmit(
         ref ShellResidentEntryState state,
-        uint verifiedPure,
-        uint force,
-        uint system,
-        uint deferred,
-        BPTR segment,
-        APTR segmentOwner)
+        in ShellResidentAdmission admission)
     {
-        if (verifiedPure > 1 || force > 1 || system > 1 || deferred > 1 ||
-            (verifiedPure != 0 && force != 0) || segment.IsNull !=
-            (deferred != 0) || (deferred == 0 && segmentOwner.IsNull))
+        if (admission.VerifiedPure > 1 || admission.Force > 1 ||
+            admission.System > 1 || admission.Deferred > 1 ||
+            (admission.VerifiedPure != 0 && admission.Force != 0) ||
+            (admission.VerifiedPure == 0 && admission.Force == 0) ||
+            admission.Segment.IsNull != (admission.Deferred != 0) ||
+            (admission.Deferred == 0 && admission.SegmentOwner.IsNull))
             return false;
 
         var flags = ShellResidentEntryFlags.None;
-        if (verifiedPure != 0)
+        if (admission.VerifiedPure != 0)
             flags |= ShellResidentEntryFlags.VerifiedPure;
-        else if (force != 0)
+        else if (admission.Force != 0)
             flags |= ShellResidentEntryFlags.Unsafe;
-        if (system != 0)
+        if (admission.System != 0)
             flags |= ShellResidentEntryFlags.System;
-        if (deferred != 0)
+        if (admission.Deferred != 0)
             flags |= ShellResidentEntryFlags.Deferred;
         else
             flags |= ShellResidentEntryFlags.Loaded;
 
-        state.Segment = segment;
-        state.SegmentOwner = segmentOwner;
+        state.Segment = admission.Segment;
+        state.SegmentOwner = admission.SegmentOwner;
         state.Flags = flags;
         state.UseCount = 0;
         return IsValid(in state);

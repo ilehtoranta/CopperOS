@@ -87,6 +87,49 @@ public sealed class ShellScriptFrameTests
             ref platform, APTR.Null, in initial));
     }
 
+	[Theory]
+	[InlineData(ShellScriptDeferredCommandKind.ConditionalAnd)]
+	[InlineData(ShellScriptDeferredCommandKind.OutputConcatenation)]
+	public void Deferred_command_frame_state_round_trips_as_a_named_record(
+		ShellScriptDeferredCommandKind kind)
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		APTR frame = new(3000);
+		ShellScriptFrameState initial = new()
+		{
+			Cli = new APTR(120),
+			Flags = ShellScriptFrameFlags.Active,
+		};
+		Assert.True(ShellScriptFrameCodec.Initialize(
+			ref platform, frame, in initial));
+		var deferred = new ShellScriptDeferredCommandState
+		{
+			Kind = kind,
+			Text = new ShellScriptTextSlice(
+				platform.Store.PutAt(6000, "Echo next"), 9),
+			NextLine = 2,
+			NextOffset = 32,
+		};
+
+		Assert.True(ShellScriptFrameCodec.TrySetDeferredCommand(ref platform,
+			frame, in deferred));
+		Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+			out var state));
+		Assert.Equal(kind, state.DeferredCommand.Kind);
+		Assert.Equal("Echo next", platform.Store.ReadText(
+			state.DeferredCommand.Text.Data,
+			state.DeferredCommand.Text.Length));
+		Assert.Equal(2u, state.DeferredCommand.NextLine);
+		Assert.Equal(32u, state.DeferredCommand.NextOffset);
+
+		Assert.True(ShellScriptFrameCodec.TrySetDeferredCommand(ref platform,
+			frame, default));
+		Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+			out state));
+		Assert.Equal(ShellScriptDeferredCommandKind.None,
+			state.DeferredCommand.Kind);
+	}
+
     [Fact]
     public void Temporary_path_is_unique_to_the_live_script_frame()
     {
@@ -186,7 +229,7 @@ public sealed class ShellScriptFrameTests
             ref platform, frame, in initial));
 
         APTR ifRecord = new(3400);
-        APTR skipRecord = new(3150);
+        APTR skipRecord = new(3200);
         Assert.True(ShellScriptControlTransitions.TryOpen(
             ref platform, frame, ifRecord, ShellScriptBlockKind.If,
             3, 20, 1));

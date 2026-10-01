@@ -146,6 +146,19 @@ public sealed class MuiAreaRenderPolicyAdmissionTests
 
 		Assert.True(MuiAreaRenderPolicyStateRecordCodec.WriteRecord(ref platform,
 			address, value));
+		var cursor = new MuiAreaRenderPolicyStateFieldCursor
+		{
+			Record = address,
+			Field = MuiAreaRenderPolicyStateField.FrameTitle,
+		};
+		Assert.True(MuiAreaRenderPolicyStateFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out var typedTitleAddress, out var typedTitleSize));
+		Assert.Equal(APTR.FromPointer(0x3F1C), typedTitleAddress);
+		Assert.Equal(MuiAreaRenderPolicyStateRecord.FieldSize, typedTitleSize);
+		Assert.True(MuiAreaRenderPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor, out var memoryTitleAddress, out var memoryTitleSize));
+		Assert.Equal(typedTitleAddress, memoryTitleAddress);
+		Assert.Equal(typedTitleSize, memoryTitleSize);
 		Assert.True(MuiAreaRenderPolicyStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiAreaRenderPolicyStateField.FrameTitle,
 			0xFEEDBEEFu));

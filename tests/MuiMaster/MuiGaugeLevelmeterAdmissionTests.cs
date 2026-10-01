@@ -69,6 +69,22 @@ public sealed class MuiGaugeLevelmeterAdmissionTests
 			out var typedHorizontal));
 		Assert.Equal(address.Raw + MuiLevelmeterPresentationStateRecord.HorizontalOffset,
 			typedHorizontal.Raw);
+		var horizontalCursor = new MuiLevelmeterPresentationStateFieldCursor
+		{
+			Record = address,
+			Field = MuiLevelmeterPresentationStateField.Horizontal,
+		};
+		Assert.True(MuiLevelmeterPresentationStateFieldCursorCodec.TryGetAddress(
+			ref platform, horizontalCursor, out var cursorHorizontal,
+			out var cursorFieldSize));
+		Assert.Equal(typedHorizontal, cursorHorizontal);
+		Assert.Equal(MuiLevelmeterPresentationStateRecord.FieldSize,
+			cursorFieldSize);
+		Assert.True(MuiLevelmeterPresentationStateRecordMemoryCodec.TryGetAddress(
+			ref platform, horizontalCursor, out var memoryHorizontal,
+			out var memoryFieldSize));
+		Assert.Equal(cursorHorizontal, memoryHorizontal);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiLevelmeterPresentationStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiLevelmeterPresentationStateField.Horizontal, 1));
 		Assert.True(MuiLevelmeterPresentationStateRecordMemoryCodec.TryReadUInt32(
@@ -84,6 +100,13 @@ public sealed class MuiGaugeLevelmeterAdmissionTests
 			ref platform, address, MuiLevelmeterPresentationStateRecord.Size, out _));
 		Assert.False(MuiLevelmeterPresentationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, (uint)0, out _));
+		horizontalCursor.Field = (MuiLevelmeterPresentationStateField)255;
+		Assert.False(MuiLevelmeterPresentationStateFieldCursorCodec.TryGetAddress(
+			ref platform, horizontalCursor, out _, out _));
+		horizontalCursor.Record = APTR.Null;
+		horizontalCursor.Field = MuiLevelmeterPresentationStateField.Horizontal;
+		Assert.False(MuiLevelmeterPresentationStateFieldCursorCodec.TryGetAddress(
+			ref platform, horizontalCursor, out _, out _));
 		Assert.False(MuiLevelmeterPresentationStateRecordCodec.TryReadRecord(
 			ref platform, APTR.Null, out _));
 	}

@@ -85,42 +85,101 @@ internal static class MuiApplicationWindowListStateFieldCursorCodec
 }
 
 // Struct-first guest-memory adapter for the fixed application window-list
-// state record. The semantic APTR members remain typed; only this bounded
-// adapter translates the eight guest LONG slots.
+// state record. The bounded cursor walks the complete packed struct before
+// selecting a field; offset constants remain ABI documentation only.
 internal static class MuiApplicationWindowListStateRecordMemoryCodec
 {
-	private static bool TryResolve(MuiApplicationWindowListStateField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiApplicationWindowListStateField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
+		address = APTR.Null;
 		switch (field)
 		{
 			case MuiApplicationWindowListStateField.Cookie:
-				offset = MuiApplicationWindowListState.CookieOffset;
-				return true;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListState.FieldSize, out address);
 			case MuiApplicationWindowListStateField.Application:
-				offset = MuiApplicationWindowListState.ApplicationOffset;
-				return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListState.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListState.FieldSize, out address);
 			case MuiApplicationWindowListStateField.List:
-				offset = MuiApplicationWindowListState.ListOffset;
-				return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListState.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListState.FieldSize, out address);
 			case MuiApplicationWindowListStateField.Entries:
-				offset = MuiApplicationWindowListState.EntriesOffset;
-				return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListState.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListState.FieldSize, out address);
 			case MuiApplicationWindowListStateField.Count:
-				offset = MuiApplicationWindowListState.CountOffset;
-				return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListState.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListState.FieldSize, out address);
 			case MuiApplicationWindowListStateField.Capacity:
-				offset = MuiApplicationWindowListState.CapacityOffset;
-				return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListState.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListState.FieldSize, out address);
 			case MuiApplicationWindowListStateField.Mutation:
-				offset = MuiApplicationWindowListState.MutationOffset;
-				return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListState.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListState.FieldSize, out address);
 			case MuiApplicationWindowListStateField.Generation:
-				offset = MuiApplicationWindowListState.GenerationOffset;
-				return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListState.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListState.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListState.FieldSize, out address);
+			default:
+				return false;
 		}
-		offset = 0;
-		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -128,11 +187,10 @@ internal static class MuiApplicationWindowListStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiApplicationWindowListState.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiApplicationWindowListState.FieldSize);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiApplicationWindowListState.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address)) return false;
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -344,26 +402,41 @@ internal static class MuiApplicationWindowListEntryFieldCursorCodec
 // the complete fixed entry before exposing a named member address.
 internal static class MuiApplicationWindowListEntryRecordMemoryCodec
 {
-	private static bool TryResolve(MuiApplicationWindowListEntryField field,
-		out uint offset)
+	private static bool TryTakeField<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiApplicationWindowListEntryField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
+		address = APTR.Null;
 		switch (field)
 		{
 			case MuiApplicationWindowListEntryField.Next:
-				offset = MuiApplicationWindowListEntry.NextOffset;
-				return true;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListEntry.FieldSize, out address);
 			case MuiApplicationWindowListEntryField.Previous:
-				offset = MuiApplicationWindowListEntry.PreviousOffset;
-				return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListEntry.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListEntry.FieldSize, out address);
 			case MuiApplicationWindowListEntryField.Object:
-				offset = MuiApplicationWindowListEntry.ObjectOffset;
-				return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListEntry.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListEntry.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListEntry.FieldSize, out address);
 			case MuiApplicationWindowListEntryField.Reserved:
-				offset = MuiApplicationWindowListEntry.ReservedOffset;
-				return true;
+				if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListEntry.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListEntry.FieldSize, out _) ||
+					!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+						MuiApplicationWindowListEntry.FieldSize, out _)) return false;
+				return MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+					MuiApplicationWindowListEntry.FieldSize, out address);
+			default:
+				return false;
 		}
-		offset = 0;
-		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -371,11 +444,10 @@ internal static class MuiApplicationWindowListEntryRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(field, out var offset) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(record, MuiApplicationWindowListEntry.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, MuiApplicationWindowListEntry.FieldSize);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, record,
+			MuiApplicationWindowListEntry.Size, out var cursor) ||
+			!TryTakeField(ref platform, ref cursor, field, out address)) return false;
+		return true;
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

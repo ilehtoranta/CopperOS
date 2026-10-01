@@ -1,5 +1,6 @@
 using Amiga;
 using System;
+using System.Runtime.InteropServices;
 
 namespace CopperOS.Shell;
 
@@ -15,6 +16,7 @@ public enum ShellScriptFrameFlags : uint
     QuitRequested = 16,
     EndRequested = 32,
     FailureLimitSet = 64,
+    Interactive = 128,
 }
 
 /// <summary>Pending control request recorded in a script frame.</summary>
@@ -27,6 +29,52 @@ public enum ShellScriptFrameControl : uint
     EndCli = 4,
     EndShell = 5,
     Quit = 6,
+}
+
+/// <summary>Persisted phase of one interactive prompt expansion.</summary>
+public enum ShellScriptPromptExpansionPhase : uint
+{
+	None = 0,
+	Expanding = 1,
+	WaitingCommand = 2,
+	ReadingCapture = 3,
+}
+
+/// <summary>
+/// Fixed-layout resumable prompt state. The cursor and capture handle are
+/// named values so callers do not depend on the DOS frame's byte offsets.
+/// </summary>
+[StructLayout(LayoutKind.Sequential, Pack = 2, Size = 20)]
+public struct ShellScriptPromptExpansionState
+{
+	public ShellScriptPromptExpansionPhase Phase;
+	public ShellScriptPromptCursor Cursor;
+	public uint TemplateLength;
+	public BPTR CaptureInput;
+	public uint CapturePathLength;
+}
+
+/// <summary>Kind of deferred command text owned by a script frame.</summary>
+public enum ShellScriptDeferredCommandKind : uint
+{
+	None = 0,
+	ConditionalAnd = 1,
+	OutputConcatenation = 2,
+}
+
+/// <summary>
+/// Fixed-width continuation for the right-hand side of a Shell <c>&amp;&amp;</c>
+/// or <c>||</c> command. The text remains in runner-owned workspace memory
+/// until it is consumed; its physical input cursor is committed only when the
+/// chain ends.
+/// </summary>
+[StructLayout(LayoutKind.Sequential, Pack = 2, Size = 20)]
+public struct ShellScriptDeferredCommandState
+{
+	public ShellScriptDeferredCommandKind Kind;
+	public ShellScriptTextSlice Text;
+	public uint NextLine;
+	public uint NextOffset;
 }
 
 /// <summary>
@@ -66,6 +114,10 @@ public struct ShellScriptFrameState
 	/// <summary>Runner-owned storage for a decoded .KEY template.</summary>
 	public APTR ScriptKeyTemplate;
 	public uint ScriptKeyTemplateLength;
+	/// <summary>Resumable state for MorphOS prompt command substitutions.</summary>
+	public ShellScriptPromptExpansionState PromptExpansion;
+	/// <summary>Unconsumed right-hand command in a compound script line.</summary>
+	public ShellScriptDeferredCommandState DeferredCommand;
 }
 
 /// <summary>
@@ -74,8 +126,9 @@ public struct ShellScriptFrameState
 public static class ShellScriptFrameCodec
 {
     public const uint Magic = 0x5343_4652;
-	public const uint Version = 3;
-	public const uint Size = 112;
+	public const uint Version = 5;
+	public const uint Size = 152;
+	public const uint DefaultFailureLimit = 10;
 
     public static bool Initialize<TPlatform>(
         ref TPlatform platform,
@@ -130,7 +183,22 @@ public static class ShellScriptFrameCodec
 		state.ScriptArgumentLength = platform.ReadUInt32(frame, 100);
 		state.ScriptKeyTemplate = APTR.FromPointer(platform.ReadUInt32(frame, 104));
 		state.ScriptKeyTemplateLength = platform.ReadUInt32(frame, 108);
-        return true;
+		state.PromptExpansion.Phase = (ShellScriptPromptExpansionPhase)
+			platform.ReadUInt32(frame, 112);
+		state.PromptExpansion.Cursor.Position = platform.ReadUInt32(frame, 116);
+		state.PromptExpansion.TemplateLength = platform.ReadUInt32(frame, 120);
+		state.PromptExpansion.CaptureInput = BPTR.FromRaw(
+			platform.ReadUInt32(frame, 124));
+		state.PromptExpansion.CapturePathLength = platform.ReadUInt32(frame, 128);
+		state.DeferredCommand.Kind = (ShellScriptDeferredCommandKind)
+			platform.ReadUInt32(frame, 132);
+		state.DeferredCommand.Text.Data = APTR.FromPointer(
+			platform.ReadUInt32(frame, 136));
+		state.DeferredCommand.Text.Length = platform.ReadUInt32(frame, 140);
+		state.DeferredCommand.NextLine = platform.ReadUInt32(frame, 144);
+		state.DeferredCommand.NextOffset = platform.ReadUInt32(frame, 148);
+		return ValidPromptExpansion(in state.PromptExpansion) &&
+			ValidDeferredCommand(ref platform, in state.DeferredCommand);
     }
 
     /// <summary>Reads only the control-chain head for freestanding callers.</summary>
@@ -320,6 +388,20 @@ public static class ShellScriptFrameCodec
         return WriteState(ref platform, frame, in state);
     }
 
+	/// <summary>Publishes a typed interactive-prompt continuation snapshot.</summary>
+	public static bool TrySetPromptExpansion<TPlatform>(
+		ref TPlatform platform,
+		APTR frame,
+		in ShellScriptPromptExpansionState expansion)
+		where TPlatform : struct, IShellPlatform
+	{
+		if (!ValidPromptExpansion(in expansion) ||
+			!TryRead(ref platform, frame, out var state))
+			return false;
+		state.PromptExpansion = expansion;
+		return WriteState(ref platform, frame, in state);
+	}
+
     public static bool TrySetLabelTop<TPlatform>(
         ref TPlatform platform,
         APTR frame,
@@ -362,6 +444,20 @@ public static class ShellScriptFrameCodec
         state.PendingNextOffset = continuation.IsNull ? 0 : nextOffset;
         return WriteState(ref platform, frame, in state);
     }
+
+	/// <summary>Stores or clears one deferred compound command.</summary>
+	public static bool TrySetDeferredCommand<TPlatform>(
+		ref TPlatform platform,
+		APTR frame,
+		in ShellScriptDeferredCommandState deferred)
+		where TPlatform : struct, IShellPlatform
+	{
+		if (!ValidDeferredCommand(ref platform, in deferred) ||
+			!TryRead(ref platform, frame, out var state))
+			return false;
+		state.DeferredCommand = deferred;
+		return WriteState(ref platform, frame, in state);
+	}
 
     public static bool TryApplySignal<TPlatform>(
         ref TPlatform platform,
@@ -486,14 +582,75 @@ public static class ShellScriptFrameCodec
 		platform.WriteUInt32(frame, 100, state.ScriptArgumentLength);
 		platform.WriteUInt32(frame, 104, state.ScriptKeyTemplate.Raw);
 		platform.WriteUInt32(frame, 108, state.ScriptKeyTemplateLength);
+		platform.WriteUInt32(frame, 112, (uint)state.PromptExpansion.Phase);
+		platform.WriteUInt32(frame, 116,
+			state.PromptExpansion.Cursor.Position);
+		platform.WriteUInt32(frame, 120,
+			state.PromptExpansion.TemplateLength);
+		platform.WriteUInt32(frame, 124,
+			state.PromptExpansion.CaptureInput.Raw);
+		platform.WriteUInt32(frame, 128,
+			state.PromptExpansion.CapturePathLength);
+		platform.WriteUInt32(frame, 132,
+			(uint)state.DeferredCommand.Kind);
+		platform.WriteUInt32(frame, 136,
+			state.DeferredCommand.Text.Data.Raw);
+		platform.WriteUInt32(frame, 140,
+			state.DeferredCommand.Text.Length);
+		platform.WriteUInt32(frame, 144,
+			state.DeferredCommand.NextLine);
+		platform.WriteUInt32(frame, 148,
+			state.DeferredCommand.NextOffset);
         return true;
     }
+
+	private static bool ValidDeferredCommand<TPlatform>(
+		ref TPlatform platform,
+		in ShellScriptDeferredCommandState deferred)
+		where TPlatform : struct, IShellPlatform
+	{
+		if (deferred.Kind == ShellScriptDeferredCommandKind.None)
+			return deferred.Text.Data.IsNull && deferred.Text.Length == 0 &&
+				deferred.NextLine == 0 && deferred.NextOffset == 0;
+		if ((deferred.Kind != ShellScriptDeferredCommandKind.ConditionalAnd &&
+			deferred.Kind !=
+				ShellScriptDeferredCommandKind.OutputConcatenation) ||
+			deferred.Text.Data.IsNull || deferred.Text.Length == 0 ||
+			deferred.Text.Length > ShellTextParser.MaximumSourceLength ||
+			deferred.Text.Data.Raw > uint.MaxValue - deferred.Text.Length ||
+			deferred.NextLine == 0)
+			return false;
+		return platform.IsMapped(deferred.Text.Data, deferred.Text.Length);
+	}
 
     private static bool ValidSignal(ShellScriptSignalFlags signal) =>
         ((uint)signal & ~(uint)(ShellScriptSignalFlags.Break |
             ShellScriptSignalFlags.CtrlC |
             ShellScriptSignalFlags.CtrlD |
             ShellScriptSignalFlags.Terminated)) == 0 && signal != 0;
+
+	private static bool ValidPromptExpansion(
+		in ShellScriptPromptExpansionState expansion)
+	{
+		if ((uint)expansion.Phase >
+			(uint)ShellScriptPromptExpansionPhase.ReadingCapture ||
+			expansion.TemplateLength >
+				ShellScriptPromptParser.MaximumTemplateLength ||
+			expansion.Cursor.Position > expansion.TemplateLength)
+			return false;
+		if (expansion.Phase == ShellScriptPromptExpansionPhase.None)
+			return expansion.Cursor.Position == 0 &&
+				expansion.TemplateLength == 0 &&
+				expansion.CaptureInput.IsNull &&
+				expansion.CapturePathLength == 0;
+		if (expansion.Phase == ShellScriptPromptExpansionPhase.Expanding)
+			return expansion.CaptureInput.IsNull &&
+				expansion.CapturePathLength == 0;
+		if (expansion.Phase == ShellScriptPromptExpansionPhase.WaitingCommand)
+			return expansion.CaptureInput.IsNull &&
+				expansion.CapturePathLength != 0;
+		return expansion.CapturePathLength != 0;
+	}
 
     private static void WriteUInt32<TPlatform>(
         ref TPlatform platform,

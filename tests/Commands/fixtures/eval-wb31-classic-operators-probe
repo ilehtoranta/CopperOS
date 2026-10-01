@@ -1,0 +1,16 @@
+; Disposable WB 3.1 Eval remaining-operator probe. Output is retained in S:Shell-Startup.
+FailAt 21
+Echo "BEGIN" >RAM:eval-capture
+C:Eval 20/5 >>RAM:eval-capture
+C:Eval 20%6 >>RAM:eval-capture
+C:Eval 20 mod 6 >>RAM:eval-capture
+C:Eval 1|2&4 >>RAM:eval-capture
+C:Eval 6 xor 3 >>RAM:eval-capture
+C:Eval 6 eqv 3 >>RAM:eval-capture
+C:Eval 1 lsh 4 >>RAM:eval-capture
+C:Eval 16 rsh 2 >>RAM:eval-capture
+C:Eval ~1 >>RAM:eval-capture
+C:Eval 2^3 >>RAM:eval-capture
+Echo "END" >>RAM:eval-capture
+Copy RAM:eval-capture S:Shell-Startup >NIL:
+EndCLI >NIL:

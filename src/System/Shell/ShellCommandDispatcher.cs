@@ -18,8 +18,8 @@ public static class ShellCommandDispatcher
         in ShellCommandWorkspace workspace)
         where TPlatform : struct, IShellPlatform
     {
-        var command = ShellInternalCommandResolver.Resolve(
-            ref platform, commandName, commandNameLength);
+        var command = ShellInternalCommandResolver.ResolveAvailable(
+            ref platform, invocation.Cli, commandName, commandNameLength);
         return command == ShellInternalCommand.Unknown
             ? (int)ShellCommandResult.Error
             : Dispatch(ref platform, in invocation, command, in workspace);

@@ -25,6 +25,19 @@ public sealed class MuiNumericStructAdapterTests
 		Assert.True(MuiNumericStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, MuiNumericStateField.Value, out var valueAddress));
 		Assert.Equal(0x350Cu, valueAddress.Raw);
+		var valueCursor = new MuiNumericStateFieldCursor
+		{
+			Record = address,
+			Field = MuiNumericStateField.Value,
+		};
+		Assert.True(MuiNumericStateFieldCursorCodec.TryGetAddress(ref platform,
+			valueCursor, out var cursorValue, out var cursorFieldSize));
+		Assert.Equal(valueAddress, cursorValue);
+		Assert.Equal(MuiNumericStateRecord.FieldSize, cursorFieldSize);
+		Assert.True(MuiNumericStateRecordMemoryCodec.TryGetAddress(ref platform,
+			valueCursor, out var memoryValue, out var memoryFieldSize));
+		Assert.Equal(cursorValue, memoryValue);
+		Assert.Equal(cursorFieldSize, memoryFieldSize);
 		Assert.True(MuiNumericStateRecordMemoryCodec.TryReadUInt32(ref platform,
 			address, MuiNumericStateField.Minimum, out var minimum));
 		Assert.Equal(unchecked((uint)-10), minimum);
@@ -37,6 +50,13 @@ public sealed class MuiNumericStructAdapterTests
 			address, (MuiNumericStateField)255, out _));
 		Assert.False(MuiNumericStateRecordMemoryCodec.TryGetAddress(ref platform,
 			APTR.Null, MuiNumericStateField.Magic, out _));
+		valueCursor.Field = (MuiNumericStateField)255;
+		Assert.False(MuiNumericStateFieldCursorCodec.TryGetAddress(ref platform,
+			valueCursor, out _, out _));
+		valueCursor.Record = APTR.Null;
+		valueCursor.Field = MuiNumericStateField.Value;
+		Assert.False(MuiNumericStateFieldCursorCodec.TryGetAddress(ref platform,
+			valueCursor, out _, out _));
 		Assert.False(MuiNumericStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

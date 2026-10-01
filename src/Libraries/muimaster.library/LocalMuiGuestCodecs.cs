@@ -5,6 +5,7 @@
 
 using System.Runtime.InteropServices;
 using Amiga;
+using Amiga.MUI;
 using CopperOS.MuiMaster;
 
 namespace CopperOS.MuiMaster
@@ -74,13 +75,12 @@ internal static class MuiCStringByteCursorCodec
 
 }
 
-namespace Amiga
+namespace CopperOS.MuiMaster
 {
 
 /// <summary>
-/// Narrow, bounded C-string operations used by the MUI host model. The
-/// published SDK package currently omits this guest-memory helper, so the MUI
-/// project keeps the value-type implementation at its own ABI boundary.
+/// Bounded MUI C-string operations. Kept in the MUI implementation namespace
+/// so the SDK remains the sole owner of its public guest-memory helpers.
 /// </summary>
 public static class CStringCodec
 {
@@ -198,24 +198,17 @@ public struct MUI_LayoutMsg
 	public const uint Size = 36;
 	internal const uint FieldSize32 = 4;
 	internal const uint FieldSize16 = 2;
-	internal const uint TypeOffset = 0;
-	internal const uint ChildrenOffset = 4;
-	internal const uint MinWidthOffset = 8;
-	internal const uint MinHeightOffset = 10;
-	internal const uint MaxWidthOffset = 12;
-	internal const uint MaxHeightOffset = 14;
-	internal const uint DefWidthOffset = 16;
-	internal const uint DefHeightOffset = 18;
-	internal const uint WidthOffset = 20;
-	internal const uint HeightOffset = 24;
-	internal const uint Private5Offset = 28;
-	internal const uint Private6Offset = 32;
 	public uint lm_Type;
 	public APTR lm_Children;
 	public MUI_MinMax lm_MinMax;
 	public MUI_LayoutDimensions lm_Layout;
 }
 #endif
+
+}
+
+namespace CopperOS.MuiMaster
+{
 
 internal enum MUI_LayoutMsgField : byte
 {
@@ -233,25 +226,21 @@ internal enum MUI_LayoutMsgField : byte
 	Private6,
 }
 
-// The layout packet's mixed-width wire positions are confined to this
-// adapter-owned table. The public packet itself is always exchanged as the
+// The layout packet's mixed-width wire shape is confined to this adapter-owned
+// declaration contract. The public packet itself is always exchanged as the
 // named MUI_LayoutMsg struct (from the fallback above or the local SDK).
 internal static class MUI_LayoutMsgLayout
 {
 	internal const uint FieldSize32 = 4;
 	internal const uint FieldSize16 = 2;
-	internal const uint TypeOffset = 0;
-	internal const uint ChildrenOffset = 4;
-	internal const uint MinWidthOffset = 8;
-	internal const uint MinHeightOffset = 10;
-	internal const uint MaxWidthOffset = 12;
-	internal const uint MaxHeightOffset = 14;
-	internal const uint DefWidthOffset = 16;
-	internal const uint DefHeightOffset = 18;
-	internal const uint WidthOffset = 20;
-	internal const uint HeightOffset = 24;
-	internal const uint Private5Offset = 28;
-	internal const uint Private6Offset = 32;
+	internal const uint FieldCount = 12;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MUI_LayoutMsgFieldCursor
+{
+	internal APTR Record;
+	internal MUI_LayoutMsgField Field;
 }
 
 // Struct-first adapter for the MorphOS layout hook packet. The hook bridge
@@ -259,64 +248,112 @@ internal static class MUI_LayoutMsgLayout
 // its nested mixed-width guest representation.
 internal static class MUI_LayoutMsgMemoryCodec
 {
-	private static bool TryResolve(MUI_LayoutMsgField field,
-		out uint offset, out uint fieldSize)
+	private static bool TryResolveFieldIndex(MUI_LayoutMsgField field,
+		out uint index, out uint fieldSize)
 	{
-		switch (field)
+		if (field == MUI_LayoutMsgField.Type)
 		{
-			case MUI_LayoutMsgField.Type:
-				offset = MUI_LayoutMsgLayout.TypeOffset;
-				fieldSize = MUI_LayoutMsgLayout.FieldSize32; return true;
-			case MUI_LayoutMsgField.Children:
-				offset = MUI_LayoutMsgLayout.ChildrenOffset;
-				fieldSize = MUI_LayoutMsgLayout.FieldSize32; return true;
-			case MUI_LayoutMsgField.MinWidth:
-				offset = MUI_LayoutMsgLayout.MinWidthOffset;
-				fieldSize = MUI_LayoutMsgLayout.FieldSize16; return true;
-			case MUI_LayoutMsgField.MinHeight:
-				offset = MUI_LayoutMsgLayout.MinHeightOffset;
-				fieldSize = MUI_LayoutMsgLayout.FieldSize16; return true;
-			case MUI_LayoutMsgField.MaxWidth:
-				offset = MUI_LayoutMsgLayout.MaxWidthOffset;
-				fieldSize = MUI_LayoutMsgLayout.FieldSize16; return true;
-			case MUI_LayoutMsgField.MaxHeight:
-				offset = MUI_LayoutMsgLayout.MaxHeightOffset;
-				fieldSize = MUI_LayoutMsgLayout.FieldSize16; return true;
-			case MUI_LayoutMsgField.DefWidth:
-				offset = MUI_LayoutMsgLayout.DefWidthOffset;
-				fieldSize = MUI_LayoutMsgLayout.FieldSize16; return true;
-			case MUI_LayoutMsgField.DefHeight:
-				offset = MUI_LayoutMsgLayout.DefHeightOffset;
-				fieldSize = MUI_LayoutMsgLayout.FieldSize16; return true;
-			case MUI_LayoutMsgField.Width:
-				offset = MUI_LayoutMsgLayout.WidthOffset;
-				fieldSize = MUI_LayoutMsgLayout.FieldSize32; return true;
-			case MUI_LayoutMsgField.Height:
-				offset = MUI_LayoutMsgLayout.HeightOffset;
-				fieldSize = MUI_LayoutMsgLayout.FieldSize32; return true;
-			case MUI_LayoutMsgField.Private5:
-				offset = MUI_LayoutMsgLayout.Private5Offset;
-				fieldSize = MUI_LayoutMsgLayout.FieldSize32; return true;
-			case MUI_LayoutMsgField.Private6:
-				offset = MUI_LayoutMsgLayout.Private6Offset;
-				fieldSize = MUI_LayoutMsgLayout.FieldSize32; return true;
+			index = 0;
+			fieldSize = MUI_LayoutMsgLayout.FieldSize32;
 		}
-		offset = 0;
-		fieldSize = 0;
-		return false;
+		else if (field == MUI_LayoutMsgField.Children)
+		{
+			index = 1;
+			fieldSize = MUI_LayoutMsgLayout.FieldSize32;
+		}
+		else if (field == MUI_LayoutMsgField.MinWidth)
+		{
+			index = 2;
+			fieldSize = MUI_LayoutMsgLayout.FieldSize16;
+		}
+		else if (field == MUI_LayoutMsgField.MinHeight)
+		{
+			index = 3;
+			fieldSize = MUI_LayoutMsgLayout.FieldSize16;
+		}
+		else if (field == MUI_LayoutMsgField.MaxWidth)
+		{
+			index = 4;
+			fieldSize = MUI_LayoutMsgLayout.FieldSize16;
+		}
+		else if (field == MUI_LayoutMsgField.MaxHeight)
+		{
+			index = 5;
+			fieldSize = MUI_LayoutMsgLayout.FieldSize16;
+		}
+		else if (field == MUI_LayoutMsgField.DefWidth)
+		{
+			index = 6;
+			fieldSize = MUI_LayoutMsgLayout.FieldSize16;
+		}
+		else if (field == MUI_LayoutMsgField.DefHeight)
+		{
+			index = 7;
+			fieldSize = MUI_LayoutMsgLayout.FieldSize16;
+		}
+		else if (field == MUI_LayoutMsgField.Width)
+		{
+			index = 8;
+			fieldSize = MUI_LayoutMsgLayout.FieldSize32;
+		}
+		else if (field == MUI_LayoutMsgField.Height)
+		{
+			index = 9;
+			fieldSize = MUI_LayoutMsgLayout.FieldSize32;
+		}
+		else if (field == MUI_LayoutMsgField.Private5)
+		{
+			index = 10;
+			fieldSize = MUI_LayoutMsgLayout.FieldSize32;
+		}
+		else if (field == MUI_LayoutMsgField.Private6)
+		{
+			index = 11;
+			fieldSize = MUI_LayoutMsgLayout.FieldSize32;
+		}
+		else
+		{
+			index = uint.MaxValue;
+			fieldSize = 0;
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TMemory>(ref TMemory memory,
 		APTR record, MUI_LayoutMsgField field, out APTR address,
 		out uint fieldSize) where TMemory : struct, IAmigaGuestMemory
 	{
+		var cursor = default(MUI_LayoutMsgFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		return TryGetAddress(ref memory, cursor, out address, out fieldSize);
+	}
+
+	internal static bool TryGetAddress<TMemory>(ref TMemory memory,
+		MUI_LayoutMsgFieldCursor cursor, out APTR address,
+		out uint fieldSize) where TMemory : struct, IAmigaGuestMemory
+	{
 		address = APTR.Null;
 		fieldSize = 0;
-		if (!TryResolve(field, out var offset, out fieldSize) || record.IsNull ||
-			record.Raw > uint.MaxValue - offset ||
-			!memory.IsMapped(record, MUI_LayoutMsg.Size)) return false;
-		address = APTR.FromPointer(record.Raw + offset);
-		return memory.IsMapped(address, fieldSize);
+		if (!TryResolveFieldIndex(cursor.Field, out var index,
+			out fieldSize) ||
+			!MuiGuestStructCursor.TryCreate(ref memory, cursor.Record,
+				MUI_LayoutMsg.Size, out var structCursor)) return false;
+		for (var current = 0u; current <= index; current++)
+		{
+			var currentSize = MUI_LayoutMsgLayout.FieldSize32;
+			if (current >= 2 && current < 8)
+				currentSize = MUI_LayoutMsgLayout.FieldSize16;
+			if (!MuiGuestStructCursor.TryTake(ref memory, ref structCursor,
+				currentSize, out var candidate)) return false;
+			if (current == index)
+			{
+				address = candidate;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt32<TMemory>(ref TMemory memory,
@@ -360,6 +397,20 @@ internal static class MUI_LayoutMsgMemoryCodec
 		memory.WriteUInt16(address, 0, value);
 		return true;
 	}
+}
+
+internal static class MUI_LayoutMsgFieldCursorCodec
+{
+	internal static bool TryGetAddress<TMemory>(ref TMemory memory,
+		MUI_LayoutMsgFieldCursor cursor, out APTR address)
+		where TMemory : struct, IAmigaGuestMemory =>
+		TryGetAddress(ref memory, cursor, out address, out _);
+
+	internal static bool TryGetAddress<TMemory>(ref TMemory memory,
+		MUI_LayoutMsgFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TMemory : struct, IAmigaGuestMemory =>
+		MUI_LayoutMsgMemoryCodec.TryGetAddress(ref memory, cursor, out address,
+			out fieldSize);
 }
 
 public static class MUI_LayoutMsgCodec
