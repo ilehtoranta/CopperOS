@@ -12,3 +12,4 @@
 *.hunk
 # Generated C: directory (tools/Commands/build-c.ps1)
 /out/
+artifacts
