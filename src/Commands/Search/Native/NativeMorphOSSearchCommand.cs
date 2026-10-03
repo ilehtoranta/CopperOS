@@ -108,16 +108,16 @@ public static class NativeMorphOSSearchCommand
                 break;
             }
 
-            var all = ReadSwitch(arguments, 2) != 0;
-            var noNumber = ReadSwitch(arguments, 3) != 0;
-            var quiet = ReadSwitch(arguments, 4) != 0;
-            var quick = ReadSwitch(arguments, 5) != 0;
-            var fileMode = ReadSwitch(arguments, 6) != 0;
-            var patternMode = ReadSwitch(arguments, 7) != 0;
+            var all = ReadSwitch(ref arguments, 2) != 0;
+            var noNumber = ReadSwitch(ref arguments, 3) != 0;
+            var quiet = ReadSwitch(ref arguments, 4) != 0;
+            var quick = ReadSwitch(ref arguments, 5) != 0;
+            var fileMode = ReadSwitch(ref arguments, 6) != 0;
+            var patternMode = ReadSwitch(ref arguments, 7) != 0;
             var caseSensitive = morphosProfile &&
-                ReadSwitch(arguments, 8) != 0;
+                ReadSwitch(ref arguments, 8) != 0;
             var linesAfter = morphosProfile
-                ? ReadNumber(arguments, 9) : 0;
+                ? ReadNumber(ref arguments, 9) : 0;
 
             workspace = Exec.AllocMem(WorkspaceAllocationBytes,
                 Exec.MemoryFlags.Public | Exec.MemoryFlags.Clear);
@@ -187,7 +187,7 @@ public static class NativeMorphOSSearchCommand
                 APTR.WriteUInt8(pattern, unchecked((int)searchLength), 0);
             }
 
-            var from = ReadPointer(arguments, 0);
+            var from = ReadPointer(ref arguments, 0);
             var fromCount = from.IsNull ? 1u : CountPointers(from, 4096);
             if (fromCount == 0)
             {
@@ -1129,15 +1129,17 @@ public static class NativeMorphOSSearchCommand
             unchecked((ushort)PathBytes));
     }
 
-    private static uint ReadSwitch(NativeCommandArguments arguments, uint index) =>
+    // The lease is passed by ref: it is a 24-byte struct, and a by-value
+    // parameter makes the compiler copy it onto the stack for every call.
+    private static uint ReadSwitch(ref NativeCommandArguments arguments, uint index) =>
         arguments.TryGetResult(index, out var value) ? value : 0;
 
-    private static uint ReadNumber(NativeCommandArguments arguments, uint index)
+    private static uint ReadNumber(ref NativeCommandArguments arguments, uint index)
     {
         if (!arguments.TryGetResult(index, out var value) || value == 0) return 0;
         return APTR.ReadUInt32(APTR.FromPointer(value), 0);
     }
 
-    private static APTR ReadPointer(NativeCommandArguments arguments, uint index) =>
+    private static APTR ReadPointer(ref NativeCommandArguments arguments, uint index) =>
         arguments.TryGetResult(index, out var value) ? APTR.FromPointer(value) : APTR.Null;
 }
