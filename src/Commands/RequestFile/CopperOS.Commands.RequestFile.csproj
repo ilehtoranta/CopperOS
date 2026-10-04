@@ -4,6 +4,7 @@
     <RootNamespace>CopperOS.Commands</RootNamespace>
     <RuntimeIdentifier>amiga-m68k</RuntimeIdentifier>
     <CopperOSCommandName>RequestFile</CopperOSCommandName>
+    <CopperOSCodeSizeOptimizations Condition="'$(CopperOSCodeSizeOptimizations)' == ''">on</CopperOSCodeSizeOptimizations>
     <CopperSharpEntry>CopperOS.Commands.Entries.RequestFileEntry::Main</CopperSharpEntry>
   </PropertyGroup>
   <ItemGroup>

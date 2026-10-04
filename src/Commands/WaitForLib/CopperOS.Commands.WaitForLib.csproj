@@ -4,6 +4,7 @@
     <RootNamespace>CopperOS.Commands</RootNamespace>
     <RuntimeIdentifier>amiga-m68k</RuntimeIdentifier>
     <CopperOSCommandName>WaitForLib</CopperOSCommandName>
+    <CopperOSCodeSizeOptimizations Condition="'$(CopperOSCodeSizeOptimizations)' == ''">on</CopperOSCodeSizeOptimizations>
     <CopperSharpEntry>CopperOS.Commands.Entries.WaitForLibEntry::Main</CopperSharpEntry>
   </PropertyGroup>
   <ItemGroup>
