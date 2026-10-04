@@ -127,31 +127,36 @@ public static class NativeMorphOSListCommand
         var matched = 0u;
         do
         {
-            var names = ReadPointer(arguments, 0);
+            var names = ReadPointer(ref arguments, 0);
             if (names.IsNull || APTR.ReadUInt32(names, 0) == 0)
             {
                 error = (int)DOS.Error.RequiredArgumentMissing;
                 break;
             }
 
-            var pat = ReadPointer(arguments, 1);
-            var keys = ReadSwitch(arguments, 2) != 0;
-            var noDates = ReadSwitch(arguments, 4) != 0;
-            var to = ReadPointer(arguments, 5);
-            var sub = ReadPointer(arguments, 6);
-            var since = ReadPointer(arguments, 7);
-            var upto = ReadPointer(arguments, 8);
-            var quick = ReadSwitch(arguments, 9) != 0;
-            var block = ReadSwitch(arguments, 10) != 0;
-            var noHead = ReadSwitch(arguments, 11) != 0;
-            var files = ReadSwitch(arguments, 12) != 0;
-            var dirs = ReadSwitch(arguments, 13) != 0;
+            var pat = ReadPointer(ref arguments, 1);
+            var keys = ReadSwitch(ref arguments, 2) != 0;
+            var noDates = ReadSwitch(ref arguments, 4) != 0;
+            var to = ReadPointer(ref arguments, 5);
+            var sub = ReadPointer(ref arguments, 6);
+            var since = ReadPointer(ref arguments, 7);
+            var upto = ReadPointer(ref arguments, 8);
+            var quick = ReadSwitch(ref arguments, 9) != 0;
+            var block = ReadSwitch(ref arguments, 10) != 0;
+            var noHead = ReadSwitch(ref arguments, 11) != 0;
+            var files = ReadSwitch(ref arguments, 12) != 0;
+            var dirs = ReadSwitch(ref arguments, 13) != 0;
+#if COPPEROS_WORKBENCH31_LIST
+            // The shipping entry always uses the classic sixteen-slot template.
+            const bool workbench31 = true;
+#else
             var workbench31 = resultCount == NativeWorkbench31ListCommand.ResultCount;
-            var lformat = ReadPointer(arguments, 14);
-            var sort = workbench31 ? APTR.Null : ReadPointer(arguments, 15);
-            var users = !workbench31 && ReadSwitch(arguments, 16) != 0;
-            var groups = !workbench31 && ReadSwitch(arguments, 17) != 0;
-            var all = ReadSwitch(arguments, workbench31 ? 15u : 18u) != 0;
+#endif
+            var lformat = ReadPointer(ref arguments, 14);
+            var sort = workbench31 ? APTR.Null : ReadPointer(ref arguments, 15);
+            var users = !workbench31 && ReadSwitch(ref arguments, 16) != 0;
+            var groups = !workbench31 && ReadSwitch(ref arguments, 17) != 0;
+            var all = ReadSwitch(ref arguments, workbench31 ? 15u : 18u) != 0;
 
             // QUICK explicitly selects name-only rows, including when DATES
             // is also supplied; the Workbench manual says DATES is the default
@@ -458,7 +463,8 @@ public static class NativeMorphOSListCommand
             unchecked((ushort)PathBytes));
     }
 
-    private static uint ReadSwitch(NativeCommandArguments arguments,
+    // Avoid copying the 24-byte parser lease for each option lookup.
+    private static uint ReadSwitch(ref NativeCommandArguments arguments,
         uint index) => arguments.TryGetResult(index, out var value) ? value : 0;
 
     private static bool BuildSubstringPattern(APTR substring,
@@ -597,7 +603,7 @@ public static class NativeMorphOSListCommand
         return result.Raw;
     }
 
-    private static APTR ReadPointer(NativeCommandArguments arguments,
+    private static APTR ReadPointer(ref NativeCommandArguments arguments,
         uint index) => arguments.TryGetResult(index, out var value)
         ? APTR.FromPointer(value) : APTR.Null;
 }

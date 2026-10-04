@@ -121,3 +121,13 @@ lifecycle, source reuse rights, licensing, package admission, and differential
 behavior remain open. The implementation must continue to use public DOS APIs
 and release every matcher, parser, output, and workspace resource on all
 exits.
+
+The [2026-10-04 size receipt](../size-reductions-20261004.json) measures the
+shipping Workbench profile with compile-time profile selection and argument
+lease helpers passed by reference. Using the same clean compiler/SDK, its
+MC68000 HUNK shrinks from 11,640 to 10,664 bytes: 556 bytes from removing lease
+copies, then 420 bytes from profile specialization. Thirty-two supplied
+Workbench invocations per CPU match baseline output, result, IoErr,
+allocations, cleanup and DOS call order on 68000/020/040. The shared MorphOS
+build passes 31 cases per CPU. Existing original guest and option gaps remain
+open.

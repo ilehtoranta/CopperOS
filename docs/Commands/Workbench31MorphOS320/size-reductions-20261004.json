@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-04",
+  "status": "passed",
+  "baselineCopperOSCommit": "1c16dd9f18c7b8627e249dbac33700d506f7a925",
+  "compilerCommit": "37ef0933f93fa83f2194f505cbc04e50b6e2727a",
+  "compilerCheckoutClean": true,
+  "dotnetSdk": "10.0.401",
+  "compilerCheckout": "CopperSharp68k-wt-command-size",
+  "flags": {
+    "cpu": "68000",
+    "format": "hunk",
+    "runtime": "resident",
+    "exceptions": "yolo",
+    "memory": "none",
+    "peephole": "fixed-point",
+    "symbols": "off"
+  },
+  "artifactDirectory": "artifacts/command-size-20261004",
+  "commands": [
+    {
+      "name": "Search",
+      "beforeBytes": 20680,
+      "afterBytes": 10840,
+      "savedBytes": 9840,
+      "savedPercent": 47.58,
+      "beforeSha256": "da84d4ec095e952e8918dc0b13b88aa8b20678976fd672929ee327aaa7d39144",
+      "afterSha256": "dd308d01137535be04205892de23df931f0ee0f998b904f9d52e520dc05b0dc0",
+      "beforeReachableMethods": 39,
+      "afterReachableMethods": 29,
+      "workbench31Bytes": 2476,
+      "workbench31Sha256": "b3e70309e954ea4a27d2e83a900bd749e59f3759e4bb1f8cb1e6943646f7bf43",
+      "workbench31SourceId": "wb31-workbench-m10-40.42",
+      "ratioToWorkbench31": 4.378,
+      "cause": "Build-time Workbench profile removes MorphOS locale, large-file buffering, soft-link, CASE/LINES and quick-progress branches from reachability. The unspecialized rebuild is byte-identical to baseline. Reachable methods decrease from 39 to 29.",
+      "nativeArtifacts": [
+        {
+          "cpu": "68000",
+          "bytes": 10840,
+          "sha256": "dd308d01137535be04205892de23df931f0ee0f998b904f9d52e520dc05b0dc0",
+          "passed": 19,
+          "runtimeReceipt": "artifacts/command-size-20261004/specialized/Search/Search.runtime.json"
+        },
+        {
+          "cpu": "68020",
+          "bytes": 11100,
+          "sha256": "1d0f3b78ae775fc2a11a5f1f989d6139f1c58fe808397b8956805aa9d5102f0b",
+          "passed": 19,
+          "runtimeReceipt": "artifacts/command-size-20261004/specialized/Search/68020/Search.hunk.runtime.json"
+        },
+        {
+          "cpu": "68040",
+          "bytes": 10864,
+          "sha256": "1b00a74a2a7c3d8c798db811031a36392a66e3c603c6885c3844d53608c3a21e",
+          "passed": 19,
+          "runtimeReceipt": "artifacts/command-size-20261004/specialized/Search/68040/Search.hunk.runtime.json"
+        }
+      ]
+    },
+    {
+      "name": "List",
+      "beforeBytes": 11640,
+      "afterBytes": 10664,
+      "savedBytes": 976,
+      "savedPercent": 8.38,
+      "beforeSha256": "592a2c418e0f00e235b2b5d19e267f64c2fe548096ecf1f03243cca70cc9ac6d",
+      "afterSha256": "d3c55feb39e42431247d5bd4fc370289df15c8d524a6eaab7d4dbe231ad224bc",
+      "beforeReachableMethods": 21,
+      "afterReachableMethods": 21,
+      "workbench31Bytes": 5108,
+      "workbench31Sha256": "69fb8b8075bc505977884e50233b7cc84237ebfc83405c27b1d818c9356dede1",
+      "workbench31SourceId": "wb31-install-m10-40.42",
+      "ratioToWorkbench31": 2.088,
+      "cause": "Pass the 24-byte argument lease by reference and fold the Workbench profile before native compilation. Ref-only/shared-profile rebuild: 11084 bytes (556 saved); profile specialization saves a further 420 bytes.",
+      "nativeArtifacts": [
+        {
+          "cpu": "68000",
+          "bytes": 10664,
+          "sha256": "d3c55feb39e42431247d5bd4fc370289df15c8d524a6eaab7d4dbe231ad224bc",
+          "passed": 32,
+          "runtimeReceipt": "artifacts/command-size-20261004/specialized/List/List.runtime.json"
+        },
+        {
+          "cpu": "68020",
+          "bytes": 10988,
+          "sha256": "359b7389ea21f1795f87655ac9232b7ee365aa0e50fe968debda59ae325174ee",
+          "passed": 32,
+          "runtimeReceipt": "artifacts/command-size-20261004/specialized/List/68020/List.hunk.runtime.json"
+        },
+        {
+          "cpu": "68040",
+          "bytes": 10884,
+          "sha256": "da6e30750fb01ebd71f4f4089efa4c8182f8a5ccc2cc9ffa5dc32dd69c4e08bd",
+          "passed": 32,
+          "runtimeReceipt": "artifacts/command-size-20261004/specialized/List/68040/List.hunk.runtime.json"
+        }
+      ]
+    },
+    {
+      "name": "Delete",
+      "beforeBytes": 9524,
+      "afterBytes": 5980,
+      "savedBytes": 3544,
+      "savedPercent": 37.21,
+      "beforeSha256": "86da86350954e78f4510ee51711369514d99681cb85e864278ee9849c1abd0ce",
+      "afterSha256": "265696f02fc1bae21320b3affe2184d0c1e0d08a3cf66a7a63507620368626bb",
+      "beforeReachableMethods": 43,
+      "afterReachableMethods": 33,
+      "workbench31Bytes": 1972,
+      "workbench31Sha256": "78b2714a750a5e2d7635238049990303f49c758808eef857b69cf8df28338d5a",
+      "workbench31SourceId": "wb31-install-m10-40.42",
+      "ratioToWorkbench31": 3.032,
+      "cause": "Select a deletion-only object worker through the existing generic Copy traversal. File transfer, destination preparation, directory creation and Copy mode dispatch are no longer reachable. Command parsing, traversal and result policy remain the same.",
+      "nativeArtifacts": [
+        {
+          "cpu": "68000",
+          "bytes": 5980,
+          "sha256": "265696f02fc1bae21320b3affe2184d0c1e0d08a3cf66a7a63507620368626bb",
+          "passed": 8,
+          "runtimeReceipt": "artifacts/command-size-20261004/specialized/Delete/Delete.runtime.json"
+        },
+        {
+          "cpu": "68020",
+          "bytes": 6088,
+          "sha256": "13b85953f23effbab301fa1cdc57dea571fa9424918a7f43ea2ca8b52495ea53",
+          "passed": 8,
+          "runtimeReceipt": "artifacts/command-size-20261004/specialized/Delete/68020/Delete.hunk.runtime.json"
+        },
+        {
+          "cpu": "68040",
+          "bytes": 5956,
+          "sha256": "f1a1df6a610934a21ae7c4c5c47e1403ac103eb943666a238c2b4d67b71eb853",
+          "passed": 8,
+          "runtimeReceipt": "artifacts/command-size-20261004/specialized/Delete/68040/Delete.hunk.runtime.json"
+        }
+      ]
+    }
+  ],
+  "combined": {
+    "beforeBytes": 41844,
+    "afterBytes": 27484,
+    "savedBytes": 14360,
+    "savedPercent": 34.32
+  },
+  "qualification": {
+    "cpus": [
+      "68000",
+      "68020",
+      "68040"
+    ],
+    "workbenchCandidateInvocations": 177,
+    "morphosCandidateInvocations": 255,
+    "baselineInvocations": 177,
+    "comparisonFields": [
+      "stdoutHex",
+      "result",
+      "ioErr",
+      "resultArrayAllocationRequests",
+      "readArgsCalls",
+      "freeArgsCalls",
+      "freeMemCalls",
+      "nativeIo",
+      "events",
+      "instructionInterleaved"
+    ],
+    "sharedImageWrites": 0,
+    "resourceLeaks": 0,
+    "managedAllocationSites": 0,
+    "runtimeHelpers": 0,
+    "runtimeFeatures": 0,
+    "externalNativeTargets": 0,
+    "exceptionRegions": 0,
+    "fatalMachineFaultSites": 0,
+    "scope": "Supplied DOS-vector execution through Copper68k 1.4.0. Search: 19 Workbench and 46 MorphOS cases per CPU; List: 32 Workbench and 31 MorphOS cases; Delete: 8 cases per profile. Workbench candidate output, result, IoErr, allocations, cleanup and DOS call order match baseline on all CPUs. Original guest parity and real filesystem behavior are not established. Delete cases cover regular files, FORCE, partial failures, parser cleanup and interleaving; recursive/link behavior and parent-protection retry remain open."
+  },
+  "outputUpdate": {
+    "directory": "out/C",
+    "commands": [
+      "Search",
+      "List",
+      "Delete"
+    ],
+    "imagesMatchQualifiedSha256": true,
+    "previousImagesBackup": "artifacts/command-size-20261004/previous-out/C",
+    "previousSelectedBytes": 84156.0,
+    "currentSelectedBytes": 27484.0,
+    "currentTotalBytes": 314256.0,
+    "note": "Existing output used a different compiler/SDK build provenance. Controlled source-only savings are recorded in combined; the larger installed-output reduction includes toolchain differences. Other C: images were not rebuilt."
+  },
+  "referenceSizeScope": "Raw m68k Workbench 3.1 HUNK sizes from command-inventory.json. MorphOS original binary sizes are not used as size comparisons."
+}

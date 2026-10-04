@@ -210,6 +210,14 @@ failure, Ctrl-C, and startup-boundary fixture. The binary identity and syntax
 are now bound, but runtime option behavior, exact Workbench output, locale
 handling, and original guest parity remain open.
 
+The [2026-10-04 size receipt](../size-reductions-20261004.json) measures the
+shipping Workbench profile with compile-time MorphOS feature selection.
+With the same clean compiler/SDK and fixed-point peephole mode, its MC68000
+HUNK shrinks from 20,680 to 10,840 bytes. Nineteen supplied invocations per CPU
+match baseline output, result, IoErr, allocations, cleanup and DOS call order
+on 68000/020/040; the shared MorphOS build separately passes 46 cases per CPU.
+This receipt does not close the original guest comparison.
+
 The refreshed three-CPU resident receipt is
 [`cc11-search-wb31-native-20260927-source-error-regression-v1/qualification.json`](D:/Koodit/GIT/CopperOS/artifacts/cc11-search-wb31-native-20260927-source-error-regression-v1/qualification.json)
 and passes nineteen supplied invocations per CPU (57 total). HUNKs are 48,580,

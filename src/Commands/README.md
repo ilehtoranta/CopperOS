@@ -34,6 +34,20 @@ Settings shared by all command projects (resident profile, fatal exceptions,
 local CopperSharp68k tree, publish copy into `out/C/`) are in
 `Directory.Build.props` and `Directory.Build.targets`.
 
+Search and List select their Workbench profile at C# build time using
+`COPPEROS_WORKBENCH31_SEARCH` and `COPPEROS_WORKBENCH31_LIST`. This allows
+native reachability analysis to discard MorphOS paths that cannot run through
+their shipping entries. The compatibility aggregate and qualification roots
+compile both profiles. Set `-p:CopperOSSpecializeWorkbench31=false` on a
+command publish to compare against the shared implementation with runtime
+profile selection. List passes its live parser lease by reference to avoid
+repeated 24-byte argument copies. Delete selects a deletion-only object worker
+through the existing generic Copy matcher traversal.
+
+The [2026-10-04 size measurement](../../docs/Commands/Workbench31MorphOS320/size-reductions-20261004.json)
+records controlled before/after builds with the same clean compiler and SDK,
+original Workbench byte counts, and supplied native comparison scope.
+
 ## Executable size policy
 
 Dir and Mount also select their Workbench profile at C# build time. Aggregate

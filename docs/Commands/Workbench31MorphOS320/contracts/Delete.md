@@ -9,6 +9,16 @@ not a complete Delete qualification: protection retries, diagnostics,
 recursion, packed-binary correspondence, real handler behavior, packaging and
 parity remain open.
 
+The [2026-10-04 size receipt](../size-reductions-20261004.json) selects a
+deletion-only object worker through the existing generic Copy traversal.
+With the same clean compiler/SDK, the shipping MC68000 HUNK shrinks from 9,524
+to 5,980 bytes, removing reachable file-transfer and destination-creation code.
+Eight supplied Workbench invocations per CPU match baseline output, result,
+IoErr, allocations, cleanup and DOS call order on 68000/020/040. The MorphOS
+profile separately passes eight cases per CPU. These cases cover regular
+files, FORCE, partial failure, parser cleanup and interleaving; recursive/link
+behavior, parent-protection retry and original guest parity remain open.
+
 The observed Workbench 3.1 v40.42 `C/Delete` HUNK is 1,972 bytes with SHA-256
 `78b2714a750a5e2d7635238049990303f49c758808eef857b69cf8df28338d5a` and
 its raw string scan finds the syntax candidate:

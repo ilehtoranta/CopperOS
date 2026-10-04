@@ -6,6 +6,7 @@
     <CopperOSCommandName>List</CopperOSCommandName>
     <CopperOSCodeSizeOptimizations Condition="'$(CopperOSCodeSizeOptimizations)' == ''">on</CopperOSCodeSizeOptimizations>
     <CopperSharpEntry>CopperOS.Commands.Entries.ListEntry::Main</CopperSharpEntry>
+    <DefineConstants Condition="'$(CopperOSSpecializeWorkbench31)' != 'false'">$(DefineConstants);COPPEROS_WORKBENCH31_LIST</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\CopperOS.Commands.Common.csproj" />

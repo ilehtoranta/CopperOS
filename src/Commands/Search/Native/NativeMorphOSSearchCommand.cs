@@ -13,6 +13,16 @@ namespace CopperOS.Commands.Native;
 /// </summary>
 public static class NativeMorphOSSearchCommand
 {
+    // The shipping Search assembly has only a Workbench entry. A runtime flag
+    // keeps MorphOS helpers reachable because the native compiler does not
+    // specialize calls by constant arguments. Fold those branches in CIL;
+    // aggregate/MorphOS qualification builds retain the complete shared body.
+#if COPPEROS_WORKBENCH31_SEARCH
+    private const bool SupportsMorphOS = false;
+#else
+    private const bool SupportsMorphOS = true;
+#endif
+
     public const string Template =
         "FROM/M,SEARCH/A,ALL/S,NONUM/S,QUIET/S,QUICK/S,FILE/S,PATTERN/S,CASE/S,LINES/N";
     public const uint ResultCount = 10;
@@ -59,7 +69,7 @@ public static class NativeMorphOSSearchCommand
         ioError = 0;
         APTR localeLibrary = APTR.Null;
         uint locale = 0;
-        if (morphosProfile)
+        if (SupportsMorphOS && morphosProfile)
         {
             localeLibrary = Exec.OpenLibraryRaw(Locale.Name, 37);
             if (localeLibrary.IsNull)
@@ -77,7 +87,7 @@ public static class NativeMorphOSSearchCommand
 
         var arguments = default(NativeCommandArguments);
         var argumentsParsed = false;
-        if (morphosProfile)
+        if (SupportsMorphOS && morphosProfile)
             argumentsParsed = NativeCommandArguments.TryRead(Template, ResultCount,
                 out arguments);
         else
@@ -114,9 +124,9 @@ public static class NativeMorphOSSearchCommand
             var quick = ReadSwitch(ref arguments, 5) != 0;
             var fileMode = ReadSwitch(ref arguments, 6) != 0;
             var patternMode = ReadSwitch(ref arguments, 7) != 0;
-            var caseSensitive = morphosProfile &&
+            var caseSensitive = SupportsMorphOS && morphosProfile &&
                 ReadSwitch(ref arguments, 8) != 0;
-            var linesAfter = morphosProfile
+            var linesAfter = SupportsMorphOS && morphosProfile
                 ? ReadNumber(ref arguments, 9) : 0;
 
             workspace = Exec.AllocMem(WorkspaceAllocationBytes,
@@ -232,7 +242,7 @@ public static class NativeMorphOSSearchCommand
                     var fib = APTR.FromPointer(anchor.Raw +
                         (uint)DosLayout.AnchorPath.Info);
                     var entryType = FileInfoBlock.GetDirEntryType(fib);
-                    var directory = morphosProfile && entryType ==
+                    var directory = SupportsMorphOS && morphosProfile && entryType ==
                         (int)DosConstants.SoftLink
                         ? NativeMorphOSSearchSoftLinks.ShouldDescend(anchor,
                             linkInfo, linkBuffer, linkWarningArguments,
@@ -297,8 +307,9 @@ public static class NativeMorphOSSearchCommand
                             if (!quiet && !quick && printNames &&
                                 !WriteFileHeading(fileName, indentation,
                                     out error)) break;
-                            var morphosQuick = morphosProfile && quick;
-                            if (morphosQuick && !WriteQuickPathPrefix(output,
+                            var morphosQuick = SupportsMorphOS && morphosProfile && quick;
+                            if (SupportsMorphOS && morphosQuick &&
+                                !WriteQuickPathPrefix(output,
                                     outputBuffer, OutputBytes, fullPath,
                                     out error)) break;
                             var opened = DOS.OpenRaw(
@@ -306,7 +317,7 @@ public static class NativeMorphOSSearchCommand
                                 DOS.FileMode.OldFile);
                             if (opened.IsNull)
                             {
-                                if (!morphosProfile)
+                                if (!SupportsMorphOS || !morphosProfile)
                                 {
                                     error = (int)DOS.IoErr();
                                     break;
@@ -316,7 +327,7 @@ public static class NativeMorphOSSearchCommand
                                 // MatchNext loop continues and clears IoErr on
                                 // successful traversal.
                             }
-                            else if (morphosProfile)
+                            else if (SupportsMorphOS && morphosProfile)
                             {
                                 var completed = SearchMorphosFile(opened, fib, output,
                                         outputBuffer, pattern, locale,
@@ -387,7 +398,7 @@ public static class NativeMorphOSSearchCommand
                     break;
                 }
             }
-            if (morphosProfile && quick && !fileMode &&
+            if (SupportsMorphOS && morphosProfile && quick && !fileMode &&
                 !WriteQuickLineClear(output, outputBuffer, OutputBytes,
                     out var quickClearError) && error == 0)
                 error = quickClearError;
@@ -428,7 +439,7 @@ public static class NativeMorphOSSearchCommand
             while (offset < sourceLength)
             {
                 var value = APTR.ReadUInt8(source, unchecked((int)offset++));
-                localeControlDelimiter = useLocale &&
+                localeControlDelimiter = SupportsMorphOS && useLocale &&
                     value != (byte)'\n' && value != 0 &&
                     value != (byte)'\t' &&
                     Locale.IsCntrl(locale, value) != 0;
@@ -444,7 +455,8 @@ public static class NativeMorphOSSearchCommand
                 delimiter = (byte)'\n';
                 length--;
             }
-            else if (useLocale && offset > start && offset <= sourceLength)
+            else if (SupportsMorphOS && useLocale && offset > start &&
+                     offset <= sourceLength)
             {
                 delimiter = APTR.ReadUInt8(source,
                     unchecked((int)(offset - 1)));
@@ -454,7 +466,7 @@ public static class NativeMorphOSSearchCommand
                     delimiter = 0;
             }
             var outputLineNumber = lineNumber;
-            if (!useLocale || (offset > start &&
+            if (!SupportsMorphOS || !useLocale || (offset > start &&
                 APTR.ReadUInt8(source, unchecked((int)(offset - 1))) ==
                     (byte)'\n'))
                 lineNumber++;
@@ -462,7 +474,7 @@ public static class NativeMorphOSSearchCommand
             if (patternMode)
                 APTR.WriteUInt8(source, unchecked((int)(start + length)), 0);
             var matches = patternMode
-                ? (caseSensitive
+                ? (SupportsMorphOS && caseSensitive
                     ? DOS.MatchPattern(CString.FromPointer(pattern.Raw),
                         CString.FromPointer(line.Raw))
                     : DOS.MatchPatternNoCase(CString.FromPointer(pattern.Raw),
@@ -473,18 +485,20 @@ public static class NativeMorphOSSearchCommand
                 APTR.WriteUInt8(source, unchecked((int)(start + length)), delimiter);
             if (matches)
             {
-                if (quick && !found && !WriteByte(output, destination,
+                if (SupportsMorphOS && quick && !found &&
+                    !WriteByte(output, destination,
                         capacity, (byte)'\n', out ioError)) return false;
                 found = true;
                 if (quiet)
-                    return quick || WritePath(output, destination, capacity,
+                    return (SupportsMorphOS && quick) ||
+                        WritePath(output, destination, capacity,
                         fullPath, out ioError);
-                following = linesAfter;
+                following = SupportsMorphOS ? linesAfter : 0;
                 if (!WriteLine(destination, capacity, output, line, length,
                         outputLineNumber, noNumber, (byte)'>', useLocale,
                         locale, out ioError)) return false;
             }
-            else if (following != 0)
+            else if (SupportsMorphOS && following != 0)
             {
                 following--;
                 if (!WriteLine(destination, capacity, output, line, length,
@@ -798,7 +812,7 @@ public static class NativeMorphOSSearchCommand
         {
             var fields = default(LineFields);
             fields.Number = lineNumber;
-            if (marker == (byte)'>')
+            if (!SupportsMorphOS || marker == (byte)'>')
             {
                 DOS.VPrintf("%6ld", LineFields.AddressOf(ref fields));
                 DOS.FPuts(DOS.Output(), "> ");
@@ -816,7 +830,7 @@ public static class NativeMorphOSSearchCommand
                 return false;
             if (used == capacity) used = 0;
             var value = APTR.ReadUInt8(line, unchecked((int)i));
-            var printable = useLocale
+            var printable = SupportsMorphOS && useLocale
                 ? Locale.IsPrint(locale, value) != 0
                 : value >= 0x20 && value <= 0x7e;
             APTR.WriteUInt8(destination, unchecked((int)used++),
@@ -830,7 +844,7 @@ public static class NativeMorphOSSearchCommand
 
     private static uint ReadFileSize(APTR fib, bool morphosProfile)
     {
-        if (!morphosProfile)
+        if (!SupportsMorphOS || !morphosProfile)
             return unchecked((uint)FileInfoBlock.GetSize(fib.Raw));
         var extendedHigh = APTR.ReadUInt32(fib, FileInfoBlock.Size64Offset);
         var extendedLow = APTR.ReadUInt32(fib,
@@ -888,7 +902,7 @@ public static class NativeMorphOSSearchCommand
                 break;
             }
             if (count > 0) bytesRead += unchecked((uint)count);
-            if (morphosProfile)
+            if (SupportsMorphOS && morphosProfile)
             {
                 var fileSignals = Exec.SetSignal(0u, CtrlDMask);
                 if ((fileSignals & CtrlDMask) != 0)
@@ -1074,10 +1088,12 @@ public static class NativeMorphOSSearchCommand
             {
                 var left = APTR.ReadUInt8(text, unchecked((int)(start + index)));
                 var right = APTR.ReadUInt8(pattern, unchecked((int)index));
-                if (!caseSensitive)
+                if (!SupportsMorphOS || !caseSensitive)
                 {
-                    left = useLocale ? LocaleUpper(locale, left) : Fold(left);
-                    right = useLocale ? LocaleUpper(locale, right) : Fold(right);
+                    left = SupportsMorphOS && useLocale
+                        ? LocaleUpper(locale, left) : Fold(left);
+                    right = SupportsMorphOS && useLocale
+                        ? LocaleUpper(locale, right) : Fold(right);
                 }
                 if (left == right) continue;
                 matched = false;

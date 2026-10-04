@@ -6,6 +6,9 @@
     <CopperOSCommandName>Search</CopperOSCommandName>
     <CopperOSCodeSizeOptimizations Condition="'$(CopperOSCodeSizeOptimizations)' == ''">on</CopperOSCodeSizeOptimizations>
     <CopperSharpEntry>CopperOS.Commands.Entries.SearchEntry::Main</CopperSharpEntry>
+    <!-- Resolve the profile before native reachability analysis. The aggregate
+         qualification roots still compile both profiles without this symbol. -->
+    <DefineConstants Condition="'$(CopperOSSpecializeWorkbench31)' != 'false'">$(DefineConstants);COPPEROS_WORKBENCH31_SEARCH</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\CopperOS.Commands.Common.csproj" />

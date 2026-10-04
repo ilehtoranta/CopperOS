@@ -3,9 +3,9 @@ using Amiga;
 namespace CopperOS.Commands.Native;
 
 /// <summary>
-/// MorphOS 3.20 Delete command frontend.  The matcher and object worker are
-/// shared with the already source-ordered Copy DELETE path, while this entry
-/// owns the Delete-specific ReadArgs lease and invocation workspace.
+/// MorphOS 3.20 Delete command frontend. The matcher is shared with the
+/// source-ordered Copy DELETE path and uses a deletion-only object worker.
+/// This entry owns the Delete-specific ReadArgs lease and invocation workspace.
 ///
 /// Parent-protection retry, exact packed-binary diagnostics, and the complete
 /// hard/soft-link policy still require their own reference captures.
@@ -109,10 +109,10 @@ public static class NativeMorphOSDeleteCommand
                     InputOmitted = false,
                 };
 
-                NativeMorphOSCopyPatternSetup.RunDeleteSources(ref options,
+                RunDeleteSources(ref options,
                     APTR.FromPointer(workspace.Raw + ClassifierOffset), ref state);
 
-                // Delete returns WARN when no object was removed.  The shared
+                // Delete returns WARN when no object was removed. The deletion
                 // worker marks each successful DeleteFile with ProcessedFlag.
                 if ((state.Flags & ProcessedFlag) == 0 &&
                     state.Result == DOS.RETURN_OK &&
@@ -132,5 +132,109 @@ public static class NativeMorphOSDeleteCommand
         Exec.FreeMem(workspace, WorkspaceBytes);
         DOS.SetIoErr((DOS.Error)ioError);
         return result;
+    }
+
+    private static void RunDeleteSources(ref NativeMorphOSCopyOptions options,
+        APTR classifierAnchor, ref NativeMorphOSCopyTraversalState state)
+    {
+        // Keep Copy's primary-only outer guard and deferred traversal ordering,
+        // but select a deletion-only worker before native reachability analysis.
+        var worker = new NativeMorphOSDeleteWork { Reserved = 0 };
+        state.SecondaryResult = DOS.RETURN_OK;
+        var limit = (state.Flags & 1024) != 0 ? DOS.RETURN_OK : DOS.RETURN_WARN;
+        var offset = 0;
+        uint source;
+        while (state.Result <= limit &&
+            (source = APTR.ReadUInt32(options.Sources, offset)) != 0)
+        {
+            NativeMorphOSCopyTraversal.Run(APTR.FromPointer(source),
+                classifierAnchor, ref state, ref worker);
+            offset += 4;
+        }
+    }
+}
+
+/// <summary>
+/// Copy DoWork's Delete path with the command's fixed operation. The frontend
+/// never supplies a destination, metadata flags, or direct-device Copy flags.
+/// Matcher traversal, directory descent/exit and result completion stay shared.
+/// </summary>
+internal struct NativeMorphOSDeleteWork : INativeMorphOSCopyWork
+{
+    // The native generic ABI requires a four-byte worker representation.
+    public uint Reserved;
+
+    public void Execute(APTR name, ref NativeMorphOSCopyTraversalState state)
+    {
+        if (state.Result > ((state.Flags & 1024) != 0 ? DOS.RETURN_OK : DOS.RETURN_WARN) ||
+            state.SecondaryResult != 0) return;
+        var quiet = (state.Flags & 256) != 0;
+        var verbose = (state.Flags & 512) != 0;
+        var entryType = FileInfoBlock.GetDirEntryType(state.Fib.Raw);
+        var source = DOS.LockRaw(CString.FromPointer(state.Path.Raw), DOS.LockMode.Shared);
+        if (source.IsNull)
+        {
+            state.Result = DOS.RETURN_WARN;
+            if (!quiet) NativeMorphOSCopyOutput.PrintNotDone("read.", state.WarningArguments);
+            return;
+        }
+        var parent = DOS.ParentDirRaw(source);
+        if (parent.IsNull)
+        {
+            state.Result = DOS.RETURN_ERROR;
+            if (!quiet)
+            {
+                APTR.WriteUInt32(state.WarningArguments, 0, state.Path.Raw);
+                DOS.VPrintf(" %s ", state.WarningArguments);
+                PrintFailurePrefix("deleted.", state.WarningArguments);
+                PrintLine("A device cannot be deleted.", state.WarningArguments);
+            }
+            DOS.UnLock(source);
+            return;
+        }
+        DOS.UnLock(parent);
+        if (!quiet && verbose)
+            NativeMorphOSCopyOutput.PrintName(name, unchecked((uint)state.Depth),
+                entryType > 0, entryType < 0 || (state.Flags & 1) == 0 ||
+                (state.Flags & (1u << 23)) != 0, state.WarningArguments);
+
+        CString error = CString.FromPointer(0);
+        CString successText = "";
+        if ((state.Flags & (1u << 23)) != 0 || (state.Flags & 1) == 0 || entryType < 0)
+        {
+            DOS.UnLock(source);
+            source = BPTR.Null;
+            if ((state.Flags & 32) != 0)
+                DOS.SetProtection(CString.FromPointer(state.Path.Raw), 0);
+            if (DOS.DeleteFile(CString.FromPointer(state.Path.Raw)) != 0)
+                successText = "deleted.";
+            else
+            {
+                state.Result = DOS.RETURN_WARN;
+                error = "deleted.";
+            }
+        }
+        // An ALL directory's first pass performs no deletion. Retain DoWork's
+        // empty-string completion and QUIET failure behavior verbatim.
+        if (CString.ToUInt32(error) != 0 && !quiet)
+            NativeMorphOSCopyOutput.PrintNotDone(error, state.WarningArguments);
+        else if (CString.ToUInt32(successText) != 0)
+        {
+            state.Flags |= 1u << 22;
+            if (!quiet && verbose) PrintLine(successText, state.WarningArguments);
+        }
+        if (source.IsNotNull) DOS.UnLock(source);
+    }
+
+    private static void PrintLine(CString text, APTR arguments)
+    {
+        APTR.WriteUInt32(arguments, 0, CString.ToUInt32(text));
+        DOS.VPrintf("%s\n", arguments);
+    }
+
+    private static void PrintFailurePrefix(CString text, APTR arguments)
+    {
+        APTR.WriteUInt32(arguments, 0, CString.ToUInt32(text));
+        DOS.VPrintf(" not %s: ", arguments);
     }
 }
