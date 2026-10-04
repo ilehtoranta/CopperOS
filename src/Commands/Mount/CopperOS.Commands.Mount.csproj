@@ -4,6 +4,7 @@
     <RootNamespace>CopperOS.Commands</RootNamespace>
     <RuntimeIdentifier>amiga-m68k</RuntimeIdentifier>
     <CopperOSCommandName>Mount</CopperOSCommandName>
+    <DefineConstants Condition="'$(CopperOSSpecializeWorkbench31)' != 'false'">$(DefineConstants);COPPEROS_WORKBENCH31_MOUNT</DefineConstants>
     <CopperSharpEntry>CopperOS.Commands.Entries.MountEntry::Main</CopperSharpEntry>
   </PropertyGroup>
   <ItemGroup>

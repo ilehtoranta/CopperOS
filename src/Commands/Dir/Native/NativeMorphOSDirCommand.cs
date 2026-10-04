@@ -8,6 +8,11 @@ namespace CopperOS.Commands.Native;
 /// </summary>
 public static class NativeMorphOSDirCommand
 {
+#if COPPEROS_WORKBENCH31_DIR
+    private const bool SupportsMorphOS = false;
+#else
+    private const bool SupportsMorphOS = true;
+#endif
     public const string Template = "DIR,OPT/K,ALL/S,DIRS/S,FILES/S,INTER/S";
     public const uint ResultCount = 6;
 
@@ -82,7 +87,7 @@ public static class NativeMorphOSDirCommand
             var interactiveSwitch = ReadSwitch(arguments, 5) != 0;
             var inter = false;
 
-            if (interactiveSwitch || all && !morphosProfile)
+            if (interactiveSwitch || all && (!SupportsMorphOS || !morphosProfile))
             {
                 error = (int)DOS.Error.NotImplemented;
                 break;
@@ -99,13 +104,13 @@ public static class NativeMorphOSDirCommand
                     var upper = ToUpper(value);
                     if (upper == (byte)'D') dirs = true;
                     else if (upper == (byte)'F') files = true;
-                    else if (upper == (byte)'A' && morphosProfile) all = true;
+                    else if (upper == (byte)'A' && SupportsMorphOS && morphosProfile) all = true;
                     else if (upper == (byte)'A')
                     {
                         error = (int)DOS.Error.NotImplemented;
                         break;
                     }
-                    else if (upper == (byte)'I' && morphosProfile)
+                    else if (upper == (byte)'I' && SupportsMorphOS && morphosProfile)
                     {
                         inter = true;
                     }
@@ -180,7 +185,7 @@ public static class NativeMorphOSDirCommand
             if (locked.IsNull)
             {
                 error = (int)DOS.IoErr();
-                if (morphosProfile && error ==
+                if (SupportsMorphOS && morphosProfile && error ==
                         (int)DOS.Error.ObjectNotFound)
                 {
                     danglingLinkScratch = Exec.AllocVec(
@@ -256,7 +261,7 @@ public static class NativeMorphOSDirCommand
                 if (workspace.IsNotNull) Exec.FreeVec(workspace);
                 return DOS.RETURN_WARN;
             }
-            if (morphosProfile && error == (int)DOS.Error.NotImplemented)
+            if (SupportsMorphOS && morphosProfile && error == (int)DOS.Error.NotImplemented)
             {
                 if (workspace.IsNotNull) Exec.FreeVec(workspace);
                 return DOS.RETURN_ERROR;
@@ -333,7 +338,7 @@ public static class NativeMorphOSDirCommand
                     DosLayout.ExAllData.Name);
                 var type = unchecked((int)APTR.ReadUInt32(
                     APTR.FromPointer(entry), DosLayout.ExAllData.Type));
-                if (morphosProfile && name != 0 && type ==
+                if (SupportsMorphOS && morphosProfile && name != 0 && type ==
                         (int)DosConstants.SoftLink)
                     type = ResolveExAllSoftLink(locked,
                         APTR.FromPointer(name), type);
@@ -460,7 +465,7 @@ public static class NativeMorphOSDirCommand
         {
             ioError = lockError != 0 ? lockError :
                 (int)DOS.Error.ObjectNotFound;
-            if (morphosProfile && ioError ==
+            if (SupportsMorphOS && morphosProfile && ioError ==
                     (int)DOS.Error.ObjectNotFound)
             {
                 var path = scratch;
@@ -578,7 +583,7 @@ public static class NativeMorphOSDirCommand
             var type = unchecked((int)APTR.ReadUInt32(info,
                 FileInfoBlock.DirEntryTypeOffset));
             var isDirectory = type > 0;
-            if (morphosProfile && type == (int)DosConstants.SoftLink)
+            if (SupportsMorphOS && morphosProfile && type == (int)DosConstants.SoftLink)
             {
                 var linkInfo = APTR.FromPointer(workspace.Raw +
                     PatternLabelStart);

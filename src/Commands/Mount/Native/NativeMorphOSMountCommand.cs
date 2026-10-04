@@ -14,6 +14,11 @@ namespace CopperOS.Commands.Native;
 /// </summary>
 public static class NativeMorphOSMountCommand
 {
+#if COPPEROS_WORKBENCH31_MOUNT
+    private const bool WorkbenchSlotsOnly = true;
+#else
+    private const bool WorkbenchSlotsOnly = false;
+#endif
     public const string Template = "DEVICE/M,FROM/K,DEBUG/S";
     public const uint ResultCount = 3;
 
@@ -897,7 +902,7 @@ public static class NativeMorphOSMountCommand
     }
 
     private static uint Slot(RecordSlot slot, bool workbench) =>
-        (uint)(workbench ? slot switch
+        (uint)(WorkbenchSlotsOnly || workbench ? slot switch
         {
             RecordSlot.Handler => 22,
             RecordSlot.EHandler => 29,
