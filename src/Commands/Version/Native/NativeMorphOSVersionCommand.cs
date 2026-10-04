@@ -292,15 +292,15 @@ public static class NativeMorphOSVersionCommand
         var error = 0;
         do
         {
-            var names = ReadPointer(arguments, 0);
-            var md5 = ReadSwitch(arguments, 1);
-            var requestedVersion = ReadNumber(arguments, 2,
+            var names = ReadPointer(ref arguments, 0);
+            var md5 = ReadSwitch(ref arguments, 1);
+            var requestedVersion = ReadNumber(ref arguments, 2,
                 out var hasVersion);
-            var requestedRevision = ReadNumber(arguments, 3,
+            var requestedRevision = ReadNumber(ref arguments, 3,
                 out var hasRevision);
-            var file = ReadSwitch(arguments, 4);
-            var full = ReadSwitch(arguments, 5);
-            var resident = ReadSwitch(arguments, 6);
+            var file = ReadSwitch(ref arguments, 4);
+            var full = ReadSwitch(ref arguments, 5);
+            var resident = ReadSwitch(ref arguments, 6);
 
             if (names.IsNull)
             {
@@ -2952,20 +2952,20 @@ public static class NativeMorphOSVersionCommand
         value >= (uint)'A' && value <= (uint)'Z' ||
         value >= (uint)'a' && value <= (uint)'z';
 
-    private static APTR ReadPointer(NativeCommandArguments arguments,
+    private static APTR ReadPointer(ref NativeCommandArguments arguments,
         uint index)
     {
         return arguments.TryGetResult(index, out var value)
             ? APTR.FromPointer(value) : APTR.Null;
     }
 
-    private static uint ReadSwitch(NativeCommandArguments arguments,
+    private static uint ReadSwitch(ref NativeCommandArguments arguments,
         uint index)
     {
         return arguments.TryGetResult(index, out var value) ? value : 0;
     }
 
-    private static int ReadNumber(NativeCommandArguments arguments,
+    private static int ReadNumber(ref NativeCommandArguments arguments,
         uint index, out bool present)
     {
         present = false;

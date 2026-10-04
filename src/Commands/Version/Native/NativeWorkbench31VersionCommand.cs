@@ -76,13 +76,13 @@ public static class NativeWorkbench31VersionCommand
         var providerPath = APTR.Null;
         do
         {
-            var name = ReadPointer(arguments, 0);
-            var requestedVersion = ReadNumber(arguments, 1,
+            var name = ReadPointer(ref arguments, 0);
+            var requestedVersion = ReadNumber(ref arguments, 1,
                 out var hasVersion);
-            var requestedRevision = ReadNumber(arguments, 2,
+            var requestedRevision = ReadNumber(ref arguments, 2,
                 out var hasRevision);
-            var file = ReadSwitch(arguments, 3);
-            var full = ReadSwitch(arguments, 4);
+            var file = ReadSwitch(ref arguments, 3);
+            var full = ReadSwitch(ref arguments, 4);
             // Original 40.1 parses UNIT/INTERNAL/RES but never reads their
             // result slots. FILE limits a named lookup to its direct file
             // provider; the no-name system report remains independent of it.
@@ -908,14 +908,14 @@ public static class NativeWorkbench31VersionCommand
             Fields.AddressOf(ref diagnostic));
     }
 
-    private static APTR ReadPointer(NativeCommandArguments arguments,
+    private static APTR ReadPointer(ref NativeCommandArguments arguments,
         uint index) => arguments.TryGetResult(index, out var value)
             ? APTR.FromPointer(value) : APTR.Null;
 
-    private static uint ReadSwitch(NativeCommandArguments arguments,
+    private static uint ReadSwitch(ref NativeCommandArguments arguments,
         uint index) => arguments.TryGetResult(index, out var value) ? value : 0;
 
-    private static int ReadNumber(NativeCommandArguments arguments,
+    private static int ReadNumber(ref NativeCommandArguments arguments,
         uint index, out bool present)
     {
         present = false;

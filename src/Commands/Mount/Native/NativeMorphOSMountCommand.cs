@@ -173,12 +173,12 @@ public static class NativeMorphOSMountCommand
         do
         {
             var from = APTR.Null;
-            if (TryGetPointer(arguments, 1, out var fromValue) &&
+            if (TryGetPointer(ref arguments, 1, out var fromValue) &&
                 fromValue.IsNotNull)
                 from = fromValue;
 
             var deviceVector = APTR.Null;
-            var hasDevices = TryGetPointer(arguments, 0, out deviceVector) &&
+            var hasDevices = TryGetPointer(ref arguments, 0, out deviceVector) &&
                 deviceVector.IsNotNull && APTR.ReadUInt32(deviceVector, 0) != 0;
             if (!hasDevices)
             {
@@ -444,7 +444,7 @@ public static class NativeMorphOSMountCommand
                         break;
                     }
 
-                    var mounted = ProcessRecord(record, deviceName,
+                    var mounted = ProcessRecord(ref record, deviceName,
                         workbench, out var recordError);
                     record.ReleaseBorrowed();
                     if (!mounted)
@@ -787,7 +787,7 @@ public static class NativeMorphOSMountCommand
                 break;
             }
 
-            var mounted = ProcessRecord(record, deviceName, workbench,
+            var mounted = ProcessRecord(ref record, deviceName, workbench,
                 out var recordError);
             record.ReleaseBorrowed();
             if (!mounted)
@@ -851,7 +851,7 @@ public static class NativeMorphOSMountCommand
                 break;
             }
 
-            var mounted = ProcessRecord(record, deviceName, workbench,
+            var mounted = ProcessRecord(ref record, deviceName, workbench,
                 out var recordError);
             record.Release();
             if (!mounted)
@@ -968,20 +968,20 @@ public static class NativeMorphOSMountCommand
             _ => 0
         });
 
-    private static bool ProcessRecord(NativeCommandArguments arguments,
+    private static bool ProcessRecord(ref NativeCommandArguments arguments,
         APTR deviceName, bool workbench, out int ioError)
     {
         ioError = 0;
         var handlerSlot = Slot(RecordSlot.Handler, workbench);
         var eHandlerSlot = Slot(RecordSlot.EHandler, workbench);
         var fileSystemSlot = Slot(RecordSlot.FileSystem, workbench);
-        if (!TryGetPointer(arguments, handlerSlot, out var handler) || handler.IsNull)
+        if (!TryGetPointer(ref arguments, handlerSlot, out var handler) || handler.IsNull)
         {
             // Workbench has separate FILESYSTEM and EHANDLER slots, while
             // MorphOS exposes FILESYSTEM as the EHANDLER spelling alias.
-            if (!TryGetPointer(arguments, fileSystemSlot, out handler) || handler.IsNull)
+            if (!TryGetPointer(ref arguments, fileSystemSlot, out handler) || handler.IsNull)
             {
-                if (!TryGetPointer(arguments, eHandlerSlot, out handler) || handler.IsNull)
+                if (!TryGetPointer(ref arguments, eHandlerSlot, out handler) || handler.IsNull)
                 {
                     ioError = (int)DOS.Error.RequiredArgumentMissing;
                     return false;
@@ -989,8 +989,8 @@ public static class NativeMorphOSMountCommand
             }
         }
         var dosTypeSlot = Slot(RecordSlot.DosType, workbench);
-        var hasDosType = HasValue(arguments, dosTypeSlot);
-        if (!TryGetNumber(arguments, dosTypeSlot, DefaultDosType, false, out var dosType) ||
+        var hasDosType = HasValue(ref arguments, dosTypeSlot);
+        if (!TryGetNumber(ref arguments, dosTypeSlot, DefaultDosType, false, out var dosType) ||
             (!hasDosType && handler.IsNull))
         {
             ioError = hasDosType ? (int)DOS.Error.BadNumber :
@@ -1027,7 +1027,7 @@ public static class NativeMorphOSMountCommand
             }
 
             var bootPriority = 0;
-            if (!TryGetNumber(arguments, Slot(RecordSlot.BootPriority, workbench),
+            if (!TryGetNumber(ref arguments, Slot(RecordSlot.BootPriority, workbench),
                     0, false, out bootPriority) ||
                 bootPriority < sbyte.MinValue || bootPriority > sbyte.MaxValue)
             {
@@ -1038,11 +1038,11 @@ public static class NativeMorphOSMountCommand
             var stackSize = 8192;
             var priority = 5;
             var globalVector = -1;
-            if (!TryGetNumber(arguments, Slot(RecordSlot.StackSize, workbench),
+            if (!TryGetNumber(ref arguments, Slot(RecordSlot.StackSize, workbench),
                     stackSize, false, out stackSize) ||
-                !TryGetNumber(arguments, Slot(RecordSlot.Priority, workbench),
+                !TryGetNumber(ref arguments, Slot(RecordSlot.Priority, workbench),
                     priority, false, out priority) ||
-                !TryGetNumber(arguments, Slot(RecordSlot.GlobalVector, workbench),
+                !TryGetNumber(ref arguments, Slot(RecordSlot.GlobalVector, workbench),
                     globalVector, false, out globalVector) ||
                 globalVector < -3 || globalVector > -1)
             {
@@ -1052,11 +1052,11 @@ public static class NativeMorphOSMountCommand
 
             var startup = 0;
             var startupSlot = Slot(RecordSlot.Startup, workbench);
-            var startupProvided = HasValue(arguments, startupSlot);
+            var startupProvided = HasValue(ref arguments, startupSlot);
             if (startupProvided &&
-                !TryGetNumber(arguments, startupSlot, startup, false, out startup))
+                !TryGetNumber(ref arguments, startupSlot, startup, false, out startup))
             {
-                if (!TryGetPointer(arguments, startupSlot, out var startupText) ||
+                if (!TryGetPointer(ref arguments, startupSlot, out var startupText) ||
                     !TryCopyBString(startupText, out startupString,
                         out startupStringBytes, out ioError)) break;
             }
@@ -1077,28 +1077,28 @@ public static class NativeMorphOSMountCommand
                 break;
             }
 
-            if (!TryGetCString(arguments, Slot(RecordSlot.Device, workbench),
+            if (!TryGetCString(ref arguments, Slot(RecordSlot.Device, workbench),
                     out var deviceText) ||
                 (!deviceText.IsNull && !TryCopyCString(deviceText,
                     out deviceString, out deviceStringBytes, out ioError)))
                 break;
-            if (!TryGetNumericOrCString(arguments,
+            if (!TryGetNumericOrCString(ref arguments,
                     Slot(RecordSlot.Unit, workbench), number,
                     out var unit, out unitString, out unitStringBytes,
                     out ioError)) break;
-            if (!TryGetNumericOrCString(arguments,
+            if (!TryGetNumericOrCString(ref arguments,
                     Slot(RecordSlot.Flags, workbench), number,
                     out var flags, out flagsString, out flagsStringBytes,
                     out ioError)) break;
             var controlSlot = Slot(RecordSlot.Control, workbench);
-            if (HasValue(arguments, controlSlot))
+            if (HasValue(ref arguments, controlSlot))
             {
-                if (!TryGetPointer(arguments, controlSlot, out var controlText) ||
+                if (!TryGetPointer(ref arguments, controlSlot, out var controlText) ||
                     !TryCopyBString(controlText, out controlString,
                         out controlStringBytes, out ioError)) break;
             }
 
-            WriteEnvironment(arguments, environment, number, bootPriority,
+            WriteEnvironment(ref arguments, environment, number, bootPriority,
                 dosType, controlString, workbench);
             APTR.WriteUInt32(packet, 0, deviceName.Raw);
             APTR.WriteUInt32(packet, 4, deviceString.Raw);
@@ -1124,7 +1124,7 @@ public static class NativeMorphOSMountCommand
                     out handlerStringBytes, out ioError)) break;
 
             var forceLoad = 0;
-            if (!TryGetNumber(arguments, Slot(RecordSlot.ForceLoad, workbench),
+            if (!TryGetNumber(ref arguments, Slot(RecordSlot.ForceLoad, workbench),
                     0, false, out forceLoad))
             {
                 ioError = (int)DOS.Error.BadNumber;
@@ -1156,7 +1156,7 @@ public static class NativeMorphOSMountCommand
             }
             APTR.WriteUInt32(node, 36, unchecked((uint)globalVector));
 
-            var activate = ReadNumber(arguments,
+            var activate = ReadNumber(ref arguments,
                 Slot(RecordSlot.Activate, workbench), number);
             var addFlags = activate != 0 ? 1u : 0u; // ADNF_STARTPROC
 
@@ -1192,14 +1192,14 @@ public static class NativeMorphOSMountCommand
         return mounted;
     }
 
-    private static void WriteEnvironment(NativeCommandArguments arguments,
+    private static void WriteEnvironment(ref NativeCommandArguments arguments,
         APTR environment, APTR scratch, int bootPriority, int dosType,
         APTR controlString, bool workbench)
     {
         WriteLong(environment, 0, 19);
         var sizeBlockSlot = Slot(RecordSlot.SectorSize, workbench);
-        var sizeBlock = ReadNumber(arguments, sizeBlockSlot, scratch);
-        if (!HasValue(arguments, sizeBlockSlot)) sizeBlock = DefaultSizeBlock;
+        var sizeBlock = ReadNumber(ref arguments, sizeBlockSlot, scratch);
+        if (!HasValue(ref arguments, sizeBlockSlot)) sizeBlock = DefaultSizeBlock;
         else sizeBlock >>= 2; // source accepts bytes and stores longwords
         WriteLong(environment, 1, sizeBlock);
         WriteLong(environment, 2, 0);
@@ -1215,32 +1215,32 @@ public static class NativeMorphOSMountCommand
         var bufferMemoryTypeSlot = Slot(RecordSlot.BufferMemoryType, workbench);
         var maximumTransferSlot = Slot(RecordSlot.MaximumTransfer, workbench);
         var maskSlot = Slot(RecordSlot.Mask, workbench);
-        WriteLong(environment, 3, HasValue(arguments, surfacesSlot) ?
-            ReadNumber(arguments, surfacesSlot, scratch) : DefaultSurfaces);
-        WriteLong(environment, 4, HasValue(arguments, sectorsPerBlockSlot) ?
-            ReadNumber(arguments, sectorsPerBlockSlot, scratch) : DefaultSectorsPerBlock);
-        WriteLong(environment, 5, HasValue(arguments, blocksPerTrackSlot) ?
-            ReadNumber(arguments, blocksPerTrackSlot, scratch) : DefaultBlocksPerTrack);
-        WriteLong(environment, 6, HasValue(arguments, reservedSlot) ?
-            ReadNumber(arguments, reservedSlot, scratch) : DefaultReserved);
-        WriteLong(environment, 7, ReadNumber(arguments, preAllocSlot, scratch));
-        WriteLong(environment, 8, ReadNumber(arguments, interleaveSlot, scratch));
-        WriteLong(environment, 9, ReadNumber(arguments, lowCylinderSlot, scratch));
-        WriteLong(environment, 10, HasValue(arguments, highCylinderSlot) ?
-            ReadNumber(arguments, highCylinderSlot, scratch) : DefaultHighCylinder);
-        WriteLong(environment, 11, HasValue(arguments, buffersSlot) ?
-            ReadNumber(arguments, buffersSlot, scratch) : DefaultBuffers);
-        WriteLong(environment, 12, HasValue(arguments, bufferMemoryTypeSlot) ?
-            ReadNumber(arguments, bufferMemoryTypeSlot, scratch) : DefaultBufferMemoryType);
-        WriteLong(environment, 13, HasValue(arguments, maximumTransferSlot) ?
-            ReadNumber(arguments, maximumTransferSlot, scratch) : DefaultMaximumTransfer);
-        WriteLong(environment, 14, HasValue(arguments, maskSlot) ?
-            ReadNumber(arguments, maskSlot, scratch) : DefaultMask);
+        WriteLong(environment, 3, HasValue(ref arguments, surfacesSlot) ?
+            ReadNumber(ref arguments, surfacesSlot, scratch) : DefaultSurfaces);
+        WriteLong(environment, 4, HasValue(ref arguments, sectorsPerBlockSlot) ?
+            ReadNumber(ref arguments, sectorsPerBlockSlot, scratch) : DefaultSectorsPerBlock);
+        WriteLong(environment, 5, HasValue(ref arguments, blocksPerTrackSlot) ?
+            ReadNumber(ref arguments, blocksPerTrackSlot, scratch) : DefaultBlocksPerTrack);
+        WriteLong(environment, 6, HasValue(ref arguments, reservedSlot) ?
+            ReadNumber(ref arguments, reservedSlot, scratch) : DefaultReserved);
+        WriteLong(environment, 7, ReadNumber(ref arguments, preAllocSlot, scratch));
+        WriteLong(environment, 8, ReadNumber(ref arguments, interleaveSlot, scratch));
+        WriteLong(environment, 9, ReadNumber(ref arguments, lowCylinderSlot, scratch));
+        WriteLong(environment, 10, HasValue(ref arguments, highCylinderSlot) ?
+            ReadNumber(ref arguments, highCylinderSlot, scratch) : DefaultHighCylinder);
+        WriteLong(environment, 11, HasValue(ref arguments, buffersSlot) ?
+            ReadNumber(ref arguments, buffersSlot, scratch) : DefaultBuffers);
+        WriteLong(environment, 12, HasValue(ref arguments, bufferMemoryTypeSlot) ?
+            ReadNumber(ref arguments, bufferMemoryTypeSlot, scratch) : DefaultBufferMemoryType);
+        WriteLong(environment, 13, HasValue(ref arguments, maximumTransferSlot) ?
+            ReadNumber(ref arguments, maximumTransferSlot, scratch) : DefaultMaximumTransfer);
+        WriteLong(environment, 14, HasValue(ref arguments, maskSlot) ?
+            ReadNumber(ref arguments, maskSlot, scratch) : DefaultMask);
         WriteLong(environment, 15, bootPriority);
         WriteLong(environment, 16, dosType);
         var baudSlot = Slot(RecordSlot.Baud, workbench);
-        WriteLong(environment, 17, HasValue(arguments, baudSlot) ?
-            ReadNumber(arguments, baudSlot, scratch) : DefaultBaud);
+        WriteLong(environment, 17, HasValue(ref arguments, baudSlot) ?
+            ReadNumber(ref arguments, baudSlot, scratch) : DefaultBaud);
         WriteLong(environment, 18, controlString.IsNull ? 0u :
             BPTR.FromAddress(controlString).Raw);
         // MOUNT/ACTIVATE controls AddDosNode's ADNF_STARTPROC flag. The
@@ -1255,7 +1255,7 @@ public static class NativeMorphOSMountCommand
     private static void WriteLong(APTR address, int index, uint value) =>
         APTR.WriteUInt32(address, index * 4, value);
 
-    private static bool TryGetPointer(NativeCommandArguments arguments,
+    private static bool TryGetPointer(ref NativeCommandArguments arguments,
         uint index, out APTR value)
     {
         value = APTR.Null;
@@ -1263,7 +1263,7 @@ public static class NativeMorphOSMountCommand
             (value = APTR.FromPointer(raw)).IsNotNull;
     }
 
-    private static bool HasValue(NativeCommandArguments arguments, uint index) =>
+    private static bool HasValue(ref NativeCommandArguments arguments, uint index) =>
         arguments.TryGetResult(index, out var value) && value != 0;
 
     private static bool TryResolveDeviceSource(APTR requested,
@@ -1396,7 +1396,7 @@ public static class NativeMorphOSMountCommand
         return SearchPathBytes;
     }
 
-    private static bool TryGetNumber(NativeCommandArguments arguments, uint index,
+    private static bool TryGetNumber(ref NativeCommandArguments arguments, uint index,
         int defaultValue, bool required, out int value)
     {
         value = defaultValue;
@@ -1417,7 +1417,7 @@ public static class NativeMorphOSMountCommand
         return true;
     }
 
-    private static uint ReadNumber(NativeCommandArguments arguments, uint index,
+    private static uint ReadNumber(ref NativeCommandArguments arguments, uint index,
         APTR scratch)
     {
         if (!arguments.TryGetResult(index, out var raw) || raw == 0 ||
@@ -1429,7 +1429,7 @@ public static class NativeMorphOSMountCommand
         return APTR.ReadUInt32(scratch, 0);
     }
 
-    private static bool TryGetCString(NativeCommandArguments arguments,
+    private static bool TryGetCString(ref NativeCommandArguments arguments,
         uint index, out APTR value)
     {
         value = APTR.Null;
@@ -1439,7 +1439,7 @@ public static class NativeMorphOSMountCommand
     }
 
     private static bool TryGetNumericOrCString(
-        NativeCommandArguments arguments, uint index, APTR scratch,
+        ref NativeCommandArguments arguments, uint index, APTR scratch,
         out uint value, out APTR textCopy, out uint textCopyBytes,
         out int ioError)
     {
@@ -1447,7 +1447,7 @@ public static class NativeMorphOSMountCommand
         textCopy = APTR.Null;
         textCopyBytes = 0;
         ioError = 0;
-        if (!TryGetCString(arguments, index, out var source) ||
+        if (!TryGetCString(ref arguments, index, out var source) ||
             source.IsNull) return true;
         if (!scratch.IsNull &&
             DOS.StrToLong(CString.FromPointer(source), scratch) > 0)

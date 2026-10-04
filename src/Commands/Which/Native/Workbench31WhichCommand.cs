@@ -59,8 +59,8 @@ public static class Workbench31WhichCommand
         var result = DOS.RETURN_WARN;
         var buffer = APTR.Null;
         var fileInfo = APTR.Null;
-        var noAlias = morphos ? ReadSwitch(arguments, 1) : 0u;
-        var alias = morphos ? ReadSwitch(arguments, 2) : 0u;
+        var noAlias = morphos ? ReadSwitch(ref arguments, 1) : 0u;
+        var alias = morphos ? ReadSwitch(ref arguments, 2) : 0u;
         var noResidentsIndex = morphos ? 3u : 1u;
         var residentsOnlyIndex = morphos ? 4u : 2u;
         var allIndex = morphos ? 5u : 3u;
@@ -328,7 +328,7 @@ public static class Workbench31WhichCommand
         return result;
     }
 
-    private static uint ReadSwitch(NativeCommandArguments arguments,
+    private static uint ReadSwitch(ref NativeCommandArguments arguments,
         uint index) => arguments.TryGetResult(index, out var value) ? value : 0;
 
     private static BPTR NextPathLock(BPTR path)

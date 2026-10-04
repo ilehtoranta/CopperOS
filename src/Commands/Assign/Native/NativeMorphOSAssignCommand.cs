@@ -32,21 +32,21 @@ public static class NativeMorphOSAssignCommand
         var error = 0;
         do
         {
-            if (!TryRead(arguments, 0, out var name) || name.IsNull)
+            if (!TryRead(ref arguments, 0, out var name) || name.IsNull)
             {
                 error = (int)DOS.Error.BadTemplate;
                 break;
             }
 
-            var list = ReadSwitch(arguments, 2);
-            var dismount = ReadSwitch(arguments, 3);
-            var defer = ReadSwitch(arguments, 4);
-            var path = ReadSwitch(arguments, 5);
-            var add = ReadSwitch(arguments, 6);
-            var remove = ReadSwitch(arguments, 7);
-            var volumes = ReadSwitch(arguments, 8);
-            var dirs = ReadSwitch(arguments, 9);
-            var devices = ReadSwitch(arguments, 10);
+            var list = ReadSwitch(ref arguments, 2);
+            var dismount = ReadSwitch(ref arguments, 3);
+            var defer = ReadSwitch(ref arguments, 4);
+            var path = ReadSwitch(ref arguments, 5);
+            var add = ReadSwitch(ref arguments, 6);
+            var remove = ReadSwitch(ref arguments, 7);
+            var volumes = ReadSwitch(ref arguments, 8);
+            var dirs = ReadSwitch(ref arguments, 9);
+            var devices = ReadSwitch(ref arguments, 10);
 
             // These modes require the original packed command's output and
             // handler protocol.  Do not reinterpret them as a mutation.
@@ -58,7 +58,7 @@ public static class NativeMorphOSAssignCommand
                 break;
             }
 
-            if (!TryRead(arguments, 1, out var targetVector) ||
+            if (!TryRead(ref arguments, 1, out var targetVector) ||
                 targetVector.IsNull)
             {
                 error = (int)DOS.Error.BadTemplate;
@@ -154,7 +154,7 @@ public static class NativeMorphOSAssignCommand
         return result;
     }
 
-    private static bool TryRead(NativeCommandArguments arguments, uint index,
+    private static bool TryRead(ref NativeCommandArguments arguments, uint index,
         out APTR value)
     {
         value = APTR.Null;
@@ -163,6 +163,6 @@ public static class NativeMorphOSAssignCommand
         return true;
     }
 
-    private static uint ReadSwitch(NativeCommandArguments arguments, uint index) =>
+    private static uint ReadSwitch(ref NativeCommandArguments arguments, uint index) =>
         arguments.TryGetResult(index, out var value) ? value : 0;
 }

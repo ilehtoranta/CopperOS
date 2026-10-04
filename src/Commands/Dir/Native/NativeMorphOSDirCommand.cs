@@ -79,12 +79,12 @@ public static class NativeMorphOSDirCommand
 
         do
         {
-            var directory = ReadPointer(arguments, 0);
-            var option = ReadPointer(arguments, 1);
-            var all = ReadSwitch(arguments, 2) != 0;
-            var dirs = ReadSwitch(arguments, 3) != 0;
-            var files = ReadSwitch(arguments, 4) != 0;
-            var interactiveSwitch = ReadSwitch(arguments, 5) != 0;
+            var directory = ReadPointer(ref arguments, 0);
+            var option = ReadPointer(ref arguments, 1);
+            var all = ReadSwitch(ref arguments, 2) != 0;
+            var dirs = ReadSwitch(ref arguments, 3) != 0;
+            var files = ReadSwitch(ref arguments, 4) != 0;
+            var interactiveSwitch = ReadSwitch(ref arguments, 5) != 0;
             var inter = false;
 
             if (interactiveSwitch || all && (!SupportsMorphOS || !morphosProfile))
@@ -788,11 +788,11 @@ public static class NativeMorphOSDirCommand
         return true;
     }
 
-    private static APTR ReadPointer(NativeCommandArguments arguments,
+    private static APTR ReadPointer(ref NativeCommandArguments arguments,
         uint index) => arguments.TryGetResult(index, out var value)
         ? APTR.FromPointer(value) : APTR.Null;
 
-    private static uint ReadSwitch(NativeCommandArguments arguments,
+    private static uint ReadSwitch(ref NativeCommandArguments arguments,
         uint index) => arguments.TryGetResult(index, out var value) ? value : 0;
 
     private static byte ToUpper(byte value) => value >= (byte)'a' &&

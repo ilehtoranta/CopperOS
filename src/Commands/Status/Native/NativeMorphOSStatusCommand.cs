@@ -54,13 +54,13 @@ public static class NativeMorphOSStatusCommand
             return arguments.ReturnLevel;
         }
 
-        var processSlot = ReadPointer(arguments, 0);
+        var processSlot = ReadPointer(ref arguments, 0);
         var hasProcess = processSlot.IsNotNull;
         var process = hasProcess ? APTR.ReadUInt32(processSlot, 0) : 0u;
-        var full = ReadSwitch(arguments, 1);
-        var tcb = ReadSwitch(arguments, 2);
-        var cli = ReadSwitch(arguments, 3);
-        var command = ReadPointer(arguments, 4);
+        var full = ReadSwitch(ref arguments, 1);
+        var tcb = ReadSwitch(ref arguments, 2);
+        var cli = ReadSwitch(ref arguments, 3);
+        var command = ReadPointer(ref arguments, 4);
         var found = false;
         var result = DOS.RETURN_OK;
 
@@ -133,12 +133,12 @@ public static class NativeMorphOSStatusCommand
         return result;
     }
 
-    private static uint ReadSwitch(NativeCommandArguments arguments, uint index)
+    private static uint ReadSwitch(ref NativeCommandArguments arguments, uint index)
     {
         return arguments.TryGetResult(index, out var value) ? value : 0;
     }
 
-    private static APTR ReadPointer(NativeCommandArguments arguments,
+    private static APTR ReadPointer(ref NativeCommandArguments arguments,
         uint index)
     {
         return arguments.TryGetResult(index, out var value)

@@ -35,22 +35,22 @@ public static class NativeWorkbench31AssignCommand
         var error = 0;
         do
         {
-            if (!TryRead(arguments, 0, out var name) || name.IsNull)
+            if (!TryRead(ref arguments, 0, out var name) || name.IsNull)
             {
                 error = (int)DOS.Error.BadTemplate;
                 break;
             }
 
-            var list = ReadSwitch(arguments, 2);
-            var exists = ReadSwitch(arguments, 3);
-            var dismount = ReadSwitch(arguments, 4);
-            var defer = ReadSwitch(arguments, 5);
-            var path = ReadSwitch(arguments, 6);
-            var add = ReadSwitch(arguments, 7);
-            var remove = ReadSwitch(arguments, 8);
-            var volumes = ReadSwitch(arguments, 9);
-            var dirs = ReadSwitch(arguments, 10);
-            var devices = ReadSwitch(arguments, 11);
+            var list = ReadSwitch(ref arguments, 2);
+            var exists = ReadSwitch(ref arguments, 3);
+            var dismount = ReadSwitch(ref arguments, 4);
+            var defer = ReadSwitch(ref arguments, 5);
+            var path = ReadSwitch(ref arguments, 6);
+            var add = ReadSwitch(ref arguments, 7);
+            var remove = ReadSwitch(ref arguments, 8);
+            var volumes = ReadSwitch(ref arguments, 9);
+            var dirs = ReadSwitch(ref arguments, 10);
+            var devices = ReadSwitch(ref arguments, 11);
 
             // These modes need a separately captured reference contract. Do
             // not silently reinterpret them as a mutation operation.
@@ -62,7 +62,7 @@ public static class NativeWorkbench31AssignCommand
                 break;
             }
 
-            if (!TryRead(arguments, 1, out var targetVector) ||
+            if (!TryRead(ref arguments, 1, out var targetVector) ||
                 targetVector.IsNull)
             {
                 error = (int)DOS.Error.BadTemplate;
@@ -158,7 +158,7 @@ public static class NativeWorkbench31AssignCommand
         return result;
     }
 
-    private static bool TryRead(NativeCommandArguments arguments, uint index,
+    private static bool TryRead(ref NativeCommandArguments arguments, uint index,
         out APTR value)
     {
         value = APTR.Null;
@@ -167,6 +167,6 @@ public static class NativeWorkbench31AssignCommand
         return true;
     }
 
-    private static uint ReadSwitch(NativeCommandArguments arguments, uint index) =>
+    private static uint ReadSwitch(ref NativeCommandArguments arguments, uint index) =>
         arguments.TryGetResult(index, out var value) ? value : 0;
 }

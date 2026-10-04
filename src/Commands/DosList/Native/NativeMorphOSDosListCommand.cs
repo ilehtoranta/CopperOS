@@ -145,14 +145,14 @@ public static class NativeMorphOSDosListCommand
             return arguments.ReturnLevel;
         }
 
-        var name = ReadPointer(arguments, 0);
-        var address = ReadPointer(arguments, 1);
+        var name = ReadPointer(ref arguments, 0);
+        var address = ReadPointer(ref arguments, 1);
         var wantedAddress = address.IsNotNull
             ? APTR.ReadUInt32(address, 0) : 0u;
-        var devices = ReadSwitch(arguments, 2) != 0;
-        var volumes = ReadSwitch(arguments, 3) != 0;
-        var assigns = ReadSwitch(arguments, 4) != 0;
-        var verbose = ReadSwitch(arguments, 5) != 0;
+        var devices = ReadSwitch(ref arguments, 2) != 0;
+        var volumes = ReadSwitch(ref arguments, 3) != 0;
+        var assigns = ReadSwitch(ref arguments, 4) != 0;
+        var verbose = ReadSwitch(ref arguments, 5) != 0;
 
         if (!devices && !volumes && !assigns)
         {
@@ -1231,10 +1231,10 @@ public static class NativeMorphOSDosListCommand
     private static byte Fold(byte value) => value is >= (byte)'a' and
         <= (byte)'z' ? (byte)(value - ((byte)'a' - (byte)'A')) : value;
 
-    private static uint ReadSwitch(NativeCommandArguments arguments,
+    private static uint ReadSwitch(ref NativeCommandArguments arguments,
         uint index) => arguments.TryGetResult(index, out var value) ? value : 0;
 
-    private static APTR ReadPointer(NativeCommandArguments arguments,
+    private static APTR ReadPointer(ref NativeCommandArguments arguments,
         uint index) => arguments.TryGetResult(index, out var value)
         ? APTR.FromPointer(value) : APTR.Null;
 }

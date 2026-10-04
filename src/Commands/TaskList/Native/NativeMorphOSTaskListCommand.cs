@@ -245,11 +245,11 @@ public static class NativeMorphOSTaskListCommand
         var error = 0;
         do
         {
-            var name = ReadPointer(arguments, 0);
-            var address = ReadNumber(arguments, 1, out var hasAddress);
-            var verbose = ReadSwitch(arguments, 2);
-            var stackTrace = ReadSwitch(arguments, 3);
-            var requestedStackLevel = ReadNumber(arguments, 4, out var hasStackLevel);
+            var name = ReadPointer(ref arguments, 0);
+            var address = ReadNumber(ref arguments, 1, out var hasAddress);
+            var verbose = ReadSwitch(ref arguments, 2);
+            var stackTrace = ReadSwitch(ref arguments, 3);
+            var requestedStackLevel = ReadNumber(ref arguments, 4, out var hasStackLevel);
             if (requestedStackLevel < 0)
             {
                 error = (int)DOS.Error.BadNumber;
@@ -264,12 +264,12 @@ public static class NativeMorphOSTaskListCommand
                 error = (int)DOS.Error.NoFreeStore;
                 break;
             }
-            var noRun = ReadSwitch(arguments, 5) != 0;
-            var noWait = ReadSwitch(arguments, 6) != 0;
-            var noReady = ReadSwitch(arguments, 7) != 0;
-            var internalMode = ReadSwitch(arguments, 8);
-            var registerDump = ReadSwitch(arguments, 9);
-            var registerCheck = ReadSwitch(arguments, 10);
+            var noRun = ReadSwitch(ref arguments, 5) != 0;
+            var noWait = ReadSwitch(ref arguments, 6) != 0;
+            var noReady = ReadSwitch(ref arguments, 7) != 0;
+            var internalMode = ReadSwitch(ref arguments, 8);
+            var registerDump = ReadSwitch(ref arguments, 9);
+            var registerCheck = ReadSwitch(ref arguments, 10);
 
             var systemBoundaries = new SystemBoundaryFields
             {
@@ -1874,20 +1874,20 @@ public static class NativeMorphOSTaskListCommand
         _ => CString.ToUInt32("-------")
     };
 
-    private static APTR ReadPointer(NativeCommandArguments arguments,
+    private static APTR ReadPointer(ref NativeCommandArguments arguments,
         uint index)
     {
         return arguments.TryGetResult(index, out var value)
             ? APTR.FromPointer(value) : APTR.Null;
     }
 
-    private static uint ReadSwitch(NativeCommandArguments arguments,
+    private static uint ReadSwitch(ref NativeCommandArguments arguments,
         uint index)
     {
         return arguments.TryGetResult(index, out var value) ? value : 0;
     }
 
-    private static int ReadNumber(NativeCommandArguments arguments,
+    private static int ReadNumber(ref NativeCommandArguments arguments,
         uint index, out bool present)
     {
         present = false;
