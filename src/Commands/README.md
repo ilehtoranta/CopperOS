@@ -33,3 +33,42 @@ pwsh tools/Commands/build-c.ps1 -Command Eval,Which -SkipCompiler
 Settings shared by all command projects (resident profile, fatal exceptions,
 local CopperSharp68k tree, publish copy into `out/C/`) are in
 `Directory.Build.props` and `Directory.Build.targets`.
+
+## Executable size policy
+
+Dir and Mount also select their Workbench profile at C# build time. Aggregate
+qualification roots retain both profiles. Command argument helpers pass the
+live `NativeCommandArguments` lease by reference through one release path.
+
+`CopperOSCodeSizeOptimizations` controls the opt-in CopperSharp resident HUNK
+size policy. Its shared default is `off`; command projects enable it only after
+a smaller executable passes native comparison. A global MSBuild value overrides
+the project selection. Compiler clients retain their existing defaults.
+
+The [complete size report](../../docs/Commands/Workbench31MorphOS320/command-executable-sizes-20261004.json)
+records the fresh baseline, accepted reductions, original Workbench ratios,
+per-pass measurements, execution costs, stack depths, toolchain hashes and
+qualification limits. Existing Search, List and Delete savings are included
+in its starting baseline. Original-image and CopperScreen execution remain
+unavailable on this host; native fixtures supply modeled Exec/DOS responses.
+
+Reproduce using the clean sibling compiler checkout on
+`codex/command-executable-size`, rather than a compiler workspace with unrelated
+local changes:
+
+```powershell
+pwsh tools/Commands/build-c.ps1 -CopperSharpRoot ../CopperSharp68k-wt-command-size -OutputDirectory artifacts/size-run/final/C
+python tools/Commands/measure_c.py artifacts/size-run/final --compiler ../CopperSharp68k-wt-command-size
+```
+
+Use `qualify_sizes.py` to compile captured inputs with an identical compiler
+and compare native receipts on all three CPU models. The compiler accepts
+`--code-size-optimizations on|off`; `--code-size-passes` selects independent
+passes for qualification. `M68kCodeSizeOptions` exposes the same switches to
+API clients, and cannot be combined with `M68kRomSizeOptions`.
+
+`publish-c.ps1` validates the complete staged set against the accepted report,
+backs up the old output, verifies installed hashes and then removes stale
+files. Filtered builds preserve every unselected output file. Baseline images,
+matching inputs and receipts are preserved under
+`artifacts/command-executable-size-20261004`.

@@ -17,6 +17,8 @@ param(
     [string[]]$Command,
     [string]$OutputDirectory,
     [string]$CopperSharpRoot,
+    [string]$CompilerAssembly,
+    [ValidateSet('on', 'off')][string]$CodeSizeOptimizations,
     [switch]$SkipCompiler
 )
 
@@ -50,7 +52,10 @@ if ($Command) {
 $directory = $OutputDirectory.TrimEnd('\') + '\'
 $failed = [Collections.Generic.List[string]]::new()
 $built = foreach ($project in $projects) {
-    & dotnet publish $project.Path -c Release -nologo -v q "-p:CopperSharp68kRoot=$CopperSharpRoot" "-p:CopperOSCDirectory=$directory"
+    $properties = @("-p:CopperSharp68kRoot=$CopperSharpRoot", "-p:CopperOSCDirectory=$directory")
+    if ($CompilerAssembly) { $properties += "-p:CopperOSCompilerAssembly=$([IO.Path]::GetFullPath($CompilerAssembly))" }
+    if ($CodeSizeOptimizations) { $properties += "-p:CopperOSCodeSizeOptimizations=$CodeSizeOptimizations" }
+    & dotnet publish $project.Path -c Release -nologo -v q @properties
     if ($LASTEXITCODE -ne 0) { $failed.Add($project.Name); continue }
     $file = Get-Item -LiteralPath (Join-Path $OutputDirectory $project.Name)
     [pscustomobject]@{ Command = $project.Name; Bytes = $file.Length
