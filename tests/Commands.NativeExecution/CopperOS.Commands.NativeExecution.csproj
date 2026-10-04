@@ -6,10 +6,15 @@
     <AssemblyName>CopperOS.Commands.NativeExecution</AssemblyName>
     <RootNamespace>CopperOS.Commands.NativeExecution</RootNamespace>
     <IsPackable>false</IsPackable>
+    <Copper68kVersion>1.5.1</Copper68kVersion>
   </PropertyGroup>
   <ItemGroup>
     <!-- Same released instruction executor as CopperSharp's native tests. -->
-    <PackageReference Include="Copper68k" Version="1.4.0" />
+    <PackageReference Include="Copper68k" Version="$(Copper68kVersion)" />
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>Copper68kPackageVersion</_Parameter1>
+      <_Parameter2>$(Copper68kVersion)</_Parameter2>
+    </AssemblyAttribute>
     <Compile Include="..\..\src\Commands\Copy\Native\NativeMorphOSCopyModeSelection.cs" Link="NativeMorphOSCopyModeSelection.cs" />
     <Compile Include="..\..\src\Commands\Common\NativeCommandArguments.cs" Link="NativeCommandArguments.cs" />
     <Compile Include="..\..\src\Commands\AddDataTypes\Native\NativeMorphOSAddDataTypesCommand.cs" Link="NativeMorphOSAddDataTypesCommand.cs" />

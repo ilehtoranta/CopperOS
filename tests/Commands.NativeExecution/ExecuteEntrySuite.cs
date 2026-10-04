@@ -654,6 +654,7 @@ internal static class ExecuteEntrySuite
             using var cpu = M68kCoreFactory.Default.Create(model, bus);
             cpu.State.StatusRegister = 0;
             cpu.BeginSubroutine(Load, owner.StackTop, Return);
+            owner.LowestStackPointer = cpu.State.A[7];
             for (var i = 0; i < 8; i++) cpu.State.D[i] = (uint)(0xde000000 + i * 16);
             for (var i = 0; i < 7; i++) cpu.State.A[i] = (uint)(0xae000000 + i * 16);
             cpu.State.D[0] = unchecked((uint)(test.EntryLength ?? test.Arguments.Length));
@@ -667,12 +668,17 @@ internal static class ExecuteEntrySuite
                     Require(++owner.Instructions < 2_000_000 && !cpu.State.Halted && !cpu.State.Stopped,
                         "Execution did not return.");
                     cpu.ExecuteInstruction();
+                    owner.LowestStackPointer = Math.Min(owner.LowestStackPointer, cpu.State.A[7]);
+                    Require(cpu.State.A[7] >= owner.StackTop - owner.StackBytes && cpu.State.A[7] <= owner.StackTop,
+                        "Execute exceeded its configured stack limit.");
                 }
                 Verify(cpu);
                 return new
                 {
                     id = test.Id, result = test.Result, ioErr = test.Error, instructions = owner.Instructions,
-                    workFile = test.WorkFile, stackBytesWritten = owner.StackTop - owner.LowestStackWrite, events
+                    workFile = test.WorkFile, stackBytesWritten = owner.StackTop - owner.LowestStackWrite,
+                    configuredStackBytes = owner.StackBytes,
+                    peakStackBytes = owner.StackTop - owner.LowestStackPointer, events
                 };
             }
             catch (Exception error)

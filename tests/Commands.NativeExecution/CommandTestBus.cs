@@ -179,7 +179,7 @@ internal sealed class CommandTestBus : IM68kBus
         Memory.AsSpan((int)address, (int)allocation.Size).Fill(0xdd);
     }
 
-    public void AssertReleased(Invocation owner) => Require(!allocations.Values.Any(a => ReferenceEquals(a.Owner, owner)),
+    public void AssertReleased(Invocation owner, string? excludedKind = null) => Require(!allocations.Values.Any(a => ReferenceEquals(a.Owner, owner) && a.Kind != excludedKind),
         "Invocation leaked guest memory or RDArgs: " + string.Join(",", allocations.Values
             .Where(a => ReferenceEquals(a.Owner, owner))
             .Select(a => $"{a.Kind}@${a.Address:X8}+{a.Size}")));

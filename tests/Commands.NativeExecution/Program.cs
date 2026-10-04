@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Security.Cryptography;
+using System.Reflection;
 using Amiga;
 using Copper68k;
 using CopperOS.Commands.Native;
@@ -50,7 +51,7 @@ internal static class Program
             };
             var image = HunkImage.Load(args[0], ProbeFixture.LoadAddress);
             imageHash = image.Sha256;
-            var fixture = new ProbeFixture(image, model, suite);
+            var fixture = new ProbeFixture(image, model, suite, args[0]);
             var cases = fixture.Run();
             var report = new
             {
@@ -61,9 +62,12 @@ internal static class Program
                 cpu = args[1],
                 imageSha256 = fixture.Image.Sha256,
                 imageBytes = new FileInfo(args[0]).Length,
+                compilerMapSha256 = File.Exists(args[0] + ".map") ? AssemblyHash(args[0] + ".map") : null,
                 loadedBytes = fixture.Image.Code.Length,
                 imageLoads = observationOnly ? cases.Count : 1,
-                instructionExecutor = "Copper68k 1.4.0",
+                instructionExecutor = "Copper68k " + typeof(Program).Assembly
+                    .GetCustomAttributes<AssemblyMetadataAttribute>()
+                    .Single(a => a.Key == "Copper68kPackageVersion").Value,
                 instructionCorePath = typeof(M68kCoreFactory).Assembly.Location,
                 instructionCoreSha256 = AssemblyHash(typeof(M68kCoreFactory).Assembly.Location),
                 managedExecutorPath = typeof(Program).Assembly.Location,
@@ -245,6 +249,7 @@ internal sealed partial class Invocation(ProbeCase definition, int slot)
     public uint Port => Process + (uint)DosLayout.Process.MessagePort;
     public uint Message => Process + 0x300;
     public uint LowestStackWrite { get; set; } = (uint)(0x40000 + slot * 0x10000);
+    public uint LowestStackPointer { get; set; } = (uint)(0x40000 + slot * 0x10000);
     public int IoError { get; set; } = InitialIoError;
     public int Opens { get; set; }
     public int Closes { get; set; }
@@ -729,6 +734,9 @@ internal sealed partial class Invocation(ProbeCase definition, int slot)
     public int SetDatePrintFaultCalls { get; set; }
     public bool Forbidden { get; set; }
     public int Instructions { get; set; }
+    public uint CompilerContextAddress { get; set; }
+    public int CompilerContextAllocations { get; set; }
+    public int CompilerContextFrees { get; set; }
     public NativeIoInvocation? NativeIo { get; set; }
     public QuoteForwardNativeLayout? QuoteForwardLayout { get; set; }
     public TypeTextNativeLayout? TypeTextLayout { get; set; }
@@ -820,7 +828,7 @@ internal sealed partial class ProbeFixture
     private bool IsTransferLoopProbeSuite => suite == CopyLoopProbeSuite ||
         suite == JoinAppendLoopProbeSuite;
 
-    public ProbeFixture(HunkImage image, M68kCpuModel model, string suite)
+    public ProbeFixture(HunkImage image, M68kCpuModel model, string suite, string? imagePath = null)
     {
         addDataTypesCallbackProbe = suite == AddDataTypesCallbackProbeSuite;
         if (addDataTypesCallbackProbe) suite = AddDataTypesListEntrySuite;
@@ -838,8 +846,18 @@ internal sealed partial class ProbeFixture
         if(directoryCommandRoot){suite=suite[..^18];Require(suite==CopyTargetDispatchSuite,"Directory command selector requires target suite.");}
         singleCommandRoot=suite.EndsWith("+single-command",StringComparison.Ordinal);
         if(singleCommandRoot){suite=suite[..^15];Require(suite==CopySingleTargetSuite,"Single command selector requires target suite.");}
-        copyCommandRoot = suite.EndsWith("+command", StringComparison.Ordinal);
-        if(copyCommandRoot) {suite=suite[..^8];Require(suite is CopyDirectSuite or CopyParsedDeleteSuite or CopyParsedMakeDirectorySuite,"Command fixture covers parsed operation lifecycle.");suite+="+explicit-parser";}
+        var explicitCommandRoot = suite.EndsWith("+command", StringComparison.Ordinal);
+        copyCommandRoot = explicitCommandRoot ||
+            (suite is CopyDirectSuite or CopyParsedDeleteSuite or CopyParsedMakeDirectorySuite &&
+             imagePath is not null && File.Exists(imagePath + ".map") &&
+             File.ReadAllText(imagePath + ".map").Contains("CopperOS.Commands.Entries.CopyEntry::Main", StringComparison.Ordinal));
+        if (copyCommandRoot)
+        {
+            if (explicitCommandRoot) suite = suite[..^8];
+            Require(suite is CopyDirectSuite or CopyParsedDeleteSuite or CopyParsedMakeDirectorySuite,
+                "Command fixture covers parsed operation lifecycle.");
+            suite += "+explicit-parser";
+        }
         explicitCopyParser = suite.EndsWith("+explicit-parser", StringComparison.Ordinal);
         if (explicitCopyParser) suite = suite[..^16] + "+unified-copy";
         unifiedCopyRoot = suite.EndsWith("+unified-copy", StringComparison.Ordinal);
@@ -866,6 +884,7 @@ internal sealed partial class ProbeFixture
         Bus.Long(4, ExecBase);
         if (!bindDriversPrivateImageProbe)
             Bus.LoadImage(LoadAddress, image.Code, image.ReadOnlyRanges, image.WritableRanges);
+        ReadCompilerContextMetadata(imagePath);
         RegisterExec();
         if (suite == AddDataTypesListEntrySuite)
         {
@@ -1434,6 +1453,7 @@ internal sealed partial class ProbeFixture
                 cores.Add(cpu);
                 cpu.State.StatusRegister = 0; // Real commands run in user mode.
                 cpu.BeginSubroutine(commandAddress, invocation.StackTop, ReturnAddress);
+                invocation.LowestStackPointer = cpu.State.A[7];
                 for (var index = 0; index < 7; index++) cpu.State.A[index] = (uint)(0xae000000 + index * 16);
                 for (var index = 0; index < 8; index++) cpu.State.D[index] = (uint)(0xde000000 + index * 16);
                 cpu.State.D[0] = unchecked((uint)(test.EntryLength ?? bytes.Length));
@@ -1512,6 +1532,9 @@ internal sealed partial class ProbeFixture
                     {
                         throw new InvalidOperationException($"{invocation.Definition.Name}, PC=${cpu.State.ProgramCounter:X8}: {error.Message}", error);
                     }
+                    invocation.LowestStackPointer = Math.Min(invocation.LowestStackPointer, cpu.State.A[7]);
+                    Require(cpu.State.A[7] >= invocation.StackTop - invocation.StackBytes &&
+                        cpu.State.A[7] <= invocation.StackTop, "Command exceeded its configured stack limit.");
                 }
             }
             var reports = new List<object>();
@@ -1792,6 +1815,8 @@ internal sealed partial class ProbeFixture
                 if (suite == Workbench31SetFontEntrySuite)
                     ReclaimSetFontConsoleStorage(invocation);
                 Bus.AssertReleased(invocation);
+                Require(invocation.CompilerContextAllocations == invocation.CompilerContextFrees,
+                    "Compiler invocation context was not released exactly once.");
                 Bus.AssertImageUnchanged();
                 reports.Add(new
                 {
@@ -1801,6 +1826,9 @@ internal sealed partial class ProbeFixture
                     instructions = invocation.Instructions,
                     configuredStackBytes = invocation.StackBytes,
                     stackBytesWritten = invocation.StackTop - invocation.LowestStackWrite,
+                    peakStackBytes = invocation.StackTop - invocation.LowestStackPointer,
+                    compilerInvocationContext = new { bytes = compilerContextBytes,
+                        allocations = invocation.CompilerContextAllocations, frees = invocation.CompilerContextFrees },
                     resultArrayAllocationRequests = invocation.AllocationRequests,
                     readArgsCalls = invocation.Reads,
                     freeArgsCalls = invocation.FreeArgs,
@@ -2793,7 +2821,7 @@ internal sealed partial class ProbeFixture
             {
                 Require(invocation.IntuitionOpens == 1 && invocation.IntuitionCloses == 0,
                     "Beep closed an unowned intuition.library lease.");
-                Bus.AssertReleased(invocation);
+                Bus.AssertReleased(invocation, "CompilerContext");
                 invocation.IntuitionCloses++;
                 return 0xc10ced;
             }
@@ -2819,7 +2847,7 @@ internal sealed partial class ProbeFixture
             {
                 Require(invocation.UtilityOpens == 1 && invocation.UtilityCloses == 0,
                     "Date closed an unowned utility.library lease.");
-                Bus.AssertReleased(invocation);
+                Bus.AssertReleased(invocation, "CompilerContext");
                 invocation.UtilityCloses++;
                 return 0xc10ced;
             }
@@ -2845,12 +2873,13 @@ internal sealed partial class ProbeFixture
             if (suite != TypeTextIoProbeSuite && suite != GuessBootDevEntrySuite &&
                 suite != FormatEntrySuite && suite != MorphOSSetKeyboardEntrySuite &&
                 suite != Workbench31SetFontEntrySuite)
-                Bus.AssertReleased(invocation);
+                Bus.AssertReleased(invocation, "CompilerContext");
             invocation.Closes++;
             return 0xc10ced;
         });
         Register(ExecBase, ExecLvo.AllocMem, "AllocMem", (state, invocation) =>
         {
+            if (TryAllocateCompilerContext(state, invocation, out var compilerContext)) return compilerContext;
             if (addDataTypesCallbackProbe)
             {
                 var definition = invocation.Definition.AddDataTypesList!;
@@ -3830,7 +3859,7 @@ internal sealed partial class ProbeFixture
                                 : 8u;
             Require(expectedBytes is not null && state.D[0] == expectedBytes &&
                 state.D[1] == (uint)(invocation.Definition.DeleteCommand is not null ? Exec.MemoryFlags.Public|Exec.MemoryFlags.Clear : recursiveCommandRoot && invocation.Definition.CopyTraversalWork!.SingleFailure=="delete" ? Exec.MemoryFlags.Public|Exec.MemoryFlags.Clear : directoryCommandRoot ? invocation.Allocations==1?Exec.MemoryFlags.Any:invocation.Allocations==0||(invocation.Allocations==2||invocation.Allocations>=4&&invocation.Allocations<invocation.Definition.CopyTraversalWork!.ExpectedSources+3)&&!invocation.Definition.CopyTraversalWork!.Stream?Exec.MemoryFlags.Public|Exec.MemoryFlags.Clear:Exec.MemoryFlags.Public : singleCommandRoot ? invocation.Allocations==0?Exec.MemoryFlags.Public|Exec.MemoryFlags.Clear:invocation.Allocations<3?Exec.MemoryFlags.Any:Exec.MemoryFlags.Public : copyCommandRoot ? invocation.Allocations==0?Exec.MemoryFlags.Public|Exec.MemoryFlags.Clear:suite==CopyParsedMakeDirectorySuite||suite==CopyParsedDeleteSuite&&invocation.Allocations==1&&invocation.Definition.CopyArgumentGate!.HasPattern?Exec.MemoryFlags.Any:suite==CopyParsedDeleteSuite?Exec.MemoryFlags.Public|Exec.MemoryFlags.Clear:Exec.MemoryFlags.Public : suite == CopySingleTargetSuite ? invocation.Allocations < 2 ? Exec.MemoryFlags.Any : Exec.MemoryFlags.Public : suite == CopyTargetDispatchSuite ? invocation.Allocations == 0 ? Exec.MemoryFlags.Any : invocation.Allocations == 1 ? Exec.MemoryFlags.Public|Exec.MemoryFlags.Clear : Exec.MemoryFlags.Public : suite == CopyParsedMakeDirectorySuite && invocation.Allocations > 1 ? Exec.MemoryFlags.Any : suite == CopyCompletionSuite ? Exec.MemoryFlags.Public : invocation.Definition.CopyArgumentGate is { NormalKind: not null, HasPattern: true } && invocation.Allocations == 2 ? Exec.MemoryFlags.Any : invocation.Definition.CopyArgumentGate?.DirectKind is not null && invocation.Allocations > 1 ? Exec.MemoryFlags.Public : invocation.Definition.CopyLinkOperation is not null ? Exec.MemoryFlags.Any : (invocation.Definition.CopyTraversalWork is not null && (invocation.Allocations > 0 || invocation.Definition.CopyTraversalWork.Stream)) || invocation.Definition.CopyWork is not null || invocation.Definition.CopySoftLink is not null || invocation.Definition.CopyFileOperation is not null ? Exec.MemoryFlags.Public : Exec.MemoryFlags.Public | Exec.MemoryFlags.Clear),
-                $"Unexpected allocation; compiler heap context is not qualified by this suite (expected {expectedBytes}, actual {state.D[0]}, allocation {invocation.Allocations}, suite {suite}).");
+                $"Unexpected command allocation (expected {expectedBytes}, actual {state.D[0]}, allocation {invocation.Allocations}, suite {suite}).");
             invocation.Allocations++;
             invocation.AllocationRequests.Add(state.D[0]);
             if(copyCommandRoot && invocation.Definition.CopyArgumentGate!.WorkspaceFailure) return 0;
@@ -4383,6 +4412,7 @@ internal sealed partial class ProbeFixture
         });
         Register(ExecBase, ExecLvo.FreeMem, "FreeMem", (state, invocation) =>
         {
+            if (TryFreeCompilerContext(state, invocation)) return 0;
             if (addDataTypesCallbackProbe)
             {
                 var definition = invocation.Definition.AddDataTypesList!;
