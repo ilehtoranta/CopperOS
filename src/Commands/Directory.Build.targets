@@ -40,14 +40,15 @@
            Text="CopperSharp compiler not built at '$(CopperSharpCompilerAssembly)'. Run: dotnet build &quot;$(CopperSharp68kRoot)\Compiler.Cli\CopperSharp.Compiler.Cli.csproj&quot; -c Release -p:SkipCopperScreenHeadlessProjectReference=true (or tools\Commands\build-c.ps1)." />
   </Target>
 
-  <!-- The qualifier scripts compile with peephole=disabled and memory=none, and
-       the fixed-point peephole default miscompiles Eval (classic-left-shift-word
-       returns 10). Sdk.targets has no typed property for either, but the
+  <!-- Use the compiler's fixed-point peephole mode after fixing data-register
+       liveness across unconditional branches in CopperSharp68k. Eval's
+       classic-left-shift-word regression passes with this mode on all CPUs.
+       Sdk.targets has no typed property for peephole or memory, but the
        compiler's response manifest accepts both keys, so add them to the
-       manifest the SDK just wrote. Set CopperOSPeephole/CopperOSMemory empty to
-       fall back to the compiler defaults. -->
+       manifest the SDK just wrote. Override CopperOSPeephole/CopperOSMemory
+       to select another optimization policy. -->
   <PropertyGroup Condition="'$(CopperOSCommandName)' != ''">
-    <CopperOSPeephole Condition="'$(CopperOSPeephole)' == ''">disabled</CopperOSPeephole>
+    <CopperOSPeephole Condition="'$(CopperOSPeephole)' == ''">fixed-point</CopperOSPeephole>
     <CopperOSMemory Condition="'$(CopperOSMemory)' == ''">none</CopperOSMemory>
     <!-- No HUNK_SYMBOL block, like the original C: binaries. Kickstart 3.1's
          LoadSeg rejects a symbol name longer than 32 longwords (128 bytes)

@@ -38,6 +38,7 @@ $projects = Get-ChildItem (Join-Path $repo 'src\Commands') -Directory |
     ForEach-Object { Get-ChildItem $_.FullName -Filter *.csproj -File } |
     Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match '<CopperOSCommandName>([^<]+)</CopperOSCommandName>' } |
     ForEach-Object { [pscustomobject]@{ Name = $Matches[1]; Path = $_.FullName } }
+$fullBuild = -not $Command
 if ($Command) {
     # `powershell -File` passes "A,B" as one string.
     $Command = @($Command | ForEach-Object { $_ -split ',' } | ForEach-Object Trim | Where-Object { $_ })
@@ -58,3 +59,15 @@ $built = foreach ($project in $projects) {
 $built | Format-Table -AutoSize
 Write-Output "C: directory: $OutputDirectory"
 if ($failed.Count -gt 0) { throw "Failed: $($failed -join ', ')" }
+
+# A successful full build owns the whole C: output and prunes removed/renamed
+# commands. Filtered builds intentionally preserve all unselected binaries.
+if ($fullBuild) {
+    $commandNames = @($projects | ForEach-Object Name)
+    $stale = @(Get-ChildItem -LiteralPath $OutputDirectory -Force -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notin $commandNames })
+    if ($stale.Count -gt 0) {
+        $stale | Remove-Item -Force
+        Write-Output "Removed stale C: files: $($stale.Name -join ', ')"
+    }
+}

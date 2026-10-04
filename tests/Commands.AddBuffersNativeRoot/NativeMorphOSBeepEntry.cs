@@ -1,4 +1,3 @@
-using Amiga;
 using CopperOS.Commands.Native;
 using CopperSharp.Compiler;
 
@@ -8,12 +7,10 @@ namespace CopperOS.Commands.AddBuffersNativeRoot;
 public static class NativeMorphOSBeepEntry
 {
     [M68kEntryPoint]
-    public static int Main(int argumentLength, CONST_STRPTR argumentText)
+    public static int Main()
     {
         var workbench = NativeCommandStartup.ReceiveWorkbenchMessage();
-        _ = argumentLength;
-        _ = argumentText;
-        var result = NativeMorphOSBeepCommand.Run(out var ioError);
-        return NativeCommandStartup.Finish(result, ioError, workbench);
+        var result = NativeMorphOSBeepCommand.Run(out _);
+        return NativeCommandStartup.FinishWithoutDos(result, workbench);
     }
 }
