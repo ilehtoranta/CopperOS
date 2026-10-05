@@ -59,11 +59,18 @@ def report(frozen, final, matrix, compiler_root, output, decoder_path):
                'staticAfter': instruction_counts(final / 'C' / name, candidate['records']['METRICS'], decoder)}
         row['executionReceipts'] = [identity(p) for p in sorted((final / 'execution').glob(name + '.*.json'))
                                    if read(p).get('imageSha256') == row['image']['sha256']]
+        row.pop('measurement', None)  # The same map measurements are in candidate.
+        row['trials'] = [{'passes': trial['measurement']['passes'],
+                          'image': trial['measurement']['image'], 'qualification': trial['qualification'],
+                          'receipt': identity(Path(trial['directory']) / 'receipt.json')}
+                         for trial in row['trials']]
         commands.append(row)
     experiments = []
     for experiment in read(matrix / 'matrix.json'):
         measurements = read(matrix / experiment['stage'] / 'compilation.json')['commands']
-        experiments.append({**experiment, 'measurements': measurements,
+        experiments.append({**experiment,
+                            'measurements': [{k: row[k] for k in ('command', 'image', 'records', 'reachableMethods')}
+                                             for row in measurements],
                             'totalBytes': sum(r['image']['bytes'] for r in measurements),
                             'compiler': (read(matrix / experiment['stage'] / 'compilation.json')['compiler']
                                          if experiment['stage'].startswith('../') else read(matrix / 'compiler-receipt.json'))})
@@ -157,7 +164,7 @@ def report(frozen, final, matrix, compiler_root, output, decoder_path):
               '## Qualification', '',
               '- 1,516 relevant compiler tests passed, including the six branch-liveness regressions, all 32 CCR combinations, partial writes, flags including X, memory width/count/order, aliases, function-pointer identity, stack restoration, HUNK relocation and branch-range tests.',
               '- 843 host command tests passed, including applicable Workbench/MorphOS profile fixtures.',
-              '- Execute: complete 151-case suite on each CPU, 453 runs. Eval: complete vectors under disabled, bounded and fixed-point peepholes on each CPU; receipts in the JSON.',
+              '- Execute: complete 151-case suite on each CPU, 453 runs. Eval: all 37 Workbench and 20 MorphOS entry vectors under disabled, bounded and fixed-point peepholes on each CPU (333 and 180 runs); receipts in the JSON.',
               '- Changed accepted shipping entries passed baseline/candidate comparisons on 68000, 68020 and 68040. Output bytes, return codes, IoErr, resource events, allocation ownership/releases, repeated invocation and supported interleaving are compared. Copy keeps compiler-owned invocation context separate from command allocations.',
               '- Copper68k package 1.5.1; actual product version `' + product_version + '`; core SHA256 `' + identity(core)['sha256'] + '`. Actual receipt identities are retained.', '',
               '## Limits and remaining opportunities', '']
@@ -165,6 +172,7 @@ def report(frozen, final, matrix, compiler_root, output, decoder_path):
     lines += ['', 'The audit’s helper sketches and 42 byte-read candidates are investigation bounds. They are not all removable: liveness, canonical wider consumers and alias effects keep some transport. Whole-image helper choices still grow some commands; their final policies reject that growth. Large Workbench gaps remain, especially aggregate-heavy List/Search and parser/formatter implementations.', '',
               '## Reproduction and delivery', '',
               'Use `tools/Commands/optimize_codegen_sizes.py` for frozen-input compile, qualify, matrix, select and publish operations. `tools/Commands/report_codegen_sizes.py` regenerates this report. `tools/Commands/build-c.ps1` stages selected commands before refreshing its output and preserves unselected commands for filtered builds.', '',
+              'Build the compiler branch with .NET SDK 10.0.401, then publish with `tools/Commands/build-c.ps1 -CopperSharpRoot C:/Users/ilkle/Koodit/GIT/CopperSharp68k-wt-codegen-size`. The unrelated dirty primary compiler checkout was preserved and does not contain these commits yet. An older compiler cannot interpret the new selected-pass names.', '',
               f"Local immutable inputs, all baseline executables, trials, maps, compiler payloads and native receipts: `{frozen}`. Final staging: `{final}`.", '',
               'Separate compiler commits and patch hashes are listed in the JSON. CopperOS tooling, per-command enablement and reporting are separate changes. Publication requires all 61 images, matching hashes, a smaller aggregate and qualification for every changed executable; previous output is retained before stale files are removed.', '',
               '[Machine-readable report](code-generator-size-optimization-20261005.json)']
