@@ -34,16 +34,9 @@ public static class NativeMorphOSListCommand
     private const byte DoDirectory = (byte)AnchorPathFlags.DoDirectory;
     private const byte DidDirectory = (byte)AnchorPathFlags.DidDirectory;
 
-    private struct QuickFields
-    {
-        public uint Name;
-
-        public static APTR AddressOf(ref QuickFields fields) =>
-            throw new System.NotSupportedException(
-                "List.QuickFields.AddressOf is lowered by CopperSharp.");
-    }
-
-    private struct LongFields
+    // The tail fields are written through APTR while packing the selected row.
+#pragma warning disable CS0649
+    private struct RowFields
     {
         public uint Name;
         public uint Size;
@@ -53,49 +46,12 @@ public static class NativeMorphOSListCommand
         public uint Time;
         public uint Comment;
 
-        public static APTR AddressOf(ref LongFields fields) =>
+        public static APTR AddressOf(ref RowFields fields) =>
             throw new System.NotSupportedException(
-                "List.LongFields.AddressOf is lowered by CopperSharp.");
+                "List.RowFields.AddressOf is lowered by CopperSharp.");
     }
 
-    private struct DefaultFields
-    {
-        public uint Name;
-        public uint Size;
-        public uint Protection;
-        public uint Date;
-        public uint Time;
-        public uint Comment;
-
-        public static APTR AddressOf(ref DefaultFields fields) =>
-            throw new System.NotSupportedException(
-                "List.DefaultFields.AddressOf is lowered by CopperSharp.");
-    }
-
-    private struct LongNoDateFields
-    {
-        public uint Name;
-        public uint Size;
-        public uint Key;
-        public uint Protection;
-        public uint Comment;
-
-        public static APTR AddressOf(ref LongNoDateFields fields) =>
-            throw new System.NotSupportedException(
-                "List.LongNoDateFields.AddressOf is lowered by CopperSharp.");
-    }
-
-    private struct DefaultNoDateFields
-    {
-        public uint Name;
-        public uint Size;
-        public uint Protection;
-        public uint Comment;
-
-        public static APTR AddressOf(ref DefaultNoDateFields fields) =>
-            throw new System.NotSupportedException(
-                "List.DefaultNoDateFields.AddressOf is lowered by CopperSharp.");
-    }
+#pragma warning restore CS0649
 
     /// <summary>
     /// Implements the public DOS matcher/FIB path for name, metadata and
@@ -308,97 +264,60 @@ public static class NativeMorphOSListCommand
                                 error = (int)DOS.IoErr();
                                 break;
                             }
-                            var fields = default(LongFields);
-                            var defaultFields = default(DefaultFields);
-                            var fieldsNoDate = default(LongNoDateFields);
-                            var defaultFieldsNoDate =
-                                default(DefaultNoDateFields);
+                            var fields = default(RowFields);
                             var namePointer = CString.ToUInt32(fileName);
-                            if (directory)
-                                fields.Size = CString.ToUInt32("Dir");
-                            else
-                                fields.Size = unchecked((uint)
-                                    FileInfoBlock.GetSize(currentFib));
+                            var size = directory
+                                ? CString.ToUInt32("Dir")
+                                : unchecked((uint)FileInfoBlock.GetSize(currentFib));
                             if (block && !directory)
-                                fields.Size = (fields.Size + 511u) >> 9;
-                            fields.Key = unchecked((uint)APTR.ReadUInt32(
-                                currentFib, FileInfoBlock.DiskKeyOffset));
-                            fields.Protection = FormatProtection(
-                                currentFib, workspace);
-                            fields.Date = workspace.Raw + DateTextOffset;
-                            fields.Time = workspace.Raw + TimeTextOffset;
-                            fields.Comment = FormatComment(currentFib, workspace);
-                            defaultFields.Name = namePointer;
-                            defaultFields.Size = fields.Size;
-                            defaultFields.Protection = fields.Protection;
-                            defaultFields.Date = fields.Date;
-                            defaultFields.Time = fields.Time;
-                            defaultFields.Comment = fields.Comment;
-                            fieldsNoDate.Name = namePointer;
-                            fieldsNoDate.Size = fields.Size;
-                            fieldsNoDate.Key = fields.Key;
-                            fieldsNoDate.Protection = fields.Protection;
-                            fieldsNoDate.Comment = fields.Comment;
-                            defaultFieldsNoDate.Name = namePointer;
-                            defaultFieldsNoDate.Size = fields.Size;
-                            defaultFieldsNoDate.Protection = fields.Protection;
-                            defaultFieldsNoDate.Comment = fields.Comment;
+                                size = (size + 511u) >> 9;
+                            var key = APTR.ReadUInt32(currentFib,
+                                FileInfoBlock.DiskKeyOffset);
+                            var protection = FormatProtection(currentFib, workspace);
+                            var comment = FormatComment(currentFib, workspace);
+                            // VPrintf consumes only the selected format's prefix.
+                            // Pack that prefix into one seven-longword stack record.
                             fields.Name = namePointer;
+                            fields.Size = size;
+                            var packedFields = RowFields.AddressOf(ref fields);
+                            int fieldOffset = 8;
+                            if (keys)
+                            {
+                                APTR.WriteUInt32(packedFields, fieldOffset, key);
+                                fieldOffset += 4;
+                            }
+                            APTR.WriteUInt32(packedFields, fieldOffset, protection);
+                            fieldOffset += 4;
+                            if (!noDates)
+                            {
+                                APTR.WriteUInt32(packedFields, fieldOffset,
+                                    workspace.Raw + DateTextOffset);
+                                APTR.WriteUInt32(packedFields, fieldOffset + 4,
+                                    workspace.Raw + TimeTextOffset);
+                                fieldOffset += 8;
+                            }
+                            APTR.WriteUInt32(packedFields, fieldOffset, comment);
+                            // Convert each literal before merging the branch values.
+                            CString format;
                             if (quick)
-                            {
-                                var quickFields = default(QuickFields);
-                                quickFields.Name = CString.ToUInt32(fileName);
-                                DOS.VPrintf("%s\n",
-                                    QuickFields.AddressOf(ref quickFields));
-                            }
+                                format = "%s\n";
                             else if (directory && keys)
-                            {
-                                if (noDates)
-                                    DOS.VPrintf(
-                                        "%-24s %7s %4ld %8s%s\n",
-                                        LongNoDateFields.AddressOf(
-                                            ref fieldsNoDate));
-                                else
-                                    DOS.VPrintf(
-                                        "%-24s %7s %4ld %8s %11s %8s%s\n",
-                                        LongFields.AddressOf(ref fields));
-                            }
+                                format = noDates
+                                    ? (CString)"%-24s %7s %4ld %8s%s\n"
+                                    : (CString)"%-24s %7s %4ld %8s %11s %8s%s\n";
                             else if (directory)
-                            {
-                                if (noDates)
-                                    DOS.VPrintf(
-                                        "%-24s %7s %8s%s\n",
-                                        DefaultNoDateFields.AddressOf(
-                                            ref defaultFieldsNoDate));
-                                else
-                                    DOS.VPrintf(
-                                        "%-24s %7s %8s %11s %8s%s\n",
-                                        DefaultFields.AddressOf(ref defaultFields));
-                            }
+                                format = noDates
+                                    ? (CString)"%-24s %7s %8s%s\n"
+                                    : (CString)"%-24s %7s %8s %11s %8s%s\n";
                             else if (keys)
-                            {
-                                if (noDates)
-                                    DOS.VPrintf(
-                                        "%-24s %7ld %4ld %8s%s\n",
-                                        LongNoDateFields.AddressOf(
-                                            ref fieldsNoDate));
-                                else
-                                    DOS.VPrintf(
-                                        "%-24s %7ld %4ld %8s %11s %8s%s\n",
-                                        LongFields.AddressOf(ref fields));
-                            }
+                                format = noDates
+                                    ? (CString)"%-24s %7ld %4ld %8s%s\n"
+                                    : (CString)"%-24s %7ld %4ld %8s %11s %8s%s\n";
                             else
-                            {
-                                if (noDates)
-                                    DOS.VPrintf(
-                                        "%-24s %7ld %8s%s\n",
-                                        DefaultNoDateFields.AddressOf(
-                                            ref defaultFieldsNoDate));
-                                else
-                                    DOS.VPrintf(
-                                        "%-24s %7ld %8s %11s %8s%s\n",
-                                        DefaultFields.AddressOf(ref defaultFields));
-                            }
+                                format = noDates
+                                    ? (CString)"%-24s %7ld %8s%s\n"
+                                    : (CString)"%-24s %7ld %8s %11s %8s%s\n";
+                            DOS.VPrintf(format, packedFields);
                             matched++;
                         }
                     }
