@@ -31,11 +31,11 @@ def parse_map(path):
     records = {}
     for line in text.splitlines():
         if line.startswith(("METRICS ", "PEEPHOLE ", "MACHINE ", "AGGREGATE-FORWARDING ",
-                            "BULK-COPY ", "CODE-SIZE ", "RESIDENT-CONTEXT ", "GENERATED-SIZE ", "GENERATED-SIZE-REWRITE ")):
+                            "BULK-COPY ", "CODE-SIZE ", "RESIDENT-CONTEXT ", "GENERATED-SIZE ", "GENERATED-SIZE-REWRITE ", "ALLOCATION ", "FRAME-SLOT ", "MACHINE-OP ")):
             name, _, values = line.partition(" ")
             row = {k: int(v) if v.isdecimal() else v for k, v in
                    re.findall(r"([\w-]+)=([^ ]+)", values)}
-            if name == 'GENERATED-SIZE-REWRITE':
+            if name in ('GENERATED-SIZE-REWRITE', 'ALLOCATION', 'FRAME-SLOT', 'MACHINE-OP'):
                 records.setdefault(name, []).append(row)
             else:
                 records[name] = row
