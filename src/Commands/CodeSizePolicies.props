@@ -1,0 +1,174 @@
+<Project>
+  <!-- Qualified frozen-assembly selections; see the generated-code size report. -->
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'AddDataTypes' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Assign' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Avail' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'BindDrivers' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,CompactGuestMemory</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Break' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'ChangeTaskPri' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Check2090' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,EliminateRedundantInitialization</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Copy' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Date' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Delete' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'DevList' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Dir' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts,InlineMemoryHelpers</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'DiskChange' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'DiskFree' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'DosList' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts,InlineMemoryHelpers,ShareArithmeticCores</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Eval' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts,InlineMemoryHelpers,ShareArithmeticCores</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Execute' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts,InlineMemoryHelpers,ShareArithmeticCores</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'ExtractKickstart' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'FileNote' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts,InlineMemoryHelpers</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'FindResident' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Format' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'GuessBootDev' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'IconPos' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,CompactGuestMemory</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Info' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,ShareArithmeticCores</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Join' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,EliminateRedundantInitialization</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'LibList' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'List' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'LoadMonDrvs' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts,InlineMemoryHelpers</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Lock' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'MakeDir' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'MakeLink' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,NarrowOperations</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'ModList' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Mount' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'PathPart' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,CompactGuestMemory</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'PortList' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Protect' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts,InlineMemoryHelpers</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Quote' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Reboot' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,EliminateRedundantInitialization</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Rename' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'RequestChoice' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'RequestFile' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,EliminateRedundantInitialization</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'ResList' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Search' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts,InlineMemoryHelpers</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'SetClock' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'SetDate' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'SetFont' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'SetKeyboard' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Status' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'TaskList' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Touch' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts,InlineMemoryHelpers</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Type' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts,InlineMemoryHelpers,ShareArithmeticCores</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Version' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,InlineMemoryHelpers</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Wait' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,ShareArithmeticCores</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'WaitForLib' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts,InlineMemoryHelpers</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'WaitForNotification' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'WaitForPort' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts,InlineMemoryHelpers</CopperOSCodeSizePasses>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Which' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts</CopperOSCodeSizePasses>
+  </PropertyGroup>
+</Project>

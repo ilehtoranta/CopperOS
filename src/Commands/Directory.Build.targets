@@ -1,4 +1,5 @@
 <Project>
+  <Import Project="$(MSBuildThisFileDirectory)CodeSizePolicies.props" />
   <!--
     A command project sets CopperOSCommandName (the C: file name) and
     CopperSharpEntry. `dotnet publish` then compiles that one entry to a HUNK
