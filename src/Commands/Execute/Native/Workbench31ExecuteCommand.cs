@@ -70,6 +70,14 @@ public static class Workbench31ExecuteCommand
 
     private enum LineAction { Emit, Drop, Fail }
 
+    // One caller-owned record avoids four separately addressed output slots.
+    private struct KeyMatch
+    {
+        internal uint Index, Modifiers;
+        internal APTR Name;
+        internal uint NameLength;
+    }
+
     private struct State
     {
         internal APTR Work;
@@ -106,11 +114,12 @@ public static class Workbench31ExecuteCommand
             return DOS.RETURN_FAIL;
         }
 
-        var state = new State
-        {
-            Work = work, Bra = (byte)'<', Ket = (byte)'>',
-            Dollar = (byte)'$', Dot = (byte)'.',
-        };
+        var state = default(State);
+        state.Work = work;
+        state.Bra = (byte)'<';
+        state.Ket = (byte)'>';
+        state.Dollar = (byte)'$';
+        state.Dot = (byte)'.';
         var result = RunWithWork(ref state, cli, argumentLength, argumentText,
             out ioError);
         if (state.RdArgs.IsNotNull)
@@ -127,11 +136,11 @@ public static class Workbench31ExecuteCommand
         APTR argumentText, out int ioError)
     {
         ioError = 0;
-        var file = At(st.Work, FileOffset);
+        var file = APTR.FromPointer(st.Work.Raw + (uint)FileOffset);
 
         // FILE is the first item only; the rest of the line belongs to the
         // script's .KEY template, so FILE/A must not see it.
-        var source = At(st.Work, CSourceOffset);
+        var source = APTR.FromPointer(st.Work.Raw + (uint)CSourceOffset);
         APTR.WriteUInt32(source, 0, argumentText.Raw);
         APTR.WriteUInt32(source, 4, (uint)argumentLength);
         APTR.WriteUInt32(source, 8, 0);
@@ -170,7 +179,7 @@ public static class Workbench31ExecuteCommand
             return DOS.RETURN_FAIL;
         }
         var cli = DOS.Cli();
-        var file = At(st.Work, FileOffset);
+        var file = APTR.FromPointer(st.Work.Raw + (uint)FileOffset);
         arguments.TryGetResult(0, out var name);
         CopyCString(APTR.FromPointer(name), file, FileCapacity);
         arguments.Release();
@@ -190,8 +199,8 @@ public static class Workbench31ExecuteCommand
             return DOS.RETURN_FAIL;
         }
 
-        var tempName = At(st.Work, TempNameOffset);
-        st.Temp = CreateWorkFile(cli, tempName);
+        var tempName = APTR.FromPointer(st.Work.Raw + (uint)TempNameOffset);
+        st.Temp = CreateWorkFile(tempName);
         if (st.Temp.IsNull)
         {
             ioError = (int)DOS.IoErr();
@@ -200,7 +209,7 @@ public static class Workbench31ExecuteCommand
             return DOS.RETURN_FAIL;
         }
 
-        var line = At(st.Work, LineOffset);
+        var line = APTR.FromPointer(st.Work.Raw + (uint)LineOffset);
         var failed = false;
         while (DOS.FGets(script, line, LineCapacity - 1).IsNotNull)
         {
@@ -208,7 +217,7 @@ public static class Workbench31ExecuteCommand
             var action = ProcessLine(ref st, line, length);
             if (action == LineAction.Fail) { failed = true; break; }
             if (action == LineAction.Emit && st.OutLength > 0)
-                DOS.FWrite(st.Temp, At(st.Work, OutOffset), 1, st.OutLength);
+                DOS.FWrite(st.Temp, APTR.FromPointer(st.Work.Raw + (uint)OutOffset), 1, st.OutLength);
         }
         DOS.Close(script);
 
@@ -222,7 +231,7 @@ public static class Workbench31ExecuteCommand
         // Inside a script: the caller's unread lines follow this script.
         var current = BPTR.FromRaw(APTR.ReadUInt32(cli, DosLayout.CommandLineInterface.CurrentInput));
         var standard = BPTR.FromRaw(APTR.ReadUInt32(cli, DosLayout.CommandLineInterface.StandardInput));
-        var oldName = At(st.Work, OldNameOffset);
+        var oldName = APTR.FromPointer(st.Work.Raw + (uint)OldNameOffset);
         APTR.WriteUInt8(oldName, 0, 0);
         if (current.IsNotNull && current.Raw != standard.Raw)
         {
@@ -325,7 +334,7 @@ public static class Workbench31ExecuteCommand
         if (argLength == 0 || argLength >= KeyTemplateCapacity)
             return Fail("Illegal KEY directive\n");
 
-        var template = At(st.Work, KeyTemplateOffset);
+        var template = APTR.FromPointer(st.Work.Raw + (uint)KeyTemplateOffset);
         var items = 1u;
         for (var i = 0u; i < argLength; i++)
         {
@@ -349,7 +358,7 @@ public static class Workbench31ExecuteCommand
         var tailLength = st.TailLength;
         if (tailLength == 0)
         {
-            tail = At(st.Work, EmptyLineOffset);
+            tail = APTR.FromPointer(st.Work.Raw + (uint)EmptyLineOffset);
             APTR.WriteUInt8(tail, 0, (byte)'\n');
             tailLength = 1;
         }
@@ -358,10 +367,10 @@ public static class Workbench31ExecuteCommand
         APTR.WriteUInt32(rdArgs, 8, 0);
 
         if (DOS.ReadArgs(CString.FromPointer(template.Raw),
-                At(st.Work, ResultsOffset), rdArgs).IsNull)
+                APTR.FromPointer(st.Work.Raw + (uint)ResultsOffset), rdArgs).IsNull)
         {
             DOS.FreeDosObject(DosRdArgs, rdArgs);
-            var args = At(st.Work, FormatArgsOffset);
+            var args = APTR.FromPointer(st.Work.Raw + (uint)FormatArgsOffset);
             APTR.WriteUInt32(args, 0, template.Raw);
             DOS.VPrintf("Parameters unsuitable for key \"%s\"\n", args);
             return LineAction.Fail;
@@ -382,9 +391,11 @@ public static class Workbench31ExecuteCommand
         }
         if (nameLength == 0)
             return argLength == 0 ? LineAction.Drop : Fail("Invalid directive argument\n");
-        if (!FindKey(ref st, arg, nameLength, out var index, out _, out _, out _))
+        var match = default(KeyMatch);
+        if (!FindKey(ref st, arg, nameLength, ref match))
             return LineAction.Drop;           // undeclared: ignored
-        var entry = At(st.Work, DefaultsOffset + (int)index * 8);
+        var index = match.Index;
+        var entry = APTR.FromPointer(st.Work.Raw + (uint)(DefaultsOffset + (int)index * 8));
         if (APTR.ReadUInt8(entry, 0) != 0)
             return LineAction.Drop;           // first .DEF wins
 
@@ -414,7 +425,7 @@ public static class Workbench31ExecuteCommand
         }
         if (st.PoolUsed + valueLength > PoolCapacity)
             return Fail("Key too long\n");
-        var pool = At(st.Work, PoolOffset);
+        var pool = APTR.FromPointer(st.Work.Raw + (uint)PoolOffset);
         for (var i = 0u; i < valueLength; i++)
             APTR.WriteUInt8(pool, (int)(st.PoolUsed + i), APTR.ReadUInt8(arg, (int)(start + i)));
         APTR.WriteUInt8(entry, 0, DefaultPresent);
@@ -445,12 +456,12 @@ public static class Workbench31ExecuteCommand
                     var split = nameStart;
                     while (split < close && APTR.ReadUInt8(line, (int)split) != st.Dollar) split++;
                     var name = APTR.FromPointer(line.Raw + nameStart);
+                    var match = default(KeyMatch);
                     if (split > nameStart &&
-                        FindKey(ref st, name, split - nameStart, out var index,
-                            out var modifiers, out var keyName, out var keyNameLength))
+                        FindKey(ref st, name, split - nameStart, ref match))
                     {
                         var hasInline = split < close;
-                        if (!AppendValue(ref st, index, modifiers, keyName, keyNameLength))
+                        if (!AppendValue(ref st, ref match))
                         {
                             if (hasInline)
                             {
@@ -459,13 +470,13 @@ public static class Workbench31ExecuteCommand
                             }
                             else
                             {
-                                var entry = At(st.Work, DefaultsOffset + (int)index * 8);
+                                var entry = APTR.FromPointer(st.Work.Raw + (uint)(DefaultsOffset + (int)match.Index * 8));
                                 var flags = APTR.ReadUInt8(entry, 0);
                                 // An empty .DEF value drops the whole line (WB 3.1 capture).
                                 if ((flags & DefaultEmpty) != 0) return LineAction.Drop;
                                 if ((flags & DefaultPresent) != 0)
                                 {
-                                    var pool = At(st.Work, PoolOffset);
+                                    var pool = APTR.FromPointer(st.Work.Raw + (uint)PoolOffset);
                                     var offset = APTR.ReadUInt16(entry, 2);
                                     var count = APTR.ReadUInt16(entry, 4);
                                     for (var d = 0; d < count; d++)
@@ -485,22 +496,21 @@ public static class Workbench31ExecuteCommand
     }
 
     /// <summary>Appends the ReadArgs value of a key; false when it was not given.</summary>
-    private static bool AppendValue(ref State st, uint index, uint modifiers,
-        APTR keyName, uint keyNameLength)
+    private static bool AppendValue(ref State st, ref KeyMatch match)
     {
-        var value = APTR.ReadUInt32(At(st.Work, ResultsOffset), (int)index * 4);
+        var value = APTR.ReadUInt32(APTR.FromPointer(st.Work.Raw + (uint)ResultsOffset), (int)match.Index * 4);
         if (value == 0) return false;
-        if ((modifiers & ModSwitch) != 0)
+        if ((match.Modifiers & ModSwitch) != 0)
         {
-            for (var i = 0u; i < keyNameLength; i++) Append(ref st, APTR.ReadUInt8(keyName, (int)i));
+            for (var i = 0u; i < match.NameLength; i++) Append(ref st, APTR.ReadUInt8(match.Name, (int)i));
             return true;
         }
-        if ((modifiers & ModNumber) != 0)
+        if ((match.Modifiers & ModNumber) != 0)
         {
             AppendNumber(ref st, (int)APTR.ReadUInt32(APTR.FromPointer(value), 0));
             return true;
         }
-        if ((modifiers & ModMulti) != 0)
+        if ((match.Modifiers & ModMulti) != 0)
         {
             var vector = APTR.FromPointer(value);
             var first = true;
@@ -523,11 +533,10 @@ public static class Workbench31ExecuteCommand
     /// Reports its index, its /S /N /M modifiers and its first name.
     /// </summary>
     private static bool FindKey(ref State st, APTR name, uint nameLength,
-        out uint index, out uint modifiers, out APTR firstName, out uint firstNameLength)
+        ref KeyMatch match)
     {
-        index = 0; modifiers = 0; firstName = APTR.Null; firstNameLength = 0;
         if (!st.KeyDefined) return false;
-        var template = At(st.Work, KeyTemplateOffset);
+        var template = APTR.FromPointer(st.Work.Raw + (uint)KeyTemplateOffset);
         var pos = 0;
         var item = 0u;
         while (true)
@@ -561,10 +570,10 @@ public static class Workbench31ExecuteCommand
             }
             if (matched)
             {
-                index = item;
-                modifiers = mods;
-                firstName = APTR.FromPointer(template.Raw + (uint)itemStart);
-                firstNameLength = firstLength;
+                match.Index = item;
+                match.Modifiers = mods;
+                match.Name = APTR.FromPointer(template.Raw + (uint)itemStart);
+                match.NameLength = firstLength;
                 return item < MaxKeys;
             }
             if (m != (byte)',') return false;
@@ -579,7 +588,7 @@ public static class Workbench31ExecuteCommand
     /// Creates T:Command-&lt;cli&gt;-T&lt;n&gt;, or the same name under :T/ when
     /// T: is not assigned. Existing names are skipped. Returns a write handle.
     /// </summary>
-    private static BPTR CreateWorkFile(APTR cli, APTR name)
+    private static BPTR CreateWorkFile(APTR name)
     {
         var process = Exec.FindTask(CString.FromPointer(0));
         var cliNumber = APTR.ReadUInt32(process, DosLayout.Process.TaskNumber) % 100;
@@ -658,12 +667,10 @@ public static class Workbench31ExecuteCommand
         return LineAction.Fail;
     }
 
-    private static APTR At(APTR work, int offset) => APTR.FromPointer(work.Raw + (uint)offset);
-
     private static void Append(ref State st, byte value)
     {
         if (st.OutLength >= OutCapacity) return;
-        APTR.WriteUInt8(At(st.Work, OutOffset), (int)st.OutLength, value);
+        APTR.WriteUInt8(APTR.FromPointer(st.Work.Raw + (uint)OutOffset), (int)st.OutLength, value);
         st.OutLength++;
     }
 
@@ -679,7 +686,7 @@ public static class Workbench31ExecuteCommand
 
     private static void AppendNumber(ref State st, int value)
     {
-        var digits = At(st.Work, NumberOffset);
+        var digits = APTR.FromPointer(st.Work.Raw + (uint)NumberOffset);
         var magnitude = value < 0 ? 0u - (uint)value : (uint)value;
         var count = 0;
         do
@@ -709,8 +716,16 @@ public static class Workbench31ExecuteCommand
 
     private static void PutTwoDigits(APTR buffer, ref int length, uint value)
     {
-        Put(buffer, ref length, (byte)('0' + value / 10 % 10));
-        Put(buffer, ref length, (byte)('0' + value % 10));
+        // Both callers supply 0..99. Count tens without full-width division.
+        var remaining = value;
+        var tens = (byte)'0';
+        while (remaining >= 10)
+        {
+            remaining -= 10;
+            tens++;
+        }
+        Put(buffer, ref length, tens);
+        Put(buffer, ref length, (byte)('0' + remaining));
     }
 
     private static bool Matches(APTR buffer, int offset, CString text)
@@ -758,7 +773,7 @@ public static class Workbench31ExecuteCommand
         c >= (byte)'a' && c <= (byte)'z' ? (byte)(c - 32) : c;
 
     private static bool IsLetter(byte c) =>
-        (c >= (byte)'a' && c <= (byte)'z') || (c >= (byte)'A' && c <= (byte)'Z');
+        unchecked((uint)((c | 32) - (byte)'a')) <= 25;
 
     private static bool IsBlank(byte c) => c == (byte)' ' || c == (byte)'\t';
 

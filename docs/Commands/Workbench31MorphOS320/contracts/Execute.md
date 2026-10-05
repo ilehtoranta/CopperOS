@@ -5,6 +5,14 @@ Recorded: 2026-08-30; updated 2026-08-31. Status: **classic template and
 resident use verified; raw-tail transport and bounded directive state are
 implemented; original fixtures and native command parity remain open**.
 
+The [2026-10-04 native size optimization](../execute-size-optimization-20261004.md)
+reduces the shipping MC68000 HUNK from 6,780 to 6,376 bytes (5.96%). The shipping
+entry passes 151 supplied Exec/DOS cases on each of 68000/020/040, including
+template prompting and Workbench startup. Peak observed stack is 328 bytes
+against the unchanged 4,096-byte fixture limit. These are native vector-model
+results; remaining original guest, I/O fault, capacity and ownership gaps are
+documented separately and are not closed by the size change.
+
 ## Reference identity
 
 | Profile | Reference | Version, size and SHA256 |

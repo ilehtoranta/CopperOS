@@ -57,6 +57,9 @@ internal static class ExecuteEntrySuite
         public bool Workbench { get; init; }
         public bool AllocationFailure { get; init; }
         public int? EntryLength { get; init; }
+        public uint TaskNumber { get; init; } = 3;
+        public string? PromptFile { get; init; }
+        public bool PromptAllocationFailure { get; init; }
     }
 
     private static Case Ok(string id, string script, string work, string arguments = Script + "\n",
@@ -176,7 +179,66 @@ internal static class ExecuteEntrySuite
         {
             Files = new() { [Script] = "echo hi\n" }, EntryLength = -1, Result = 10, Error = 120
         },
+        .. SizeOptimizationCases(),
     ];
+
+    private static IEnumerable<Case> SizeOptimizationCases()
+    {
+        yield return Ok("template-prompt", "echo prompted\n", "echo prompted\n", "?\n") with
+        {
+            PromptFile = Script
+        };
+        yield return new("template-prompt-parse-failure", "?\n")
+        {
+            PromptFile = Script, ReadArgsFails = true,
+            Result = 20, Error = 116, Faults = [(116, null)]
+        };
+        yield return new("template-prompt-allocation-failure", "?\n")
+        {
+            PromptFile = Script, PromptAllocationFailure = true,
+            Result = 20, Error = 103, Faults = [(103, null)]
+        };
+
+        // Both filename digit inputs must cover their complete private range.
+        foreach (var number in Enumerable.Range(0, 100).Select(n => (uint)n).Concat([100u, uint.MaxValue]))
+            yield return Ok($"task-number-{number}", "echo hi\n", "echo hi\n") with
+            {
+                TaskNumber = number, WorkFile = $"T:Command-{number % 100:00}-T01"
+            };
+
+        var collisions = new Dictionary<string, string> { [Script] = "echo hi\n" };
+        for (var n = 1; n < 99; n++) collisions[$"T:Command-03-T{n:00}"] = "keep\n";
+        yield return new("work-name-suffix-99", Script + "\n")
+        {
+            Files = collisions, WorkFile = "T:Command-03-T99", WorkText = "echo hi\n"
+        };
+
+        var template = string.Join(',', Enumerable.Range(0, 32).Select(i => i switch
+        {
+            0 => "k0=first", 30 => "k30=default", 31 => "k31=last", _ => $"k{i}"
+        }));
+        var values = new string?[32];
+        values[0] = "first"; values[31] = "last";
+        yield return Ok("key-first-last-slot-alias", $".KEY {template}\necho <LAST> <k0> <missing>\n",
+            "echo last first <missing>\n", key: template, values: values);
+        yield return Ok("default-last-slot-alias", $".KEY {template}\n.DEF default fallback\necho <K30>\n",
+            "echo fallback\n", key: template, values: new string?[32]);
+        yield return Ok("mixed-case-switch-alias", ".KEY flag=f/s\necho <F> <FLAG>\n",
+            "echo flag flag\n", key: "flag=f/s", values: ["-"]);
+
+        foreach (var number in new[] { int.MinValue, int.MaxValue, 0 })
+            yield return Ok($"numeric-key-{number}", ".KEY n/N\necho <N>\n", $"echo {number}\n",
+                key: "n/N", values: [number.ToString(System.Globalization.CultureInfo.InvariantCulture)]);
+
+        // Directives and aliases exercise the ASCII range boundaries.
+        yield return Ok("ascii-key-name-boundaries", ".k A,Z,a0,z0\necho <a> <z> <A0> <Z0>\n",
+            "echo one two three four\n", key: "A,Z,a0,z0", values: ["one", "two", "three", "four"]);
+        yield return Fails("directive-before-letter", ".@\n", "Invalid directive\n");
+        yield return Fails("directive-after-letter", ".[\n", "Invalid directive\n");
+        yield return Fails("directive-high-byte", ".\u00c0\n", "Invalid directive\n");
+        yield return Ok("key-high-byte-case-preserved", ".KEY \u00c0\necho <\u00e0> <\u00c0>\n",
+            "echo <\u00e0> given\n", key: "\u00c0", values: ["given"]);
+    }
 
     public static int Run(string[] args)
     {
@@ -192,7 +254,16 @@ internal static class ExecuteEntrySuite
                 "68040" => M68kCpuModel.M68040, _ => throw new ArgumentException("Unknown CPU.")
             };
             var image = HunkImage.Load(args[0], Fixture.Load);
-            foreach (var test in Cases) observations.Add(new Fixture(image, model, test).Execute());
+            uint? commandBody = null;
+            if (File.Exists(args[0] + ".map"))
+            {
+                var method = System.Text.RegularExpressions.Regex.Match(File.ReadAllText(args[0] + ".map"),
+                    @"^([0-9A-F]{8})\s+\d+\s+CopperOS.Commands.Native.Workbench31ExecuteCommand::Run\r?$",
+                    System.Text.RegularExpressions.RegexOptions.Multiline);
+                Require(method.Success, "Execute Run body is missing from the compiler map.");
+                commandBody = Fixture.Load + Convert.ToUInt32(method.Groups[1].Value, 16);
+            }
+            foreach (var test in Cases) observations.Add(new Fixture(image, model, test, commandBody).Execute());
             Require(Hash(args[0]) == hash, "HUNK changed during execution.");
         }
         catch (Exception error) { failure = error.ToString(); }
@@ -202,6 +273,7 @@ internal static class ExecuteEntrySuite
         {
             schemaVersion = 1, suite = Suite, status = passed ? "passed" : "failed", failure,
             cpu = args[1], imageSha256 = hash,
+            compilerMapSha256 = File.Exists(args[0] + ".map") ? Hash(args[0] + ".map") : null,
             managedExecutorSha256 = Hash(typeof(Program).Assembly.Location),
             instructionCoreSha256 = Hash(typeof(M68kCoreFactory).Assembly.Location),
             realKickstartExecution = false, realDosParser = false, realDosIo = false,
@@ -224,12 +296,14 @@ internal static class ExecuteEntrySuite
         private const uint Return = 0x2000, ExecBase = 0x4000;
         private const uint WorkBytes = 4672, MemPublicClear = 0x10001;
         private const uint StandardInput = 0x3bfff, InitialWindow = 0x00012340;
-        private const uint TaskNumber = 3;
 
         private readonly CommandTestBus bus = new();
         private readonly Invocation owner;
         private readonly M68kCpuModel model;
         private readonly Case test;
+        private readonly uint? commandBody;
+        private (uint Return, uint[] Data, uint[] Address)? bodyCall;
+        private int checkedBodyReturns;
         private readonly int codeLength;
         private readonly HashSet<uint> gateways = [];
         private readonly List<string> events = [];
@@ -241,6 +315,7 @@ internal static class ExecuteEntrySuite
         private readonly uint cli, commandFile, dosBase;
         private uint nextHandle = 0x3c000, nextLock = 0x3d000;
         private uint work, rdArgs, argValues, callerHandle;
+        private uint promptResults;
         private int itemEnd = -1, opens, closes, forbids, replies, readArgs, freeArgs;
 
         private sealed class Handle(string name, bool write, int position)
@@ -250,10 +325,11 @@ internal static class ExecuteEntrySuite
             public int Position { get; set; } = position;
         }
 
-        public Fixture(HunkImage image, M68kCpuModel model, Case test)
+        public Fixture(HunkImage image, M68kCpuModel model, Case test, uint? commandBody)
         {
             this.model = model;
             this.test = test;
+            this.commandBody = commandBody;
             codeLength = image.Code.Length;
             owner = new Invocation(new ProbeCase(test.Id, test.Arguments, test.Result, test.Error, test.Output)
             {
@@ -285,7 +361,7 @@ internal static class ExecuteEntrySuite
 
             var process = owner.Process;
             bus.Long(process + (uint)DosLayout.Process.CommandLineInterface, test.Workbench ? 0 : cli >> 2);
-            bus.Long(process + (uint)DosLayout.Process.TaskNumber, TaskNumber);
+            bus.Long(process + (uint)DosLayout.Process.TaskNumber, test.TaskNumber);
             bus.Long(process + (uint)DosLayout.Process.WindowPointer, InitialWindow);
             bus.Long(process + (uint)DosLayout.Process.Result2, Invocation.InitialIoError);
             var arguments = Encoding.Latin1.GetBytes(test.Arguments);
@@ -338,6 +414,13 @@ internal static class ExecuteEntrySuite
             });
             Register(ExecBase, ExecLvo.AllocMem, "AllocMem", s =>
             {
+                if (s.D[0] == 4)
+                {
+                    Require(test.PromptFile is not null && work != 0 && promptResults == 0 &&
+                        s.D[1] == MemPublicClear, "Unexpected prompt result allocation.");
+                    if (test.PromptAllocationFailure) return 0;
+                    return promptResults = bus.Allocate(owner, 4, "PromptResults", true);
+                }
                 Require(s.D[0] == WorkBytes && s.D[1] == MemPublicClear && work == 0,
                     "Execute work-area allocation differs.");
                 if (test.AllocationFailure) return 0;
@@ -345,6 +428,13 @@ internal static class ExecuteEntrySuite
             });
             Register(ExecBase, ExecLvo.FreeMem, "FreeMem", s =>
             {
+                if (s.A[1] == promptResults && promptResults != 0)
+                {
+                    Require(rdArgs == 0 && argValues == 0 && s.D[0] == 4, "Prompt lease freed early or wrongly.");
+                    bus.Release(owner, promptResults, "PromptResults", 4);
+                    promptResults = 0;
+                    return 0;
+                }
                 Require(s.A[1] == work && rdArgs == 0, "Work area freed early or wrongly.");
                 bus.Release(owner, work, "Work", s.D[0]);
                 work = 0;
@@ -382,6 +472,12 @@ internal static class ExecuteEntrySuite
                 Require(s.D[1] == rdArgs && argValues != 0 && freeArgs++ == 0, "FreeArgs differs or repeats.");
                 bus.Release(owner, argValues, "ArgValues");
                 argValues = 0;
+                if (test.PromptFile is not null)
+                {
+                    // ReadArgs allocated this RDArgs itself, so FreeArgs owns it.
+                    bus.Release(owner, rdArgs, "RDArgs");
+                    rdArgs = 0;
+                }
                 return 0;
             });
             Register(dosBase, DosLvo.FindArg, "FindArg", s =>
@@ -504,6 +600,17 @@ internal static class ExecuteEntrySuite
 
         private uint ReadArgs(uint template, uint array, uint args)
         {
+            if (test.PromptFile is { } prompt)
+            {
+                Require(readArgs++ == 0 && bus.CString(template) == "FILE/A" && args == 0 &&
+                    array == promptResults && bus.Long(array) == 0, "Prompt ReadArgs ABI or result storage differs.");
+                if (test.ReadArgsFails) { owner.IoError = 116; return 0; }
+                rdArgs = bus.Allocate(owner, 32, "RDArgs", true);
+                argValues = bus.Allocate(owner, (uint)Encoding.Latin1.GetByteCount(prompt) + 1, "ArgValues", true);
+                PutString(argValues, prompt);
+                bus.Long(array, argValues);
+                return rdArgs;
+            }
             Require(test.KeyTemplate is not null && readArgs++ == 0, "Unexpected or repeated ReadArgs.");
             Require(bus.CString(template) == test.KeyTemplate, $"ReadArgs template \"{bus.CString(template)}\" differs.");
             Require(args == rdArgs && args != 0, "ReadArgs did not get the AllocDosObject RDArgs.");
@@ -664,10 +771,26 @@ internal static class ExecuteEntrySuite
                 while (cpu.State.ProgramCounter != Return)
                 {
                     var pc = cpu.State.ProgramCounter;
+                    if (pc == commandBody)
+                    {
+                        Require(bodyCall is null, "Execute command body unexpectedly recursed.");
+                        bodyCall = (bus.Long(cpu.State.A[7]), cpu.State.D.ToArray(), cpu.State.A.ToArray());
+                    }
                     Require(pc >= Load && pc < Load + codeLength || gateways.Contains(pc), $"Unexpected PC ${pc:X8}.");
                     Require(++owner.Instructions < 2_000_000 && !cpu.State.Halted && !cpu.State.Stopped,
                         "Execution did not return.");
                     cpu.ExecuteInstruction();
+                    // A DOS executable entry may clobber working registers.
+                    // The internal Run function has the ordinary callee ABI.
+                    if (bodyCall is { } saved && cpu.State.ProgramCounter == saved.Return)
+                    {
+                        for (var r = 2; r < 8; r++)
+                            Require(cpu.State.D[r] == saved.Data[r], $"Run did not restore D{r}.");
+                        for (var r = 2; r < 7; r++)
+                            Require(cpu.State.A[r] == saved.Address[r], $"Run did not restore A{r}.");
+                        bodyCall = null;
+                        checkedBodyReturns++;
+                    }
                     owner.LowestStackPointer = Math.Min(owner.LowestStackPointer, cpu.State.A[7]);
                     Require(cpu.State.A[7] >= owner.StackTop - owner.StackBytes && cpu.State.A[7] <= owner.StackTop,
                         "Execute exceeded its configured stack limit.");
@@ -678,7 +801,7 @@ internal static class ExecuteEntrySuite
                     id = test.Id, result = test.Result, ioErr = test.Error, instructions = owner.Instructions,
                     workFile = test.WorkFile, stackBytesWritten = owner.StackTop - owner.LowestStackWrite,
                     configuredStackBytes = owner.StackBytes,
-                    peakStackBytes = owner.StackTop - owner.LowestStackPointer, events
+                    peakStackBytes = owner.StackTop - owner.LowestStackPointer, checkedBodyReturns, events
                 };
             }
             catch (Exception error)
@@ -698,6 +821,10 @@ internal static class ExecuteEntrySuite
             Require(result == test.Result && error == test.Error,
                 $"RC {result} / Result2 {error}, expected {test.Result} / {test.Error}.");
             Require(cpu.State.A[7] == owner.StackTop, "Stack pointer not restored.");
+            Require(bodyCall is null, "Execute Run body did not return through its caller.");
+            if (commandBody is not null)
+                Require(checkedBodyReturns == (test.MissingDos || test.Workbench || test.EntryLength < 0 ? 0 : 1),
+                    "Execute Run register checks were not reached as expected.");
             Require(bus.Memory.AsSpan((int)owner.StackTop, 16).IndexOfAnyExcept((byte)0xb6) < 0 &&
                 bus.Memory.AsSpan((int)(owner.StackTop - owner.StackBytes - 16), 16).IndexOfAnyExcept((byte)0xb6) < 0,
                 "Stack guard changed.");
@@ -706,11 +833,12 @@ internal static class ExecuteEntrySuite
                 $"PrintFault calls [{string.Join(';', faults)}], expected [{string.Join(';', test.Faults)}].");
             Require(opens == (test.MissingDos ? 0 : 1) && closes == opens, "Unbalanced dos.library lifetime.");
             Require(replies == (test.Workbench ? 1 : 0) && forbids == replies, "Unbalanced WBStartup reply.");
-            Require(work == 0 && rdArgs == 0 && argValues == 0 && locks.Count == 0,
+            Require(work == 0 && rdArgs == 0 && argValues == 0 && promptResults == 0 && locks.Count == 0,
                 "Work area, RDArgs, ReadArgs results or a lock leaked.");
             Require(bus.Long(owner.Process + (uint)DosLayout.Process.WindowPointer) == InitialWindow,
                 "pr_WindowPtr was not restored.");
-            Require(readArgs == (test.KeyTemplate is null ? 0 : 1), "ReadArgs call count differs.");
+            Require(readArgs == (test.KeyTemplate is not null || test.PromptFile is not null &&
+                !test.PromptAllocationFailure ? 1 : 0), "ReadArgs call count differs.");
 
             var currentInput = bus.Long(cli + (uint)DosLayout.CommandLineInterface.CurrentInput);
             var interactive = bus.Long(cli + (uint)DosLayout.CommandLineInterface.Interactive);

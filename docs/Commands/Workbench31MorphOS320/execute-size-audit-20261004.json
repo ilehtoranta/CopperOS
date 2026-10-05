@@ -1,0 +1,1710 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-04",
+  "command": "Execute",
+  "status": "audit-complete-candidates-not-installed",
+  "sourceCommit": "330ecad64da1070fd8bc1ac9f1a6887d4a97a2dc",
+  "compiler": {
+    "root": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperSharp68k-wt-command-size",
+    "commit": "b73f3794246be849706492df0bab2e2ba24636ec",
+    "status": [],
+    "trackedPatchSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "untrackedFiles": []
+  },
+  "compilerFiles": [
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\command-executable-size-20261004\\final\\compiler\\CopperSharp.Compiler.Cli.dll",
+      "bytes": 41472,
+      "sha256": "b3aee87ed4262278d9b1afbb41489b443a845272dfdfce40f745748d556af112"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\command-executable-size-20261004\\final\\compiler\\CopperSharp.Compiler.dll",
+      "bytes": 2316800,
+      "sha256": "c92f627430b3e88c823ad707f47a9855351f7bdc49f73cc5ff6f979cdcdff6e6"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\command-executable-size-20261004\\final\\compiler\\CopperSharp.Runtime.AmigaPal.dll",
+      "bytes": 23552,
+      "sha256": "5d571aa0866002408a72245c3f495f67dae3d24a152b23b538a8e264e6374e0c"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\command-executable-size-20261004\\final\\compiler\\CopperSharp.Runtime.Managed.dll",
+      "bytes": 51200,
+      "sha256": "93355bb8bbf5114e86ceacf20d05c8233d4cd179edc1984a06639b5733baa745"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\command-executable-size-20261004\\final\\compiler\\CopperSharp.Sdk.Amiga.dll",
+      "bytes": 548864,
+      "sha256": "be6480f0afa9f212aad05d09d8170c94ab7425c6c156d541adddfb37e5d115af"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\command-executable-size-20261004\\final\\compiler\\CopperSharp.Targets.Amiga.dll",
+      "bytes": 42496,
+      "sha256": "ce6200ee086ae7e8a78ceffc9c4940fa100602c306a9bcac18a5c15ab7f1aaa2"
+    }
+  ],
+  "dotnetSdk": "10.0.401",
+  "sdkVersion": "0.1.0-preview.1; matching assembly hashes in frozenInputs",
+  "frozenInputs": [
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\command-executable-size-20261004\\final\\inputs\\Execute\\CopperOS.Commands.Common.dll",
+      "bytes": 9216,
+      "sha256": "b2af60b713e973ed2538f584006f6028a69441af7dbf48d70f0ad738f102d6a6"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\command-executable-size-20261004\\final\\inputs\\Execute\\CopperOS.Commands.Execute.dll",
+      "bytes": 14848,
+      "sha256": "474cca715f3f9f464c599447a78d1943ca30acc6a5b616e392ed075f8df01c98"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\command-executable-size-20261004\\final\\inputs\\Execute\\CopperSharp.Compiler.dll",
+      "bytes": 2316800,
+      "sha256": "51cb9751b2ab13c7b65c35c6afe59253132296f2940d234ab11483075ac4f782"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\command-executable-size-20261004\\final\\inputs\\Execute\\CopperSharp.Sdk.Amiga.dll",
+      "bytes": 548864,
+      "sha256": "5fa56889103555a6bc6cb1fa2256566cfa79cdc250504ee9ce04bb5c7034724b"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\command-executable-size-20261004\\final\\inputs\\Execute\\CopperSharp.Sdk.Amiga.Support.dll",
+      "bytes": 155648,
+      "sha256": "4885703674640a6e96959f03ca504728733ee9f40bf6af3b4505c14b07e8ca27"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\src\\Commands\\Execute\\Native\\Workbench31ExecuteCommand.cs",
+      "bytes": 31475,
+      "sha256": "5b67a00247f198e2551d42e34814458409aeeb6180381419d25dfb8524d48e27"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\src\\Commands\\Execute\\Entry\\ExecuteEntry.cs",
+      "bytes": 1823,
+      "sha256": "021f1d71e914dbbee890e7ba84cd1064f0f41dcceebb40f9af8a966d9dcf6394"
+    }
+  ],
+  "flags": {
+    "cpu": "68000",
+    "format": "hunk",
+    "runtime": "resident",
+    "exceptions": "yolo",
+    "memory": "none",
+    "peephole": "fixed-point",
+    "symbols": "off",
+    "codeSizeOptimizations": "on"
+  },
+  "baseline": {
+    "command": "Execute",
+    "beforeBytes": 6872,
+    "afterBytes": 6780,
+    "savedBytes": 92,
+    "sha256": "b8821fc852c7aa128c82759be334d17e3be2122c3efc4d0371c7ff21cedc4f24",
+    "qualified": true,
+    "accepted": true,
+    "policy": "on",
+    "workbench31Bytes": 4432,
+    "workbench31Sha256": "27c2f578b63857ab5fbe03cdf621d553408cc670b9f07d9988ce224d22b57ecd",
+    "ratioToWorkbench31": 1.529783393501805,
+    "before": {
+      "records": {
+        "METRICS": {
+          "artifact-bytes": 6872,
+          "code-bytes": 6754,
+          "rom-bytes": 6754,
+          "rom-code-bytes": 6472,
+          "rom-rodata-bytes": 282,
+          "initialized-ram-bytes": 0,
+          "bss-bytes": 0,
+          "symbols": 39,
+          "relocations": 16,
+          "loops": 35,
+          "framework-features": 0,
+          "managed-allocation-sites": 0
+        },
+        "PEEPHOLE": {
+          "mode": "FixedPoint",
+          "analyzed-bytes": 263044,
+          "batches": 51,
+          "rewrites": 664,
+          "rounds": 157,
+          "method-ranges": 39,
+          "converged": "yes",
+          "terminal-groups": 0,
+          "terminal-merged-copies": 0,
+          "terminal-inverted-branches": 0,
+          "terminal-trampolines": 0,
+          "terminal-gross-bytes-removed": 0,
+          "terminal-branch-bytes-added": 0,
+          "terminal-net-bytes-saved": 0,
+          "return-condition-targets": 0,
+          "return-condition-tests-removed": 0,
+          "return-condition-tests-inserted": 0,
+          "return-condition-net-bytes-saved": 0,
+          "identical-method-groups": 0,
+          "identical-method-thunks": 0,
+          "identical-method-gross-bytes-removed": 0,
+          "identical-method-jump-bytes-added": 0,
+          "identical-method-net-bytes-saved": 0
+        },
+        "MACHINE": {
+          "scc": 39,
+          "devirtualized-calls": 0,
+          "inlined-calls": 0,
+          "single-use-inlined-calls": 0,
+          "retained-methods": 39,
+          "estimated-cost-before": 1058702,
+          "estimated-cost-after": 1046298
+        },
+        "AGGREGATE-FORWARDING": {
+          "return-buffers": 0,
+          "private-locals": 0,
+          "temporary-homes-removed": 0,
+          "temporary-frame-bytes-removed": 0
+        },
+        "BULK-COPY": {
+          "calls": 0,
+          "static-copy-bytes": 0,
+          "return-calls": 0,
+          "return-bytes": 0,
+          "local-calls": 0,
+          "local-bytes": 0,
+          "argument-calls": 0,
+          "argument-bytes": 0,
+          "unclassified-calls": 0,
+          "unclassified-bytes": 0,
+          "managed-providers": 0,
+          "external-providers": 0
+        }
+      },
+      "reachableMethods": 39,
+      "largestMethods": [
+        {
+          "offset": 1082,
+          "bytes": 848,
+          "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::RunScript"
+        },
+        {
+          "offset": 3958,
+          "bytes": 510,
+          "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::Substitute"
+        },
+        {
+          "offset": 5488,
+          "bytes": 498,
+          "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::FindKey"
+        },
+        {
+          "offset": 4994,
+          "bytes": 494,
+          "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::DefineDefault"
+        },
+        {
+          "offset": 2528,
+          "bytes": 390,
+          "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::CreateWorkFile"
+        },
+        {
+          "offset": 3500,
+          "bytes": 390,
+          "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::ProcessDirective"
+        },
+        {
+          "offset": 4646,
+          "bytes": 348,
+          "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::DefineKey"
+        },
+        {
+          "offset": 338,
+          "bytes": 346,
+          "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::Run"
+        },
+        {
+          "offset": 1930,
+          "bytes": 312,
+          "method": "CopperOS.Commands.Native.NativeCommandArguments::TryRead"
+        },
+        {
+          "offset": 684,
+          "bytes": 220,
+          "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::RunWithWork"
+        }
+      ]
+    },
+    "after": {
+      "records": {
+        "RESIDENT-CONTEXT": {
+          "bytes": 8,
+          "placement": "stack"
+        },
+        "CODE-SIZE": {
+          "mode": "general"
+        },
+        "METRICS": {
+          "artifact-bytes": 6780,
+          "code-bytes": 6658,
+          "rom-bytes": 6658,
+          "rom-code-bytes": 6376,
+          "rom-rodata-bytes": 282,
+          "initialized-ram-bytes": 0,
+          "bss-bytes": 0,
+          "symbols": 39,
+          "relocations": 17,
+          "loops": 35,
+          "framework-features": 0,
+          "managed-allocation-sites": 0
+        },
+        "PEEPHOLE": {
+          "mode": "FixedPoint",
+          "analyzed-bytes": 285304,
+          "batches": 54,
+          "rewrites": 699,
+          "rounds": 160,
+          "method-ranges": 39,
+          "converged": "yes",
+          "terminal-groups": 12,
+          "terminal-merged-copies": 25,
+          "terminal-inverted-branches": 3,
+          "terminal-trampolines": 22,
+          "terminal-gross-bytes-removed": 160,
+          "terminal-branch-bytes-added": 90,
+          "terminal-net-bytes-saved": 62,
+          "return-condition-targets": 1,
+          "return-condition-tests-removed": 5,
+          "return-condition-tests-inserted": 2,
+          "return-condition-net-bytes-saved": 6,
+          "identical-method-groups": 0,
+          "identical-method-thunks": 0,
+          "identical-method-gross-bytes-removed": 0,
+          "identical-method-jump-bytes-added": 0,
+          "identical-method-net-bytes-saved": 0
+        },
+        "MACHINE": {
+          "scc": 39,
+          "devirtualized-calls": 0,
+          "inlined-calls": 0,
+          "single-use-inlined-calls": 0,
+          "retained-methods": 39,
+          "estimated-cost-before": 1058702,
+          "estimated-cost-after": 1046298
+        },
+        "AGGREGATE-FORWARDING": {
+          "return-buffers": 0,
+          "private-locals": 0,
+          "temporary-homes-removed": 0,
+          "temporary-frame-bytes-removed": 0
+        },
+        "BULK-COPY": {
+          "calls": 0,
+          "static-copy-bytes": 0,
+          "return-calls": 0,
+          "return-bytes": 0,
+          "local-calls": 0,
+          "local-bytes": 0,
+          "argument-calls": 0,
+          "argument-bytes": 0,
+          "unclassified-calls": 0,
+          "unclassified-bytes": 0,
+          "managed-providers": 0,
+          "external-providers": 0
+        }
+      },
+      "reachableMethods": 39,
+      "largestMethods": [
+        {
+          "offset": 764,
+          "bytes": 822,
+          "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::RunScript"
+        },
+        {
+          "offset": 3542,
+          "bytes": 506,
+          "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::Substitute"
+        },
+        {
+          "offset": 2852,
+          "bytes": 494,
+          "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::FindKey"
+        },
+        {
+          "offset": 2374,
+          "bytes": 478,
+          "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::DefineDefault"
+        },
+        {
+          "offset": 1962,
+          "bytes": 386,
+          "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::ProcessDirective"
+        },
+        {
+          "offset": 4456,
+          "bytes": 384,
+          "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::CreateWorkFile"
+        },
+        {
+          "offset": 1594,
+          "bytes": 346,
+          "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::DefineKey"
+        },
+        {
+          "offset": 30,
+          "bytes": 342,
+          "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::Run"
+        },
+        {
+          "offset": 5476,
+          "bytes": 302,
+          "method": "CopperOS.Commands.Native.NativeCommandArguments::TryRead"
+        },
+        {
+          "offset": 372,
+          "bytes": 220,
+          "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::RunWithWork"
+        }
+      ]
+    },
+    "execution": [
+      {
+        "cpu": "68000",
+        "suite": "wb31-execute-native-entry-vector-fixture",
+        "passed": true,
+        "baselineFailure": null,
+        "candidateFailure": null,
+        "differentCases": [],
+        "invocations": 34,
+        "instructionsBefore": 109278,
+        "instructionsAfter": 109294,
+        "peakStackBefore": 408,
+        "peakStackAfter": 408,
+        "coreVersion": "Copper68k 1.5.1",
+        "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+      },
+      {
+        "cpu": "68020",
+        "suite": "wb31-execute-native-entry-vector-fixture",
+        "passed": true,
+        "baselineFailure": null,
+        "candidateFailure": null,
+        "differentCases": [],
+        "invocations": 34,
+        "instructionsBefore": 109278,
+        "instructionsAfter": 109294,
+        "peakStackBefore": 408,
+        "peakStackAfter": 408,
+        "coreVersion": "Copper68k 1.5.1",
+        "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+      },
+      {
+        "cpu": "68040",
+        "suite": "wb31-execute-native-entry-vector-fixture",
+        "passed": true,
+        "baselineFailure": null,
+        "candidateFailure": null,
+        "differentCases": [],
+        "invocations": 34,
+        "instructionsBefore": 109278,
+        "instructionsAfter": 109294,
+        "peakStackBefore": 408,
+        "peakStackAfter": 408,
+        "coreVersion": "Copper68k 1.5.1",
+        "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+      }
+    ]
+  },
+  "imageBytes": 6780,
+  "imageSha256": "b8821fc852c7aa128c82759be334d17e3be2122c3efc4d0371c7ff21cedc4f24",
+  "workbench31Bytes": 4432,
+  "workbench31Sha256": "27c2f578b63857ab5fbe03cdf621d553408cc670b9f07d9988ce224d22b57ecd",
+  "ratioToWorkbench31": 1.529783393501805,
+  "gapBytes": 2348,
+  "hunkCodeBytes": 6660,
+  "instructionBytes": 6376,
+  "constantDataBytes": 282,
+  "containerAndAlignmentBytes": 122,
+  "codeCategories": {
+    "entry_and_startup": 312,
+    "prompt_parser_lease": 514,
+    "execute_implementation": 5520,
+    "wrapper_shared_tails_and_padding": 30
+  },
+  "methods": [
+    {
+      "offset": 30,
+      "bytes": 342,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::Run",
+      "instructions": 104,
+      "stackInstructionBytes": 160,
+      "category": "execute_implementation",
+      "internalCallCount": 1,
+      "vectorCallCount": 7
+    },
+    {
+      "offset": 372,
+      "bytes": 220,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::RunWithWork",
+      "instructions": 86,
+      "stackInstructionBytes": 48,
+      "category": "execute_implementation",
+      "internalCallCount": 2,
+      "vectorCallCount": 2
+    },
+    {
+      "offset": 592,
+      "bytes": 172,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::RunTemplatePrompt",
+      "instructions": 56,
+      "stackInstructionBytes": 66,
+      "category": "execute_implementation",
+      "internalCallCount": 6,
+      "vectorCallCount": 2
+    },
+    {
+      "offset": 764,
+      "bytes": 822,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::RunScript",
+      "instructions": 257,
+      "stackInstructionBytes": 336,
+      "category": "execute_implementation",
+      "internalCallCount": 10,
+      "vectorCallCount": 20
+    },
+    {
+      "offset": 1586,
+      "bytes": 8,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::At",
+      "instructions": 4,
+      "stackInstructionBytes": 0,
+      "category": "execute_implementation",
+      "internalCallCount": 0,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 1594,
+      "bytes": 346,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::DefineKey",
+      "instructions": 125,
+      "stackInstructionBytes": 62,
+      "category": "execute_implementation",
+      "internalCallCount": 4,
+      "vectorCallCount": 5
+    },
+    {
+      "offset": 1940,
+      "bytes": 22,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::Fail",
+      "instructions": 10,
+      "stackInstructionBytes": 6,
+      "category": "execute_implementation",
+      "internalCallCount": 0,
+      "vectorCallCount": 1
+    },
+    {
+      "offset": 1962,
+      "bytes": 386,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::ProcessDirective",
+      "instructions": 144,
+      "stackInstructionBytes": 36,
+      "category": "execute_implementation",
+      "internalCallCount": 4,
+      "vectorCallCount": 1
+    },
+    {
+      "offset": 2348,
+      "bytes": 26,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::IsBlank",
+      "instructions": 13,
+      "stackInstructionBytes": 0,
+      "category": "execute_implementation",
+      "internalCallCount": 0,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 2374,
+      "bytes": 478,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::DefineDefault",
+      "instructions": 182,
+      "stackInstructionBytes": 86,
+      "category": "execute_implementation",
+      "internalCallCount": 6,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 2852,
+      "bytes": 494,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::FindKey",
+      "instructions": 210,
+      "stackInstructionBytes": 76,
+      "category": "execute_implementation",
+      "internalCallCount": 3,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 3346,
+      "bytes": 66,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::EqualsIgnoreCase",
+      "instructions": 30,
+      "stackInstructionBytes": 12,
+      "category": "execute_implementation",
+      "internalCallCount": 2,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 3412,
+      "bytes": 30,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::ToUpper",
+      "instructions": 15,
+      "stackInstructionBytes": 0,
+      "category": "execute_implementation",
+      "internalCallCount": 0,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 3442,
+      "bytes": 100,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::ProcessLine",
+      "instructions": 41,
+      "stackInstructionBytes": 16,
+      "category": "execute_implementation",
+      "internalCallCount": 1,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 3542,
+      "bytes": 506,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::Substitute",
+      "instructions": 203,
+      "stackInstructionBytes": 82,
+      "category": "execute_implementation",
+      "internalCallCount": 7,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 4048,
+      "bytes": 62,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::Append",
+      "instructions": 24,
+      "stackInstructionBytes": 6,
+      "category": "execute_implementation",
+      "internalCallCount": 1,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 4110,
+      "bytes": 194,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::AppendValue",
+      "instructions": 83,
+      "stackInstructionBytes": 28,
+      "category": "execute_implementation",
+      "internalCallCount": 6,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 4304,
+      "bytes": 46,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::AppendCString",
+      "instructions": 18,
+      "stackInstructionBytes": 8,
+      "category": "execute_implementation",
+      "internalCallCount": 1,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 4350,
+      "bytes": 106,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::PutTwoDigits",
+      "instructions": 45,
+      "stackInstructionBytes": 8,
+      "category": "execute_implementation",
+      "internalCallCount": 1,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 4456,
+      "bytes": 384,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::CreateWorkFile",
+      "instructions": 140,
+      "stackInstructionBytes": 90,
+      "category": "execute_implementation",
+      "internalCallCount": 10,
+      "vectorCallCount": 6
+    },
+    {
+      "offset": 4840,
+      "bytes": 16,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::Put",
+      "instructions": 8,
+      "stackInstructionBytes": 0,
+      "category": "execute_implementation",
+      "internalCallCount": 0,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 4856,
+      "bytes": 48,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::PutText",
+      "instructions": 20,
+      "stackInstructionBytes": 8,
+      "category": "execute_implementation",
+      "internalCallCount": 1,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 4904,
+      "bytes": 60,
+      "method": "CopperOS.Commands.Native.NativeCommandStartup::Finish",
+      "instructions": 21,
+      "stackInstructionBytes": 16,
+      "category": "entry_and_startup",
+      "internalCallCount": 0,
+      "vectorCallCount": 4
+    },
+    {
+      "offset": 4964,
+      "bytes": 154,
+      "method": "CopperOS.Commands.Entries.ExecuteEntry::Main",
+      "instructions": 54,
+      "stackInstructionBytes": 54,
+      "category": "entry_and_startup",
+      "internalCallCount": 4,
+      "vectorCallCount": 1
+    },
+    {
+      "offset": 5118,
+      "bytes": 64,
+      "method": "CopperOS.Commands.Native.NativeCommandStartup::ReceiveWorkbenchMessage",
+      "instructions": 24,
+      "stackInstructionBytes": 8,
+      "category": "entry_and_startup",
+      "internalCallCount": 0,
+      "vectorCallCount": 3
+    },
+    {
+      "offset": 5182,
+      "bytes": 36,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::CStringLength",
+      "instructions": 18,
+      "stackInstructionBytes": 4,
+      "category": "execute_implementation",
+      "internalCallCount": 0,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 5218,
+      "bytes": 86,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::WriteCommandFile",
+      "instructions": 36,
+      "stackInstructionBytes": 12,
+      "category": "execute_implementation",
+      "internalCallCount": 1,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 5304,
+      "bytes": 76,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::IsWorkFileName",
+      "instructions": 32,
+      "stackInstructionBytes": 0,
+      "category": "execute_implementation",
+      "internalCallCount": 0,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 5380,
+      "bytes": 62,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::Matches",
+      "instructions": 28,
+      "stackInstructionBytes": 12,
+      "category": "execute_implementation",
+      "internalCallCount": 0,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 5442,
+      "bytes": 34,
+      "method": "CopperOS.Commands.Native.NativeCommandStartup::OpenDos",
+      "instructions": 13,
+      "stackInstructionBytes": 4,
+      "category": "entry_and_startup",
+      "internalCallCount": 0,
+      "vectorCallCount": 1
+    },
+    {
+      "offset": 5476,
+      "bytes": 302,
+      "method": "CopperOS.Commands.Native.NativeCommandArguments::TryRead",
+      "instructions": 110,
+      "stackInstructionBytes": 52,
+      "category": "prompt_parser_lease",
+      "internalCallCount": 0,
+      "vectorCallCount": 9
+    },
+    {
+      "offset": 5778,
+      "bytes": 6,
+      "method": "CopperOS.Commands.Native.NativeCommandArguments::get_IoError",
+      "instructions": 2,
+      "stackInstructionBytes": 0,
+      "category": "prompt_parser_lease",
+      "internalCallCount": 0,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 5784,
+      "bytes": 68,
+      "method": "CopperOS.Commands.Native.NativeCommandArguments::TryGetResult",
+      "instructions": 32,
+      "stackInstructionBytes": 20,
+      "category": "prompt_parser_lease",
+      "internalCallCount": 0,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 5852,
+      "bytes": 70,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::CopyCString",
+      "instructions": 31,
+      "stackInstructionBytes": 14,
+      "category": "execute_implementation",
+      "internalCallCount": 0,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 5922,
+      "bytes": 138,
+      "method": "CopperOS.Commands.Native.NativeCommandArguments::Release",
+      "instructions": 46,
+      "stackInstructionBytes": 48,
+      "category": "prompt_parser_lease",
+      "internalCallCount": 0,
+      "vectorCallCount": 4
+    },
+    {
+      "offset": 6060,
+      "bytes": 90,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::ReadCommandFile",
+      "instructions": 38,
+      "stackInstructionBytes": 18,
+      "category": "execute_implementation",
+      "internalCallCount": 0,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 6150,
+      "bytes": 38,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::IsLetter",
+      "instructions": 19,
+      "stackInstructionBytes": 0,
+      "category": "execute_implementation",
+      "internalCallCount": 0,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 6188,
+      "bytes": 34,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::IsTrailing",
+      "instructions": 17,
+      "stackInstructionBytes": 0,
+      "category": "execute_implementation",
+      "internalCallCount": 0,
+      "vectorCallCount": 0
+    },
+    {
+      "offset": 6222,
+      "bytes": 154,
+      "method": "CopperOS.Commands.Native.Workbench31ExecuteCommand::AppendNumber",
+      "instructions": 68,
+      "stackInstructionBytes": 14,
+      "category": "execute_implementation",
+      "internalCallCount": 3,
+      "vectorCallCount": 0
+    }
+  ],
+  "decoder": "capstone 5.0.6",
+  "sourceExperiments": [
+    {
+      "variant": "control",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\execute-size-audit-20261004\\control\\C\\Execute",
+        "bytes": 6780,
+        "sha256": "b8821fc852c7aa128c82759be334d17e3be2122c3efc4d0371c7ff21cedc4f24"
+      },
+      "savedBytes": 0,
+      "sourceSha256": "a0573de76ea2436996bba9f18e8f2357fe34286db5de8da4bd3e4a3d90e83782",
+      "byteIdenticalToShipping": true,
+      "checks": []
+    },
+    {
+      "variant": "direct-state",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\execute-size-audit-20261004\\direct-state\\C\\Execute",
+        "bytes": 6704,
+        "sha256": "1d0aa88eb7cf5181255651790770c2d371ba3cf1016647b8f6dc246b730489c6"
+      },
+      "savedBytes": 76,
+      "sourceSha256": "f7c46f8bf5674f0b1dbab29bb9524d40a6b975d3f5ef7c3329969a2faec83da0",
+      "byteIdenticalToShipping": null,
+      "checks": [
+        {
+          "cpu": "68000",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109294,
+          "instructionsAfter": 108452,
+          "peakStackBefore": 408,
+          "peakStackAfter": 360,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68020",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109294,
+          "instructionsAfter": 108452,
+          "peakStackBefore": 408,
+          "peakStackAfter": 360,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68040",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109294,
+          "instructionsAfter": 108452,
+          "peakStackBefore": 408,
+          "peakStackAfter": 360,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        }
+      ]
+    },
+    {
+      "variant": "inline-at",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\execute-size-audit-20261004\\inline-at\\C\\Execute",
+        "bytes": 6636,
+        "sha256": "cd91f05e6fe75ebfb13a68f5e203e690305c3984ba85d944899819345861c38b"
+      },
+      "savedBytes": 144,
+      "sourceSha256": "c017c0671b4686fc98929f894c5489a3a6e4276af19c0b8634ded101440c5541",
+      "byteIdenticalToShipping": null,
+      "checks": [
+        {
+          "cpu": "68000",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109294,
+          "instructionsAfter": 105159,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68020",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109294,
+          "instructionsAfter": 105159,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68040",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109294,
+          "instructionsAfter": 105159,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        }
+      ]
+    },
+    {
+      "variant": "bounded-two-digits",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\execute-size-audit-20261004\\bounded-two-digits\\C\\Execute",
+        "bytes": 6752,
+        "sha256": "bf2a5db12fe2c0f8b4f48a12293a579be847c47f7494d52dfa7bee7f9e059171"
+      },
+      "savedBytes": 28,
+      "sourceSha256": "d41bd507c61c487fc181f8bfe49b9fce8bc503468b7f8afc0bef7eeeb7fc8138",
+      "byteIdenticalToShipping": null,
+      "checks": [
+        {
+          "cpu": "68000",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109294,
+          "instructionsAfter": 97534,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68020",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109294,
+          "instructionsAfter": 97534,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68040",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109294,
+          "instructionsAfter": 97534,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        }
+      ]
+    },
+    {
+      "variant": "unused-cli",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\execute-size-audit-20261004\\unused-cli\\C\\Execute",
+        "bytes": 6776,
+        "sha256": "a804bfd280f225d71c06fc15a8bb7174d125d87324121d956c05a14928b31030"
+      },
+      "savedBytes": 4,
+      "sourceSha256": "def05da3dae66743c9c64da522b8aae526370c0943167d69509e5f6ad2f34f65",
+      "byteIdenticalToShipping": null,
+      "checks": [
+        {
+          "cpu": "68000",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109294,
+          "instructionsAfter": 109267,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68020",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109294,
+          "instructionsAfter": 109267,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68040",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109294,
+          "instructionsAfter": 109267,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        }
+      ]
+    },
+    {
+      "variant": "combined",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\execute-size-audit-20261004\\combined\\C\\Execute",
+        "bytes": 6536,
+        "sha256": "e5fda3733e85f2f39914bfae26d8c1062140eac9865139b8888fceb15e1e154b"
+      },
+      "savedBytes": 244,
+      "sourceSha256": "b5a157f9de738e504bbf87a986390083b5b77cea813711d15ff76c477e790428",
+      "byteIdenticalToShipping": null,
+      "checks": [
+        {
+          "cpu": "68000",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109294,
+          "instructionsAfter": 92557,
+          "peakStackBefore": 408,
+          "peakStackAfter": 360,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68020",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109294,
+          "instructionsAfter": 92557,
+          "peakStackBefore": 408,
+          "peakStackAfter": 360,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68040",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109294,
+          "instructionsAfter": 92557,
+          "peakStackBefore": 408,
+          "peakStackAfter": 360,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        }
+      ]
+    },
+    {
+      "variant": "all-four",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\execute-size-audit-20261004\\all-four\\C\\Execute",
+        "bytes": 6536,
+        "sha256": "285b28b2e0d993684a9d4d23c123c81f3602adde845af879786b8f5a1fbc2bf1"
+      },
+      "savedBytes": 244,
+      "sourceSha256": "7e2db99b0f6e708ab9bb1b26ae55c48de2b6dd2cfd0035ab5a313599c40236c1",
+      "byteIdenticalToShipping": null,
+      "checks": [
+        {
+          "cpu": "68000",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109294,
+          "instructionsAfter": 92530,
+          "peakStackBefore": 408,
+          "peakStackAfter": 360,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68020",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109294,
+          "instructionsAfter": 92530,
+          "peakStackBefore": 408,
+          "peakStackAfter": 360,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68040",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109294,
+          "instructionsAfter": 92530,
+          "peakStackBefore": 408,
+          "peakStackAfter": 360,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        }
+      ]
+    }
+  ],
+  "compilerPolicies": [
+    {
+      "policy": "off",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\execute-size-audit-20261004\\passes\\off\\C\\Execute",
+        "bytes": 6872,
+        "sha256": "a6b816d9b64d6af2169f8382c136e8926f00bf80070bcbfeefd6aed89414ef5d"
+      },
+      "savedAgainstOff": 0,
+      "checks": []
+    },
+    {
+      "policy": "ElideUnusedRegisterArguments",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\execute-size-audit-20261004\\passes\\ElideUnusedRegisterArguments\\C\\Execute",
+        "bytes": 6856,
+        "sha256": "90f1f52204c8eaaa99580ef7e5be2f2a2ab46bd954046f9aecbfa16339e5379f"
+      },
+      "savedAgainstOff": 16,
+      "checks": [
+        {
+          "cpu": "68000",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109249,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68020",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109249,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68040",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109249,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        }
+      ]
+    },
+    {
+      "policy": "ReuseIncomingArgumentHomes",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\execute-size-audit-20261004\\passes\\ReuseIncomingArgumentHomes\\C\\Execute",
+        "bytes": 6872,
+        "sha256": "a6b816d9b64d6af2169f8382c136e8926f00bf80070bcbfeefd6aed89414ef5d"
+      },
+      "savedAgainstOff": 0,
+      "checks": [
+        {
+          "cpu": "68000",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109278,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68020",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109278,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68040",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109278,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        }
+      ]
+    },
+    {
+      "policy": "ForwardReadOnlyAggregateLocals",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\execute-size-audit-20261004\\passes\\ForwardReadOnlyAggregateLocals\\C\\Execute",
+        "bytes": 6872,
+        "sha256": "a6b816d9b64d6af2169f8382c136e8926f00bf80070bcbfeefd6aed89414ef5d"
+      },
+      "savedAgainstOff": 0,
+      "checks": [
+        {
+          "cpu": "68000",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109278,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68020",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109278,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68040",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109278,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        }
+      ]
+    },
+    {
+      "policy": "InlineSingleUseMethods",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\execute-size-audit-20261004\\passes\\InlineSingleUseMethods\\C\\Execute",
+        "bytes": 6872,
+        "sha256": "a6b816d9b64d6af2169f8382c136e8926f00bf80070bcbfeefd6aed89414ef5d"
+      },
+      "savedAgainstOff": 0,
+      "checks": [
+        {
+          "cpu": "68000",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109278,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68020",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109278,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68040",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109278,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        }
+      ]
+    },
+    {
+      "policy": "ClusterInternalCalls",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\execute-size-audit-20261004\\passes\\ClusterInternalCalls\\C\\Execute",
+        "bytes": 6860,
+        "sha256": "6c58ab29ac7fde2ecc9b26e8741c4b57f285575f34ff439eb2d2f6bbfb0da001"
+      },
+      "savedAgainstOff": 12,
+      "checks": [
+        {
+          "cpu": "68000",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109259,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68020",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109259,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68040",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109259,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        }
+      ]
+    },
+    {
+      "policy": "ShareIdenticalMethods",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\execute-size-audit-20261004\\passes\\ShareIdenticalMethods\\C\\Execute",
+        "bytes": 6872,
+        "sha256": "a6b816d9b64d6af2169f8382c136e8926f00bf80070bcbfeefd6aed89414ef5d"
+      },
+      "savedAgainstOff": 0,
+      "checks": [
+        {
+          "cpu": "68000",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109278,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68020",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109278,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68040",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109278,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        }
+      ]
+    },
+    {
+      "policy": "ShareReturnSequences",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\execute-size-audit-20261004\\passes\\ShareReturnSequences\\C\\Execute",
+        "bytes": 6808,
+        "sha256": "e1730484ef36a86a603c08f3294f8b15064548b57b9be7186a5881a3d1702c76"
+      },
+      "savedAgainstOff": 64,
+      "checks": [
+        {
+          "cpu": "68000",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109342,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68020",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109342,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68040",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109342,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        }
+      ]
+    },
+    {
+      "policy": "on",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\execute-size-audit-20261004\\passes\\on\\C\\Execute",
+        "bytes": 6780,
+        "sha256": "b8821fc852c7aa128c82759be334d17e3be2122c3efc4d0371c7ff21cedc4f24"
+      },
+      "savedAgainstOff": 92,
+      "checks": [
+        {
+          "cpu": "68000",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109294,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68020",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109294,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68040",
+          "suite": "wb31-execute-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 34,
+          "instructionsBefore": 109278,
+          "instructionsAfter": 109294,
+          "peakStackBefore": 408,
+          "peakStackAfter": 408,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        }
+      ]
+    }
+  ],
+  "runtime": {
+    "runner": {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tests\\Commands.NativeExecution\\bin\\Release\\net10.0\\CopperOS.Commands.NativeExecution.dll",
+      "bytes": 2627584,
+      "sha256": "9e03b694d8425372d73d077c04783a9a30f012e1a9fccad0a048dc683a6425df"
+    },
+    "core": {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tests\\Commands.NativeExecution\\bin\\Release\\net10.0\\Copper68k.dll",
+      "bytes": 892416,
+      "sha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+    },
+    "coreVersion": "1.5.1+43a3a84f79657cb4c2b32bb58d8e510e3aec9c15",
+    "invocationsPerCpu": 34,
+    "configuredStackBytes": 4096,
+    "workAllocationBytes": 4672,
+    "compilerContextBytes": 8,
+    "compilerContextPlacement": "stack"
+  },
+  "artifacts": "artifacts\\execute-size-audit-20261004",
+  "candidatePatch": {
+    "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\execute-size-audit-20261004\\execute-size-candidate.patch",
+    "bytes": 9167,
+    "sha256": "f02de03ead4448798dcabb340b095c59ce1905a1057971b2d58ee720fc3c599c"
+  },
+  "findings": [
+    {
+      "kind": "codegen",
+      "location": "Run object initializer",
+      "evidence": "48-byte temporary copied into the final state; direct initialization saves 76 executable bytes and 48 peak stack bytes"
+    },
+    {
+      "kind": "codegen",
+      "location": "At helper",
+      "evidence": "19 internal call sites; exposing constant offsets saves 144 executable bytes"
+    },
+    {
+      "kind": "codegen",
+      "location": "PutTwoDigits",
+      "evidence": "full 32-bit restoring division for unsigned /10 and %10; values proven below 100 allow removing one modulo loop, saving 28 bytes"
+    },
+    {
+      "kind": "correctness",
+      "location": "RunScript:205-235",
+      "evidence": "FWrite and Close return values ignored; FGets/FRead termination not distinguished from read failure"
+    },
+    {
+      "kind": "correctness",
+      "location": "Append:663-667",
+      "evidence": "2048-byte output bound silently discards remaining bytes"
+    },
+    {
+      "kind": "correctness",
+      "location": "IsWorkFileName:616-624",
+      "evidence": "T:Command- and :T/Command- prefix checks do not establish ownership of the previous input"
+    }
+  ],
+  "limits": [
+    "Size comparison uses the existing hash-bound original Workbench receipt; original image is unavailable on this host, so no fresh original disassembly or guest replay.",
+    "Existing shipping entry vector fixture models DOS parsers and I/O; all experiments preserve its observations, but this is not full Workbench parity.",
+    "No Execute ? continuation, short writes, read faults, close faults, work-file reopen faults, capacity boundaries, Ctrl-C/Ctrl-D, or truly interleaved resident invocation coverage in this fixture.",
+    "Cases reuse the loaded image with separate fixture instances; nested script concatenation is covered, overlapping continuations are not.",
+    "MorphOS host adapter is not reachable from the shipping entry and has no PPC size comparison here.",
+    "CopperScreen and original-image checks unavailable; out/C/Execute is unchanged.",
+    "Stack is peak observed A7 at instruction boundaries; instruction counts exclude execution inside real DOS/Exec library implementations."
+  ]
+}
