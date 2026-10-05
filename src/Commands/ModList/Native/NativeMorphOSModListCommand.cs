@@ -150,6 +150,8 @@ public static class NativeMorphOSModListCommand
                 cells.Priority = APTR.ReadUInt32(record, 16);
                 var flags = APTR.ReadUInt32(record, 20);
                 var hasRevision = APTR.ReadUInt32(record, 24) != 0;
+                if (!hasRevision)
+                    cells.Revision = cells.Priority;
                 DOS.VPrintf(hasRevision
                     ? "0x%08.lx\t%30.s\t%3lu.%-3lu\t%4.ld\t<"
                     : "0x%08.lx\t%30.s\t%3lu\t%4.ld\t<",

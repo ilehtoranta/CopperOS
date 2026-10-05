@@ -28,7 +28,9 @@ internal sealed record TaskListEntryCase(
     string CliName = "Command",
     bool RegisterDump = false,
     bool Verbose = false,
-    bool SysDebugUnavailable = false);
+    bool SysDebugUnavailable = false,
+    bool UnknownStackUsed = false,
+    bool WaitingDead = false);
 
 internal sealed record TaskListNativeLayout(uint ReadyList, uint WaitList,
     uint ReadyTask, uint WaitingTask, uint ReadyName, uint WaitingName,
@@ -53,6 +55,12 @@ internal sealed partial class ProbeFixture
     {
         ProbeCase[] cases =
         [
+            TaskCase("unknown-stack-used", new(NoRun: true, NoWait: true, UnknownStackUsed: true),
+                output: TaskOutput(false, true, false).Replace("/128     ", "/???     ", StringComparison.Ordinal)),
+            TaskCase("unknown-cli-stack-used", new(NoRun: true, NoWait: true, ReadyFirstCli: true, UnknownStackUsed: true),
+                output: TaskOutput(false, 1, 0, "Command").Replace("/128     ", "/???     ", StringComparison.Ordinal)),
+            TaskCase("waiting-no-signal-dead", new(NoRun: true, NoReady: true, WaitingDead: true),
+                output: TaskOutput(false, false, true).Replace("   wait", "   dead", StringComparison.Ordinal)),
             TaskCase("all-three-lists", new(),
                 output: TaskOutput(true, true, true)),
             TaskCase("three-ready-waiting", new(Ready: 3, Waiting: 3),
@@ -379,7 +387,7 @@ internal sealed partial class ProbeFixture
         for (var slot = 0; slot < waiting; slot++)
         {
             output.Append(Row((uint)(5 + slot), 0x6000u + (uint)slot * 0x100u,
-                "task", -2 - slot, "   dead", 0x400,
+                "task", -2 - slot, "   wait", 0x400,
                 TaskName("Waiter", slot)));
             if (verbose)
                 output.Append(TaskListVerboseOutput(0x6000u +
@@ -566,11 +574,16 @@ internal sealed partial class ProbeFixture
                 PrepareCli(task, cli, commandName, definition.CliName);
             }
             if (slot < Math.Max(3, definition.Waiting))
+            {
                 PrepareTask(waitingTask + (uint)slot * 0x100u, 1, 4,
                     -2 - slot, 0x63000u + (uint)slot * 0x1000u,
                     0x63400u + (uint)slot * 0x1000u,
                     waitingName + (uint)slot * 0x40u,
                     TaskName("Waiter", slot));
+                if (definition.WaitingDead)
+                    Bus.Long(waitingTask + (uint)slot * 0x100u +
+                        (uint)ExecLayout.Task.SignalWait, 0);
+            }
         }
 
         InitializeTaskList(ExecBase + (uint)ExecLayout.ExecBase.ResourceList,
@@ -934,7 +947,7 @@ internal sealed partial class ProbeFixture
                     0x09 => 0x80u,
                     0x0E => upper >= lower ? upper - lower : 0u,
                     0x0F => 32768u,
-                    0x10 => 128u,
+                    0x10 => invocation.Definition.TaskList!.UnknownStackUsed ? uint.MaxValue : 128u,
                     0x11 => 512u,
                     0x24 => TaskListPid(task, invocation.Process, layout),
                     0x26 => PpcStackBounds(task, layout).Lower,
@@ -1249,7 +1262,7 @@ internal sealed partial class ProbeFixture
             }
             var cliRow = format.Contains(" [%s]", StringComparison.Ordinal);
             var cliPid = format.StartsWith("%6lu", StringComparison.Ordinal);
-            var numericUsed = format.Contains("%8lu/%-8lu",
+            var numericUsed = !format.Contains("%8lu/%s",
                 StringComparison.Ordinal);
             var expectedFormat = cliRow
                 ? numericUsed
@@ -1258,7 +1271,8 @@ internal sealed partial class ProbeFixture
                 : numericUsed
                     ? "%4lu 0x%08lx %s %4ld %s %8lu/%-8lu %8lu/%-8lu %s\n"
                     : "%4lu 0x%08lx %s %4ld %s %8lu/%s %8lu/%-8lu %s\n";
-            Require(cliRow == cliPid && format == expectedFormat,
+            Require(cliRow == cliPid && format == expectedFormat &&
+                numericUsed != invocation.Definition.TaskList!.UnknownStackUsed,
                 "TaskList row format differs.");
             var fields = state.D[2];
             var pid = Bus.Long(fields);

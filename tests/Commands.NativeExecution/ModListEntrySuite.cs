@@ -7,7 +7,7 @@ namespace CopperOS.Commands.NativeExecution;
 
 internal sealed record ModListEntryCase(int Entries = 0,
     bool AllocationFailure = false, bool CtrlC = false,
-    bool ParserFailure = false, bool IdRevision = false);
+    bool ParserFailure = false, bool IdRevision = false, bool NoRevision = false);
 
 internal sealed record ModListNativeLayout(uint Table, uint Resident,
     uint Name, uint IdString)
@@ -33,6 +33,10 @@ internal sealed partial class ProbeFixture
             ModCase("empty-list"),
             ModCase("one-resident", new(1)),
             ModCase("id-string-revision", new(1, IdRevision: true)),
+            ModCase("no-revision", new(1, NoRevision: true)),
+            ModCase("three-no-revisions", new(3, NoRevision: true)),
+            ModCase("no-revision-ctrl-c", new(3, CtrlC: true, NoRevision: true),
+                result: DOS.RETURN_FAIL, error: (int)DOS.Error.Break),
             ModCase("three-residents", new(3)),
             ModCase("ctrl-c", new(3, CtrlC: true),
                 result: DOS.RETURN_FAIL, error: (int)DOS.Error.Break),
@@ -58,8 +62,12 @@ internal sealed partial class ProbeFixture
         var reports = new List<object>();
         foreach (var test in cases) reports.AddRange(Execute([test], false));
         reports.AddRange(Execute([
-            ModCase("interleaved-left", new(1), output: ModOutput(1)),
-            ModCase("interleaved-right", new(1), output: ModOutput(1))
+            ModCase("interleaved-left", new(1, NoRevision: true)),
+            ModCase("interleaved-right", new(1, NoRevision: true))
+        ], true));
+        reports.AddRange(Execute([
+            ModCase("interleaved-revision-left", new(1)),
+            ModCase("interleaved-revision-right", new(1))
         ], true));
         Bus.AssertImageUnchanged();
         return reports;
@@ -74,7 +82,7 @@ internal sealed partial class ProbeFixture
             output = definition.ParserFailure ? "" : definition.AllocationFailure
                 ? ModListMemoryError : definition.Entries == 0
                 ? ModListHeader : ModOutput(definition.CtrlC ? 1 :
-                    definition.Entries, definition.IdRevision);
+                    definition.Entries, definition.IdRevision, definition.NoRevision);
         return new(name, definition.IdRevision ? "VERBOSE" : "", result,
             error, output)
         {
@@ -82,7 +90,7 @@ internal sealed partial class ProbeFixture
         };
     }
 
-    private static string ModOutput(int entries, bool idRevision = false)
+    private static string ModOutput(int entries, bool idRevision = false, bool noRevision = false)
     {
         var output = new StringBuilder(ModListHeader);
         for (var slot = 0; slot < entries; slot++)
@@ -91,12 +99,10 @@ internal sealed partial class ProbeFixture
             var version = 50 + slot;
             var revision = 4 + slot;
             var priority = -1 + slot;
-            var flags = slot == 0 && idRevision ? "NEVER" :
+            var flags = (slot == 0 && idRevision) || noRevision ? "NEVER" :
                 "AutoInit | Extended";
-            output.Append(string.Format(
-                "0x{0:x8}\t{1}\t {2,2}.{3,-3}\t{4,4}\t<{5}>\n",
-                0x6000u + (uint)slot * 0x100u, name.PadLeft(30),
-                version, revision, priority, flags));
+            var versionText = noRevision ? $"{version,3}" : $"{version,3}.{revision,-3}";
+            output.Append($"0x{0x6000u + (uint)slot * 0x100u:x8}\t{name.PadLeft(30)}\t{versionText}\t{priority,4}\t<{flags}>\n");
         }
         return output.ToString();
     }
@@ -124,7 +130,7 @@ internal sealed partial class ProbeFixture
             Bus.Word(residentAddress + (uint)ExecLayout.Resident.MatchWord,
                 ExecConstants.ResidentMatchWord);
             Bus.Memory[residentAddress + (uint)ExecLayout.Resident.Flags] =
-                definition.IdRevision ? (byte)0 : (byte)0xc0;
+                definition.IdRevision || definition.NoRevision ? (byte)0 : (byte)0xc0;
             Bus.Memory[residentAddress + (uint)ExecLayout.Resident.Version] =
                 (byte)(50 + slot);
             Bus.Memory[residentAddress + (uint)ExecLayout.Resident.Priority] =
@@ -138,7 +144,7 @@ internal sealed partial class ProbeFixture
             var moduleName = slot == 0 ? "Mod" : "Mod" + slot;
             Encoding.Latin1.GetBytes($"{moduleName}\0").CopyTo(
                 Bus.Memory.AsSpan((int)nameAddress));
-            var id = $"$VER: ModList {50 + slot}.{4 + slot} (13.6.05)\0";
+            var id = definition.NoRevision ? "No version information\0" : $"$VER: ModList {50 + slot}.{4 + slot} (13.6.05)\0";
             Encoding.Latin1.GetBytes(id).CopyTo(
                 Bus.Memory.AsSpan((int)idAddress));
         }
@@ -191,17 +197,20 @@ internal sealed partial class ProbeFixture
             var address = Bus.Long(args);
             var name = Bus.CString(Bus.Long(args + 4));
             var version = Bus.Long(args + 8);
-            var revision = Bus.Long(args + 12);
-            var priority = unchecked((int)Bus.Long(args + 16));
+            var hasRevision = !invocation.Definition.ModList!.NoRevision;
+            Require(format.Contains(".%-3lu") == hasRevision, "ModList selected the wrong revision format.");
+            var revision = hasRevision ? Bus.Long(args + 12) : 0;
+            var priority = unchecked((int)Bus.Long(args + (hasRevision ? 16u : 12u)));
             var sourceId = Bus.CString(invocation.ModListLayout!.IdString);
             var slot = checked((int)((address - 0x6000u) / 0x100u));
             var expectedName = slot == 0 ? "Mod" : "Mod" + slot;
             Require(address == 0x6000u + (uint)slot * 0x100u &&
                 name == expectedName && version == (uint)(50 + slot) &&
-                revision == (uint)(4 + slot) && priority == -1 + slot,
+                revision == (hasRevision ? (uint)(4 + slot) : 0u) && priority == -1 + slot,
                 $"ModList resident fields differ (source={sourceId}, format={format}, address=0x{address:x}, name={name}, version={version}, revision={revision}, priority={priority}).");
+            var versionText = hasRevision ? $"{version,3}.{revision,-3}" : $"{version,3}";
             invocation.Output.Write(Encoding.Latin1.GetBytes(
-                $"0x{address:x8}\t{name.PadLeft(30)}\t{version,3}.{revision,-3}\t{priority,4}\t<"));
+                $"0x{address:x8}\t{name.PadLeft(30)}\t{versionText}\t{priority,4}\t<"));
             invocation.ModListVPrintfCalls++;
             return 0;
         });
