@@ -79,7 +79,7 @@
     <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts</CopperOSCodeSizePasses>
   </PropertyGroup>
   <PropertyGroup Condition="'$(CopperOSCommandName)' == 'List' and '$(CopperOSCodeSizePasses)' == ''">
-    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactPrivateStackCopies</CopperOSCodeSizePasses>
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactPrivateStackCopies,ValidateLiteralOperands</CopperOSCodeSizePasses>
   </PropertyGroup>
   <PropertyGroup Condition="'$(CopperOSCommandName)' == 'LoadMonDrvs' and '$(CopperOSCodeSizePasses)' == ''">
     <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts,InlineMemoryHelpers</CopperOSCodeSizePasses>
