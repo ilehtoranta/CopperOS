@@ -97,6 +97,7 @@ def report(frozen, final, matrix, compiler_root, output, decoder_path):
               'compilerCommits': commits, 'dotnetSdk': subprocess.check_output(['dotnet', '--version'], cwd=REPO).decode().strip(),
               'decoder': 'Capstone ' + capstone.__version__, 'tests': tests,
               'instructionCore': {**identity(core), 'productVersion': product_version},
+              'buildToolChecks': read(frozen / 'build-tool-check/qualification.json'),
               'evalPeepholeModes': read(frozen / 'eval-modes.json'),
               'morphosEvalPeepholeModes': read(frozen / 'morphos-eval-modes.json'),
               'baselineQualification': read(frozen / 'baseline/qualification.json'), 'experiments': experiments,
@@ -166,6 +167,7 @@ def report(frozen, final, matrix, compiler_root, output, decoder_path):
               '- 843 host command tests passed, including applicable Workbench/MorphOS profile fixtures.',
               '- Execute: complete 151-case suite on each CPU, 453 runs. Eval: all 37 Workbench and 20 MorphOS entry vectors under disabled, bounded and fixed-point peepholes on each CPU (333 and 180 runs); receipts in the JSON.',
               '- Changed accepted shipping entries passed baseline/candidate comparisons on 68000, 68020 and 68040. Output bytes, return codes, IoErr, resource events, allocation ownership/releases, repeated invocation and supported interleaving are compared. Copy keeps compiler-owned invocation context separate from command allocations.',
+              '- Fresh source publishes of Execute, List, Search and Reboot match their qualified frozen images exactly. Filtered builds preserve unselected output, and a failed build leaves previous executables unchanged.',
               '- Copper68k package 1.5.1; actual product version `' + product_version + '`; core SHA256 `' + identity(core)['sha256'] + '`. Actual receipt identities are retained.', '',
               '## Limits and remaining opportunities', '']
     lines += ['- ' + limit for limit in result['limits']]
@@ -176,6 +178,8 @@ def report(frozen, final, matrix, compiler_root, output, decoder_path):
               f"Local immutable inputs, all baseline executables, trials, maps, compiler payloads and native receipts: `{frozen}`. Final staging: `{final}`.", '',
               'Separate compiler commits and patch hashes are listed in the JSON. CopperOS tooling, per-command enablement and reporting are separate changes. Publication requires all 61 images, matching hashes, a smaller aggregate and qualification for every changed executable; previous output is retained before stale files are removed.', '',
               '[Machine-readable report](code-generator-size-optimization-20261005.json)']
+    if result['publication']:
+        lines += ['', f"Published to `{result['publication']['directory']}`: all 61 command hashes match staging. Previous output is retained in `{result['publication']['backup']}`."]
     output.with_suffix('.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
     print(f"Reported {len(commands)} commands: {result['selectedTotalBytes']} bytes, saved {saved}")
 

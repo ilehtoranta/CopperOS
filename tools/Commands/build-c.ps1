@@ -60,7 +60,7 @@ $built = foreach ($project in $projects) {
     if ($CompilerAssembly) { $properties += "-p:CopperOSCompilerAssembly=$([IO.Path]::GetFullPath($CompilerAssembly))" }
     if ($CodeSizeOptimizations) { $properties += "-p:CopperOSCodeSizeOptimizations=$CodeSizeOptimizations" }
     if ($CodeSizePasses) { $properties += "-p:CopperOSCodeSizePasses=$($CodeSizePasses.Replace(',', '%2C'))" }
-    & dotnet publish $project.Path -c Release -nologo -v q @properties
+    & dotnet publish $project.Path -c Release -nologo -v q @properties | Out-Host
     if ($LASTEXITCODE -ne 0) { $failed.Add($project.Name); continue }
     $file = Get-Item -LiteralPath (Join-Path $stagingDirectory $project.Name)
     [pscustomobject]@{ Command = $project.Name; Bytes = $file.Length
