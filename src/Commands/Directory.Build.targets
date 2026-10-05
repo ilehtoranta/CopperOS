@@ -68,11 +68,12 @@
     </ReadLinesFromFile>
     <ItemGroup>
       <_CopperOSManifestLine Remove="@(_CopperOSManifestLine)"
-                             Condition="$([System.String]::Copy('%(Identity)').StartsWith('peephole=')) or $([System.String]::Copy('%(Identity)').StartsWith('memory=')) or $([System.String]::Copy('%(Identity)').StartsWith('symbols=')) or $([System.String]::Copy('%(Identity)').StartsWith('code-size-optimizations='))" />
+                             Condition="$([System.String]::Copy('%(Identity)').StartsWith('peephole=')) or $([System.String]::Copy('%(Identity)').StartsWith('memory=')) or $([System.String]::Copy('%(Identity)').StartsWith('symbols=')) or $([System.String]::Copy('%(Identity)').StartsWith('code-size-optimizations=')) or $([System.String]::Copy('%(Identity)').StartsWith('code-size-passes='))" />
       <_CopperOSManifestLine Include="peephole=$(CopperOSPeephole)" Condition="'$(CopperOSPeephole)' != ''" />
       <_CopperOSManifestLine Include="memory=$(CopperOSMemory)" Condition="'$(CopperOSMemory)' != ''" />
       <_CopperOSManifestLine Include="symbols=$(CopperOSSymbols)" Condition="'$(CopperOSSymbols)' != ''" />
       <_CopperOSManifestLine Include="code-size-optimizations=$(CopperOSCodeSizeOptimizations)" />
+      <_CopperOSManifestLine Include="code-size-passes=$(CopperOSCodeSizePasses)" Condition="'$(CopperOSCodeSizePasses)' != '' and '$(CopperOSCodeSizeOptimizations)' == 'on'" />
     </ItemGroup>
     <WriteLinesToFile File="$(CopperSharpResponseManifestPath)"
                       Lines="@(_CopperOSManifestLine)"

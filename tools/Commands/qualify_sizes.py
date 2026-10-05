@@ -13,7 +13,7 @@ PASSES = ('ElideUnusedRegisterArguments', 'ReuseIncomingArgumentHomes',
           'ForwardReadOnlyAggregateLocals', 'InlineSingleUseMethods',
           'ClusterInternalCalls', 'ShareIdenticalMethods', 'ShareReturnSequences')
 SUITE_CONSTANTS = dict(pair.split('=') for pair in '''
-AddDataTypes=Workbench31AddDataTypesEntrySuite Assign=Workbench31AssignEntrySuite
+AddBuffers=AddBuffersEntrySuite AddDataTypes=Workbench31AddDataTypesEntrySuite Assign=Workbench31AssignEntrySuite
 Avail=Workbench31AvailEntrySuite Beep=BeepEntrySuite BindDrivers=Workbench31BindDriversEntrySuite
 Break=Workbench31BreakEntrySuite ChangeTaskPri=Workbench31ChangeTaskPriEntrySuite
 Check2090=Check2090EntrySuite Date=Workbench31DateEntrySuite Delete=WorkbenchDeleteCommandProbeSuite
@@ -26,7 +26,7 @@ LibList=LibListEntrySuite List=WorkbenchListEntrySuite LoadMonDrvs=LoadMonDrvsEn
 Lock=Workbench31LockEntrySuite MakeDir=Workbench31MakeDirEntrySuite MakeLink=WorkbenchMakeLinkEntrySuite
 ModList=ModListEntrySuite Mount=Workbench31MountEntrySuite PathPart=PathPartEntrySuite
 PortList=PortListEntrySuite Protect=Workbench31ProtectEntrySuite Quote=QuoteNativeEntrySuite
-Reboot=Workbench31RebootEntrySuite Rename=WorkbenchRenameStartupSuite
+Reboot=Workbench31RebootEntrySuite Relabel=RelabelEntrySuite Rename=WorkbenchRenameStartupSuite
 RequestChoice=Workbench31RequestChoiceEntrySuite RequestFile=Workbench31RequestFileEntrySuite
 ResList=ResListEntrySuite Search=WorkbenchSearchEntrySuite SetClock=Workbench31SetClockEntrySuite
 SetDate=Workbench31SetDateEntrySuite SetFont=Workbench31SetFontEntrySuite
@@ -100,7 +100,7 @@ def receipt(stage, name, cpu, suite, runner):
         shutil.copy2(recorded_map, map_path)
     report = stage / 'execution' / f'{name}.{cpu}.{suite}.json'
     cached = json.loads(report.read_text(encoding='utf-8-sig')) if report.exists() else {}
-    valid = cached.get('status') == 'passed' and cached.get('managedExecutorSha256') == identity(runner)['sha256'] and cached.get('imageSha256') == identity(image)['sha256']
+    valid = cached.get('status') in ('passed', 'failed') and cached.get('managedExecutorSha256') == identity(runner)['sha256'] and cached.get('imageSha256') == identity(image)['sha256']
     if cached.get('compilerMapSha256') is not None:
         valid &= cached['compilerMapSha256'] == identity(map_path)['sha256']
     if not valid:
@@ -109,8 +109,10 @@ def receipt(stage, name, cpu, suite, runner):
     return json.loads(report.read_text(encoding='utf-8-sig'))
 
 
-def qualify(before, after, runner, names):
+def qualify(before, after, runner, names, suite_overrides=None):
     supported = suites()
+    if suite_overrides:
+        supported.update(suite_overrides)
     rows = []
     for name in names:
         base_bytes = (before / 'C' / name).stat().st_size
@@ -157,7 +159,9 @@ if __name__ == '__main__':
     parser.add_argument('--runner', type=Path)
     parser.add_argument('--commands', help='comma-separated command names')
     parser.add_argument('--policy', choices=('on', 'off'), default='off')
-    parser.add_argument('--pass', dest='selected', choices=PASSES)
+    parser.add_argument('--pass', dest='selected', choices=PASSES + ('RemoveRedundantTransport',
+                        'CompactGuestMemory', 'NarrowOperations', 'EliminateRedundantInitialization',
+                        'SizeFirstCosts', 'InlineMemoryHelpers', 'ShareArithmeticCores'))
     parser.add_argument('--peephole', choices=('off', 'bounded', 'fixed-point'))
     args = parser.parse_args()
     names = args.commands.split(',') if args.commands else sorted(p.name for p in

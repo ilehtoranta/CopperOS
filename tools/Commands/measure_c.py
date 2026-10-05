@@ -31,10 +31,14 @@ def parse_map(path):
     records = {}
     for line in text.splitlines():
         if line.startswith(("METRICS ", "PEEPHOLE ", "MACHINE ", "AGGREGATE-FORWARDING ",
-                            "BULK-COPY ", "CODE-SIZE ", "RESIDENT-CONTEXT ")):
+                            "BULK-COPY ", "CODE-SIZE ", "RESIDENT-CONTEXT ", "GENERATED-SIZE ", "GENERATED-SIZE-REWRITE ")):
             name, _, values = line.partition(" ")
-            records[name] = {k: int(v) if v.isdecimal() else v for k, v in
-                             re.findall(r"([\w-]+)=([^ ]+)", values)}
+            row = {k: int(v) if v.isdecimal() else v for k, v in
+                   re.findall(r"([\w-]+)=([^ ]+)", values)}
+            if name == 'GENERATED-SIZE-REWRITE':
+                records.setdefault(name, []).append(row)
+            else:
+                records[name] = row
     methods = [{"offset": int(m[1], 16), "bytes": int(m[2]), "method": m[3]}
                for m in re.finditer(r"^([0-9A-F]{8})\s+(\d+)\s+(.+::.+)$", text, re.M)]
     return {"records": records, "reachableMethods": len(methods),
