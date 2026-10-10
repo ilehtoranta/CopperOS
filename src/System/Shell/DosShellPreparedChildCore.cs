@@ -86,7 +86,13 @@ internal static class DosShellPreparedChildCore
 					child.ResidentEntry);
 		}
 		else if (child.Segment.IsNotNull)
+		{
+#if COPPERSTART_ROM_DOS
+			platform.UnloadDosProcessSegment(child.State, child.Segment);
+#else
 			DosSegmentLoaderCore.Unload(ref platform, child.State, child.Segment);
+#endif
+		}
 		DosCore.SetIoErr(ref platform, child.State, error);
 		rollbackComplete = true;
 		return false;
