@@ -387,7 +387,17 @@ internal static class DosShellNativeLaunchCore
 			command.CommandNameLength > 65_535 ||
 			command.CommandName.Raw > uint.MaxValue - command.CommandNameLength ||
 			!dos.IsMapped(command.CommandName, command.CommandNameLength) ||
-			!command.Arguments.IsContainedBy(command.Line, command.LineLength) ||
+			!command.Arguments.IsContainedBy(command.Line, command.LineLength))
+			return false;
+		// A missing command is a completed command error. Reporting a platform
+		// failure would terminate the persistent interactive Shell runner.
+		if (lookup.Kind == CopperOS.Shell.ShellScriptLookupKind.NotFound)
+		{
+			if (!DosCore.TryGetShellProcessContext(ref dos, state, cli, out _)) return false;
+			DosCore.SetIoErr(ref dos, state, DOS.Error.ObjectNotFound);
+			return true;
+		}
+		if (
 			lookup.ResolvedPath.IsNull ||
 			lookup.PathLength == 0 || lookup.PathLength > 65_535 ||
 			lookup.ResolvedPath.Raw > uint.MaxValue - lookup.PathLength ||
