@@ -265,11 +265,10 @@ public static class ShellTextParser
             var expected = index < 4
                 ? (firstWord >> unchecked((int)((3u - index) * 8))) & 0xFFu
                 : (secondWord >> unchecked((int)((7u - index) * 8))) & 0xFFu;
-            // Guest scalars are big-endian; the byte at the requested address
-            // is therefore the most-significant byte of a 32-bit read.  The
-            // previous low-byte extraction compared each character with the
-            // fourth byte in the window and made every packed lookup fail.
-            var actual = platform.ReadUInt32(value, unchecked((int)index)) >> 24;
+            // Text can begin at an odd address and end at the allocation edge.
+            // Reading one character must not issue an unaligned scalar access
+            // or read beyond the supplied span on a 68000.
+            var actual = (uint)platform.ReadUInt8(value, unchecked((int)index));
             if (actual is >= (uint)'A' and <= (uint)'Z') actual += 32;
             if (expected is >= (uint)'A' and <= (uint)'Z') expected += 32;
             if (actual != expected) return false;
