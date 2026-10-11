@@ -8,6 +8,15 @@ public static class NativeMorphOSLockCommand
     public const string Template = "DRIVE/A,ON/S,OFF/S,PASSKEY";
     public const uint ResultCount = 4;
 
+    private struct DisplayCells
+    {
+        public uint Drive;
+
+        public static APTR AddressOf(ref DisplayCells cells) =>
+            throw new System.NotSupportedException(
+                "Lock.DisplayCells.AddressOf is lowered by CopperSharp.");
+    }
+
     private const int ActionWriteProtect = 1023;
     private const uint DeviceProcDeviceNodeOffset = 12;
     private const uint DeviceNodeTypeOffset = 4;
@@ -71,6 +80,8 @@ public static class NativeMorphOSLockCommand
                 }
             }
 
+            var display = new DisplayCells { Drive = drive };
+            var displayArguments = DisplayCells.AddressOf(ref display);
             if (on != 0)
             {
                 var packetResult = DOS.DoPkt2(
@@ -80,10 +91,10 @@ public static class NativeMorphOSLockCommand
                 {
                     ioError = (int)DOS.IoErr();
                     DOS.VPrintf("Attempt to lock drive %s failed\n",
-                        APTR.FromPointer(drive));
+                        displayArguments);
                     break;
                 }
-                DOS.VPrintf("%s locked\n", APTR.FromPointer(drive));
+                DOS.VPrintf("%s locked\n", displayArguments);
             }
             else if (off != 0)
             {
@@ -94,10 +105,10 @@ public static class NativeMorphOSLockCommand
                 {
                     ioError = (int)DOS.IoErr();
                     DOS.VPrintf("Attempt to unlock drive %s failed\n",
-                        APTR.FromPointer(drive));
+                        displayArguments);
                     break;
                 }
-                DOS.VPrintf("%s unlocked\n", APTR.FromPointer(drive));
+                DOS.VPrintf("%s unlocked\n", displayArguments);
             }
 
             result = DOS.RETURN_OK;

@@ -512,6 +512,7 @@ internal sealed partial class ProbeFixture
             var args = state.D[2];
             if (format == "%s\n")
             {
+                Require(invocation.Definition.List!.Quick, "List selected quick output without QUICK.");
                 invocation.Output.Write(Encoding.Latin1.GetBytes(
                     Bus.CString(Bus.Long(args)) + "\n"));
             }
@@ -532,6 +533,11 @@ internal sealed partial class ProbeFixture
                     "%-24s %7ld %4ld %8s%s\n" or
                     "%-24s %7ld %8s%s\n",
                     "List long format differs.");
+                var definition = invocation.Definition.List!;
+                var entry = (definition.Entries ?? DefaultListEntries)[invocation.ListLayout!.EntryIndex];
+                Require(!definition.Quick && hasKeys == definition.Keys &&
+                    hasDates == !definition.NoDates && directory == entry.Directory,
+                    "List selected a format inconsistent with its options or entry type.");
                 var name = Bus.CString(Bus.Long(args));
                 var rawSize = Bus.Long(args + 4);
                 var size = directory ? Bus.CString(rawSize) :

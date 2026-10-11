@@ -288,8 +288,8 @@ internal sealed partial class ProbeFixture
         Register(baseAddress, DosLvo.VPrintf, "VPrintf", (state,
             invocation) =>
         {
-            var name = Bus.CString(Bus.Long(state.D[2]));
             var format = Bus.CString(state.D[1]);
+            var name = format == "No name given\n" ? string.Empty : Bus.CString(Bus.Long(state.D[2]));
             if (IsWorkbench31MakeDirEntrySuite(suite))
             {
                 Require(format is "No name given\n" or

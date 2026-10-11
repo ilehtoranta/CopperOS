@@ -42,6 +42,9 @@ internal sealed partial class ProbeFixture
                 result: DOS.RETURN_FAIL, error: (int)DOS.Error.DiskWriteProtected,
                 packetResult: 0,
                 expected: "Attempt to lock drive Work: failed\n"),
+            Case("unlock-packet-failure", "Work:", on: false, off: true,
+                result: DOS.RETURN_FAIL, error: (int)DOS.Error.DiskWriteProtected,
+                packetResult: 0, expected: "Attempt to unlock drive Work: failed\n"),
             Case("parser-failure", "Work:", on: true, off: false,
                 result: DOS.RETURN_ERROR, error: 116, parserError: 116),
             new("workbench-startup", "", DOS.RETURN_ERROR,
@@ -167,14 +170,15 @@ internal sealed partial class ProbeFixture
         {
             var definition = invocation.Definition.Lock!;
             var format = Bus.CString(state.D[1]);
-            Require(format is "%s locked\n" or "%s unlocked\n" or
-                "Attempt to lock drive %s failed\n",
-                "Lock display format differs.");
-            var drive = Bus.CString(state.D[2]);
+            var expectedFormat = definition.PacketResult == 0
+                ? definition.On ? "Attempt to lock drive %s failed\n" : "Attempt to unlock drive %s failed\n"
+                : definition.On ? "%s locked\n" : "%s unlocked\n";
+            Require(format == expectedFormat, "Lock display format differs.");
+            var drive = Bus.CString(Bus.Long(state.D[2]));
             Require(drive == definition.Drive, "Lock display argument differs.");
             invocation.Output.Write(Encoding.Latin1.GetBytes(
                 format.StartsWith("Attempt", StringComparison.Ordinal)
-                    ? $"Attempt to lock drive {drive} failed\n"
+                    ? $"Attempt to {(definition.On ? "lock" : "unlock")} drive {drive} failed\n"
                     : $"{drive} {(format.Contains("unlocked") ? "unlocked" : "locked")}\n"));
             return 0;
         });
