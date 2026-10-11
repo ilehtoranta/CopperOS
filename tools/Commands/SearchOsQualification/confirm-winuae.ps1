@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory)][string]$Stage,
     [string]$Rom = $env:COPPERSHARP_KICKSTART31_ROM,
-    [string]$WinUAE = 'C:\Program Files\WinUAE\winuae64.exe'
+    [string]$WinUAE = 'C:\Program Files\WinUAE\winuae64.exe',
+    [switch]$RequireCorrectOutput
 )
 $ErrorActionPreference = 'Stop'
 $Stage = (Resolve-Path -LiteralPath $Stage).Path
@@ -62,3 +63,6 @@ C:UAEquit
 $records | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath "$Stage/winuae/results.json" -Encoding utf8
 $records | ForEach-Object { Write-Output "WinUAE $($_.cpu): completed=$($_.completed), match=$($_.outputsAgree), numbered-output-correct=$($_.numberedOutputCorrect)" }
 if (@($records | Where-Object { -not $_.completed -or -not $_.outputsAgree }).Count) { throw 'WinUAE confirmation did not complete.' }
+if ($RequireCorrectOutput -and @($records | Where-Object { -not $_.numberedOutputCorrect }).Count) {
+    throw 'Search numbered output failed its strict WinUAE expectation.'
+}

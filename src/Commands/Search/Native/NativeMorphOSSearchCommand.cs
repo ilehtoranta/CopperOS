@@ -1059,6 +1059,13 @@ public static class NativeMorphOSSearchCommand
     private static bool WriteBuffer(BPTR output, APTR buffer, uint length,
         out int ioError)
     {
+        // VPrintf/FPuts and PutStr buffer prefixes and headings. Commit those
+        // bytes before raw Write, which bypasses the DOS file buffer.
+        if (DOS.Flush(output) == 0)
+        {
+            ioError = (int)DOS.IoErr();
+            return false;
+        }
         var offset = 0u;
         while (offset < length)
         {

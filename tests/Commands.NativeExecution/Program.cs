@@ -1543,6 +1543,7 @@ internal sealed partial class ProbeFixture
                 var cpu = cores[index];
                 var invocation = invocations[index];
                 var test = invocation.Definition;
+                if (IsSearchEntrySuite(suite)) DrainSearchOutput(invocation);
                 if (bindDriversPrivateImageProbe)
                 {
                     reports.Add(new

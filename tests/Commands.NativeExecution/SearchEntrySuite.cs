@@ -22,7 +22,9 @@ internal sealed record SearchEntryCase(string Path = "SRC:one.txt",
     bool LocaleHighBytePrintable = false,
     int ParserError = 0, int ReadChunkBytes = 0,
     int CtrlDSignalCall = 0, bool Seek64FileSize = false,
-    bool Seek64Failure = false, bool OpenFailure = false);
+    bool Seek64Failure = false, bool OpenFailure = false,
+    bool FlushFailure = false, bool WriteFailure = false,
+    int WriteChunkBytes = 0);
 
 internal sealed record SearchTraversalStep(string Name, int EntryType,
     byte Flags, uint DirectoryLock, string DirectoryPath);
@@ -59,6 +61,8 @@ internal sealed class SearchEntryNativeLayout(uint control, uint from,
     public int SearchSeek64Calls { get; set; }
     public List<(uint PositionHigh, uint PositionLow, int Mode)>
         SearchSeek64Requests { get; } = [];
+    public MemoryStream BufferedOutput { get; } = new();
+    public int OutputFlushCalls { get; set; }
 }
 
 internal sealed partial class ProbeFixture
@@ -271,6 +275,25 @@ internal sealed partial class ProbeFixture
             ];
         }
 
+        // Preserve the existing MorphOS per-file continuation policy: the
+        // match is recorded before output, and successful traversal clears
+        // the file error. Workbench instead reports the failed output.
+        var outputFailureResult = suite == SearchEntrySuite
+            ? DOS.RETURN_OK : DOS.RETURN_FAIL;
+        var outputFailureError = suite == SearchEntrySuite
+            ? 0 : (int)DOS.Error.DiskFull;
+        cases =
+        [
+            .. cases,
+            Search("output-flush-failure", new(FlushFailure: true),
+                "SRC:one.txt needle", "", outputFailureResult,
+                outputFailureError),
+            Search("output-write-failure", new(WriteFailure: true),
+                "SRC:one.txt needle", "     2> ", outputFailureResult,
+                outputFailureError),
+            Search("output-short-writes", new(WriteChunkBytes: 2),
+                "SRC:one.txt needle", "     2> Needle\n")
+        ];
         var reports = new List<object>();
         foreach (var test in cases) reports.AddRange(Execute([test], false));
         reports.AddRange(Execute([
@@ -983,7 +1006,7 @@ internal sealed partial class ProbeFixture
         Register(baseAddress, DosLvo.PutStr, "PutStr", (state, invocation) =>
         {
             var value = Bus.CString(state.D[1]);
-            invocation.Output.Write(Encoding.Latin1.GetBytes(value));
+            invocation.SearchEntryLayout!.BufferedOutput.Write(Encoding.Latin1.GetBytes(value));
             return (uint)value.Length;
         });
         Register(baseAddress, DosLvo.VPrintf, "VPrintf", (state, invocation) =>
@@ -992,7 +1015,7 @@ internal sealed partial class ProbeFixture
             if (format == "%6ld")
             {
                 var number = Bus.Long(state.D[2]);
-                invocation.Output.Write(Encoding.Latin1.GetBytes(
+                invocation.SearchEntryLayout!.BufferedOutput.Write(Encoding.Latin1.GetBytes(
                     string.Format("{0,6}", number)));
                 return 0;
             }
@@ -1001,7 +1024,7 @@ internal sealed partial class ProbeFixture
                 Bus.CString(Bus.Long(state.D[2])) == "Dangling" &&
                 Bus.CString(Bus.Long(state.D[2] + 4)) == "TARGET:",
                 "Search dangling-link warning arguments differ.");
-            invocation.Output.Write(Encoding.Latin1.GetBytes(
+            invocation.SearchEntryLayout!.BufferedOutput.Write(Encoding.Latin1.GetBytes(
                 "Warning: Skipping dangling softlink Dangling -> TARGET:\n"));
             invocation.SearchEntryLayout!.SoftLinkWarnings++;
             return 0;
@@ -1013,8 +1036,21 @@ internal sealed partial class ProbeFixture
                 (Bus.Memory[state.D[2]] == (byte)'>' || Bus.Memory[state.D[2]] == (byte)':') &&
                 Bus.Memory[state.D[2] + 1] == (byte)' ',
                 "Search line marker output differs.");
-            invocation.Output.Write(Encoding.Latin1.GetBytes(markerText));
+            invocation.SearchEntryLayout!.BufferedOutput.Write(Encoding.Latin1.GetBytes(markerText));
             return 0;
+        });
+        Register(baseAddress, DosLvo.Flush, "Flush", (state, invocation) =>
+        {
+            Require(state.D[1] == invocation.OutputBptr,
+                "Search flushed a handle other than its selected output.");
+            invocation.SearchEntryLayout!.OutputFlushCalls++;
+            if (invocation.Definition.Search!.FlushFailure)
+            {
+                invocation.IoError = (int)DOS.Error.DiskFull;
+                return 0;
+            }
+            DrainSearchOutput(invocation);
+            return uint.MaxValue;
         });
         Register(baseAddress, DosLvo.Write, "Write", (state, invocation) =>
         {
@@ -1022,9 +1058,19 @@ internal sealed partial class ProbeFixture
                 state.D[3] > 0 && state.D[3] <= 8192,
                 "Search Write arguments differ.");
             invocation.SearchWriteCalls++;
+            Require(invocation.SearchEntryLayout!.BufferedOutput.Length == 0,
+                "Search mixed buffered output with raw Write without flushing.");
+            var definition = invocation.Definition.Search!;
+            if (definition.WriteFailure)
+            {
+                invocation.IoError = (int)DOS.Error.DiskFull;
+                return uint.MaxValue;
+            }
+            var written = definition.WriteChunkBytes == 0 ? state.D[3] :
+                Math.Min(state.D[3], unchecked((uint)definition.WriteChunkBytes));
             invocation.Output.Write(Bus.Memory, (int)state.D[2],
-                checked((int)state.D[3]));
-            return state.D[3];
+                checked((int)written));
+            return written;
         });
         Register(baseAddress, DosLvo.PrintFault, "PrintFault", (_, invocation) =>
         {
@@ -1039,6 +1085,16 @@ internal sealed partial class ProbeFixture
             invocation.IoError = unchecked((int)state.D[1]);
             return 0;
         });
+    }
+
+    private static void DrainSearchOutput(Invocation invocation)
+    {
+        // Model the caller's final stream flush as well as explicit DOS Flush.
+        // A failed output provider cannot persist its pending bytes.
+        if (invocation.Definition.Search!.FlushFailure) return;
+        var pending = invocation.SearchEntryLayout!.BufferedOutput;
+        invocation.Output.Write(pending.ToArray());
+        pending.SetLength(0);
     }
 
     private void PutSearchFib(Invocation invocation, SearchEntryNativeLayout layout)
@@ -1194,6 +1250,23 @@ internal sealed partial class ProbeFixture
             invocation.SearchMatchFirstCalls == 1 &&
             invocation.SearchMatchEndCalls == 1,
             $"Search parser/workspace/matcher ownership differs for {invocation.Definition.Name} (alloc={invocation.SearchAllocMemCalls}/{expectedAllocations}, free={invocation.SearchFreeMemCalls}/{expectedAllocations}, opens={invocation.SearchFileOpenCalls}).");
+        if (definition.FlushFailure || definition.WriteFailure)
+        {
+            Require(layout.OutputFlushCalls == 1 &&
+                invocation.SearchWriteCalls == (definition.FlushFailure ? 0 : 1) &&
+                invocation.SearchFileOpenCalls == 1 &&
+                invocation.SearchFileCloseCalls == 1 &&
+                invocation.SearchReadCalls == 1 &&
+                invocation.SearchMatchNextCalls ==
+                    (suite == SearchEntrySuite ? 1 : 0) &&
+                invocation.SearchPrintFaultCalls ==
+                    (suite == SearchEntrySuite ? 0 : 1),
+                "Search output failure did not stop writes and release parser, file, workspace and matcher ownership.");
+            return;
+        }
+        if (definition.WriteChunkBytes != 0)
+            Require(invocation.SearchWriteCalls == 4,
+                "Search failed to finish a line through short raw writes.");
         if (suite == SearchEntrySuite &&
             definition.BufferAllocationFailures != 0)
         {

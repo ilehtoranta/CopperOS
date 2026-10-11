@@ -83,3 +83,39 @@ PDB binding checks current runner/launcher source against their frozen modules
 and reports engine source drift explicitly. The installed engine may differ
 from the current dirty CopperScreen checkout. Preserve that distinction.
 ROMs remain user-owned external inputs and are never copied into the repo.
+
+## Corrected ordering checkpoint
+
+The corrected run is `artifacts/search-output-ordering-final-20261012`.
+`prepare-corrected.py <fresh-stage>` freezes the current normal Search publish
+response and CIL once, then compiles baseline and opt-in SimplifyLoopPhis images
+from those same inputs with the previously frozen compiler. Before running it,
+publish baseline Search into `<fresh-stage>/publish-baseline/C`, publish the
+candidate into `<fresh-stage>/publish-candidate/C`, place a current vector
+executor in `<fresh-stage>/vector-runner`, and build the shared MorphOS source
+profile into `<fresh-stage>/morphos-cil`. Publish the baseline last so the
+current publish response excludes SimplifyLoopPhis. The script preserves the
+old native runner/guest/host payloads and records source and input hashes.
+
+Generate the corpus and its two partitions as above, then run **both partitions
+on all three CPUs**, preserving the same frame/time limits. Run WinUAE with
+`-RequireCorrectOutput`, which rejects the previous misordered numbered line.
+Use `qualify_sizes.qualify` for baseline/candidate vector comparisons, with
+the `morphos320-search-native-entry-vector-fixture` suite override for the
+MorphOS images. The vector executor now buffers VPrintf/FPuts/PutStr until
+Flush and rejects a raw Write while buffered bytes remain. Run
+`control-buffering.py <stage>` to bind its failing old-image control to the
+frozen executor and image; retain Search's host TRX in `tests/search-host.trx`.
+
+`report-corrected.py <stage> <report-prefix>` requires exact output, returns,
+caller restoration, stable repeat memory, all CPU/vector comparisons,
+independent WinUAE output and the old-image negative control. It checks that
+the normal publish path produces identical images, frozen inputs remain
+unchanged, and the production policy still excludes SimplifyLoopPhis. It
+emits `<report-prefix>.json`; a passing finite checkpoint does not claim
+original Workbench Search parity, actual MorphOS execution or shipping/PURE
+qualification. The first corrected attempt remains in
+`artifacts/search-output-ordering-20261012`: its MorphOS failure vectors
+incorrectly expected Workbench's command-level error result. The final fixture
+retains MorphOS's existing per-file continuation policy while requiring both
+profiles to stop raw writes and release file/parser/matcher/workspace ownership.

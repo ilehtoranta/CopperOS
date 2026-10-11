@@ -48,6 +48,13 @@ string offsets are recorded in
 These are static candidates; they do not establish runtime parser use or
 behavioral parity.
 
+The [2026-10-12 output-ordering checkpoint](../search-output-ordering-20261012.md)
+flushes buffered DOS prefixes/headings before raw Write. Corrected frozen
+baseline/candidate images pass 192 original-DOS invocations, 426 supplied
+vectors and independent WinUAE checks across 68000/68020/68040. The new
+SimplifyLoopPhis optimization remains disabled; shipping/PURE and original
+Search/MorphOS runtime parity remain open.
+
 | Profile | CPU | Resident HUNK | SHA-256 | Reachable methods | Supplied vectors |
 | --- | --- | ---: | --- | ---: | ---: |
 | MorphOS 3.20 | 68000 | 48,580 bytes | `0ac0fad6eedda759f056ed178047415daecbaefaf50025247a1f1b4d5bc0d168` | 43 | 46 |
