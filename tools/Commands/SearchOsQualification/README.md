@@ -1,0 +1,85 @@
+# Search native OS qualification
+
+`Guest.cs` is an authored MC68000 CLI diagnostic compiled against frozen Amiga
+SDK inputs. It loads two unchanged Search images using native DOS LoadSeg,
+alternates their RunCommand invocations, and writes a binary receipt through
+native OFS. Search reads native RAM files and uses original DOS ReadArgs,
+pattern APIs, traversal, and file I/O. The guest diagnostic implements no OS
+services. `Host.cs` only prepares input files and decodes saved disk receipts;
+it calls the existing frozen NativeOsSession API for boot and completion.
+
+The finite corpus contains 18 cases, warm-up calls and repeated/interleaved
+calls at requested 4096/8192-byte RunCommand stacks. The combined 60-call batch
+is too long for the recorded 68000 3000-frame cap. Partition it into a 30-call
+batch and a 34-call batch (the second includes four warm-up calls); keep that
+same frame cap. 68020/68040 complete the combined corpus. Cycles include boot
+and disk I/O and are not a payload benchmark.
+
+The retained experiment is `artifacts/search-os-qualification-20261012`. Its
+report rejects admission because both images mix buffered prefixes/headings
+with unbuffered Write. No policy or installed image is changed by this tooling.
+`report.py` requires the retained failed 68000 combined run, successful split
+runs, successful 68020/68040 runs, and WinUAE confirmations. It is an audit of
+this specific experiment, not a generic acceptance script for later fixes.
+Keep strict output expectations when creating the next corrected checkpoint.
+
+Recreate the diagnostic in a **fresh** evidence directory, preserving the
+existing runner and compiler payloads. From the CopperOS root:
+
+```powershell
+$stage = [IO.Path]::GetFullPath('artifacts/search-os-replay-UNIQUE')
+$pressure = [IO.Path]::GetFullPath('artifacts/search-pressure-20261011')
+$python = 'C:/Users/ilkle/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe'
+# Use the already-frozen runner, not binaries from the dirty owner checkout.
+$runner = [IO.Path]::GetFullPath('artifacts/search-os-qualification-20261012/runner')
+New-Item -ItemType Directory -Path "$stage/runner", "$stage/inputs", "$stage/guest" | Out-Null
+Copy-Item "$runner/*" "$stage/runner" -Recurse
+Copy-Item "$pressure/baseline/C/Search" "$stage/inputs/Search.baseline"
+Copy-Item "$pressure/final/C/Search" "$stage/inputs/Search.candidate"
+Copy-Item artifacts/search-os-qualification-20261012/inputs/*.IN "$stage/inputs"
+dotnet build tools/Commands/SearchOsQualification/Guest.csproj -c Release `
+    "-p:FrozenInputs=$pressure/inputs/Search" --artifacts-path "$stage/build/guest" -o "$stage/guest/cil"
+if ($LASTEXITCODE) { throw 'Guest CIL build failed' }
+dotnet "$pressure/final/compiler/CopperSharp.Compiler.Cli.dll" `
+    "$stage/guest/cil/CopperOS.SearchQualification.Guest.dll" `
+    --entry CopperOS.SearchQualification.Guest::Main --platform amiga --cpu 68000 `
+    --exceptions yolo --format hunk --runtime resident --memory none --peephole fixed-point `
+    --managed-assembly "$stage/guest/cil/CopperSharp.Sdk.Amiga.dll" `
+    --managed-assembly "$pressure/inputs/Search/CopperSharp.Sdk.Amiga.Support.dll" `
+    --managed-assembly "$stage/guest/cil/CopperSharp.Compiler.dll" `
+    --output "$stage/guest/SearchQualification" --compatibility-report "$stage/guest/compatibility.json"
+if ($LASTEXITCODE) { throw 'Guest HUNK build failed' }
+dotnet build tools/Commands/SearchOsQualification/Host.csproj -c Release `
+    "-p:FrozenRunner=$stage/runner" --artifacts-path "$stage/build/host" -o "$stage/host"
+if ($LASTEXITCODE) { throw 'Host build failed' }
+$hostDll = "$stage/host/CopperOS.SearchQualification.Host.dll"
+dotnet $hostDll --bind "$stage/runner" "$stage/runner-source-binding.json"
+& $python tools/Commands/SearchOsQualification/cases.py $stage
+$cases = Get-Content "$stage/cases.json" -Raw | ConvertFrom-Json
+$cases[0..29] | ConvertTo-Json -Depth 8 | Set-Content "$stage/cases-part1.json"
+@($cases[0..3]) + @($cases[30..59]) | ConvertTo-Json -Depth 8 | Set-Content "$stage/cases-part2.json"
+dotnet $hostDll $stage $env:COPPERSHARP_KICKSTART31_ROM 68000 "$stage/cases-part1.json" part1
+if ($LASTEXITCODE) { throw '68000 part1 failed' }
+dotnet $hostDll $stage $env:COPPERSHARP_KICKSTART31_ROM 68000 "$stage/cases-part2.json" part2
+if ($LASTEXITCODE) { throw '68000 part2 failed' }
+foreach ($cpu in '68020', '68040') {
+    dotnet $hostDll $stage $env:COPPERSHARP_KICKSTART31_ROM $cpu "$stage/cases.json" corpus
+    if ($LASTEXITCODE) { throw "Native $cpu execution failed" }
+}
+pwsh -NoProfile -File tools/Commands/SearchOsQualification/confirm-winuae.ps1 -Stage $stage
+```
+
+The host's success means the diagnostic completed and decoded its own matching
+receipt. It does **not** mean the captured Search output passed its contract.
+The report compares exact outputs and returns separately and preserves the
+failed admission decision. ReadArgs errors are generated by original DOS;
+the extra positional string is a FROM/M path, not an invalid keyword.
+Pending Ctrl-C uses public SetSignal on the current guest task, not emulated
+keyboard input. Separate stderr and read/allocation failure injection remain
+outside this original-OS corpus. Stack coverage is finite execution at 4 KiB
+and 8 KiB, not an absolute minimum-stack or canary measurement.
+
+PDB binding checks current runner/launcher source against their frozen modules
+and reports engine source drift explicitly. The installed engine may differ
+from the current dirty CopperScreen checkout. Preserve that distinction.
+ROMs remain user-owned external inputs and are never copied into the repo.
