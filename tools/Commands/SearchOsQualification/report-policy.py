@@ -3,6 +3,7 @@ import hashlib
 import json
 import pathlib
 import struct
+import subprocess
 import sys
 import xml.etree.ElementTree as ET
 
@@ -13,6 +14,8 @@ from qualify_sizes import comparable
 
 stage = pathlib.Path(sys.argv[1]).resolve()
 output = pathlib.Path(sys.argv[2])
+main_toolchain = sys.argv[3:] == ["--main-toolchain"]
+assert not sys.argv[3:] or main_toolchain
 previous = repo / "artifacts/search-output-ordering-final-20261012"
 reference_path = repo / "docs/Commands/Workbench31MorphOS320/search-output-ordering-20261012.json"
 
@@ -42,6 +45,21 @@ for row in freeze["files"]:
     assert identity(row["path"]) == row
 build_command = read(stage / "build-command.json")
 assert not any("codesize" in value.lower() for value in build_command)
+if main_toolchain:
+    assert build_command == ["pwsh", "-NoProfile", "-File", "tools/Commands/build-c.ps1", "-Command", "Search"]
+    main = repo.parent / "CopperSharp68k"
+    for row in freeze["compilerSources"]:
+        assert identity(row["original"]["path"]) == row["original"]
+        assert identity(row["snapshot"]["path"]) == row["snapshot"]
+    compiler_state = read(stage / "compiler-state.json")
+    for row in compiler_state["preserved"]:
+        assert identity(main / row["path"])["sha256"] == row["expectedSha256"]
+    assert len(compiler_state["preserved"]) == 281
+    for path in (stage / "compiler").rglob("*"):
+        if path.is_file():
+            assert path.read_bytes() == (main / "Compiler.Cli/bin/Release/net10.0" / path.relative_to(stage / "compiler")).read_bytes()
+    compiler_tests = ET.parse(stage / "tests/compiler-integration-final.trx").find(".//{*}Counters").attrib
+    assert int(compiler_tests["failed"]) == 0 and int(compiler_tests["passed"]) == int(compiler_tests["executed"]) == 1156
 flags = (stage / "normal/publish.rsp").read_text().splitlines()
 assert "code-size-optimizations=on" in flags
 assert "code-size-passes=" + new_passes in flags
@@ -49,10 +67,13 @@ assert "cpu=68000" in flags
 image = identity(stage / "normal/C/Search")
 qualified = next(row for row in reference["compilations"]
                  if (row["profile"], row["trial"]) == ("workbench", "candidate"))
-assert image["sha256"] == qualified["image"]["sha256"] and image["bytes"] == 5396
+if not main_toolchain:
+    assert image["sha256"] == qualified["image"]["sha256"] and image["bytes"] == 5396
 assert identity(stage / "inputs/Search.candidate")["sha256"] == image["sha256"]
 assert (stage / "inputs/Search.baseline").read_bytes() == (previous / "inputs/Search.baseline").read_bytes()
 for directory in ("compiler", "runner", "guest", "host", "vector-runner"):
+    if main_toolchain and directory == "compiler":
+        continue
     for path in (stage / directory).rglob("*"):
         if path.is_file():
             assert path.read_bytes() == (previous / path.relative_to(stage)).read_bytes()
@@ -121,9 +142,10 @@ assert all(row["completed"] and row["outputsAgree"] and row["numberedOutputCorre
            row["returns"] == "baseline 0 0\ncandidate 0 0\n" for row in winuae)
 installed = identity(repo / "out/C/Search")
 assert installed["sha256"] == image["sha256"]
-installation_command = read(stage / "installation-command.json")
+installation_command = build_command if main_toolchain else read(stage / "installation-command.json")
 assert not any("codesize" in value.lower() or "outputdirectory" in value.lower() for value in installation_command)
-assert (stage / "installation/publish.rsp").read_bytes() == (stage / "normal/publish.rsp").read_bytes()
+if not main_toolchain:
+    assert (stage / "installation/publish.rsp").read_bytes() == (stage / "normal/publish.rsp").read_bytes()
 report = dict(date="2026-10-12", status="passed-normal-build-policy-qualification", optimizationEnabled=True,
     scope="Finite Workbench syntax-candidate execution; no original Search parity, shipping/PURE or actual MorphOS runtime claim.",
     reference=identity(reference_path), compilerCommit="02a7fa3", buildCommand=build_command,
@@ -132,6 +154,21 @@ report = dict(date="2026-10-12", status="passed-normal-build-policy-qualificatio
     runnerSourceBinding=read(stage / "runner-source-binding.json"),
     files=[identity(p) for directory in ("normal", "installation", "winuae") for p in sorted((stage / directory).rglob("*")) if p.is_file()],
     verifier=identity(pathlib.Path(__file__)))
+if main_toolchain:
+    report.update(status="passed-main-checkout-default-build-qualification", compilerCommit=None,
+        compilerState=compiler_state, compilerTests=compiler_tests,
+        previousQualifiedImage=qualified["image"],
+        integrationEvidence=[identity(stage / name) for name in (
+            "integration-plan.json", "resolved-plan.json", "integration-applied.json", "recovery.json",
+            "compiler-state.json", "normal-build.log", "compiler-tests.log", "compiler-tests-final.log")],
+        testEvidence=[identity(p) for p in sorted((stage / "tests").iterdir()) if p.is_file()])
+    commit_path = stage / "integration-commit.json"
+    if commit_path.exists():
+        commit = read(commit_path)
+        assert subprocess.check_output(["git", "-C", str(main), "rev-parse", "HEAD"]).decode().strip() == commit["commit"]
+        assert subprocess.check_output(["git", "-C", str(main), "rev-parse", "HEAD^{tree}"]).decode().strip() == compiler_state["indexTree"]
+        report["compilerCommit"] = commit["commit"]
+        report["integrationCommit"] = commit
 output.with_suffix(".json").write_text(json.dumps(report, indent=2) + "\n")
 print(json.dumps(dict(status=report["status"], imageBytes=image["bytes"],
     nativeInvocations=sum(row["nativeInvocations"] for row in matrix),

@@ -42,10 +42,12 @@ pwsh -NoProfile -File tools/Commands/build-c.ps1 -Command Search `
 The first run used a private OutputDirectory for CPU verification; the second
 uses the default `out/C` destination, preserves the previous image through
 build-c's normal staging backup, and reproduces the same publish response and
-image. Neither run passes CodeSizeOptimizations or CodeSizePasses. The primary
-CopperSharp checkout still lacks SimplifyLoopPhis: it needs the compiler change
-before it can build this selection. That dirty checkout and CopperScreen were
-not modified. The [JSON receipt](search-policy-enabled-20261012.json) records
+image. Neither run passes CodeSizeOptimizations or CodeSizePasses. At this
+checkpoint the primary CopperSharp checkout lacked SimplifyLoopPhis and was
+not modified. The later [main-toolchain checkpoint](search-main-toolchain-20261012.md)
+integrates the qualified changes while preserving existing work and verifies
+the default build without toolchain overrides. CopperScreen was not modified.
+The [JSON receipt](search-policy-enabled-20261012.json) records
 both commands, the compiler/SDK/input/policy hashes, exact native output and
 binary receipts, vector comparisons, independent WinUAE results and installed
 image identity. Evidence is in `artifacts/search-policy-enabled-20261012`.

@@ -138,3 +138,13 @@ are unchanged, every native result matches the recorded exact contract, all
 CPU/vector/WinUAE checks pass and `out/C/Search` matches. It preserves the older
 default-off receipt and its auditor; that earlier auditor checks the source
 and installed-image state specific to its checkpoint.
+
+`--main-toolchain` selects the later main-checkout integration audit. It
+requires exactly `pwsh -NoProfile -File tools/Commands/build-c.ps1 -Command
+Search`, checks the executed compiler against the default sibling's payload
+and frozen source snapshots, validates the backed-up work's final hashes and
+requires the passing compiler integration TRX. This mode accepts a different
+image from the isolated candidate only after all strict native contracts,
+vector comparisons and WinUAE checks pass. The recorded integration is
+`artifacts/search-main-toolchain-20261012`; its JSON distinguishes the committed
+qualified merge from preserved, unrelated uncommitted compiler work.

@@ -54,7 +54,11 @@ baseline/candidate images pass 192 original-DOS invocations, 426 supplied
 vectors and independent WinUAE checks across 68000/68020/68040. The subsequent
 [normal-build policy checkpoint](../search-policy-enabled-20261012.md) enables
 SimplifyLoopPhis for Search and refreshes its normal output after all three
-CPUs pass. Shipping/PURE and original Search/MorphOS runtime parity remain open.
+CPUs pass. The [main-toolchain checkpoint](../search-main-toolchain-20261012.md)
+then integrates the qualified compiler history into the default sibling
+checkout, preserves existing work and verifies the normal build without
+toolchain overrides on all three CPUs. Shipping/PURE and original
+Search/MorphOS runtime parity remain open.
 
 | Profile | CPU | Resident HUNK | SHA-256 | Reachable methods | Supplied vectors |
 | --- | --- | ---: | --- | ---: | ---: |
