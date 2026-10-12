@@ -51,9 +51,10 @@ behavioral parity.
 The [2026-10-12 output-ordering checkpoint](../search-output-ordering-20261012.md)
 flushes buffered DOS prefixes/headings before raw Write. Corrected frozen
 baseline/candidate images pass 192 original-DOS invocations, 426 supplied
-vectors and independent WinUAE checks across 68000/68020/68040. The new
-SimplifyLoopPhis optimization remains disabled; shipping/PURE and original
-Search/MorphOS runtime parity remain open.
+vectors and independent WinUAE checks across 68000/68020/68040. The subsequent
+[normal-build policy checkpoint](../search-policy-enabled-20261012.md) enables
+SimplifyLoopPhis for Search and refreshes its normal output after all three
+CPUs pass. Shipping/PURE and original Search/MorphOS runtime parity remain open.
 
 | Profile | CPU | Resident HUNK | SHA-256 | Reachable methods | Supplied vectors |
 | --- | --- | ---: | --- | ---: | ---: |

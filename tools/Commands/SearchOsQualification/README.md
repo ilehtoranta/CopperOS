@@ -119,3 +119,22 @@ qualification. The first corrected attempt remains in
 incorrectly expected Workbench's command-level error result. The final fixture
 retains MorphOS's existing per-file continuation policy while requiring both
 profiles to stop raw writes and release file/parser/matcher/workspace ownership.
+
+## Default policy selection
+
+`artifacts/search-policy-enabled-20261012` records the later default-on Search
+selection. Run build-c with the qualified compiler/SDK and **no code-size or
+pass overrides**, retaining its command, log, publish response, map and image
+in `normal/`. Freeze its CIL/dependencies with `freeze_response`, copy the
+previous corrected baseline and frozen diagnostic/runner/vector payloads into
+the fresh stage, and rerun both native partitions, the Workbench vector
+comparisons and strict WinUAE checks on all three CPUs. Preserve the normal
+default-output build command/log/response under `installation/` as well.
+
+`report-policy.py <stage> <report-prefix>` checks that only Search's policy
+adds SimplifyLoopPhis, no build command overrides that selection, the normal
+image is byte-identical to the corrected qualified candidate, frozen inputs
+are unchanged, every native result matches the recorded exact contract, all
+CPU/vector/WinUAE checks pass and `out/C/Search` matches. It preserves the older
+default-off receipt and its auditor; that earlier auditor checks the source
+and installed-image state specific to its checkpoint.

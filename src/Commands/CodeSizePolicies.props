@@ -127,7 +127,7 @@
     <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization</CopperOSCodeSizePasses>
   </PropertyGroup>
   <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Search' and '$(CopperOSCodeSizePasses)' == ''">
-    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts,InlineMemoryHelpers,CompactPrivateStackCopies</CopperOSCodeSizePasses>
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts,InlineMemoryHelpers,CompactPrivateStackCopies,SimplifyLoopPhis</CopperOSCodeSizePasses>
   </PropertyGroup>
   <PropertyGroup Condition="'$(CopperOSCommandName)' == 'SetClock' and '$(CopperOSCodeSizePasses)' == ''">
     <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,SizeFirstCosts</CopperOSCodeSizePasses>

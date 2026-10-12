@@ -4,7 +4,9 @@ Search now flushes DOS's buffered prefixes and headings before raw `Write`.
 Redirected numbered output is exactly `     2> Needle\n`, and directory/file
 headings precede their matching text. The corrected baseline and the opt-in
 SimplifyLoopPhis candidate pass this finite correctness checkpoint on 68000,
-68020 and 68040. **SimplifyLoopPhis remains disabled in the production policy.**
+68020 and 68040. **SimplifyLoopPhis was disabled at this checkpoint.** The later
+[normal-build policy checkpoint](search-policy-enabled-20261012.md) enables it
+after verifying the default selection on all three CPUs.
 
 The [previous checkpoint](search-os-qualification-20261012.md) remains a
 retained failure. Its baseline and candidate agreed on incorrect output; the
