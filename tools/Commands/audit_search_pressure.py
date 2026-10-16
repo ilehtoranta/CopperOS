@@ -1,4 +1,4 @@
-"""Freeze Search once, compile isolated payloads, and compare three-CPU receipts."""
+"""Freeze List or Search once and compare isolated compiler policies on three CPUs."""
 import argparse
 import json
 import shutil
@@ -12,21 +12,21 @@ from verify_correctness_checkpoint import freeze_response
 REPO = Path(__file__).resolve().parents[2]
 
 
-def freeze(stage, checkpoint):
+def freeze(stage, checkpoint, command="Search"):
     if stage.exists():
         raise RuntimeError('Use a new freeze destination.')
-    inputs = stage / 'inputs/Search'
-    source = checkpoint / 'inputs/Search'
+    inputs = stage / 'inputs' / command
+    source = checkpoint / 'inputs' / command
     frozen = freeze_response(source / 'compile.rsp', source, inputs)
     shutil.copytree(checkpoint / 'runner', stage / 'runner')
     shutil.copytree(checkpoint / 'private-inputs', stage / 'morphos-inputs')
     (stage / 'morphos-freeze.json').write_text(json.dumps(
         [identity(p) for p in sorted((stage / 'morphos-inputs').glob('*.dll'))], indent=2) + '\n')
-    reference = stage / 'reference/C/Search'
+    reference = stage / 'reference/C' / command
     reference.parent.mkdir(parents=True)
-    shutil.copy2(checkpoint / 'fresh/C/Search', reference)
-    shutil.copy2(checkpoint / 'fresh/C/Search.map', str(reference) + '.map')
-    manifest = {'source': git_state(REPO), 'inputs': frozen,
+    shutil.copy2(checkpoint / 'fresh/C' / command, reference)
+    shutil.copy2(checkpoint / 'fresh/C' / (command + '.map'), str(reference) + '.map')
+    manifest = {'command': command, 'source': git_state(REPO), 'inputs': frozen,
                 'reference': identity(reference),
                 'runnerFiles': [identity(p) for p in sorted((stage / 'runner').rglob('*')) if p.is_file()]}
     (stage / 'freeze.json').write_text(json.dumps(manifest, indent=2) + '\n')
@@ -49,6 +49,7 @@ def add_pass(lines, selected):
 
 def compile_trial(stage, label, compiler, compiler_root, selected=None):
     validate_frozen(stage)
+    command = json.loads((stage / "freeze.json").read_text()).get("command", "Search")
     target = stage / label
     if target.exists():
         raise RuntimeError('Use a new trial label.')
@@ -56,10 +57,10 @@ def compile_trial(stage, label, compiler, compiler_root, selected=None):
     shutil.copytree(compiler.parent, payload)
     (target / 'compiler.patch').write_bytes(subprocess.check_output(
         ['git', '-C', str(compiler_root), 'diff', '--binary', 'HEAD']))
-    image = target / 'C/Search'
+    image = target / 'C' / command
     image.parent.mkdir()
     response = target / 'compile.rsp'
-    lines = add_pass((stage / 'inputs/Search/compile.rsp').read_text().splitlines(), selected)
+    lines = add_pass((stage / 'inputs' / command / 'compile.rsp').read_text().splitlines(), selected)
     lines += ['output=' + str(image.resolve())]
     response.write_text('\n'.join(lines) + '\n')
     if run(['dotnet', str(payload / compiler.name), '@' + str(response.resolve())], target / 'compile.log'):
@@ -67,17 +68,18 @@ def compile_trial(stage, label, compiler, compiler_root, selected=None):
     report = {'compilerSource': git_state(compiler_root),
               'compilerFiles': [identity(p) for p in sorted(payload.rglob('*')) if p.is_file()],
               'image': identity(image), 'response': identity(response),
-              'referenceIdentical': image.read_bytes() == (stage / 'reference/C/Search').read_bytes(),
+              'referenceIdentical': image.read_bytes() == (stage / 'reference/C' / command).read_bytes(),
               **parse_map(Path(str(image) + '.map'))}
     (target / 'compilation.json').write_text(json.dumps(report, indent=2) + '\n')
     validate_frozen(stage)
     main = next(r for r in report['records']['ALLOCATION']
-                if r['method'] == 'CopperOS.Commands.Native.NativeMorphOSSearchCommand::Run')
+                if r['method'] == f'CopperOS.Commands.Native.NativeMorphOS{command}Command::Run')
     print(label, report['image']['bytes'], main, flush=True)
 
 
 def compile_morphos(stage, label, compiler, selected=None):
     validate_frozen(stage)
+    command = json.loads((stage / "freeze.json").read_text()).get("command", "Search")
     destination = stage / 'morphos-inputs'
     if not destination.exists():
         raise RuntimeError('Frozen MorphOS inputs are missing.')
@@ -89,12 +91,12 @@ def compile_morphos(stage, label, compiler, selected=None):
         raise RuntimeError('Use a new trial label.')
     payload = target / 'compiler'
     shutil.copytree(compiler.parent, payload)
-    image = target / 'C/Search'
+    image = target / 'C' / command
     image.parent.mkdir()
-    flags = add_pass((stage / 'inputs/Search/compile.rsp').read_text().splitlines(), selected)
+    flags = add_pass((stage / 'inputs' / command / 'compile.rsp').read_text().splitlines(), selected)
     flags = [line for line in flags if not line.startswith(('input=', 'managed-assembly=', 'entry='))]
     flags += ['input=' + str(destination / 'CopperOS.Commands.AddBuffersNativeRoot.dll'),
-              'entry=CopperOS.Commands.AddBuffersNativeRoot.NativeMorphOSSearchEntry::Main',
+              f'entry=CopperOS.Commands.AddBuffersNativeRoot.NativeMorphOS{command}Entry::Main',
               'output=' + str(image.resolve())]
     flags += ['managed-assembly=' + str(p) for p in sorted(destination.glob('*.dll'))
               if p.name != 'CopperOS.Commands.AddBuffersNativeRoot.dll']
@@ -114,6 +116,7 @@ def main():
     parser.add_argument('mode', choices=['freeze', 'compile', 'compile-morphos', 'qualify'])
     parser.add_argument('--stage', required=True, type=Path)
     parser.add_argument('--checkpoint', type=Path)
+    parser.add_argument('--command', choices=['List', 'Search'], default='Search', help='Command to freeze; later modes use the frozen selection.')
     parser.add_argument('--label')
     parser.add_argument('--compiler', type=Path)
     parser.add_argument('--compiler-root', type=Path)
@@ -125,7 +128,7 @@ def main():
     if args.mode == 'freeze':
         if not args.checkpoint:
             parser.error('--checkpoint is required')
-        freeze(stage, args.checkpoint.resolve())
+        freeze(stage, args.checkpoint.resolve(), args.command)
     elif args.mode == 'compile':
         if not args.label or not args.compiler or not args.compiler_root:
             parser.error('--label, --compiler, and --compiler-root are required')
@@ -138,9 +141,10 @@ def main():
         if not args.label:
             parser.error('--label is required')
         validate_frozen(stage)
+        command = json.loads((stage / 'freeze.json').read_text()).get('command', 'Search')
         qualify(stage / args.baseline, stage / args.label,
-                stage / 'runner/CopperOS.Commands.NativeExecution.dll', ['Search'],
-                {'Search': ['morphos320-search-native-entry-vector-fixture']} if args.morphos else None)
+                stage / 'runner/CopperOS.Commands.NativeExecution.dll', [command],
+                {command: [f'morphos320-{command.lower()}-native-entry-vector-fixture']} if args.morphos else None)
 
 
 if __name__ == '__main__':
