@@ -885,6 +885,7 @@ internal sealed partial class ProbeFixture
         if (!bindDriversPrivateImageProbe)
             Bus.LoadImage(LoadAddress, image.Code, image.ReadOnlyRanges, image.WritableRanges);
         ReadCompilerContextMetadata(imagePath);
+        if (suite == TaskListEntrySuite) BindTaskListStackPointerProbe(imagePath);
         RegisterExec();
         if (suite == AddDataTypesListEntrySuite)
         {
@@ -1527,6 +1528,7 @@ internal sealed partial class ProbeFixture
                             suite == TaskListEntrySuite
                             ? 1_000_000 : 200_000),
                         $"{invocation.Definition.Name}: native instruction limit exceeded.");
+                    if (suite == TaskListEntrySuite) ObserveTaskListStackPointer(cpu.State, invocation);
                     try { cpu.ExecuteInstruction(); }
                     catch (Exception error)
                     {
@@ -1834,6 +1836,7 @@ internal sealed partial class ProbeFixture
                     readArgsCalls = invocation.Reads,
                     freeArgsCalls = invocation.FreeArgs,
                     freeMemCalls = invocation.FreeMem,
+                    taskListStackPointerReads = invocation.TaskListStackPointerReads,
                     nativeIo = invocation.NativeIo?.Report,
                     events = invocation.Events
                 });

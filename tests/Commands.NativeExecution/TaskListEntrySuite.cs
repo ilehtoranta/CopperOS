@@ -39,8 +39,40 @@ internal sealed record TaskListNativeLayout(uint ReadyList, uint WaitList,
     public uint Control => ReadyList;
 }
 
+internal sealed partial class Invocation
+{
+    public List<TaskListStackPointerRead> TaskListStackPointerReads { get; } = [];
+}
+
+internal sealed record TaskListStackPointerRead(uint ProgramCounter, uint Value);
+
 internal sealed partial class ProbeFixture
 {
+    private uint taskListVerboseStart, taskListVerboseEnd;
+
+    private void BindTaskListStackPointerProbe(string? imagePath)
+    {
+        Require(imagePath is not null && File.Exists(imagePath + ".map"),
+            "TaskList live-SP qualification requires its compiler map.");
+        var match = System.Text.RegularExpressions.Regex.Match(
+            File.ReadAllText(imagePath + ".map"),
+            @"(?m)^([0-9A-Fa-f]{8})\s+(\d+)\s+CopperOS\.Commands\.Native\.NativeMorphOSTaskListCommand::WriteVerbose\s*$");
+        Require(match.Success, "TaskList WriteVerbose map range is missing.");
+        taskListVerboseStart = LoadAddress + Convert.ToUInt32(match.Groups[1].Value, 16);
+        taskListVerboseEnd = taskListVerboseStart + uint.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture);
+    }
+
+    private void ObserveTaskListStackPointer(Copper68k.M68kCpuState state, Invocation invocation)
+    {
+        var pc = state.ProgramCounter;
+        // Observe a long MOVE from A7 before execution, only within the map-bound
+        // WriteVerbose method. Peepholes may fold the read into its memory store.
+        if (pc >= taskListVerboseStart && pc < taskListVerboseEnd &&
+            (Bus.Word(pc) & 0xf03f) == 0x200f &&
+            ((Bus.Word(pc) >> 6) & 7) is 0 or 5)
+            invocation.TaskListStackPointerReads.Add(new(pc, state.A[7]));
+    }
+
     public const string TaskListEntrySuite =
         "morphos320-tasklist-native-entry-vector-fixture";
 
@@ -443,7 +475,9 @@ internal sealed partial class ProbeFixture
             return false;
         var lower = invocation.StackTop >= invocation.StackBytes
             ? invocation.StackTop - invocation.StackBytes : 0;
-        return stackPointer >= lower && stackPointer <= invocation.StackTop;
+        return stackPointer >= lower && stackPointer <= invocation.StackTop &&
+            invocation.TaskListStackPointerReads.Count == 1 &&
+            stackPointer == invocation.TaskListStackPointerReads[0].Value;
     }
 
     private static string RegisterDumpOutput(uint task)

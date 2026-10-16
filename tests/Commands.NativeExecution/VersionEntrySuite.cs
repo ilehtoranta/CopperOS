@@ -2693,7 +2693,8 @@ internal sealed partial class ProbeFixture
             Require(state.D[1] == layout.FileHandle && state.D[2] != 0 &&
                 (inFileBuffer || inScratchBuffer) &&
                 state.D[3] > 0,
-                "Version file-read buffer or handle differs.");
+                $"Version file-read buffer or handle differs: handle={state.D[1]:x8}, expected={layout.FileHandle:x8}; " +
+                $"buffer={state.D[2]:x8}, file={layout.FileBuffer:x8}, scratch={layout.ScratchBuffer:x8}, count={state.D[3]}.");
             var call = layout.FileReadCalls++;
             if (layout.LibraryFileActive)
                 layout.LibraryFileReadCalls++;
