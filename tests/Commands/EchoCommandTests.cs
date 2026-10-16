@@ -5,6 +5,32 @@ namespace CopperOS.Commands.Tests;
 
 public sealed class EchoCommandTests
 {
+    [Theory]
+    [InlineData("e")]
+    [InlineData("cD")]
+    [InlineData("aSk")]
+    [InlineData("EcHo")]
+    [InlineData("eVaLx")]
+    [InlineData("eXeCuT")]
+    [InlineData("eXeCuTe")]
+    [InlineData("ReSiDeNt")]
+    public void Packed_keyword_match_reads_only_the_supplied_text_span(string text)
+    {
+        TestShellPlatform platform = new();
+        var value = APTR.FromPointer((uint)(platform.Store.Memory.Length - text.Length));
+        uint first = 0, second = 0;
+        for (var index = 0; index < text.Length; index++)
+        {
+            platform.WriteUInt8(value, index, (byte)text[index]);
+            var character = (uint)char.ToLowerInvariant(text[index]);
+            if (index < 4) first |= character << ((3 - index) * 8);
+            else second |= character << ((7 - index) * 8);
+        }
+        Assert.True(ShellTextParser.EqualsPacked(ref platform, value, (uint)text.Length, first, second));
+        platform.WriteUInt8(value, text.Length - 1, (byte)'!');
+        Assert.False(ShellTextParser.EqualsPacked(ref platform, value, (uint)text.Length, first, second));
+    }
+
     [Fact]
     public void Writes_message_and_default_line_feed()
     {

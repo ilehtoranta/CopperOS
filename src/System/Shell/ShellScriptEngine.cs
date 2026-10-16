@@ -525,7 +525,8 @@ public static class ShellScriptEngine
 				ShellScriptDeferredCommandKind.OutputConcatenation;
 			var childStatus = MeetsFailureLimit(childResult,
 				state.FailureLimit) && !promptCommandPending &&
-				!concatenationPending
+				!concatenationPending &&
+				(state.Flags & ShellScriptFrameFlags.Interactive) == 0
 				? ShellScriptStepStatus.FailureLimitExceeded
 				: ShellScriptStepStatus.Executed;
 		step = MakeStep(
@@ -1345,7 +1346,8 @@ public static class ShellScriptEngine
 		}
 
 		var commandStatus = !continueCompound && MeetsFailureLimit(commandResult,
-			afterCommand.FailureLimit)
+			afterCommand.FailureLimit) &&
+			(afterCommand.Flags & ShellScriptFrameFlags.Interactive) == 0
 			? ShellScriptStepStatus.FailureLimitExceeded
 			: ShellScriptStepStatus.Executed;
 		step = MakeStep(

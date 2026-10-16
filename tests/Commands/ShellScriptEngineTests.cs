@@ -5,6 +5,51 @@ namespace CopperOS.Commands.Tests;
 
 public sealed class ShellScriptEngineTests
 {
+	[Fact]
+	public void Interactive_readargs_error_preserves_diagnostics_and_accepts_the_next_command()
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.ScriptText = "Stack bad\nEcho after\n";
+		platform.Store.ScriptPromptText = "> ";
+		var frame = InitializeFrame(ref platform,
+			ShellScriptFrameFlags.Active | ShellScriptFrameFlags.Interactive);
+		var workspace = CreateWorkspace();
+		Assert.Equal(ShellScriptStepStatus.Executed,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out var failed));
+		Assert.Equal((int)ShellCommandResult.Error, failed.CommandResult);
+		Assert.Equal((int)DOS.Error.BadNumber, platform.Store.PublishedDiagnostics.IoError);
+		Assert.Equal(ShellScriptStepStatus.Executed,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out var next));
+		Assert.Equal((int)ShellCommandResult.Ok, next.CommandResult);
+		Assert.Equal("> > after\n", platform.Store.OutputText);
+	}
+
+	[Theory]
+	[InlineData(10)]
+	[InlineData(20)]
+	public void Interactive_async_child_error_accepts_the_next_command(int childResult)
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.ScriptText = "external\nEcho after\n";
+		platform.Store.ScriptExternalPending = true;
+		platform.Store.ScriptPromptText = "> ";
+		var frame = InitializeFrame(ref platform,
+			ShellScriptFrameFlags.Active | ShellScriptFrameFlags.Interactive);
+		var workspace = CreateWorkspace();
+		Assert.Equal(ShellScriptStepStatus.Waiting,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+		platform.Store.ContinuationObservedState = ShellProcessContinuationState.Completed;
+		platform.Store.ContinuationResult = childResult;
+		Assert.Equal(ShellScriptStepStatus.Executed,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out var failed));
+		Assert.Equal(childResult, failed.CommandResult);
+		Assert.Equal(childResult, platform.Store.PublishedDiagnostics.ReturnCode);
+		Assert.Equal(ShellScriptStepStatus.Executed,
+			ShellScriptEngine.Step(ref platform, frame, in workspace, out var next));
+		Assert.Equal((int)ShellCommandResult.Ok, next.CommandResult);
+		Assert.Equal("> > after\n", platform.Store.OutputText);
+	}
+
     [Fact]
     public void Interactive_prompt_is_preflighted_then_emitted_as_literal_segments()
     {
