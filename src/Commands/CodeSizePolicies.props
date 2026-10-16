@@ -154,7 +154,7 @@
     <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts,InlineMemoryHelpers,ShareArithmeticCores,SimplifyLoopPhis</CopperOSCodeSizePasses>
   </PropertyGroup>
   <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Version' and '$(CopperOSCodeSizePasses)' == ''">
-    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,InlineMemoryHelpers</CopperOSCodeSizePasses>
+    <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,InlineMemoryHelpers,SimplifyLoopPhis</CopperOSCodeSizePasses>
   </PropertyGroup>
   <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Wait' and '$(CopperOSCodeSizePasses)' == ''">
     <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,ShareArithmeticCores</CopperOSCodeSizePasses>

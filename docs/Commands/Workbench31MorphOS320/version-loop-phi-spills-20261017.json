@@ -1,0 +1,3411 @@
+{
+  "compilerBase": "55628a0",
+  "compilerPatch": {
+    "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\docs\\Commands\\Workbench31MorphOS320\\version-loop-phi-spills-20261017.patch",
+    "bytes": 5788,
+    "sha256": "769b73209e461a2c38346dfbff33ca0a01a82d67d23b8d91824b6ed6d36d3068"
+  },
+  "isolatedSources": [
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperSharp68k-version-phis-20261017\\Compiler\\Backend\\M68kRegisterAllocation.cs",
+      "bytes": 48847,
+      "sha256": "6858d9822e86b0d9737b9cd97b56bf5d11426b4e1b564c73ba337dd3ad7d6386"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperSharp68k-version-phis-20261017\\Compiler.Tests\\LoopPhiAddressCoalescingTests.cs",
+      "bytes": 4463,
+      "sha256": "8c2e4a078dcb7a422734b1063a0fdfc7c51f67c8f1fdf4cd39f170c993da2e38"
+    }
+  ],
+  "primaryPort": {
+    "file": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperSharp68k\\Compiler\\Backend\\M68kRegisterAllocation.cs",
+    "beforeSha256": "fcbaf95281450daee5c88d90e5539bec6cc134884a168bc2f40891e519d9096c",
+    "afterSha256": "e6fac36f365ea4cf943e1415a0063031eb422527f79a650fe777c810feb5dcd0",
+    "unrelatedBytesPreserved": true
+  },
+  "compilerTestPayload": {
+    "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperSharp68k-version-phis-20261017\\Compiler.Tests\\bin\\Release\\net10.0\\CopperSharp.Compiler.dll",
+    "bytes": 2363392,
+    "sha256": "abf49732268b0834c86c2237daaf9026782ea3bc05b9d1613d9585d8a0ce9937"
+  },
+  "freeze": {
+    "source": {
+      "root": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS",
+      "commit": "83659835dc152c45a6b65402b84b4dc9decbe2c8",
+      "status": [
+        " M src/System/Shell/DosShellNativeChildCore.cs",
+        " M src/System/Shell/DosShellNativePlatform.cs",
+        " M src/System/Shell/ShellScriptEngine.cs",
+        " M src/System/Shell/ShellTextParser.cs",
+        " M tests/Commands/ShellScriptEngineTests.cs",
+        "?? docs/Commands/Workbench31MorphOS320/version-loop-phis-20261017.json",
+        "?? docs/Commands/Workbench31MorphOS320/version-loop-phis-20261017.md",
+        "?? tests/Commands/ShellPackedNameBoundaryTests.cs",
+        "?? tools/Commands/qualify_version_loop_phis.py",
+        "?? tools/Commands/qualify_version_spill_fix.py",
+        "?? tools/ImageBuilder/README.md",
+        "?? tools/ImageBuilder/build_storage_proof.ps1",
+        "?? tools/ImageBuilder/build_system_image.py",
+        "?? tools/ImageBuilder/build_system_proof.ps1",
+        "?? tools/ImageBuilder/tests/",
+        "?? tools/SystemImage.NativeRoot/"
+      ],
+      "trackedPatchSha256": "3a3e1f0c2a5cf185b12ff21a61766f47d8683ca239203d72e2f7b9c3fa77928d",
+      "untrackedFiles": [
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\docs\\Commands\\Workbench31MorphOS320\\version-loop-phis-20261017.json",
+          "bytes": 99814,
+          "sha256": "e697f29db12fadb39603edb5423a9e96c6a0defcd2e4103c4f07a0221d4a0f97"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\docs\\Commands\\Workbench31MorphOS320\\version-loop-phis-20261017.md",
+          "bytes": 4757,
+          "sha256": "bbde613c886fac5a8d8da74e0d25961bb4c522a7f8fb2c13aaff799fc74a8e97"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tests\\Commands\\ShellPackedNameBoundaryTests.cs",
+          "bytes": 991,
+          "sha256": "2f80634709996430346e43e9fc67964b581b657ed8444a391f1d0d67cc01a306"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\Commands\\qualify_version_loop_phis.py",
+          "bytes": 14158,
+          "sha256": "68397cd0bcaafd97109416b9c20f8456892bcc83d0b3db586f65bfc352f9d78b"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\Commands\\qualify_version_spill_fix.py",
+          "bytes": 3685,
+          "sha256": "78bc9030959eb26d1a10a4d84d71a5f9adc86af1769e77abef8975bd588b92e6"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\ImageBuilder\\README.md",
+          "bytes": 3729,
+          "sha256": "8f1af009ce55e761d150867f86ac75e2fd5f8ba71fd2c1a93f792f8c65df1211"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\ImageBuilder\\build_storage_proof.ps1",
+          "bytes": 5083,
+          "sha256": "24602306aa3548be236d7a96fceaed408c22f0f8fccd590f0b4f32bdaa1cb8dc"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\ImageBuilder\\build_system_image.py",
+          "bytes": 10034,
+          "sha256": "220f281a57724a7e1fd10b4843612ef1c0bcba24f43c66400fe2beb8029db99c"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\ImageBuilder\\build_system_proof.ps1",
+          "bytes": 6542,
+          "sha256": "33c690b993651f535692263117e5fa2dab1eee01da13040b15eb6e3a17ea1546"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\ImageBuilder\\tests\\test_system_image.py",
+          "bytes": 4800,
+          "sha256": "73a7f7b7eefe7a64c018dd545c54cd521dad32f13fc3d9d513f5c5994baa194f"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\SystemImage.NativeRoot\\CopperOS.SystemImage.NativeRoot.csproj",
+          "bytes": 720,
+          "sha256": "ac54b942c8fba0c41a1b475fb7ce68c7c982f76534d0a0f7786006f0ac039215"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\SystemImage.NativeRoot\\NativeFfsFile.cs",
+          "bytes": 5128,
+          "sha256": "594513926286856d6d260210435055d93729908e2bedf6c52c19f8a57eafadd8"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\SystemImage.NativeRoot\\SingleHunkStreamLoader.cs",
+          "bytes": 4847,
+          "sha256": "feeee892f0ca87040f0f0d34bca6ece81d47a2ac9201288497588353a6a90447"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\SystemImage.NativeRoot\\StorageProbe.cs",
+          "bytes": 5886,
+          "sha256": "5bb67fd6c53ca19b2e18b2cbdc9e1e920d70bbdebfb6c7acab66af42d39c61f1"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\SystemImage.NativeRoot\\SystemBootstrap.cs",
+          "bytes": 8816,
+          "sha256": "766a5a781fbc64d4a713b84bcb4df6b1948a8d0c7ed39b8290cc42aae16e1d85"
+        }
+      ]
+    },
+    "previous": {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\qualification.json",
+      "bytes": 3934,
+      "sha256": "4a9a97cf0bbe814daaac3e811fd6c4106dbaae3bfcc444549a84e87fd5a2faba"
+    },
+    "previousFreeze": {
+      "source": {
+        "root": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS",
+        "commit": "83659835dc152c45a6b65402b84b4dc9decbe2c8",
+        "status": [
+          " M src/System/Shell/DosShellNativeChildCore.cs",
+          " M src/System/Shell/DosShellNativePlatform.cs",
+          " M src/System/Shell/ShellScriptEngine.cs",
+          " M src/System/Shell/ShellTextParser.cs",
+          " M tests/Commands/ShellScriptEngineTests.cs",
+          "?? tests/Commands/ShellPackedNameBoundaryTests.cs",
+          "?? tools/Commands/qualify_version_loop_phis.py",
+          "?? tools/ImageBuilder/README.md",
+          "?? tools/ImageBuilder/build_storage_proof.ps1",
+          "?? tools/ImageBuilder/build_system_image.py",
+          "?? tools/ImageBuilder/build_system_proof.ps1",
+          "?? tools/ImageBuilder/tests/",
+          "?? tools/SystemImage.NativeRoot/"
+        ],
+        "trackedPatchSha256": "24fb6fe861abb24f195e820223d72872c8c2c2004f6c4dc6fc0279deca7b8155",
+        "untrackedFiles": [
+          {
+            "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tests\\Commands\\ShellPackedNameBoundaryTests.cs",
+            "bytes": 991,
+            "sha256": "2f80634709996430346e43e9fc67964b581b657ed8444a391f1d0d67cc01a306"
+          },
+          {
+            "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\Commands\\qualify_version_loop_phis.py",
+            "bytes": 6528,
+            "sha256": "5154a08c63f78ddb1f93045d47f47201e165961d5dfb920897e99829f357cd90"
+          },
+          {
+            "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\ImageBuilder\\README.md",
+            "bytes": 3729,
+            "sha256": "8f1af009ce55e761d150867f86ac75e2fd5f8ba71fd2c1a93f792f8c65df1211"
+          },
+          {
+            "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\ImageBuilder\\build_storage_proof.ps1",
+            "bytes": 5083,
+            "sha256": "24602306aa3548be236d7a96fceaed408c22f0f8fccd590f0b4f32bdaa1cb8dc"
+          },
+          {
+            "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\ImageBuilder\\build_system_image.py",
+            "bytes": 10034,
+            "sha256": "220f281a57724a7e1fd10b4843612ef1c0bcba24f43c66400fe2beb8029db99c"
+          },
+          {
+            "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\ImageBuilder\\build_system_proof.ps1",
+            "bytes": 6542,
+            "sha256": "33c690b993651f535692263117e5fa2dab1eee01da13040b15eb6e3a17ea1546"
+          },
+          {
+            "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\ImageBuilder\\tests\\test_system_image.py",
+            "bytes": 4800,
+            "sha256": "73a7f7b7eefe7a64c018dd545c54cd521dad32f13fc3d9d513f5c5994baa194f"
+          },
+          {
+            "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\SystemImage.NativeRoot\\CopperOS.SystemImage.NativeRoot.csproj",
+            "bytes": 720,
+            "sha256": "ac54b942c8fba0c41a1b475fb7ce68c7c982f76534d0a0f7786006f0ac039215"
+          },
+          {
+            "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\SystemImage.NativeRoot\\NativeFfsFile.cs",
+            "bytes": 5128,
+            "sha256": "594513926286856d6d260210435055d93729908e2bedf6c52c19f8a57eafadd8"
+          },
+          {
+            "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\SystemImage.NativeRoot\\SingleHunkStreamLoader.cs",
+            "bytes": 4847,
+            "sha256": "feeee892f0ca87040f0f0d34bca6ece81d47a2ac9201288497588353a6a90447"
+          },
+          {
+            "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\SystemImage.NativeRoot\\StorageProbe.cs",
+            "bytes": 5886,
+            "sha256": "5bb67fd6c53ca19b2e18b2cbdc9e1e920d70bbdebfb6c7acab66af42d39c61f1"
+          },
+          {
+            "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\SystemImage.NativeRoot\\SystemBootstrap.cs",
+            "bytes": 8816,
+            "sha256": "766a5a781fbc64d4a713b84bcb4df6b1948a8d0c7ed39b8290cc42aae16e1d85"
+          }
+        ]
+      },
+      "previousProof": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\docs\\Commands\\Workbench31MorphOS320\\version-helper-continuation-fix-20261016.json",
+        "bytes": 52879,
+        "sha256": "2f32c73e8b855debdb3df07df4bb8f262a56a64b1cd9721f8e32eb55182f4a2e"
+      },
+      "compiler": [
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\compiler\\CopperSharp.Compiler.Cli.deps.json",
+          "bytes": 3147,
+          "sha256": "86e23bf0099d1213fdccd265e9919e1f50dd7ffc55f81325fa6af1b265a07544"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\compiler\\CopperSharp.Compiler.Cli.dll",
+          "bytes": 43008,
+          "sha256": "5dbbed3c2825e004fc06d7dadd9c256700c3eeb141ce7557e3166dcd9c6f2747"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\compiler\\CopperSharp.Compiler.Cli.exe",
+          "bytes": 162816,
+          "sha256": "304cdf67dc3f73f9b03fa8d380f7a7bd9ba0b5ab6e32119043e132d72e679212"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\compiler\\CopperSharp.Compiler.Cli.pdb",
+          "bytes": 17544,
+          "sha256": "ae4afc629d90cee1fe580e4b0066ac173862f09b416a67417e8c6372a1f28b1b"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\compiler\\CopperSharp.Compiler.Cli.runtimeconfig.json",
+          "bytes": 342,
+          "sha256": "c230a317a54dd960bcbeb5f347f52e18dc665a26f7efda2159fced9a5ac7e097"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\compiler\\CopperSharp.Compiler.dll",
+          "bytes": 2363392,
+          "sha256": "dc8dbeca97302249233ab45fee098ea66e6b1aae9faddd4cab88fd24fff0c442"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\compiler\\CopperSharp.Compiler.pdb",
+          "bytes": 579408,
+          "sha256": "bebd07225526b77642dbdd1efed97bda7a74ed0f3ca78768b672cc03c30771ae"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\compiler\\CopperSharp.Compiler.xml",
+          "bytes": 72597,
+          "sha256": "b8c4783b0c33fc11893a1ca0babc7ab9bbc3e6ae6a5139be87147428e32676fd"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\compiler\\CopperSharp.Runtime.AmigaPal.dll",
+          "bytes": 23552,
+          "sha256": "1b1543e265830b53f89967bce5ad70eebd9874cf50cc81990c045033a07bdeed"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\compiler\\CopperSharp.Runtime.AmigaPal.pdb",
+          "bytes": 23836,
+          "sha256": "4a6a07766a3e09a8f63c16d42fb6882e3490951409585e65019c418041917f1c"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\compiler\\CopperSharp.Runtime.AmigaPal.xml",
+          "bytes": 4451,
+          "sha256": "13bc46577399a0bc026096a2f3012cfd31d3f588ae337d4a0745b97638bf2562"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\compiler\\CopperSharp.Runtime.Managed.dll",
+          "bytes": 51200,
+          "sha256": "1ebfdc946f807a28a51a70aecb8d0b9a65d02b4e9a912601c07b87d7ea1c8315"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\compiler\\CopperSharp.Runtime.Managed.pdb",
+          "bytes": 41608,
+          "sha256": "fc372ae1cd93e7d29571d1336e6354664010075b4432b1e12b28874875ff1fdf"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\compiler\\CopperSharp.Sdk.Amiga.dll",
+          "bytes": 548864,
+          "sha256": "2f1ecc09e092d5c7c40e730051adad7b5a249e6b8a8c8800717d8c96d06e4402"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\compiler\\CopperSharp.Sdk.Amiga.pdb",
+          "bytes": 68420,
+          "sha256": "b6848d05ab7484d66d6a78fa9f36330c35116c149becd866142fe6b0df37db7e"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\compiler\\CopperSharp.Sdk.Amiga.xml",
+          "bytes": 509463,
+          "sha256": "31b25a17b60d608634a1486b295442ffbbe9a7d29b141c71107944a4052f3219"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\compiler\\CopperSharp.Targets.Amiga.dll",
+          "bytes": 42496,
+          "sha256": "b93706668d24d953fb5c3a2c02b738162912b70890fabff5af1d2ba47851d0b0"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\compiler\\CopperSharp.Targets.Amiga.pdb",
+          "bytes": 18908,
+          "sha256": "519854f2d063b39351975e947fa38205b964ea75dea13de8dfc281f6b6c534ee"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\compiler\\CopperSharp.Targets.Amiga.xml",
+          "bytes": 528,
+          "sha256": "fc02d0a5c2add9d6d342a7642d704aaf39b68aba77065ab4e75f00f3b7853ab5"
+        }
+      ],
+      "runner": [
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\runner\\Copper68k.dll",
+          "bytes": 892416,
+          "sha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\runner\\CopperFloat.dll",
+          "bytes": 28672,
+          "sha256": "4dcca673e38589763d9488dd38c34034780944d4da9bfda943a34dc1a64ad235"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\runner\\CopperOS.Commands.NativeExecution.deps.json",
+          "bytes": 2501,
+          "sha256": "a40bd2b6d9b7f93b69abba21be4d7027fe7f146f1f05566616494a2877dbd251"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\runner\\CopperOS.Commands.NativeExecution.dll",
+          "bytes": 2646528,
+          "sha256": "0e5512143f1888dd95ef7993b57c679623601abb35679a4fd95ca45c57472ca2"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\runner\\CopperOS.Commands.NativeExecution.exe",
+          "bytes": 162816,
+          "sha256": "8f5fcbb5c6394072754a115e88690c44a79442413d7601ca0f08e22be78ffaa1"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\runner\\CopperOS.Commands.NativeExecution.pdb",
+          "bytes": 514092,
+          "sha256": "c2fe93e3975e979db3688416a8bb2c9fd26955c748a1eef6f8e6a1263d099490"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\runner\\CopperOS.Commands.NativeExecution.runtimeconfig.json",
+          "bytes": 342,
+          "sha256": "c230a317a54dd960bcbeb5f347f52e18dc665a26f7efda2159fced9a5ac7e097"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\runner\\CopperSharp.Compiler.dll",
+          "bytes": 2738688,
+          "sha256": "c09c54e1b1053471bf86df7ae38317b8670b8221bd6517cca77e975501747a16"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\runner\\CopperSharp.Compiler.pdb",
+          "bytes": 643168,
+          "sha256": "bf0a1365a57c08b68a85140da9ad2611a36e934493e94fd6048f611a680adb5d"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\runner\\CopperSharp.Compiler.xml",
+          "bytes": 73139,
+          "sha256": "56f4d55b15c1e71c4cd50b251464fc7701d60426cb8d0e0cdde853ad6e0a073d"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\runner\\CopperSharp.Sdk.Amiga.dll",
+          "bytes": 548864,
+          "sha256": "90188f287094a39c218892fe4d46dab3d0c12ddd28c00d62db1210c11f0232c6"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\runner\\CopperSharp.Sdk.Amiga.pdb",
+          "bytes": 68532,
+          "sha256": "a2398058f522b3d66e704d9661827d2d77c23d7313404d66e4915e824673f320"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\runner\\CopperSharp.Sdk.Amiga.xml",
+          "bytes": 509463,
+          "sha256": "31b25a17b60d608634a1486b295442ffbbe9a7d29b141c71107944a4052f3219"
+        }
+      ],
+      "shippingInputs": {
+        "command": "Version",
+        "inputs": [
+          {
+            "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\loop-phi-rollout-20261016\\inputs\\Version\\compile.rsp",
+            "bytes": 1117,
+            "sha256": "0e60f1337282556efe849b66a05ea1a97ad8179c280ebeba697f25d4f61f72a5"
+          },
+          {
+            "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\loop-phi-rollout-20261016\\inputs\\Version\\CopperOS.Commands.Common.dll",
+            "bytes": 9216,
+            "sha256": "59fdb1afa69dc39a4727c2b497c3279bb8fda47ecc57212ae4f690ce29181d80"
+          },
+          {
+            "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\loop-phi-rollout-20261016\\inputs\\Version\\CopperOS.Commands.Version.dll",
+            "bytes": 43008,
+            "sha256": "81d5a19cf2ae180bec5eace7525c9e0e1925369532d7c40ec07777b843c6e55e"
+          },
+          {
+            "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\loop-phi-rollout-20261016\\inputs\\Version\\CopperSharp.Compiler.dll",
+            "bytes": 2738688,
+            "sha256": "c09c54e1b1053471bf86df7ae38317b8670b8221bd6517cca77e975501747a16"
+          },
+          {
+            "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\loop-phi-rollout-20261016\\inputs\\Version\\CopperSharp.Sdk.Amiga.dll",
+            "bytes": 548864,
+            "sha256": "90188f287094a39c218892fe4d46dab3d0c12ddd28c00d62db1210c11f0232c6"
+          },
+          {
+            "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\loop-phi-rollout-20261016\\inputs\\Version\\CopperSharp.Sdk.Amiga.Support.dll",
+            "bytes": 155648,
+            "sha256": "989e168cabfaf8b41ce1ab5e07af573b07aaf25c86f867631242726f4db6baf2"
+          }
+        ],
+        "sourceImage": {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\loop-phi-rollout-20261016\\fresh\\C\\Version",
+          "bytes": 8748,
+          "sha256": "7f786337d1b812d4dfa3dc8d033a9eeba9c4d4e47cc0206438780130f0b9487c"
+        },
+        "installed": {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\loop-phi-rollout-20261016\\installed\\C\\Version",
+          "bytes": 8676,
+          "sha256": "c59ae2fa61e56fdd65dff408cba0548aed9be1fa7b7bbe02d6f006e9349e30f7"
+        }
+      },
+      "privateInputs": [
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\loop-phi-rollout-20261016\\private-inputs\\addbuffers\\CopperOS.Commands.AddBuffersNativeRoot.dll",
+          "bytes": 323072,
+          "sha256": "bf1ac864edaa795b1ad4e5cfc58bfa9b19c823b7f92908db3de80c442bbc7331"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\loop-phi-rollout-20261016\\private-inputs\\addbuffers\\CopperSharp.Compiler.dll",
+          "bytes": 2738688,
+          "sha256": "c09c54e1b1053471bf86df7ae38317b8670b8221bd6517cca77e975501747a16"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\loop-phi-rollout-20261016\\private-inputs\\addbuffers\\CopperSharp.Sdk.Amiga.dll",
+          "bytes": 548864,
+          "sha256": "90188f287094a39c218892fe4d46dab3d0c12ddd28c00d62db1210c11f0232c6"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\loop-phi-rollout-20261016\\private-inputs\\addbuffers\\CopperSharp.Sdk.Amiga.Support.dll",
+          "bytes": 155648,
+          "sha256": "989e168cabfaf8b41ce1ab5e07af573b07aaf25c86f867631242726f4db6baf2"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\loop-phi-rollout-20261016\\private-inputs\\eval\\CopperOS.Commands.Native.dll",
+          "bytes": 379904,
+          "sha256": "6df444432ba2c9151d24d6957c2f53a1890a85e0480a1b0d5b9376855775d085"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\loop-phi-rollout-20261016\\private-inputs\\eval\\CopperOS.Commands.NativeRoot.dll",
+          "bytes": 8192,
+          "sha256": "866bfc843b62a2bb48baa35eb7cd04e1dfd3f2be214956473502d06eb61cac5e"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\loop-phi-rollout-20261016\\private-inputs\\eval\\CopperSharp.Compiler.dll",
+          "bytes": 2738688,
+          "sha256": "c09c54e1b1053471bf86df7ae38317b8670b8221bd6517cca77e975501747a16"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\loop-phi-rollout-20261016\\private-inputs\\eval\\CopperSharp.Sdk.Amiga.dll",
+          "bytes": 548864,
+          "sha256": "90188f287094a39c218892fe4d46dab3d0c12ddd28c00d62db1210c11f0232c6"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\loop-phi-rollout-20261016\\private-inputs\\eval\\CopperSharp.Sdk.Amiga.Support.dll",
+          "bytes": 155648,
+          "sha256": "989e168cabfaf8b41ce1ab5e07af573b07aaf25c86f867631242726f4db6baf2"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\loop-phi-rollout-20261016\\private-inputs\\type\\CopperOS.Commands.TypeNativeRoot.dll",
+          "bytes": 16384,
+          "sha256": "5e18bf55d9474f99ab4d2799fc7626018495e2b83e9bffb730707f7b25e2b0ed"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\loop-phi-rollout-20261016\\private-inputs\\type\\CopperSharp.Compiler.dll",
+          "bytes": 2738688,
+          "sha256": "c09c54e1b1053471bf86df7ae38317b8670b8221bd6517cca77e975501747a16"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\loop-phi-rollout-20261016\\private-inputs\\type\\CopperSharp.Sdk.Amiga.dll",
+          "bytes": 548864,
+          "sha256": "90188f287094a39c218892fe4d46dab3d0c12ddd28c00d62db1210c11f0232c6"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\loop-phi-rollout-20261016\\private-inputs\\type\\CopperSharp.Sdk.Amiga.Support.dll",
+          "bytes": 155648,
+          "sha256": "989e168cabfaf8b41ce1ab5e07af573b07aaf25c86f867631242726f4db6baf2"
+        }
+      ],
+      "installed": [
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\AddBuffers",
+          "bytes": 1084,
+          "sha256": "65def8103fcfdd36e0fdb29abfba96a0fd8ddec671ddcf2370ca24f83a8198b7"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\AddDataTypes",
+          "bytes": 7720,
+          "sha256": "2c840474f28d10f430f53dfa1df920d24564f7f61bf7bc1e4997b306573fb7f7"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Assign",
+          "bytes": 2100,
+          "sha256": "af051f571dc9f4eb8312f7c321dc4418ecf23a1296a3db5055d05001c0270a1a"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Avail",
+          "bytes": 1600,
+          "sha256": "cb6bc5419b0c5d9e5f55b87909bd79f77ab9405aa6ce673c66557587a51e5ddd"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Beep",
+          "bytes": 268,
+          "sha256": "c98218c490f10230a5d76c75288f3fc69ad2c647e279a6555bd8b8679127a0a6"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\BindDrivers",
+          "bytes": 2096,
+          "sha256": "2f97f20baba4afacd69d30a2cdafc7acee9e558ad0dfcf7c60666ecef3a0e73b"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Break",
+          "bytes": 1408,
+          "sha256": "158fb5ea90f25854c8f47e390505d608cc4939d9c0e89e1b137b1e81a2847379"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\ChangeTaskPri",
+          "bytes": 1404,
+          "sha256": "a07585060e2dfa72efd995a9fca9a5404c2d33cda73140a40ac726c6215d923b"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Check2090",
+          "bytes": 504,
+          "sha256": "a9b14ebacf905c4c97ff3f191d3c1b4c6f0b4ce70e4b1e451d016496372daaf8"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Copy",
+          "bytes": 15284,
+          "sha256": "f0809696779e50551e498b610974f4e99bd789cb1b92d92ef4a10c4423e6b56b"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Date",
+          "bytes": 2564,
+          "sha256": "2a69ccbf0646817a5dafda7498ddfac75ea52b2a283922886918db2d1688277d"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Delete",
+          "bytes": 5636,
+          "sha256": "049609a9985adf2c4fefd17487b0bbc06824ba631552b1d832f7a5c3ef393182"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\DevList",
+          "bytes": 1196,
+          "sha256": "1f71a12e6df8f6071d39da3dbb69418aa8c380cc38481e7292aced5a0a0fb29d"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Dir",
+          "bytes": 6192,
+          "sha256": "a65e0180aaa1e09e34527a767f88c4a5378ed9338dc70aef49b371052c644177"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\DiskChange",
+          "bytes": 1232,
+          "sha256": "4a6757e5fb7e2dd5bf239a4af18aafd14892f0666d20719d3ec64719c8fb2247"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\DiskFree",
+          "bytes": 2012,
+          "sha256": "e723c08c126634df58b2adb227b5e950e7442d09668208966c11ea20d6014d3a"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\DosList",
+          "bytes": 9916,
+          "sha256": "e3ebf9f04b861e6004b5959a2963c671413d2167ec72ad72362324ca0f3244ee"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Eval",
+          "bytes": 9636,
+          "sha256": "3792736f98ecfbc1a24b772b040b43f99acfa0e274f8a82b8ac6b641fdf5e267"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Exe2Arc",
+          "bytes": 14708,
+          "sha256": "80f20051347d74f63af387c13b6d357f9298be9ec9525df0ebe69677031bffc1"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Execute",
+          "bytes": 5888,
+          "sha256": "018fa8b9fad5b8e17825987b59c13cd5b32f138ccb2de5df752bebff806a4c63"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\ExtractKickstart",
+          "bytes": 2692,
+          "sha256": "e66c83404ffb1035e34d56219475c4b4705d8500eec3f405cdf8fce1fcabed1d"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\FileNote",
+          "bytes": 2092,
+          "sha256": "a45a5c412d0968c39c159873244b6d02a1f5b99895245889a3a0725d5bd05fed"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\FindResident",
+          "bytes": 1096,
+          "sha256": "4e914781643cd3c315ade6f1ad90e00c7f3bfb36225b15455941e6c75bca4f82"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Format",
+          "bytes": 7960,
+          "sha256": "3a74bd1d2076d5d5ea72afbae03311873cd56fb4389566d9640989e89437ed3c"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\GuessBootDev",
+          "bytes": 2132,
+          "sha256": "2045ca7d8df6d5daead3ba4f57c6bb48187b5516c70ef366badd07d44ff11975"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\IconPos",
+          "bytes": 2460,
+          "sha256": "2b8328fab30151a95a5a731a3b0cec73f4b9541226e7003021abcf8abcb203e3"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Info",
+          "bytes": 3520,
+          "sha256": "c98a2f61f5232279894c07d99b384bb3690efaebb718f4b084e2578335749bc8"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Join",
+          "bytes": 2272,
+          "sha256": "d8f725145bab7abb98f4dd320ca921524a1fd0b8d31929fd711d263fef21dd68"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\LibList",
+          "bytes": 1204,
+          "sha256": "dcc1535abf1523c7d6fd9c0b4aef371b12e26edee223f156a0a8e5982cd85497"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\List",
+          "bytes": 4684,
+          "sha256": "4a906e81b92ab2d0187cb590d6af9ebc86dced90c98c8ce8e4a92b7f8b812450"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\LoadMonDrvs",
+          "bytes": 2572,
+          "sha256": "e0f15322c56d67b3c499ea180c578e81c86934f3b0608d1121ab839561a863b4"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Lock",
+          "bytes": 1592,
+          "sha256": "f6d25f014ab111bbb0cf22de70c297989a096f7a74207a26e28560d43c5d4fa6"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\MakeDir",
+          "bytes": 1288,
+          "sha256": "7815b8e3ae0d6b9eb83700e0318677fa3dd8502cfc31c0c36a183849274f5b75"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\MakeLink",
+          "bytes": 1840,
+          "sha256": "6191228b33d4cc838f3e378def38c9f26b213fcdf684fc326a8bf6d29c6500be"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\ModList",
+          "bytes": 2424,
+          "sha256": "20a109e789fe381f378876b2099cfda69adb58fef99cf04b75945b937b010890"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Mount",
+          "bytes": 11340,
+          "sha256": "18a5d4c943ee47cdf8cd35236d2aaaa391d20b6612490dbad05129129e23e2c4"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\PathPart",
+          "bytes": 2120,
+          "sha256": "4b9efba7a2380203a525c8c833c30ec8d4ecea8ffd1ac9f2025b02111e0f7685"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\PortList",
+          "bytes": 1460,
+          "sha256": "45391e88dbf38ba990c6dd2ccc72066439459e92eacad9dc05b5f371f8b72377"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Protect",
+          "bytes": 3308,
+          "sha256": "c42424ec0f0b885286a608f497de68df5abcc576fd52b3921ad4c51bf645b0f7"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Quote",
+          "bytes": 6076,
+          "sha256": "cb67f60ef68d32668bb0d1a36d6613e6f1966022b6cb0bd2af27826d0347521e"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Reboot",
+          "bytes": 516,
+          "sha256": "ba1d8a80d16ee8eef517b2b3234b9a5ac38e4a50bef1353b785af2c8cd74076c"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Relabel",
+          "bytes": 1060,
+          "sha256": "a9e050245828737435099ba055eca6edcd4eae9bfbb9df7aa6f50e351940d866"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Rename",
+          "bytes": 2592,
+          "sha256": "53475580d41a5413d4d9cea7f3e14ba887c06d263a74399c9bea983203298e37"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\RequestChoice",
+          "bytes": 2240,
+          "sha256": "d1b3852638b713bbc95afb880297652261da57fc57f46ad915d48861a3cf1404"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\RequestFile",
+          "bytes": 2996,
+          "sha256": "f246b02c797940e8d5a5101ef9a59963797ab849b899da9222fa2bfbc62d7dec"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\ResList",
+          "bytes": 1076,
+          "sha256": "d5c913bd1f0b7f511950d61a2153046c50b5cd1151daaafeb78793f13c0f5ed2"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Search",
+          "bytes": 5428,
+          "sha256": "38444ca732d98dab5d2fe087b72863e9b02ee096d4998db4fdeddfd2a494f671"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\SetClock",
+          "bytes": 1716,
+          "sha256": "fa9a3e2b17e742b8c3c034aa58bedd686a1a1afb1ea6021dbef5ef5694a9061d"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\SetDate",
+          "bytes": 1852,
+          "sha256": "3550aac1835f06830dd41743688e7c3bd2b1aeec30f45940fc74369913e984b4"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\SetFont",
+          "bytes": 2688,
+          "sha256": "7026b001da8e8bc221109432d99593b69c764bdbb444f11eef8f7f0ec0d8f3b9"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\SetKeyboard",
+          "bytes": 1652,
+          "sha256": "7049d9beed0b876d8dfc6f82544aa2c6a8c14d74d4936aeb875ae1153882f302"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Status",
+          "bytes": 3600,
+          "sha256": "8f6cdb3ae03d30b661bc43111c1a3f3f64280d1b723931538118a17e9442420c"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\TaskList",
+          "bytes": 14476,
+          "sha256": "db5b067c416901ff010015188dbf1104fa60b26f2805fe4045163aa469914e34"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Touch",
+          "bytes": 2164,
+          "sha256": "2a5145a94d119769049acdc0a948c3deb62db537d3f03d4f613266c1d8a2abf3"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Type",
+          "bytes": 4896,
+          "sha256": "d885352724b9b12d0c509c6fc01795e5ced32c547d681f91317afa8ab370ec29"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Version",
+          "bytes": 8676,
+          "sha256": "c59ae2fa61e56fdd65dff408cba0548aed9be1fa7b7bbe02d6f006e9349e30f7"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Wait",
+          "bytes": 2392,
+          "sha256": "ab801c95925dc9f803ac3b0d5c9a5281945203a84931aacde5920f7515696a06"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\WaitForLib",
+          "bytes": 1344,
+          "sha256": "81e5555072dc9e843470869789cde7604df4783af12a6ef2689f99f32c71f9bf"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\WaitForNotification",
+          "bytes": 2016,
+          "sha256": "ff21efda2416da4a86fbf13a90d766b95084c5c64ad5ae30e9adadc44edc9d42"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\WaitForPort",
+          "bytes": 1436,
+          "sha256": "22f001c6457b4210341ba51305789e792f94abfc36a8e4adf9677c1805e79c29"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-loop-phis-20261017\\installed\\C\\Which",
+          "bytes": 3940,
+          "sha256": "fbcb88263c0c8fa3cbf4c06272af0f4f30733c3aa165a88a41bac43a03194569"
+        }
+      ]
+    },
+    "compiler": [
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\compiler\\CopperSharp.Compiler.Cli.deps.json",
+        "bytes": 3147,
+        "sha256": "86e23bf0099d1213fdccd265e9919e1f50dd7ffc55f81325fa6af1b265a07544"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\compiler\\CopperSharp.Compiler.Cli.dll",
+        "bytes": 43008,
+        "sha256": "db9867455b10837cb9ff17ab7099713a3904d5cdd9a4d7d177f74c6f9c3ab5ac"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\compiler\\CopperSharp.Compiler.Cli.exe",
+        "bytes": 162816,
+        "sha256": "304cdf67dc3f73f9b03fa8d380f7a7bd9ba0b5ab6e32119043e132d72e679212"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\compiler\\CopperSharp.Compiler.Cli.pdb",
+        "bytes": 17540,
+        "sha256": "7b83f707ab7a7b2e73f943b4902c6cb5c9d1b07210365b761b58d4852f747f8a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\compiler\\CopperSharp.Compiler.Cli.runtimeconfig.json",
+        "bytes": 342,
+        "sha256": "c230a317a54dd960bcbeb5f347f52e18dc665a26f7efda2159fced9a5ac7e097"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\compiler\\CopperSharp.Compiler.dll",
+        "bytes": 2363392,
+        "sha256": "abf49732268b0834c86c2237daaf9026782ea3bc05b9d1613d9585d8a0ce9937"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\compiler\\CopperSharp.Compiler.pdb",
+        "bytes": 579404,
+        "sha256": "c6d01b7cb6ef16d9bfe04cff3ccd4124f4832d042ad5080f69c724fa6680b0c0"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\compiler\\CopperSharp.Compiler.xml",
+        "bytes": 72597,
+        "sha256": "b8c4783b0c33fc11893a1ca0babc7ab9bbc3e6ae6a5139be87147428e32676fd"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\compiler\\CopperSharp.Runtime.AmigaPal.dll",
+        "bytes": 23552,
+        "sha256": "c4d9cf0c96a8c05d9c823b89cb4f64105713735afc92c02baad84027d24aa11f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\compiler\\CopperSharp.Runtime.AmigaPal.pdb",
+        "bytes": 23832,
+        "sha256": "2853d26aca09a522612362b3f94f62f0ecbcb12533725caa93e910bcc4392d0c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\compiler\\CopperSharp.Runtime.AmigaPal.xml",
+        "bytes": 4451,
+        "sha256": "13bc46577399a0bc026096a2f3012cfd31d3f588ae337d4a0745b97638bf2562"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\compiler\\CopperSharp.Runtime.Managed.dll",
+        "bytes": 51200,
+        "sha256": "cacf8307fe7badb1160d5ab92e61091ea28d628b6304af8b5794b5401e4acfa4"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\compiler\\CopperSharp.Runtime.Managed.pdb",
+        "bytes": 41604,
+        "sha256": "ddefb3a3d6d5a56eb5bf16317ca0fc7fc671d3d30cb8157521167e22dd4ec71a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\compiler\\CopperSharp.Sdk.Amiga.dll",
+        "bytes": 548864,
+        "sha256": "ed5c9a8744600bbf6f4b22c339f015f1fcfa16228464ad18b15b0a7477eb674a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\compiler\\CopperSharp.Sdk.Amiga.pdb",
+        "bytes": 68416,
+        "sha256": "34683da4aca6ff38fa8e5207a9042e2a3368ab7ee4aad74d16cc3b5b3c4eae67"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\compiler\\CopperSharp.Sdk.Amiga.xml",
+        "bytes": 509463,
+        "sha256": "31b25a17b60d608634a1486b295442ffbbe9a7d29b141c71107944a4052f3219"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\compiler\\CopperSharp.Targets.Amiga.dll",
+        "bytes": 42496,
+        "sha256": "2434bb71d4cabfca48292fd56f97a6670fb79685a0e415dd3e124f2694b400d1"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\compiler\\CopperSharp.Targets.Amiga.pdb",
+        "bytes": 18904,
+        "sha256": "74ea28eaf8ea8589cc3bb81e9f73da8b1f202bd3648cec061a61a3acd92abcae"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\compiler\\CopperSharp.Targets.Amiga.xml",
+        "bytes": 528,
+        "sha256": "fc02d0a5c2add9d6d342a7642d704aaf39b68aba77065ab4e75f00f3b7853ab5"
+      }
+    ],
+    "runner": [
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\runner\\Copper68k.dll",
+        "bytes": 892416,
+        "sha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\runner\\CopperFloat.dll",
+        "bytes": 28672,
+        "sha256": "4dcca673e38589763d9488dd38c34034780944d4da9bfda943a34dc1a64ad235"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\runner\\CopperOS.Commands.NativeExecution.deps.json",
+        "bytes": 2501,
+        "sha256": "a40bd2b6d9b7f93b69abba21be4d7027fe7f146f1f05566616494a2877dbd251"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\runner\\CopperOS.Commands.NativeExecution.dll",
+        "bytes": 2646528,
+        "sha256": "0e5512143f1888dd95ef7993b57c679623601abb35679a4fd95ca45c57472ca2"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\runner\\CopperOS.Commands.NativeExecution.exe",
+        "bytes": 162816,
+        "sha256": "8f5fcbb5c6394072754a115e88690c44a79442413d7601ca0f08e22be78ffaa1"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\runner\\CopperOS.Commands.NativeExecution.pdb",
+        "bytes": 514092,
+        "sha256": "c2fe93e3975e979db3688416a8bb2c9fd26955c748a1eef6f8e6a1263d099490"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\runner\\CopperOS.Commands.NativeExecution.runtimeconfig.json",
+        "bytes": 342,
+        "sha256": "c230a317a54dd960bcbeb5f347f52e18dc665a26f7efda2159fced9a5ac7e097"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\runner\\CopperSharp.Compiler.dll",
+        "bytes": 2738688,
+        "sha256": "c09c54e1b1053471bf86df7ae38317b8670b8221bd6517cca77e975501747a16"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\runner\\CopperSharp.Compiler.pdb",
+        "bytes": 643168,
+        "sha256": "bf0a1365a57c08b68a85140da9ad2611a36e934493e94fd6048f611a680adb5d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\runner\\CopperSharp.Compiler.xml",
+        "bytes": 73139,
+        "sha256": "56f4d55b15c1e71c4cd50b251464fc7701d60426cb8d0e0cdde853ad6e0a073d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\runner\\CopperSharp.Sdk.Amiga.dll",
+        "bytes": 548864,
+        "sha256": "90188f287094a39c218892fe4d46dab3d0c12ddd28c00d62db1210c11f0232c6"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\runner\\CopperSharp.Sdk.Amiga.pdb",
+        "bytes": 68532,
+        "sha256": "a2398058f522b3d66e704d9661827d2d77c23d7313404d66e4915e824673f320"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\runner\\CopperSharp.Sdk.Amiga.xml",
+        "bytes": 509463,
+        "sha256": "31b25a17b60d608634a1486b295442ffbbe9a7d29b141c71107944a4052f3219"
+      }
+    ],
+    "installed": [
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\AddBuffers",
+        "bytes": 1084,
+        "sha256": "65def8103fcfdd36e0fdb29abfba96a0fd8ddec671ddcf2370ca24f83a8198b7"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\AddDataTypes",
+        "bytes": 7720,
+        "sha256": "2c840474f28d10f430f53dfa1df920d24564f7f61bf7bc1e4997b306573fb7f7"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Assign",
+        "bytes": 2100,
+        "sha256": "af051f571dc9f4eb8312f7c321dc4418ecf23a1296a3db5055d05001c0270a1a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Avail",
+        "bytes": 1600,
+        "sha256": "cb6bc5419b0c5d9e5f55b87909bd79f77ab9405aa6ce673c66557587a51e5ddd"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Beep",
+        "bytes": 268,
+        "sha256": "c98218c490f10230a5d76c75288f3fc69ad2c647e279a6555bd8b8679127a0a6"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\BindDrivers",
+        "bytes": 2096,
+        "sha256": "2f97f20baba4afacd69d30a2cdafc7acee9e558ad0dfcf7c60666ecef3a0e73b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Break",
+        "bytes": 1408,
+        "sha256": "158fb5ea90f25854c8f47e390505d608cc4939d9c0e89e1b137b1e81a2847379"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\ChangeTaskPri",
+        "bytes": 1404,
+        "sha256": "a07585060e2dfa72efd995a9fca9a5404c2d33cda73140a40ac726c6215d923b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Check2090",
+        "bytes": 504,
+        "sha256": "a9b14ebacf905c4c97ff3f191d3c1b4c6f0b4ce70e4b1e451d016496372daaf8"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Copy",
+        "bytes": 15284,
+        "sha256": "f0809696779e50551e498b610974f4e99bd789cb1b92d92ef4a10c4423e6b56b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Date",
+        "bytes": 2564,
+        "sha256": "2a69ccbf0646817a5dafda7498ddfac75ea52b2a283922886918db2d1688277d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Delete",
+        "bytes": 5636,
+        "sha256": "049609a9985adf2c4fefd17487b0bbc06824ba631552b1d832f7a5c3ef393182"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\DevList",
+        "bytes": 1196,
+        "sha256": "1f71a12e6df8f6071d39da3dbb69418aa8c380cc38481e7292aced5a0a0fb29d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Dir",
+        "bytes": 6192,
+        "sha256": "a65e0180aaa1e09e34527a767f88c4a5378ed9338dc70aef49b371052c644177"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\DiskChange",
+        "bytes": 1232,
+        "sha256": "4a6757e5fb7e2dd5bf239a4af18aafd14892f0666d20719d3ec64719c8fb2247"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\DiskFree",
+        "bytes": 2012,
+        "sha256": "e723c08c126634df58b2adb227b5e950e7442d09668208966c11ea20d6014d3a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\DosList",
+        "bytes": 9916,
+        "sha256": "e3ebf9f04b861e6004b5959a2963c671413d2167ec72ad72362324ca0f3244ee"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Eval",
+        "bytes": 9636,
+        "sha256": "3792736f98ecfbc1a24b772b040b43f99acfa0e274f8a82b8ac6b641fdf5e267"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Exe2Arc",
+        "bytes": 14708,
+        "sha256": "80f20051347d74f63af387c13b6d357f9298be9ec9525df0ebe69677031bffc1"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Execute",
+        "bytes": 5888,
+        "sha256": "018fa8b9fad5b8e17825987b59c13cd5b32f138ccb2de5df752bebff806a4c63"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\ExtractKickstart",
+        "bytes": 2692,
+        "sha256": "e66c83404ffb1035e34d56219475c4b4705d8500eec3f405cdf8fce1fcabed1d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\FileNote",
+        "bytes": 2092,
+        "sha256": "a45a5c412d0968c39c159873244b6d02a1f5b99895245889a3a0725d5bd05fed"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\FindResident",
+        "bytes": 1096,
+        "sha256": "4e914781643cd3c315ade6f1ad90e00c7f3bfb36225b15455941e6c75bca4f82"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Format",
+        "bytes": 7960,
+        "sha256": "3a74bd1d2076d5d5ea72afbae03311873cd56fb4389566d9640989e89437ed3c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\GuessBootDev",
+        "bytes": 2132,
+        "sha256": "2045ca7d8df6d5daead3ba4f57c6bb48187b5516c70ef366badd07d44ff11975"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\IconPos",
+        "bytes": 2460,
+        "sha256": "2b8328fab30151a95a5a731a3b0cec73f4b9541226e7003021abcf8abcb203e3"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Info",
+        "bytes": 3520,
+        "sha256": "c98a2f61f5232279894c07d99b384bb3690efaebb718f4b084e2578335749bc8"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Join",
+        "bytes": 2272,
+        "sha256": "d8f725145bab7abb98f4dd320ca921524a1fd0b8d31929fd711d263fef21dd68"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\LibList",
+        "bytes": 1204,
+        "sha256": "dcc1535abf1523c7d6fd9c0b4aef371b12e26edee223f156a0a8e5982cd85497"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\List",
+        "bytes": 4684,
+        "sha256": "4a906e81b92ab2d0187cb590d6af9ebc86dced90c98c8ce8e4a92b7f8b812450"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\LoadMonDrvs",
+        "bytes": 2572,
+        "sha256": "e0f15322c56d67b3c499ea180c578e81c86934f3b0608d1121ab839561a863b4"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Lock",
+        "bytes": 1592,
+        "sha256": "f6d25f014ab111bbb0cf22de70c297989a096f7a74207a26e28560d43c5d4fa6"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\MakeDir",
+        "bytes": 1288,
+        "sha256": "7815b8e3ae0d6b9eb83700e0318677fa3dd8502cfc31c0c36a183849274f5b75"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\MakeLink",
+        "bytes": 1840,
+        "sha256": "6191228b33d4cc838f3e378def38c9f26b213fcdf684fc326a8bf6d29c6500be"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\ModList",
+        "bytes": 2424,
+        "sha256": "20a109e789fe381f378876b2099cfda69adb58fef99cf04b75945b937b010890"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Mount",
+        "bytes": 11340,
+        "sha256": "18a5d4c943ee47cdf8cd35236d2aaaa391d20b6612490dbad05129129e23e2c4"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\PathPart",
+        "bytes": 2120,
+        "sha256": "4b9efba7a2380203a525c8c833c30ec8d4ecea8ffd1ac9f2025b02111e0f7685"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\PortList",
+        "bytes": 1460,
+        "sha256": "45391e88dbf38ba990c6dd2ccc72066439459e92eacad9dc05b5f371f8b72377"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Protect",
+        "bytes": 3308,
+        "sha256": "c42424ec0f0b885286a608f497de68df5abcc576fd52b3921ad4c51bf645b0f7"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Quote",
+        "bytes": 6076,
+        "sha256": "cb67f60ef68d32668bb0d1a36d6613e6f1966022b6cb0bd2af27826d0347521e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Reboot",
+        "bytes": 516,
+        "sha256": "ba1d8a80d16ee8eef517b2b3234b9a5ac38e4a50bef1353b785af2c8cd74076c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Relabel",
+        "bytes": 1060,
+        "sha256": "a9e050245828737435099ba055eca6edcd4eae9bfbb9df7aa6f50e351940d866"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Rename",
+        "bytes": 2592,
+        "sha256": "53475580d41a5413d4d9cea7f3e14ba887c06d263a74399c9bea983203298e37"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\RequestChoice",
+        "bytes": 2240,
+        "sha256": "d1b3852638b713bbc95afb880297652261da57fc57f46ad915d48861a3cf1404"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\RequestFile",
+        "bytes": 2996,
+        "sha256": "f246b02c797940e8d5a5101ef9a59963797ab849b899da9222fa2bfbc62d7dec"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\ResList",
+        "bytes": 1076,
+        "sha256": "d5c913bd1f0b7f511950d61a2153046c50b5cd1151daaafeb78793f13c0f5ed2"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Search",
+        "bytes": 5428,
+        "sha256": "38444ca732d98dab5d2fe087b72863e9b02ee096d4998db4fdeddfd2a494f671"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\SetClock",
+        "bytes": 1716,
+        "sha256": "fa9a3e2b17e742b8c3c034aa58bedd686a1a1afb1ea6021dbef5ef5694a9061d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\SetDate",
+        "bytes": 1852,
+        "sha256": "3550aac1835f06830dd41743688e7c3bd2b1aeec30f45940fc74369913e984b4"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\SetFont",
+        "bytes": 2688,
+        "sha256": "7026b001da8e8bc221109432d99593b69c764bdbb444f11eef8f7f0ec0d8f3b9"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\SetKeyboard",
+        "bytes": 1652,
+        "sha256": "7049d9beed0b876d8dfc6f82544aa2c6a8c14d74d4936aeb875ae1153882f302"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Status",
+        "bytes": 3600,
+        "sha256": "8f6cdb3ae03d30b661bc43111c1a3f3f64280d1b723931538118a17e9442420c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\TaskList",
+        "bytes": 14476,
+        "sha256": "db5b067c416901ff010015188dbf1104fa60b26f2805fe4045163aa469914e34"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Touch",
+        "bytes": 2164,
+        "sha256": "2a5145a94d119769049acdc0a948c3deb62db537d3f03d4f613266c1d8a2abf3"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Type",
+        "bytes": 4896,
+        "sha256": "d885352724b9b12d0c509c6fc01795e5ced32c547d681f91317afa8ab370ec29"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Version",
+        "bytes": 8676,
+        "sha256": "c59ae2fa61e56fdd65dff408cba0548aed9be1fa7b7bbe02d6f006e9349e30f7"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Wait",
+        "bytes": 2392,
+        "sha256": "ab801c95925dc9f803ac3b0d5c9a5281945203a84931aacde5920f7515696a06"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\WaitForLib",
+        "bytes": 1344,
+        "sha256": "81e5555072dc9e843470869789cde7604df4783af12a6ef2689f99f32c71f9bf"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\WaitForNotification",
+        "bytes": 2016,
+        "sha256": "ff21efda2416da4a86fbf13a90d766b95084c5c64ad5ae30e9adadc44edc9d42"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\WaitForPort",
+        "bytes": 1436,
+        "sha256": "22f001c6457b4210341ba51305789e792f94abfc36a8e4adf9677c1805e79c29"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installed\\C\\Which",
+        "bytes": 3940,
+        "sha256": "fbcb88263c0c8fa3cbf4c06272af0f4f30733c3aa165a88a41bac43a03194569"
+      }
+    ]
+  },
+  "measurements": [
+    {
+      "profile": "shipping",
+      "label": "baseline",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\shipping\\baseline\\C\\Version",
+        "bytes": 8676,
+        "sha256": "c59ae2fa61e56fdd65dff408cba0548aed9be1fa7b7bbe02d6f006e9349e30f7"
+      },
+      "map": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\shipping\\baseline\\C\\Version.map",
+        "bytes": 80634,
+        "sha256": "7d8117e1375c04df38c24075516a5990f628c20af44968db48fd06c5e3468977"
+      },
+      "records": {
+        "RESIDENT-CONTEXT": {
+          "bytes": 8,
+          "placement": "stack"
+        },
+        "CODE-SIZE": {
+          "mode": "general"
+        },
+        "GENERATED-SIZE": {
+          "passes": "InlineMemoryHelpers,ElideUnusedRegisterArguments,ShareReturnSequences,ShareIdenticalMethods,ReuseIncomingArgumentHomes,ClusterInternalCalls,InlineSingleUseMethods,ForwardReadOnlyAggregateLocals"
+        },
+        "GENERATED-SIZE-REWRITE": [
+          {
+            "pass": "InlineMemoryHelpers",
+            "rewrites": 1,
+            "local-byte-delta": 8
+          }
+        ],
+        "METRICS": {
+          "artifact-bytes": 8676,
+          "code-bytes": 8542,
+          "rom-bytes": 8542,
+          "rom-code-bytes": 8288,
+          "rom-rodata-bytes": 254,
+          "initialized-ram-bytes": 0,
+          "bss-bytes": 0,
+          "symbols": 36,
+          "relocations": 20,
+          "loops": 32,
+          "framework-features": 0,
+          "managed-allocation-sites": 0
+        },
+        "PEEPHOLE": {
+          "mode": "FixedPoint",
+          "analyzed-bytes": 1081976,
+          "batches": 56,
+          "rewrites": 979,
+          "rounds": 155,
+          "method-ranges": 36,
+          "converged": "yes",
+          "terminal-groups": 21,
+          "terminal-merged-copies": 48,
+          "terminal-inverted-branches": 3,
+          "terminal-trampolines": 45,
+          "terminal-gross-bytes-removed": 332,
+          "terminal-branch-bytes-added": 184,
+          "terminal-net-bytes-saved": 136,
+          "return-condition-targets": 3,
+          "return-condition-tests-removed": 11,
+          "return-condition-tests-inserted": 6,
+          "return-condition-net-bytes-saved": 10,
+          "identical-method-groups": 0,
+          "identical-method-thunks": 0,
+          "identical-method-gross-bytes-removed": 0,
+          "identical-method-jump-bytes-added": 0,
+          "identical-method-net-bytes-saved": 0
+        },
+        "MACHINE": {
+          "scc": 36,
+          "devirtualized-calls": 0,
+          "inlined-calls": 0,
+          "single-use-inlined-calls": 0,
+          "retained-methods": 36,
+          "estimated-cost-before": 498766,
+          "estimated-cost-after": 495906
+        },
+        "AGGREGATE-FORWARDING": {
+          "return-buffers": 0,
+          "private-locals": 0,
+          "temporary-homes-removed": 0,
+          "temporary-frame-bytes-removed": 0
+        },
+        "BULK-COPY": {
+          "calls": 0,
+          "static-copy-bytes": 0,
+          "return-calls": 0,
+          "return-bytes": 0,
+          "local-calls": 0,
+          "local-bytes": 0,
+          "argument-calls": 0,
+          "argument-bytes": 0,
+          "unclassified-calls": 0,
+          "unclassified-bytes": 0,
+          "managed-providers": 0,
+          "external-providers": 0
+        }
+      },
+      "largestMethods": [
+        {
+          "offset": 940,
+          "bytes": 2342,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::Run"
+        },
+        {
+          "offset": 3378,
+          "bytes": 846,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionFull::ParseSuffix"
+        },
+        {
+          "offset": 82,
+          "bytes": 666,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::PrintFileVersionPath"
+        },
+        {
+          "offset": 7756,
+          "bytes": 464,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::ScanDirectFileForVersion"
+        },
+        {
+          "offset": 4626,
+          "bytes": 408,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::ReadCommandSegmentVersion"
+        },
+        {
+          "offset": 4224,
+          "bytes": 372,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionFull::Print"
+        },
+        {
+          "offset": 5034,
+          "bytes": 360,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::TryParseDirectFileVersion"
+        },
+        {
+          "offset": 5394,
+          "bytes": 346,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::TryReadRevision"
+        },
+        {
+          "offset": 6896,
+          "bytes": 302,
+          "method": "CopperOS.Commands.Native.NativeCommandArguments::TryRead"
+        },
+        {
+          "offset": 6240,
+          "bytes": 256,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::SnapshotLoadedNode"
+        }
+      ]
+    },
+    {
+      "profile": "shipping",
+      "label": "reference",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\shipping\\reference\\C\\Version",
+        "bytes": 8684,
+        "sha256": "f7fdb4c3c5e7380458d481db2a81fd420f7a8a47d5e3fad183ff0ec2efcfd411"
+      },
+      "map": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\shipping\\reference\\C\\Version.map",
+        "bytes": 81121,
+        "sha256": "3e083fb17711df3c941505c0077b42bd6bc352d6f49b88d8a3ac6680dd3fd04e"
+      },
+      "records": {
+        "RESIDENT-CONTEXT": {
+          "bytes": 8,
+          "placement": "stack"
+        },
+        "CODE-SIZE": {
+          "mode": "general"
+        },
+        "GENERATED-SIZE": {
+          "passes": "SimplifyLoopPhis,InlineMemoryHelpers,ElideUnusedRegisterArguments,ShareReturnSequences,ShareIdenticalMethods,ReuseIncomingArgumentHomes,ClusterInternalCalls,InlineSingleUseMethods,ForwardReadOnlyAggregateLocals"
+        },
+        "GENERATED-SIZE-REWRITE": [
+          {
+            "pass": "InlineMemoryHelpers",
+            "rewrites": 1,
+            "local-byte-delta": 8
+          }
+        ],
+        "METRICS": {
+          "artifact-bytes": 8684,
+          "code-bytes": 8550,
+          "rom-bytes": 8550,
+          "rom-code-bytes": 8296,
+          "rom-rodata-bytes": 254,
+          "initialized-ram-bytes": 0,
+          "bss-bytes": 0,
+          "symbols": 36,
+          "relocations": 20,
+          "loops": 32,
+          "framework-features": 0,
+          "managed-allocation-sites": 0
+        },
+        "PEEPHOLE": {
+          "mode": "FixedPoint",
+          "analyzed-bytes": 1099100,
+          "batches": 56,
+          "rewrites": 1025,
+          "rounds": 155,
+          "method-ranges": 36,
+          "converged": "yes",
+          "terminal-groups": 22,
+          "terminal-merged-copies": 47,
+          "terminal-inverted-branches": 3,
+          "terminal-trampolines": 44,
+          "terminal-gross-bytes-removed": 330,
+          "terminal-branch-bytes-added": 180,
+          "terminal-net-bytes-saved": 138,
+          "return-condition-targets": 3,
+          "return-condition-tests-removed": 11,
+          "return-condition-tests-inserted": 6,
+          "return-condition-net-bytes-saved": 10,
+          "identical-method-groups": 0,
+          "identical-method-thunks": 0,
+          "identical-method-gross-bytes-removed": 0,
+          "identical-method-jump-bytes-added": 0,
+          "identical-method-net-bytes-saved": 0
+        },
+        "MACHINE": {
+          "scc": 36,
+          "devirtualized-calls": 0,
+          "inlined-calls": 0,
+          "single-use-inlined-calls": 0,
+          "retained-methods": 36,
+          "estimated-cost-before": 498766,
+          "estimated-cost-after": 495906
+        },
+        "AGGREGATE-FORWARDING": {
+          "return-buffers": 0,
+          "private-locals": 0,
+          "temporary-homes-removed": 0,
+          "temporary-frame-bytes-removed": 0
+        },
+        "BULK-COPY": {
+          "calls": 0,
+          "static-copy-bytes": 0,
+          "return-calls": 0,
+          "return-bytes": 0,
+          "local-calls": 0,
+          "local-bytes": 0,
+          "argument-calls": 0,
+          "argument-bytes": 0,
+          "unclassified-calls": 0,
+          "unclassified-bytes": 0,
+          "managed-providers": 0,
+          "external-providers": 0
+        }
+      },
+      "largestMethods": [
+        {
+          "offset": 940,
+          "bytes": 2342,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::Run"
+        },
+        {
+          "offset": 3378,
+          "bytes": 844,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionFull::ParseSuffix"
+        },
+        {
+          "offset": 82,
+          "bytes": 666,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::PrintFileVersionPath"
+        },
+        {
+          "offset": 4598,
+          "bytes": 440,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::ReadCommandSegmentVersion"
+        },
+        {
+          "offset": 7800,
+          "bytes": 428,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::ScanDirectFileForVersion"
+        },
+        {
+          "offset": 5038,
+          "bytes": 408,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::TryParseDirectFileVersion"
+        },
+        {
+          "offset": 5446,
+          "bytes": 348,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::TryReadRevision"
+        },
+        {
+          "offset": 4222,
+          "bytes": 346,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionFull::Print"
+        },
+        {
+          "offset": 6948,
+          "bytes": 302,
+          "method": "CopperOS.Commands.Native.NativeCommandArguments::TryRead"
+        },
+        {
+          "offset": 6294,
+          "bytes": 256,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::SnapshotLoadedNode"
+        }
+      ]
+    },
+    {
+      "profile": "shipping",
+      "label": "candidate",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\shipping\\candidate\\C\\Version",
+        "bytes": 8580,
+        "sha256": "1c6418637e04f84ecbfc03ad70dc541fc60793380bb735abe3c0cd29800d5038"
+      },
+      "map": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\shipping\\candidate\\C\\Version.map",
+        "bytes": 79785,
+        "sha256": "06aae4e8954ebe3df768acd41ab90392892a8493e22223ff59541081545f7c24"
+      },
+      "records": {
+        "RESIDENT-CONTEXT": {
+          "bytes": 8,
+          "placement": "stack"
+        },
+        "CODE-SIZE": {
+          "mode": "general"
+        },
+        "GENERATED-SIZE": {
+          "passes": "SimplifyLoopPhis,InlineMemoryHelpers,ElideUnusedRegisterArguments,ShareReturnSequences,ShareIdenticalMethods,ReuseIncomingArgumentHomes,ClusterInternalCalls,InlineSingleUseMethods,ForwardReadOnlyAggregateLocals"
+        },
+        "GENERATED-SIZE-REWRITE": [
+          {
+            "pass": "InlineMemoryHelpers",
+            "rewrites": 1,
+            "local-byte-delta": 8
+          }
+        ],
+        "METRICS": {
+          "artifact-bytes": 8580,
+          "code-bytes": 8448,
+          "rom-bytes": 8448,
+          "rom-code-bytes": 8194,
+          "rom-rodata-bytes": 254,
+          "initialized-ram-bytes": 0,
+          "bss-bytes": 0,
+          "symbols": 36,
+          "relocations": 20,
+          "loops": 32,
+          "framework-features": 0,
+          "managed-allocation-sites": 0
+        },
+        "PEEPHOLE": {
+          "mode": "FixedPoint",
+          "analyzed-bytes": 1078068,
+          "batches": 56,
+          "rewrites": 963,
+          "rounds": 155,
+          "method-ranges": 36,
+          "converged": "yes",
+          "terminal-groups": 20,
+          "terminal-merged-copies": 44,
+          "terminal-inverted-branches": 3,
+          "terminal-trampolines": 41,
+          "terminal-gross-bytes-removed": 308,
+          "terminal-branch-bytes-added": 168,
+          "terminal-net-bytes-saved": 128,
+          "return-condition-targets": 3,
+          "return-condition-tests-removed": 11,
+          "return-condition-tests-inserted": 6,
+          "return-condition-net-bytes-saved": 10,
+          "identical-method-groups": 0,
+          "identical-method-thunks": 0,
+          "identical-method-gross-bytes-removed": 0,
+          "identical-method-jump-bytes-added": 0,
+          "identical-method-net-bytes-saved": 0
+        },
+        "MACHINE": {
+          "scc": 36,
+          "devirtualized-calls": 0,
+          "inlined-calls": 0,
+          "single-use-inlined-calls": 0,
+          "retained-methods": 36,
+          "estimated-cost-before": 498766,
+          "estimated-cost-after": 495906
+        },
+        "AGGREGATE-FORWARDING": {
+          "return-buffers": 0,
+          "private-locals": 0,
+          "temporary-homes-removed": 0,
+          "temporary-frame-bytes-removed": 0
+        },
+        "BULK-COPY": {
+          "calls": 0,
+          "static-copy-bytes": 0,
+          "return-calls": 0,
+          "return-bytes": 0,
+          "local-calls": 0,
+          "local-bytes": 0,
+          "argument-calls": 0,
+          "argument-bytes": 0,
+          "unclassified-calls": 0,
+          "unclassified-bytes": 0,
+          "managed-providers": 0,
+          "external-providers": 0
+        }
+      },
+      "largestMethods": [
+        {
+          "offset": 940,
+          "bytes": 2380,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::Run"
+        },
+        {
+          "offset": 3416,
+          "bytes": 818,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionFull::ParseSuffix"
+        },
+        {
+          "offset": 82,
+          "bytes": 666,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::PrintFileVersionPath"
+        },
+        {
+          "offset": 7710,
+          "bytes": 416,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::ScanDirectFileForVersion"
+        },
+        {
+          "offset": 4610,
+          "bytes": 380,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::ReadCommandSegmentVersion"
+        },
+        {
+          "offset": 4990,
+          "bytes": 358,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::TryParseDirectFileVersion"
+        },
+        {
+          "offset": 5348,
+          "bytes": 348,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::TryReadRevision"
+        },
+        {
+          "offset": 4234,
+          "bytes": 346,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionFull::Print"
+        },
+        {
+          "offset": 6852,
+          "bytes": 302,
+          "method": "CopperOS.Commands.Native.NativeCommandArguments::TryRead"
+        },
+        {
+          "offset": 6198,
+          "bytes": 256,
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::SnapshotLoadedNode"
+        }
+      ]
+    },
+    {
+      "profile": "morphos",
+      "label": "baseline",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\morphos\\baseline\\C\\Version",
+        "bytes": 27640,
+        "sha256": "bb9010432b28fda5f5567b1d54a6e92a3ce5c96bb2499dfffa9faf39ed62b0c3"
+      },
+      "map": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\morphos\\baseline\\C\\Version.map",
+        "bytes": 155761,
+        "sha256": "97cd277b92dc32b4680bde23704d1bfd8c0bb0f2d15e0526e1beda939666aded"
+      },
+      "records": {
+        "RESIDENT-CONTEXT": {
+          "bytes": 8,
+          "placement": "stack"
+        },
+        "CODE-SIZE": {
+          "mode": "general"
+        },
+        "GENERATED-SIZE": {
+          "passes": "InlineMemoryHelpers,ElideUnusedRegisterArguments,ShareReturnSequences,ShareIdenticalMethods,ReuseIncomingArgumentHomes,ClusterInternalCalls,InlineSingleUseMethods,ForwardReadOnlyAggregateLocals"
+        },
+        "GENERATED-SIZE-REWRITE": [
+          {
+            "pass": "InlineMemoryHelpers",
+            "rewrites": 1,
+            "local-byte-delta": 8
+          }
+        ],
+        "METRICS": {
+          "artifact-bytes": 27640,
+          "code-bytes": 27108,
+          "rom-bytes": 27108,
+          "rom-code-bytes": 26370,
+          "rom-rodata-bytes": 738,
+          "initialized-ram-bytes": 0,
+          "bss-bytes": 0,
+          "symbols": 66,
+          "relocations": 120,
+          "loops": 66,
+          "framework-features": 0,
+          "managed-allocation-sites": 0
+        },
+        "PEEPHOLE": {
+          "mode": "FixedPoint",
+          "analyzed-bytes": 3961226,
+          "batches": 94,
+          "rewrites": 1850,
+          "rounds": 271,
+          "method-ranges": 66,
+          "converged": "yes",
+          "terminal-groups": 23,
+          "terminal-merged-copies": 66,
+          "terminal-inverted-branches": 0,
+          "terminal-trampolines": 66,
+          "terminal-gross-bytes-removed": 406,
+          "terminal-branch-bytes-added": 266,
+          "terminal-net-bytes-saved": 134,
+          "return-condition-targets": 4,
+          "return-condition-tests-removed": 12,
+          "return-condition-tests-inserted": 7,
+          "return-condition-net-bytes-saved": 10,
+          "identical-method-groups": 0,
+          "identical-method-thunks": 0,
+          "identical-method-gross-bytes-removed": 0,
+          "identical-method-jump-bytes-added": 0,
+          "identical-method-net-bytes-saved": 0
+        },
+        "MACHINE": {
+          "scc": 66,
+          "devirtualized-calls": 0,
+          "inlined-calls": 0,
+          "single-use-inlined-calls": 0,
+          "retained-methods": 66,
+          "estimated-cost-before": 4745859112,
+          "estimated-cost-after": 4745658984
+        },
+        "AGGREGATE-FORWARDING": {
+          "return-buffers": 0,
+          "private-locals": 0,
+          "temporary-homes-removed": 0,
+          "temporary-frame-bytes-removed": 0
+        },
+        "BULK-COPY": {
+          "calls": 0,
+          "static-copy-bytes": 0,
+          "return-calls": 0,
+          "return-bytes": 0,
+          "local-calls": 0,
+          "local-bytes": 0,
+          "argument-calls": 0,
+          "argument-bytes": 0,
+          "unclassified-calls": 0,
+          "unclassified-bytes": 0,
+          "managed-providers": 0,
+          "external-providers": 0
+        }
+      },
+      "largestMethods": [
+        {
+          "offset": 204,
+          "bytes": 11628,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::Run"
+        },
+        {
+          "offset": 11914,
+          "bytes": 1550,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::RunSystemVersion"
+        },
+        {
+          "offset": 16392,
+          "bytes": 1282,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::RunOneFile"
+        },
+        {
+          "offset": 13892,
+          "bytes": 1138,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::ParseFileVersion"
+        },
+        {
+          "offset": 20838,
+          "bytes": 812,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::ScanForVersionTag"
+        },
+        {
+          "offset": 15534,
+          "bytes": 782,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::RunMorphOSDirectoryFileCandidates"
+        },
+        {
+          "offset": 22600,
+          "bytes": 574,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::TryParseAndFormatDate"
+        },
+        {
+          "offset": 21864,
+          "bytes": 542,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::Md5Constant"
+        },
+        {
+          "offset": 17988,
+          "bytes": 532,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::ReadAmbientFile"
+        },
+        {
+          "offset": 20186,
+          "bytes": 482,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::TransformMd5"
+        }
+      ]
+    },
+    {
+      "profile": "morphos",
+      "label": "reference",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\morphos\\reference\\C\\Version",
+        "bytes": 19920,
+        "sha256": "60bef47869f5b7b42e14af63613a46f2e658064888a6a9824af283eaa42fce99"
+      },
+      "map": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\morphos\\reference\\C\\Version.map",
+        "bytes": 153996,
+        "sha256": "225fe304e60141cb905a7156dad7c3045efda83fc3a591695f433ee8476f277d"
+      },
+      "records": {
+        "RESIDENT-CONTEXT": {
+          "bytes": 8,
+          "placement": "stack"
+        },
+        "CODE-SIZE": {
+          "mode": "general"
+        },
+        "GENERATED-SIZE": {
+          "passes": "SimplifyLoopPhis,InlineMemoryHelpers,ElideUnusedRegisterArguments,ShareReturnSequences,ShareIdenticalMethods,ReuseIncomingArgumentHomes,ClusterInternalCalls,InlineSingleUseMethods,ForwardReadOnlyAggregateLocals"
+        },
+        "GENERATED-SIZE-REWRITE": [
+          {
+            "pass": "InlineMemoryHelpers",
+            "rewrites": 1,
+            "local-byte-delta": 8
+          }
+        ],
+        "METRICS": {
+          "artifact-bytes": 19920,
+          "code-bytes": 19388,
+          "rom-bytes": 19388,
+          "rom-code-bytes": 18650,
+          "rom-rodata-bytes": 738,
+          "initialized-ram-bytes": 0,
+          "bss-bytes": 0,
+          "symbols": 66,
+          "relocations": 120,
+          "loops": 66,
+          "framework-features": 0,
+          "managed-allocation-sites": 0
+        },
+        "PEEPHOLE": {
+          "mode": "FixedPoint",
+          "analyzed-bytes": 2191704,
+          "batches": 94,
+          "rewrites": 1802,
+          "rounds": 271,
+          "method-ranges": 66,
+          "converged": "yes",
+          "terminal-groups": 23,
+          "terminal-merged-copies": 66,
+          "terminal-inverted-branches": 0,
+          "terminal-trampolines": 66,
+          "terminal-gross-bytes-removed": 406,
+          "terminal-branch-bytes-added": 266,
+          "terminal-net-bytes-saved": 134,
+          "return-condition-targets": 4,
+          "return-condition-tests-removed": 12,
+          "return-condition-tests-inserted": 7,
+          "return-condition-net-bytes-saved": 10,
+          "identical-method-groups": 0,
+          "identical-method-thunks": 0,
+          "identical-method-gross-bytes-removed": 0,
+          "identical-method-jump-bytes-added": 0,
+          "identical-method-net-bytes-saved": 0
+        },
+        "MACHINE": {
+          "scc": 66,
+          "devirtualized-calls": 0,
+          "inlined-calls": 0,
+          "single-use-inlined-calls": 0,
+          "retained-methods": 66,
+          "estimated-cost-before": 4745859112,
+          "estimated-cost-after": 4745658984
+        },
+        "AGGREGATE-FORWARDING": {
+          "return-buffers": 0,
+          "private-locals": 0,
+          "temporary-homes-removed": 0,
+          "temporary-frame-bytes-removed": 0
+        },
+        "BULK-COPY": {
+          "calls": 0,
+          "static-copy-bytes": 0,
+          "return-calls": 0,
+          "return-bytes": 0,
+          "local-calls": 0,
+          "local-bytes": 0,
+          "argument-calls": 0,
+          "argument-bytes": 0,
+          "unclassified-calls": 0,
+          "unclassified-bytes": 0,
+          "managed-providers": 0,
+          "external-providers": 0
+        }
+      },
+      "largestMethods": [
+        {
+          "offset": 204,
+          "bytes": 4660,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::Run"
+        },
+        {
+          "offset": 4946,
+          "bytes": 1392,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::RunSystemVersion"
+        },
+        {
+          "offset": 8954,
+          "bytes": 1282,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::RunOneFile"
+        },
+        {
+          "offset": 6748,
+          "bytes": 874,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::ParseFileVersion"
+        },
+        {
+          "offset": 13178,
+          "bytes": 784,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::ScanForVersionTag"
+        },
+        {
+          "offset": 8120,
+          "bytes": 758,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::RunMorphOSDirectoryFileCandidates"
+        },
+        {
+          "offset": 14176,
+          "bytes": 542,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::Md5Constant"
+        },
+        {
+          "offset": 10550,
+          "bytes": 532,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::ReadAmbientFile"
+        },
+        {
+          "offset": 14912,
+          "bytes": 524,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::TryParseAndFormatDate"
+        },
+        {
+          "offset": 18190,
+          "bytes": 460,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::QueryAmbientVersion"
+        }
+      ]
+    },
+    {
+      "profile": "morphos",
+      "label": "candidate",
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\morphos\\candidate\\C\\Version",
+        "bytes": 19804,
+        "sha256": "1475f43ae040831943a30aaa9f48474c8bfe32e2414c1fbf8d3044d30cc8d471"
+      },
+      "map": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\morphos\\candidate\\C\\Version.map",
+        "bytes": 154305,
+        "sha256": "f6db0c30a05cc4db69d80e25e257e4f584947ee5d5dfdb733d2238f03231b443"
+      },
+      "records": {
+        "RESIDENT-CONTEXT": {
+          "bytes": 8,
+          "placement": "stack"
+        },
+        "CODE-SIZE": {
+          "mode": "general"
+        },
+        "GENERATED-SIZE": {
+          "passes": "SimplifyLoopPhis,InlineMemoryHelpers,ElideUnusedRegisterArguments,ShareReturnSequences,ShareIdenticalMethods,ReuseIncomingArgumentHomes,ClusterInternalCalls,InlineSingleUseMethods,ForwardReadOnlyAggregateLocals"
+        },
+        "GENERATED-SIZE-REWRITE": [
+          {
+            "pass": "InlineMemoryHelpers",
+            "rewrites": 1,
+            "local-byte-delta": 8
+          }
+        ],
+        "METRICS": {
+          "artifact-bytes": 19804,
+          "code-bytes": 19272,
+          "rom-bytes": 19272,
+          "rom-code-bytes": 18534,
+          "rom-rodata-bytes": 738,
+          "initialized-ram-bytes": 0,
+          "bss-bytes": 0,
+          "symbols": 66,
+          "relocations": 120,
+          "loops": 66,
+          "framework-features": 0,
+          "managed-allocation-sites": 0
+        },
+        "PEEPHOLE": {
+          "mode": "FixedPoint",
+          "analyzed-bytes": 2056974,
+          "batches": 94,
+          "rewrites": 1741,
+          "rounds": 271,
+          "method-ranges": 66,
+          "converged": "yes",
+          "terminal-groups": 22,
+          "terminal-merged-copies": 62,
+          "terminal-inverted-branches": 0,
+          "terminal-trampolines": 62,
+          "terminal-gross-bytes-removed": 382,
+          "terminal-branch-bytes-added": 250,
+          "terminal-net-bytes-saved": 126,
+          "return-condition-targets": 4,
+          "return-condition-tests-removed": 12,
+          "return-condition-tests-inserted": 7,
+          "return-condition-net-bytes-saved": 10,
+          "identical-method-groups": 0,
+          "identical-method-thunks": 0,
+          "identical-method-gross-bytes-removed": 0,
+          "identical-method-jump-bytes-added": 0,
+          "identical-method-net-bytes-saved": 0
+        },
+        "MACHINE": {
+          "scc": 66,
+          "devirtualized-calls": 0,
+          "inlined-calls": 0,
+          "single-use-inlined-calls": 0,
+          "retained-methods": 66,
+          "estimated-cost-before": 4745859112,
+          "estimated-cost-after": 4745658984
+        },
+        "AGGREGATE-FORWARDING": {
+          "return-buffers": 0,
+          "private-locals": 0,
+          "temporary-homes-removed": 0,
+          "temporary-frame-bytes-removed": 0
+        },
+        "BULK-COPY": {
+          "calls": 0,
+          "static-copy-bytes": 0,
+          "return-calls": 0,
+          "return-bytes": 0,
+          "local-calls": 0,
+          "local-bytes": 0,
+          "argument-calls": 0,
+          "argument-bytes": 0,
+          "unclassified-calls": 0,
+          "unclassified-bytes": 0,
+          "managed-providers": 0,
+          "external-providers": 0
+        }
+      },
+      "largestMethods": [
+        {
+          "offset": 206,
+          "bytes": 4606,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::Run"
+        },
+        {
+          "offset": 4894,
+          "bytes": 1390,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::RunSystemVersion"
+        },
+        {
+          "offset": 8870,
+          "bytes": 1248,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::RunOneFile"
+        },
+        {
+          "offset": 6698,
+          "bytes": 880,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::ParseFileVersion"
+        },
+        {
+          "offset": 13066,
+          "bytes": 800,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::ScanForVersionTag"
+        },
+        {
+          "offset": 8078,
+          "bytes": 716,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::RunMorphOSDirectoryFileCandidates"
+        },
+        {
+          "offset": 14082,
+          "bytes": 542,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::Md5Constant"
+        },
+        {
+          "offset": 14818,
+          "bytes": 542,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::TryParseAndFormatDate"
+        },
+        {
+          "offset": 10432,
+          "bytes": 538,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::ReadAmbientFile"
+        },
+        {
+          "offset": 18074,
+          "bytes": 460,
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::QueryAmbientVersion"
+        }
+      ]
+    }
+  ],
+  "targetMethodAllocations": {
+    "shipping": {
+      "baseline": [
+        {
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::ReadCommandSegmentVersion",
+          "values": 289,
+          "registers": 299,
+          "spilled": 8,
+          "reloads": 10,
+          "rematerialized": 0,
+          "spill-bytes": 8,
+          "frame-bytes": 8,
+          "saved-bytes": 28,
+          "iterations": 2,
+          "pre-peephole-code-bytes": 610,
+          "pre-peephole-stack-instructions": 35,
+          "encodedBytes": 408
+        },
+        {
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::TryParseDirectFileVersion",
+          "values": 255,
+          "registers": 261,
+          "spilled": 5,
+          "reloads": 6,
+          "rematerialized": 0,
+          "spill-bytes": 4,
+          "frame-bytes": 24,
+          "saved-bytes": 36,
+          "iterations": 2,
+          "pre-peephole-code-bytes": 550,
+          "pre-peephole-stack-instructions": 30,
+          "encodedBytes": 360
+        }
+      ],
+      "reference": [
+        {
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::ReadCommandSegmentVersion",
+          "values": 236,
+          "registers": 258,
+          "spilled": 17,
+          "reloads": 22,
+          "rematerialized": 0,
+          "spill-bytes": 12,
+          "frame-bytes": 12,
+          "saved-bytes": 24,
+          "iterations": 2,
+          "pre-peephole-code-bytes": 704,
+          "pre-peephole-stack-instructions": 56,
+          "encodedBytes": 440
+        },
+        {
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::TryParseDirectFileVersion",
+          "values": 196,
+          "registers": 214,
+          "spilled": 15,
+          "reloads": 18,
+          "rematerialized": 0,
+          "spill-bytes": 12,
+          "frame-bytes": 32,
+          "saved-bytes": 28,
+          "iterations": 3,
+          "pre-peephole-code-bytes": 634,
+          "pre-peephole-stack-instructions": 51,
+          "encodedBytes": 408
+        }
+      ],
+      "candidate": [
+        {
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::ReadCommandSegmentVersion",
+          "values": 236,
+          "registers": 236,
+          "spilled": 0,
+          "reloads": 0,
+          "rematerialized": 0,
+          "spill-bytes": 0,
+          "frame-bytes": 0,
+          "saved-bytes": 32,
+          "iterations": 1,
+          "pre-peephole-code-bytes": 550,
+          "pre-peephole-stack-instructions": 19,
+          "encodedBytes": 380
+        },
+        {
+          "method": "CopperOS.Commands.Native.NativeWorkbench31VersionCommand::TryParseDirectFileVersion",
+          "values": 196,
+          "registers": 196,
+          "spilled": 0,
+          "reloads": 0,
+          "rematerialized": 0,
+          "spill-bytes": 0,
+          "frame-bytes": 20,
+          "saved-bytes": 36,
+          "iterations": 1,
+          "pre-peephole-code-bytes": 526,
+          "pre-peephole-stack-instructions": 19,
+          "encodedBytes": 358
+        }
+      ]
+    },
+    "morphos": {
+      "baseline": [
+        {
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::ReadCommandSegmentVersion",
+          "values": 292,
+          "registers": 306,
+          "spilled": 11,
+          "reloads": 14,
+          "rematerialized": 0,
+          "spill-bytes": 8,
+          "frame-bytes": 8,
+          "saved-bytes": 32,
+          "iterations": 3,
+          "pre-peephole-code-bytes": 636,
+          "pre-peephole-stack-instructions": 42,
+          "encodedBytes": 424
+        }
+      ],
+      "reference": [
+        {
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::ReadCommandSegmentVersion",
+          "values": 232,
+          "registers": 252,
+          "spilled": 15,
+          "reloads": 20,
+          "rematerialized": 0,
+          "spill-bytes": 8,
+          "frame-bytes": 8,
+          "saved-bytes": 32,
+          "iterations": 3,
+          "pre-peephole-code-bytes": 670,
+          "pre-peephole-stack-instructions": 52,
+          "encodedBytes": 438
+        }
+      ],
+      "candidate": [
+        {
+          "method": "CopperOS.Commands.Native.NativeMorphOSVersionCommand::ReadCommandSegmentVersion",
+          "values": 232,
+          "registers": 232,
+          "spilled": 0,
+          "reloads": 0,
+          "rematerialized": 0,
+          "spill-bytes": 0,
+          "frame-bytes": 0,
+          "saved-bytes": 32,
+          "iterations": 1,
+          "pre-peephole-code-bytes": 536,
+          "pre-peephole-stack-instructions": 18,
+          "encodedBytes": 390
+        }
+      ]
+    }
+  },
+  "qualification": {
+    "shipping": {
+      "baseline": [
+        {
+          "command": "Version",
+          "beforeBytes": 8676,
+          "afterBytes": 8580,
+          "savedBytes": 96,
+          "checks": [
+            {
+              "cpu": "68000",
+              "suite": "workbench31-version-native-entry-vector-fixture",
+              "passed": true,
+              "baselineFailure": null,
+              "candidateFailure": null,
+              "differentCases": [],
+              "invocations": 93,
+              "instructionsBefore": 370984,
+              "instructionsAfter": 353715,
+              "peakStackBefore": 780,
+              "peakStackAfter": 784,
+              "coreVersion": "Copper68k 1.5.1",
+              "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+            },
+            {
+              "cpu": "68020",
+              "suite": "workbench31-version-native-entry-vector-fixture",
+              "passed": true,
+              "baselineFailure": null,
+              "candidateFailure": null,
+              "differentCases": [],
+              "invocations": 93,
+              "instructionsBefore": 370984,
+              "instructionsAfter": 353715,
+              "peakStackBefore": 780,
+              "peakStackAfter": 784,
+              "coreVersion": "Copper68k 1.5.1",
+              "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+            },
+            {
+              "cpu": "68040",
+              "suite": "workbench31-version-native-entry-vector-fixture",
+              "passed": true,
+              "baselineFailure": null,
+              "candidateFailure": null,
+              "differentCases": [],
+              "invocations": 93,
+              "instructionsBefore": 370984,
+              "instructionsAfter": 353715,
+              "peakStackBefore": 780,
+              "peakStackAfter": 784,
+              "coreVersion": "Copper68k 1.5.1",
+              "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+            }
+          ],
+          "passed": true,
+          "qualified": true,
+          "accept": true
+        }
+      ],
+      "reference": [
+        {
+          "command": "Version",
+          "beforeBytes": 8684,
+          "afterBytes": 8580,
+          "savedBytes": 104,
+          "checks": [
+            {
+              "cpu": "68000",
+              "suite": "workbench31-version-native-entry-vector-fixture",
+              "passed": true,
+              "baselineFailure": null,
+              "candidateFailure": null,
+              "differentCases": [],
+              "invocations": 93,
+              "instructionsBefore": 353642,
+              "instructionsAfter": 353715,
+              "peakStackBefore": 780,
+              "peakStackAfter": 784,
+              "coreVersion": "Copper68k 1.5.1",
+              "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+            },
+            {
+              "cpu": "68020",
+              "suite": "workbench31-version-native-entry-vector-fixture",
+              "passed": true,
+              "baselineFailure": null,
+              "candidateFailure": null,
+              "differentCases": [],
+              "invocations": 93,
+              "instructionsBefore": 353642,
+              "instructionsAfter": 353715,
+              "peakStackBefore": 780,
+              "peakStackAfter": 784,
+              "coreVersion": "Copper68k 1.5.1",
+              "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+            },
+            {
+              "cpu": "68040",
+              "suite": "workbench31-version-native-entry-vector-fixture",
+              "passed": true,
+              "baselineFailure": null,
+              "candidateFailure": null,
+              "differentCases": [],
+              "invocations": 93,
+              "instructionsBefore": 353642,
+              "instructionsAfter": 353715,
+              "peakStackBefore": 780,
+              "peakStackAfter": 784,
+              "coreVersion": "Copper68k 1.5.1",
+              "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+            }
+          ],
+          "passed": true,
+          "qualified": true,
+          "accept": true
+        }
+      ]
+    },
+    "morphos": {
+      "baseline": [
+        {
+          "command": "Version",
+          "beforeBytes": 27640,
+          "afterBytes": 19804,
+          "savedBytes": 7836,
+          "checks": [
+            {
+              "cpu": "68000",
+              "suite": "morphos320-version-native-entry-vector-fixture",
+              "passed": true,
+              "baselineFailure": null,
+              "candidateFailure": null,
+              "differentCases": [],
+              "invocations": 94,
+              "instructionsBefore": 3572993,
+              "instructionsAfter": 3239444,
+              "peakStackBefore": 1568,
+              "peakStackAfter": 1524,
+              "coreVersion": "Copper68k 1.5.1",
+              "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+            },
+            {
+              "cpu": "68020",
+              "suite": "morphos320-version-native-entry-vector-fixture",
+              "passed": true,
+              "baselineFailure": null,
+              "candidateFailure": null,
+              "differentCases": [],
+              "invocations": 94,
+              "instructionsBefore": 3572993,
+              "instructionsAfter": 3239444,
+              "peakStackBefore": 1568,
+              "peakStackAfter": 1524,
+              "coreVersion": "Copper68k 1.5.1",
+              "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+            },
+            {
+              "cpu": "68040",
+              "suite": "morphos320-version-native-entry-vector-fixture",
+              "passed": true,
+              "baselineFailure": null,
+              "candidateFailure": null,
+              "differentCases": [],
+              "invocations": 94,
+              "instructionsBefore": 3572993,
+              "instructionsAfter": 3239444,
+              "peakStackBefore": 1568,
+              "peakStackAfter": 1524,
+              "coreVersion": "Copper68k 1.5.1",
+              "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+            }
+          ],
+          "passed": true,
+          "qualified": true,
+          "accept": true
+        }
+      ],
+      "reference": [
+        {
+          "command": "Version",
+          "beforeBytes": 19920,
+          "afterBytes": 19804,
+          "savedBytes": 116,
+          "checks": [
+            {
+              "cpu": "68000",
+              "suite": "morphos320-version-native-entry-vector-fixture",
+              "passed": true,
+              "baselineFailure": null,
+              "candidateFailure": null,
+              "differentCases": [],
+              "invocations": 94,
+              "instructionsBefore": 3134276,
+              "instructionsAfter": 3239444,
+              "peakStackBefore": 1520,
+              "peakStackAfter": 1524,
+              "coreVersion": "Copper68k 1.5.1",
+              "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+            },
+            {
+              "cpu": "68020",
+              "suite": "morphos320-version-native-entry-vector-fixture",
+              "passed": true,
+              "baselineFailure": null,
+              "candidateFailure": null,
+              "differentCases": [],
+              "invocations": 94,
+              "instructionsBefore": 3134276,
+              "instructionsAfter": 3239444,
+              "peakStackBefore": 1520,
+              "peakStackAfter": 1524,
+              "coreVersion": "Copper68k 1.5.1",
+              "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+            },
+            {
+              "cpu": "68040",
+              "suite": "morphos320-version-native-entry-vector-fixture",
+              "passed": true,
+              "baselineFailure": null,
+              "candidateFailure": null,
+              "differentCases": [],
+              "invocations": 94,
+              "instructionsBefore": 3134276,
+              "instructionsAfter": 3239444,
+              "peakStackBefore": 1520,
+              "peakStackAfter": 1524,
+              "coreVersion": "Copper68k 1.5.1",
+              "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+            }
+          ],
+          "passed": true,
+          "qualified": true,
+          "accept": true
+        }
+      ]
+    }
+  },
+  "additionalCommands": [
+    {
+      "command": "Dir",
+      "beforeBytes": 6216,
+      "afterBytes": 6208,
+      "savedBytes": 8,
+      "checks": [
+        {
+          "cpu": "68000",
+          "suite": "workbench31-dir-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 30,
+          "instructionsBefore": 750963,
+          "instructionsAfter": 751841,
+          "peakStackBefore": 384,
+          "peakStackAfter": 384,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68020",
+          "suite": "workbench31-dir-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 30,
+          "instructionsBefore": 750963,
+          "instructionsAfter": 751841,
+          "peakStackBefore": 384,
+          "peakStackAfter": 384,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68040",
+          "suite": "workbench31-dir-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 30,
+          "instructionsBefore": 750963,
+          "instructionsAfter": 751841,
+          "peakStackBefore": 384,
+          "peakStackAfter": 384,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        }
+      ],
+      "passed": true,
+      "qualified": true,
+      "accept": true
+    },
+    {
+      "command": "List",
+      "beforeBytes": 4700,
+      "afterBytes": 4652,
+      "savedBytes": 48,
+      "checks": [
+        {
+          "cpu": "68000",
+          "suite": "workbench31-list-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 32,
+          "instructionsBefore": 42714,
+          "instructionsAfter": 42982,
+          "peakStackBefore": 268,
+          "peakStackAfter": 264,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68020",
+          "suite": "workbench31-list-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 32,
+          "instructionsBefore": 42714,
+          "instructionsAfter": 42982,
+          "peakStackBefore": 268,
+          "peakStackAfter": 264,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68040",
+          "suite": "workbench31-list-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 32,
+          "instructionsBefore": 42714,
+          "instructionsAfter": 42982,
+          "peakStackBefore": 268,
+          "peakStackAfter": 264,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        }
+      ],
+      "passed": true,
+      "qualified": true,
+      "accept": true
+    },
+    {
+      "command": "Search",
+      "beforeBytes": 5396,
+      "afterBytes": 5300,
+      "savedBytes": 96,
+      "checks": [
+        {
+          "cpu": "68000",
+          "suite": "wb31-search-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 22,
+          "instructionsBefore": 873065,
+          "instructionsAfter": 864816,
+          "peakStackBefore": 476,
+          "peakStackAfter": 476,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68020",
+          "suite": "wb31-search-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 22,
+          "instructionsBefore": 873065,
+          "instructionsAfter": 864816,
+          "peakStackBefore": 476,
+          "peakStackAfter": 476,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        },
+        {
+          "cpu": "68040",
+          "suite": "wb31-search-native-entry-vector-fixture",
+          "passed": true,
+          "baselineFailure": null,
+          "candidateFailure": null,
+          "differentCases": [],
+          "invocations": 22,
+          "instructionsBefore": 873065,
+          "instructionsAfter": 864816,
+          "peakStackBefore": 476,
+          "peakStackAfter": 476,
+          "coreVersion": "Copper68k 1.5.1",
+          "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+        }
+      ],
+      "passed": true,
+      "qualified": true,
+      "accept": true
+    }
+  ],
+  "tests": {
+    "address-coalescing-fixed.trx": {
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\tests\\address-coalescing-fixed.trx",
+        "bytes": 11931,
+        "sha256": "09d039d74a530bfc01db5873c09884c7192f25e289834567f6c1a3af171f34f6"
+      },
+      "counters": {
+        "total": "7",
+        "executed": "7",
+        "passed": "7",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    "address-coalescing-unfixed.trx": {
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\tests\\address-coalescing-unfixed.trx",
+        "bytes": 17531,
+        "sha256": "47478f86fc3489dfb2d80600ec6fc461b47b0426e05faf5dad0eb8c1eba06379"
+      },
+      "counters": {
+        "total": "7",
+        "executed": "7",
+        "passed": "4",
+        "failed": "3",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    "qualified-address-coalescing.trx": {
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\tests\\qualified-address-coalescing.trx",
+        "bytes": 2376730,
+        "sha256": "7dd8471530786a6108bfedf6181b8b9e07313cfb8d7e313f26d2f3166824f020"
+      },
+      "counters": {
+        "total": "1553",
+        "executed": "1553",
+        "passed": "1553",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    }
+  },
+  "traces": [
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\trace-off\\trace.jsonl",
+      "bytes": 543081,
+      "sha256": "e5539b97a81bf6ea86633faa9c3a2ed7f1ad560d80ab4adf5efe2823be578c5c"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\trace-on\\trace.jsonl",
+      "bytes": 576391,
+      "sha256": "636fefa5938bd35904f6fa2a6b67202a16b97b65ea28778af59c5bb027a32c91"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\conservative-on\\trace.jsonl",
+      "bytes": 243612,
+      "sha256": "75cccffc16229a6ece75160cff2615d0a81a5cff941ca7790f8c9776615a69e9"
+    }
+  ],
+  "sourceBuildInputs": [
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installation-inputs\\compile.rsp",
+      "bytes": 1219,
+      "sha256": "351ed369920183217789e7254f18ec88e4f0b946a3677c6eee070ba3616dca39"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installation-inputs\\CopperOS.Commands.Common.dll",
+      "bytes": 9216,
+      "sha256": "8bf8665209b7f1a028619f07e2cf2431c807620c3dc871af18d5a858ea9310e5"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installation-inputs\\CopperOS.Commands.Version.dll",
+      "bytes": 43008,
+      "sha256": "4485aec891e614f6f655134759c112a07b49356fd73359bf699946d36324add8"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installation-inputs\\CopperSharp.Compiler.dll",
+      "bytes": 2739200,
+      "sha256": "91d634c0c289ddf2a22d17c8618417d34353c81d08103d5c0f86b10ea1f84fe5"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installation-inputs\\CopperSharp.Sdk.Amiga.dll",
+      "bytes": 548864,
+      "sha256": "df55577e7a31591dcc9ed8be6b108dd0f903393c0810a8e329492f4dd5f42492"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\installation-inputs\\CopperSharp.Sdk.Amiga.Support.dll",
+      "bytes": 155648,
+      "sha256": "a966c6716ec0574af09888bf31ad416751a560243ce50c8870ba49fff9248c70"
+    }
+  ],
+  "cpuReceipts": [
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\other-commands\\Dir\\baseline\\execution\\Dir.68000.workbench31-dir-native-entry-vector-fixture.json",
+      "bytes": 172807,
+      "sha256": "0faa7fd06f4ed9b8971a1d5b3b8de6b94c9a2ae5620d9be953d5b75cc42932f3"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\other-commands\\Dir\\baseline\\execution\\Dir.68020.workbench31-dir-native-entry-vector-fixture.json",
+      "bytes": 172805,
+      "sha256": "1056ce89706025ca140e7c5f54d035bccb3d9adfe47afd312e3628e7575cd345"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\other-commands\\Dir\\baseline\\execution\\Dir.68040.workbench31-dir-native-entry-vector-fixture.json",
+      "bytes": 172805,
+      "sha256": "1a36a1c9173ac6218439c7522b625b18329835605db18e7cd931f1fe8076ac77"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\other-commands\\Dir\\candidate\\execution\\Dir.68000.workbench31-dir-native-entry-vector-fixture.json",
+      "bytes": 172807,
+      "sha256": "1bf5400da77d629f726b4b47c0284837799b5f4187502566515f0667823dc152"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\other-commands\\Dir\\candidate\\execution\\Dir.68020.workbench31-dir-native-entry-vector-fixture.json",
+      "bytes": 172805,
+      "sha256": "925243dd4b442b82442967eaa4f962220bc1a64f8edfdaca96d774eb0dd9a8ba"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\other-commands\\Dir\\candidate\\execution\\Dir.68040.workbench31-dir-native-entry-vector-fixture.json",
+      "bytes": 172805,
+      "sha256": "ae15baaf98962f03c80e989043a6f7bd6cc51bdd6a70a3c0fe54ccfcce7e2146"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\other-commands\\List\\baseline\\execution\\List.68000.workbench31-list-native-entry-vector-fixture.json",
+      "bytes": 38766,
+      "sha256": "f14f8b745325d1516675016967213f1684adbe86d7ba037bbb48a6db27d3cff4"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\other-commands\\List\\baseline\\execution\\List.68020.workbench31-list-native-entry-vector-fixture.json",
+      "bytes": 38766,
+      "sha256": "1c61dde3bb0deaa74b93f29a745e4fe99a9d807fb8baa2e74d0ad176fb6fe307"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\other-commands\\List\\baseline\\execution\\List.68040.workbench31-list-native-entry-vector-fixture.json",
+      "bytes": 38766,
+      "sha256": "bf5a900edb8cb251cd1cf650f27c98db30eab69e9ddc5a44495e9ebd0ff655b9"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\other-commands\\List\\candidate\\execution\\List.68000.workbench31-list-native-entry-vector-fixture.json",
+      "bytes": 38766,
+      "sha256": "02ed67c51ef67595f42b6d7fb44d3725f9763dc4ecaad76d07211cd255583549"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\other-commands\\List\\candidate\\execution\\List.68020.workbench31-list-native-entry-vector-fixture.json",
+      "bytes": 38766,
+      "sha256": "1b47685f59db21e0a62f85e012e42ee1f89733aefb758c9ec9229fd008182322"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\other-commands\\List\\candidate\\execution\\List.68040.workbench31-list-native-entry-vector-fixture.json",
+      "bytes": 38766,
+      "sha256": "72098e13fd164eeee3ed8c9e83fb93700e61e7e3d9c4c6031c48ea9c077737ef"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\other-commands\\Search\\baseline\\execution\\Search.68000.wb31-search-native-entry-vector-fixture.json",
+      "bytes": 43095,
+      "sha256": "c1430a4b7a0008a690cc59cfa800fa942988a0e804914314e26bdd25ad1aae0a"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\other-commands\\Search\\baseline\\execution\\Search.68020.wb31-search-native-entry-vector-fixture.json",
+      "bytes": 43094,
+      "sha256": "16b4f5daa9e5df16e86fef128c91949ab0e6d2850f3b001f47ae1c0ba1635792"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\other-commands\\Search\\baseline\\execution\\Search.68040.wb31-search-native-entry-vector-fixture.json",
+      "bytes": 43094,
+      "sha256": "3a99cea3c597163feb6f964b0c1b4e97815d07a654ae1ad697e2f59243eb51d9"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\other-commands\\Search\\candidate\\execution\\Search.68000.wb31-search-native-entry-vector-fixture.json",
+      "bytes": 43095,
+      "sha256": "805ebb8aa81231be6992dbb45aed8767f3d667b6e6e223af6e8ca8eb7a684b3e"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\other-commands\\Search\\candidate\\execution\\Search.68020.wb31-search-native-entry-vector-fixture.json",
+      "bytes": 43094,
+      "sha256": "cbfab59b102465459d21c13640c8cf026ffa37f9f4dfa6fe3fcf70386dc3916f"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\other-commands\\Search\\candidate\\execution\\Search.68040.wb31-search-native-entry-vector-fixture.json",
+      "bytes": 43094,
+      "sha256": "89e90526dedfb40e1cb6db257839586c09ca2bf65efd52fc56b0ae547170a0b3"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\morphos\\baseline\\execution\\Version.68000.morphos320-version-native-entry-vector-fixture.json",
+      "bytes": 133486,
+      "sha256": "50050e8127b0f05fc00666fb7d036e352a3d94c83dff12270f4f9f49421da428"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\morphos\\baseline\\execution\\Version.68020.morphos320-version-native-entry-vector-fixture.json",
+      "bytes": 133486,
+      "sha256": "4a47b76298bf17aa4b3d2fee7928ec064553c6eb40c218e54ead00c48aeaf318"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\morphos\\baseline\\execution\\Version.68040.morphos320-version-native-entry-vector-fixture.json",
+      "bytes": 133486,
+      "sha256": "5ac82f6e5bb7d7e8490f0ce533b04b83e749f83de36daaff34b4a0e0d238e83b"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\morphos\\candidate\\execution\\Version.68000.morphos320-version-native-entry-vector-fixture.json",
+      "bytes": 133482,
+      "sha256": "17b2f9475a75ebf6e1918861ae84d20c951ac0fab98cebc3e194f7b64934c68f"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\morphos\\candidate\\execution\\Version.68020.morphos320-version-native-entry-vector-fixture.json",
+      "bytes": 133482,
+      "sha256": "95d7cf0ad21450bcbdbacada9cdc9f15215069cd78a819172ade7f35ee4b695c"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\morphos\\candidate\\execution\\Version.68040.morphos320-version-native-entry-vector-fixture.json",
+      "bytes": 133482,
+      "sha256": "896c19fad76b852d38c529de7f705d69a317e966b1626dc6a4289a5afc4043d6"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\morphos\\reference\\execution\\Version.68000.morphos320-version-native-entry-vector-fixture.json",
+      "bytes": 133479,
+      "sha256": "07956530538c1155b6e0a2fa35ca2d78a06d88f1b02927b3bdab3854c45eddb9"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\morphos\\reference\\execution\\Version.68020.morphos320-version-native-entry-vector-fixture.json",
+      "bytes": 133479,
+      "sha256": "da58379f667acf961468216708e7380a3488a62a072048be689b9f3ef427135c"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\morphos\\reference\\execution\\Version.68040.morphos320-version-native-entry-vector-fixture.json",
+      "bytes": 133479,
+      "sha256": "572492ec477236a36cfae53abd449c31414f0194c2c322a9be92e62955ba75c1"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\shipping\\baseline\\execution\\Version.68000.workbench31-version-native-entry-vector-fixture.json",
+      "bytes": 111870,
+      "sha256": "9682ca7bd77366b7585084348e17d85180dca1fa43ab4d26a0defa3d8bc28bb9"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\shipping\\baseline\\execution\\Version.68020.workbench31-version-native-entry-vector-fixture.json",
+      "bytes": 111870,
+      "sha256": "06405a9da323efb57f4fc50f18d22d62d0b44461e5be690df0440e8d52cfd460"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\shipping\\baseline\\execution\\Version.68040.workbench31-version-native-entry-vector-fixture.json",
+      "bytes": 111870,
+      "sha256": "9ea403c72d5d54d3ebb67d428443e0398f1e31ff1cafa22f0e6e726023f464da"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\shipping\\candidate\\execution\\Version.68000.workbench31-version-native-entry-vector-fixture.json",
+      "bytes": 111870,
+      "sha256": "dd53f405c4cc4f3d9d9d4cc6c09ff42bbd414f50f381628acdffe0d9b43406ea"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\shipping\\candidate\\execution\\Version.68020.workbench31-version-native-entry-vector-fixture.json",
+      "bytes": 111870,
+      "sha256": "02a0c2b0ef24c05e33c6080f8262cbf10407bc3f62e6522cf90b92e21c6ffec6"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\shipping\\candidate\\execution\\Version.68040.workbench31-version-native-entry-vector-fixture.json",
+      "bytes": 111870,
+      "sha256": "b50bea51ec43002379d9fab802310f47f206f9e83552462fb6f3178b65381112"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\shipping\\reference\\execution\\Version.68000.workbench31-version-native-entry-vector-fixture.json",
+      "bytes": 111870,
+      "sha256": "8436983f6fcde248d783feba3b3414d8016ff783f6eb554d55e49453fe733c23"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\shipping\\reference\\execution\\Version.68020.workbench31-version-native-entry-vector-fixture.json",
+      "bytes": 111870,
+      "sha256": "6280617a84f795a8091f178602ab767f240139ca1f08565883da798f3ef7a78c"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\shipping\\reference\\execution\\Version.68040.workbench31-version-native-entry-vector-fixture.json",
+      "bytes": 111870,
+      "sha256": "6732521db105592c9b141bddee0e03044164e1bd768bfb9a73bbf68ba495dd10"
+    }
+  ],
+  "publication": {
+    "sourceBuild": {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\default-build\\C\\Version",
+      "bytes": 8580,
+      "sha256": "1c6418637e04f84ecbfc03ad70dc541fc60793380bb735abe3c0cd29800d5038"
+    },
+    "inventory": [
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\AddBuffers",
+        "bytes": 1084,
+        "sha256": "65def8103fcfdd36e0fdb29abfba96a0fd8ddec671ddcf2370ca24f83a8198b7"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\AddDataTypes",
+        "bytes": 7720,
+        "sha256": "2c840474f28d10f430f53dfa1df920d24564f7f61bf7bc1e4997b306573fb7f7"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Assign",
+        "bytes": 2100,
+        "sha256": "af051f571dc9f4eb8312f7c321dc4418ecf23a1296a3db5055d05001c0270a1a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Avail",
+        "bytes": 1600,
+        "sha256": "cb6bc5419b0c5d9e5f55b87909bd79f77ab9405aa6ce673c66557587a51e5ddd"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Beep",
+        "bytes": 268,
+        "sha256": "c98218c490f10230a5d76c75288f3fc69ad2c647e279a6555bd8b8679127a0a6"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\BindDrivers",
+        "bytes": 2096,
+        "sha256": "2f97f20baba4afacd69d30a2cdafc7acee9e558ad0dfcf7c60666ecef3a0e73b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Break",
+        "bytes": 1408,
+        "sha256": "158fb5ea90f25854c8f47e390505d608cc4939d9c0e89e1b137b1e81a2847379"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\ChangeTaskPri",
+        "bytes": 1404,
+        "sha256": "a07585060e2dfa72efd995a9fca9a5404c2d33cda73140a40ac726c6215d923b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Check2090",
+        "bytes": 504,
+        "sha256": "a9b14ebacf905c4c97ff3f191d3c1b4c6f0b4ce70e4b1e451d016496372daaf8"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Copy",
+        "bytes": 15284,
+        "sha256": "f0809696779e50551e498b610974f4e99bd789cb1b92d92ef4a10c4423e6b56b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Date",
+        "bytes": 2564,
+        "sha256": "2a69ccbf0646817a5dafda7498ddfac75ea52b2a283922886918db2d1688277d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Delete",
+        "bytes": 5636,
+        "sha256": "049609a9985adf2c4fefd17487b0bbc06824ba631552b1d832f7a5c3ef393182"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\DevList",
+        "bytes": 1196,
+        "sha256": "1f71a12e6df8f6071d39da3dbb69418aa8c380cc38481e7292aced5a0a0fb29d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Dir",
+        "bytes": 6192,
+        "sha256": "a65e0180aaa1e09e34527a767f88c4a5378ed9338dc70aef49b371052c644177"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\DiskChange",
+        "bytes": 1232,
+        "sha256": "4a6757e5fb7e2dd5bf239a4af18aafd14892f0666d20719d3ec64719c8fb2247"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\DiskFree",
+        "bytes": 2012,
+        "sha256": "e723c08c126634df58b2adb227b5e950e7442d09668208966c11ea20d6014d3a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\DosList",
+        "bytes": 9916,
+        "sha256": "e3ebf9f04b861e6004b5959a2963c671413d2167ec72ad72362324ca0f3244ee"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Eval",
+        "bytes": 9636,
+        "sha256": "3792736f98ecfbc1a24b772b040b43f99acfa0e274f8a82b8ac6b641fdf5e267"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Exe2Arc",
+        "bytes": 14708,
+        "sha256": "80f20051347d74f63af387c13b6d357f9298be9ec9525df0ebe69677031bffc1"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Execute",
+        "bytes": 5888,
+        "sha256": "018fa8b9fad5b8e17825987b59c13cd5b32f138ccb2de5df752bebff806a4c63"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\ExtractKickstart",
+        "bytes": 2692,
+        "sha256": "e66c83404ffb1035e34d56219475c4b4705d8500eec3f405cdf8fce1fcabed1d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\FileNote",
+        "bytes": 2092,
+        "sha256": "a45a5c412d0968c39c159873244b6d02a1f5b99895245889a3a0725d5bd05fed"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\FindResident",
+        "bytes": 1096,
+        "sha256": "4e914781643cd3c315ade6f1ad90e00c7f3bfb36225b15455941e6c75bca4f82"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Format",
+        "bytes": 7960,
+        "sha256": "3a74bd1d2076d5d5ea72afbae03311873cd56fb4389566d9640989e89437ed3c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\GuessBootDev",
+        "bytes": 2132,
+        "sha256": "2045ca7d8df6d5daead3ba4f57c6bb48187b5516c70ef366badd07d44ff11975"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\IconPos",
+        "bytes": 2460,
+        "sha256": "2b8328fab30151a95a5a731a3b0cec73f4b9541226e7003021abcf8abcb203e3"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Info",
+        "bytes": 3520,
+        "sha256": "c98a2f61f5232279894c07d99b384bb3690efaebb718f4b084e2578335749bc8"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Join",
+        "bytes": 2272,
+        "sha256": "d8f725145bab7abb98f4dd320ca921524a1fd0b8d31929fd711d263fef21dd68"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\LibList",
+        "bytes": 1204,
+        "sha256": "dcc1535abf1523c7d6fd9c0b4aef371b12e26edee223f156a0a8e5982cd85497"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\List",
+        "bytes": 4684,
+        "sha256": "4a906e81b92ab2d0187cb590d6af9ebc86dced90c98c8ce8e4a92b7f8b812450"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\LoadMonDrvs",
+        "bytes": 2572,
+        "sha256": "e0f15322c56d67b3c499ea180c578e81c86934f3b0608d1121ab839561a863b4"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Lock",
+        "bytes": 1592,
+        "sha256": "f6d25f014ab111bbb0cf22de70c297989a096f7a74207a26e28560d43c5d4fa6"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\MakeDir",
+        "bytes": 1288,
+        "sha256": "7815b8e3ae0d6b9eb83700e0318677fa3dd8502cfc31c0c36a183849274f5b75"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\MakeLink",
+        "bytes": 1840,
+        "sha256": "6191228b33d4cc838f3e378def38c9f26b213fcdf684fc326a8bf6d29c6500be"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\ModList",
+        "bytes": 2424,
+        "sha256": "20a109e789fe381f378876b2099cfda69adb58fef99cf04b75945b937b010890"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Mount",
+        "bytes": 11340,
+        "sha256": "18a5d4c943ee47cdf8cd35236d2aaaa391d20b6612490dbad05129129e23e2c4"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\PathPart",
+        "bytes": 2120,
+        "sha256": "4b9efba7a2380203a525c8c833c30ec8d4ecea8ffd1ac9f2025b02111e0f7685"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\PortList",
+        "bytes": 1460,
+        "sha256": "45391e88dbf38ba990c6dd2ccc72066439459e92eacad9dc05b5f371f8b72377"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Protect",
+        "bytes": 3308,
+        "sha256": "c42424ec0f0b885286a608f497de68df5abcc576fd52b3921ad4c51bf645b0f7"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Quote",
+        "bytes": 6076,
+        "sha256": "cb67f60ef68d32668bb0d1a36d6613e6f1966022b6cb0bd2af27826d0347521e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Reboot",
+        "bytes": 516,
+        "sha256": "ba1d8a80d16ee8eef517b2b3234b9a5ac38e4a50bef1353b785af2c8cd74076c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Relabel",
+        "bytes": 1060,
+        "sha256": "a9e050245828737435099ba055eca6edcd4eae9bfbb9df7aa6f50e351940d866"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Rename",
+        "bytes": 2592,
+        "sha256": "53475580d41a5413d4d9cea7f3e14ba887c06d263a74399c9bea983203298e37"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\RequestChoice",
+        "bytes": 2240,
+        "sha256": "d1b3852638b713bbc95afb880297652261da57fc57f46ad915d48861a3cf1404"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\RequestFile",
+        "bytes": 2996,
+        "sha256": "f246b02c797940e8d5a5101ef9a59963797ab849b899da9222fa2bfbc62d7dec"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\ResList",
+        "bytes": 1076,
+        "sha256": "d5c913bd1f0b7f511950d61a2153046c50b5cd1151daaafeb78793f13c0f5ed2"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Search",
+        "bytes": 5428,
+        "sha256": "38444ca732d98dab5d2fe087b72863e9b02ee096d4998db4fdeddfd2a494f671"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\SetClock",
+        "bytes": 1716,
+        "sha256": "fa9a3e2b17e742b8c3c034aa58bedd686a1a1afb1ea6021dbef5ef5694a9061d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\SetDate",
+        "bytes": 1852,
+        "sha256": "3550aac1835f06830dd41743688e7c3bd2b1aeec30f45940fc74369913e984b4"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\SetFont",
+        "bytes": 2688,
+        "sha256": "7026b001da8e8bc221109432d99593b69c764bdbb444f11eef8f7f0ec0d8f3b9"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\SetKeyboard",
+        "bytes": 1652,
+        "sha256": "7049d9beed0b876d8dfc6f82544aa2c6a8c14d74d4936aeb875ae1153882f302"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Status",
+        "bytes": 3600,
+        "sha256": "8f6cdb3ae03d30b661bc43111c1a3f3f64280d1b723931538118a17e9442420c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\TaskList",
+        "bytes": 14476,
+        "sha256": "db5b067c416901ff010015188dbf1104fa60b26f2805fe4045163aa469914e34"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Touch",
+        "bytes": 2164,
+        "sha256": "2a5145a94d119769049acdc0a948c3deb62db537d3f03d4f613266c1d8a2abf3"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Type",
+        "bytes": 4896,
+        "sha256": "d885352724b9b12d0c509c6fc01795e5ced32c547d681f91317afa8ab370ec29"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Version",
+        "bytes": 8580,
+        "sha256": "1c6418637e04f84ecbfc03ad70dc541fc60793380bb735abe3c0cd29800d5038"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Wait",
+        "bytes": 2392,
+        "sha256": "ab801c95925dc9f803ac3b0d5c9a5281945203a84931aacde5920f7515696a06"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\WaitForLib",
+        "bytes": 1344,
+        "sha256": "81e5555072dc9e843470869789cde7604df4783af12a6ef2689f99f32c71f9bf"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\WaitForNotification",
+        "bytes": 2016,
+        "sha256": "ff21efda2416da4a86fbf13a90d766b95084c5c64ad5ae30e9adadc44edc9d42"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\WaitForPort",
+        "bytes": 1436,
+        "sha256": "22f001c6457b4210341ba51305789e792f94abfc36a8e4adf9677c1805e79c29"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\qualification\\accepted\\C\\Which",
+        "bytes": 3940,
+        "sha256": "fbcb88263c0c8fa3cbf4c06272af0f4f30733c3aa165a88a41bac43a03194569"
+      }
+    ],
+    "beforeBytes": 225336,
+    "afterBytes": 225240,
+    "policy": {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\src\\Commands\\CodeSizePolicies.props",
+      "bytes": 24719,
+      "sha256": "68cc92c3010f31488dc3c745eae2b0fc996d54a4494d0a110e2aa5ae67e12a46"
+    }
+  },
+  "legacyOffImage": {
+    "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\version-spills-20261017\\final-off\\C\\Version",
+    "bytes": 8676,
+    "sha256": "c59ae2fa61e56fdd65dff408cba0548aed9be1fa7b7bbe02d6f006e9349e30f7"
+  },
+  "tool": {
+    "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\Commands\\qualify_version_spill_fix.py",
+    "bytes": 6535,
+    "sha256": "ecc3fbedc06f51c26701109a37cf7e13099f8635b992026f65b0ae792efacaaf"
+  },
+  "limits": [
+    "Supplied-vector fixtures; no new original-DOS, WinUAE/CopperScreen or actual MorphOS execution.",
+    "Focused compiler tests; not the full compiler suite or every other command/profile combination.",
+    "Primary compiler unrelated work preserved; qualification uses isolated compiler payload."
+  ],
+  "delivery": {
+    "compilerFixCommit": "69d01d18f686d72f2e281918042846a512307e50",
+    "compilerPushedTo": "origin/main",
+    "qualifiedPayloadUnchanged": true
+  }
+}
