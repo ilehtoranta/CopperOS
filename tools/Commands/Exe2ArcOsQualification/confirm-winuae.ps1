@@ -1,17 +1,29 @@
-param([Parameter(Mandatory)][string]$Stage, [string]$Rom='C:/Data/ROM/kickstart-3.1-a500.rom', [string]$WinUAE='C:/Program Files/WinUAE/winuae64.exe', [switch]$Resume, [string[]]$Batches=@('typed','automatic','names','errors1','errors2','signals','repeat'))
+param(
+ [Parameter(Mandatory)][string]$Stage,
+ [string]$Rom='C:/Data/ROM/kickstart-3.1-a500.rom',
+ [string]$WinUAE='C:/Program Files/WinUAE/winuae64.exe',
+ [switch]$Resume,
+ [string[]]$Batches=@('typed','automatic','names','errors1','errors2','signals','cross','large','repeat'),
+ [string[]]$Cpus=@('68000','68020','68040'),
+ [string]$EvidenceRoot,
+ [ValidateRange(1,600)][int]$TimeoutSeconds=120
+)
 $ErrorActionPreference='Stop'
 $Stage=(Resolve-Path -LiteralPath $Stage).Path
+if (-not $EvidenceRoot) {$EvidenceRoot=Join-Path $Stage 'winuae'}
+$EvidenceRoot=[IO.Path]::GetFullPath($EvidenceRoot)
 $records=@()
-foreach ($cpu in '68000','68020','68040') {
+foreach ($cpu in $Cpus) {
+ if ($cpu -notin '68000','68020','68040') {throw 'Unsupported CPU.'}
  foreach ($batch in $Batches) {
-  $root=Join-Path $Stage "winuae/$batch-$cpu"
+  $root=Join-Path $EvidenceRoot "$batch-$cpu"
   if (Test-Path -LiteralPath $root) {
    if ($Resume -and (Test-Path -LiteralPath "$root/result.json")) {
     $prior=Get-Content -LiteralPath "$root/result.json" -Raw | ConvertFrom-Json
     if (-not $prior.completed) {throw 'Existing run failed; preserve evidence.'}
     $records+=$prior; continue
    }
-   $root=Join-Path $Stage "winuae/retry-$batch-$cpu"
+   $root=Join-Path $EvidenceRoot "retry-$batch-$cpu"
    if (Test-Path -LiteralPath $root) {throw 'Preserve retry evidence.'}
   }
   $sys=Join-Path $root 'sys'
@@ -28,16 +40,29 @@ foreach ($cpu in '68000','68020','68040') {
   [IO.File]::WriteAllLines("$root/run.uae",$config,[Text.UTF8Encoding]::new($false))
   $process=Start-Process -FilePath $WinUAE -ArgumentList @('-nobootlog','-f',"`"$root/run.uae`"") -WindowStyle Hidden -PassThru
   $watch=[Diagnostics.Stopwatch]::StartNew()
-  while (-not $process.WaitForExit(1000) -and $watch.Elapsed.TotalSeconds -lt 45) {}
+  $progress=@()
+  $lastBytes=-1L
+  $lastSample=-5.0
+  $cpuSeconds=0.0
+  while (-not $process.WaitForExit(1000) -and $watch.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
+   $process.Refresh()
+   $cpuSeconds=$process.TotalProcessorTime.TotalSeconds
+   $bytes=if (Test-Path -LiteralPath "$sys/PAYLOAD.OK") {(Get-Item -LiteralPath "$sys/PAYLOAD.OK").Length} else {0L}
+   if ($bytes -ne $lastBytes -or $watch.Elapsed.TotalSeconds-$lastSample -ge 5) {
+    $progress+=@{seconds=$watch.Elapsed.TotalSeconds;processCpuSeconds=$cpuSeconds;receiptBytes=$bytes}
+    $progress | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath "$root/progress.json" -Encoding utf8
+    $lastBytes=$bytes; $lastSample=$watch.Elapsed.TotalSeconds
+   }
+  }
   $exited=$process.HasExited
   if (-not $exited) {Stop-Process -Id $process.Id -Force; $process.WaitForExit(5000) | Out-Null}
   $completed=$exited -and (Test-Path -LiteralPath "$sys/done.txt") -and (Test-Path -LiteralPath "$sys/PAYLOAD.OK")
   $return=if (Test-Path -LiteralPath "$sys/guest-return.txt") {[IO.File]::ReadAllText("$sys/guest-return.txt")} else {$null}
-  $record=[ordered]@{batch=$batch;cpu=$cpu;completed=$completed;guestReturn=$return;jit=$false;seconds=$watch.Elapsed.TotalSeconds;romSha256=(Get-FileHash -LiteralPath $Rom).Hash.ToLowerInvariant();winuaeSha256=(Get-FileHash -LiteralPath $WinUAE).Hash.ToLowerInvariant();winuaeVersion=(Get-Item -LiteralPath $WinUAE).VersionInfo.ProductVersion}
+  $record=[ordered]@{batch=$batch;cpu=$cpu;completed=$completed;guestReturn=$return;jit=$false;seconds=$watch.Elapsed.TotalSeconds;timeoutSeconds=$TimeoutSeconds;processCpuSeconds=$cpuSeconds;evidenceDirectory=$root;romSha256=(Get-FileHash -LiteralPath $Rom).Hash.ToLowerInvariant();winuaeSha256=(Get-FileHash -LiteralPath $WinUAE).Hash.ToLowerInvariant();winuaeVersion=(Get-Item -LiteralPath $WinUAE).VersionInfo.ProductVersion}
   $record | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath "$root/result.json" -Encoding utf8
   $records+=$record
   Write-Output "WinUAE $batch $cpu completed=$completed return=$return"
   if (-not $completed) {throw 'Guest failed; retain evidence.'}
  }
 }
-$records | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath "$Stage/winuae/results.json" -Encoding utf8
+$records | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath "$EvidenceRoot/results.json" -Encoding utf8

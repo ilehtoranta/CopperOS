@@ -1,0 +1,2068 @@
+{
+  "passed": true,
+  "contracts": 32,
+  "cpus": [
+    "68000",
+    "68020",
+    "68040"
+  ],
+  "coverage": [
+    {
+      "cpu": "68000",
+      "image": 0,
+      "contracts": 32
+    },
+    {
+      "cpu": "68000",
+      "image": 1,
+      "contracts": 32
+    },
+    {
+      "cpu": "68020",
+      "image": 0,
+      "contracts": 32
+    },
+    {
+      "cpu": "68020",
+      "image": 1,
+      "contracts": 32
+    },
+    {
+      "cpu": "68040",
+      "image": 0,
+      "contracts": 32
+    },
+    {
+      "cpu": "68040",
+      "image": 1,
+      "contracts": 32
+    }
+  ],
+  "independentInvocations": 366,
+  "additionalInvocations": 36,
+  "runs": [
+    {
+      "batch": "typed",
+      "cpu": "68000",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 10.8822806,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 18,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\typed-68000\\sys\\PAYLOAD.OK",
+        "bytes": 5670,
+        "sha256": "b162711725c0f40231c58ec888662557bb920f4a15720eab75e1d0094c99fa20"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\typed-68000\\sys\\CASES.FIX",
+        "bytes": 27952,
+        "sha256": "d0911e2d3c31bad5de7a704912e4d590c5a84f330de0c4126f4c88e6158227ac"
+      }
+    },
+    {
+      "batch": "automatic",
+      "cpu": "68000",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 11.551194,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 18,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\automatic-68000\\sys\\PAYLOAD.OK",
+        "bytes": 5670,
+        "sha256": "b162711725c0f40231c58ec888662557bb920f4a15720eab75e1d0094c99fa20"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\automatic-68000\\sys\\CASES.FIX",
+        "bytes": 27952,
+        "sha256": "ec2709e7a1e6854ee617d549c3d5f6aa5fa75b9ea855898de9d947e7b71cccab"
+      }
+    },
+    {
+      "batch": "names",
+      "cpu": "68000",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 9.0115614,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 12,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\names-68000\\sys\\PAYLOAD.OK",
+        "bytes": 3838,
+        "sha256": "4110d09d1c9448bd667581023d16768a39796b348df529a10e6e947f13506aa8"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\names-68000\\sys\\CASES.FIX",
+        "bytes": 18640,
+        "sha256": "9290bfe11a26e8072e9e36fa2096dd0ca0efa4435ce91a728ccf128f8c228cf2"
+      }
+    },
+    {
+      "batch": "errors1",
+      "cpu": "68000",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 8.8235037,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 16,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\errors1-68000\\sys\\PAYLOAD.OK",
+        "bytes": 4028,
+        "sha256": "daee9c3df9d3321b2afb037e9265865ffe70d30d605322ab9fd563ed410192ad"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\errors1-68000\\sys\\CASES.FIX",
+        "bytes": 24848,
+        "sha256": "919db6d045ce59ecc3da8d5c434b84776457e3c628c23cf91a0a6e6e4bdd71b3"
+      }
+    },
+    {
+      "batch": "errors2",
+      "cpu": "68000",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 9.3607324,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 16,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\errors2-68000\\sys\\PAYLOAD.OK",
+        "bytes": 3352,
+        "sha256": "cf0dfee5ddad30e64bbfc16dc0128b19190efeb69e9ca0cc0dbfc8d2c973dd96"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\errors2-68000\\sys\\CASES.FIX",
+        "bytes": 24848,
+        "sha256": "23557cb7efd307b4a7b47516cab387e612dcfe8c18de1f4bf6be08b01d520e56"
+      }
+    },
+    {
+      "batch": "signals",
+      "cpu": "68000",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 7.4525898,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 6,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\signals-68000\\sys\\PAYLOAD.OK",
+        "bytes": 1738,
+        "sha256": "251bcfab293c8f2d5500352a6fc446a0215de17dafa19b39f035e7c92bfd818e"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\signals-68000\\sys\\CASES.FIX",
+        "bytes": 9328,
+        "sha256": "9b7b7eea23a4c0007d527812300e33d0abe749a2a66e19b55e07a645012ebd7f"
+      }
+    },
+    {
+      "batch": "repeat",
+      "cpu": "68000",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 10.259296,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 24,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\repeat-68000\\sys\\PAYLOAD.OK",
+        "bytes": 6352,
+        "sha256": "c7ebf58bec92bf50ea9f8ba9ef5f45ad906fc4d661d300156e92ee1776c5fec9"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\repeat-68000\\sys\\CASES.FIX",
+        "bytes": 37264,
+        "sha256": "fb47c08aa73a379b6d6b6e88df156c85a1b9275bcf20b239a3d389e7f0764886"
+      }
+    },
+    {
+      "batch": "typed",
+      "cpu": "68020",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 5.3952989,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 18,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\typed-68020\\sys\\PAYLOAD.OK",
+        "bytes": 5670,
+        "sha256": "b162711725c0f40231c58ec888662557bb920f4a15720eab75e1d0094c99fa20"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\typed-68020\\sys\\CASES.FIX",
+        "bytes": 27952,
+        "sha256": "d0911e2d3c31bad5de7a704912e4d590c5a84f330de0c4126f4c88e6158227ac"
+      }
+    },
+    {
+      "batch": "automatic",
+      "cpu": "68020",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 6.2701933,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 18,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\automatic-68020\\sys\\PAYLOAD.OK",
+        "bytes": 5670,
+        "sha256": "b162711725c0f40231c58ec888662557bb920f4a15720eab75e1d0094c99fa20"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\automatic-68020\\sys\\CASES.FIX",
+        "bytes": 27952,
+        "sha256": "ec2709e7a1e6854ee617d549c3d5f6aa5fa75b9ea855898de9d947e7b71cccab"
+      }
+    },
+    {
+      "batch": "names",
+      "cpu": "68020",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 4.5584593,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 12,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\names-68020\\sys\\PAYLOAD.OK",
+        "bytes": 3838,
+        "sha256": "4110d09d1c9448bd667581023d16768a39796b348df529a10e6e947f13506aa8"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\names-68020\\sys\\CASES.FIX",
+        "bytes": 18640,
+        "sha256": "9290bfe11a26e8072e9e36fa2096dd0ca0efa4435ce91a728ccf128f8c228cf2"
+      }
+    },
+    {
+      "batch": "errors1",
+      "cpu": "68020",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 4.8856509,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 16,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\errors1-68020\\sys\\PAYLOAD.OK",
+        "bytes": 4028,
+        "sha256": "daee9c3df9d3321b2afb037e9265865ffe70d30d605322ab9fd563ed410192ad"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\errors1-68020\\sys\\CASES.FIX",
+        "bytes": 24848,
+        "sha256": "919db6d045ce59ecc3da8d5c434b84776457e3c628c23cf91a0a6e6e4bdd71b3"
+      }
+    },
+    {
+      "batch": "errors2",
+      "cpu": "68020",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 4.745336,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 16,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\errors2-68020\\sys\\PAYLOAD.OK",
+        "bytes": 3352,
+        "sha256": "cf0dfee5ddad30e64bbfc16dc0128b19190efeb69e9ca0cc0dbfc8d2c973dd96"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\errors2-68020\\sys\\CASES.FIX",
+        "bytes": 24848,
+        "sha256": "23557cb7efd307b4a7b47516cab387e612dcfe8c18de1f4bf6be08b01d520e56"
+      }
+    },
+    {
+      "batch": "signals",
+      "cpu": "68020",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 3.5823541,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 6,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\signals-68020\\sys\\PAYLOAD.OK",
+        "bytes": 1738,
+        "sha256": "251bcfab293c8f2d5500352a6fc446a0215de17dafa19b39f035e7c92bfd818e"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\signals-68020\\sys\\CASES.FIX",
+        "bytes": 9328,
+        "sha256": "9b7b7eea23a4c0007d527812300e33d0abe749a2a66e19b55e07a645012ebd7f"
+      }
+    },
+    {
+      "batch": "repeat",
+      "cpu": "68020",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 5.7126115,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 24,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\repeat-68020\\sys\\PAYLOAD.OK",
+        "bytes": 6352,
+        "sha256": "c7ebf58bec92bf50ea9f8ba9ef5f45ad906fc4d661d300156e92ee1776c5fec9"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\repeat-68020\\sys\\CASES.FIX",
+        "bytes": 37264,
+        "sha256": "fb47c08aa73a379b6d6b6e88df156c85a1b9275bcf20b239a3d389e7f0764886"
+      }
+    },
+    {
+      "batch": "typed",
+      "cpu": "68040",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 4.5644538,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 18,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\typed-68040\\sys\\PAYLOAD.OK",
+        "bytes": 5670,
+        "sha256": "5cd0cbf04353ee7cbb23b307458cad49794658db167e4e61df2db27158a775fd"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\typed-68040\\sys\\CASES.FIX",
+        "bytes": 27952,
+        "sha256": "d0911e2d3c31bad5de7a704912e4d590c5a84f330de0c4126f4c88e6158227ac"
+      }
+    },
+    {
+      "batch": "automatic",
+      "cpu": "68040",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 4.7970533,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 18,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\automatic-68040\\sys\\PAYLOAD.OK",
+        "bytes": 5670,
+        "sha256": "5cd0cbf04353ee7cbb23b307458cad49794658db167e4e61df2db27158a775fd"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\automatic-68040\\sys\\CASES.FIX",
+        "bytes": 27952,
+        "sha256": "ec2709e7a1e6854ee617d549c3d5f6aa5fa75b9ea855898de9d947e7b71cccab"
+      }
+    },
+    {
+      "batch": "names",
+      "cpu": "68040",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 3.5222609,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 12,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\names-68040\\sys\\PAYLOAD.OK",
+        "bytes": 3838,
+        "sha256": "16bd8d96b5fd66b8ba7eb77282ddf3ed93cdd210e5ca92beefcebdcf8c0a35e5"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\names-68040\\sys\\CASES.FIX",
+        "bytes": 18640,
+        "sha256": "9290bfe11a26e8072e9e36fa2096dd0ca0efa4435ce91a728ccf128f8c228cf2"
+      }
+    },
+    {
+      "batch": "errors1",
+      "cpu": "68040",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 3.965816,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 16,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\errors1-68040\\sys\\PAYLOAD.OK",
+        "bytes": 4028,
+        "sha256": "8e03eba07d87f38be2b2f40496a8b1b0da0cc0fb4fe13fbfc50eb8bac2ebf698"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\errors1-68040\\sys\\CASES.FIX",
+        "bytes": 24848,
+        "sha256": "919db6d045ce59ecc3da8d5c434b84776457e3c628c23cf91a0a6e6e4bdd71b3"
+      }
+    },
+    {
+      "batch": "errors2",
+      "cpu": "68040",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 3.6610367,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 16,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\errors2-68040\\sys\\PAYLOAD.OK",
+        "bytes": 3352,
+        "sha256": "d8c7cf8337cf0a6c0d0a98615eb44d93d00261db48bc48ebb8a8f01fe66a9a4f"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\errors2-68040\\sys\\CASES.FIX",
+        "bytes": 24848,
+        "sha256": "23557cb7efd307b4a7b47516cab387e612dcfe8c18de1f4bf6be08b01d520e56"
+      }
+    },
+    {
+      "batch": "signals",
+      "cpu": "68040",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 2.8355889,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 6,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\signals-68040\\sys\\PAYLOAD.OK",
+        "bytes": 1738,
+        "sha256": "d6d0053bdf53362da54946462925e0eb6bb8a93c39ac4f009994ada87e5a9ced"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\signals-68040\\sys\\CASES.FIX",
+        "bytes": 9328,
+        "sha256": "9b7b7eea23a4c0007d527812300e33d0abe749a2a66e19b55e07a645012ebd7f"
+      }
+    },
+    {
+      "batch": "repeat",
+      "cpu": "68040",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 4.4845847,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 24,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\repeat-68040\\sys\\PAYLOAD.OK",
+        "bytes": 6352,
+        "sha256": "e51c0da8360f732542776beab61267fc7e4b85744a2aedafd3ab47bd3abef5da"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-os-v2-20261017\\winuae\\repeat-68040\\sys\\CASES.FIX",
+        "bytes": 37264,
+        "sha256": "fb47c08aa73a379b6d6b6e88df156c85a1b9275bcf20b239a3d389e7f0764886"
+      }
+    },
+    {
+      "batch": "cross",
+      "cpu": "68000",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 56.3251317,
+      "timeoutSeconds": 120,
+      "processCpuSeconds": 21.953125,
+      "evidenceDirectory": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000",
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 6,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\PAYLOAD.OK",
+        "bytes": 1800,
+        "sha256": "c20c555bfb1c928b1e21209dbba9887426e62c2010818d758974ec22b4be8f81"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\CASES.FIX",
+        "bytes": 9328,
+        "sha256": "14fd65c83959b0d9ad246c07c662d285d1bd6f5e23a9d0cc31a401deb431e68b"
+      }
+    },
+    {
+      "batch": "large",
+      "cpu": "68000",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 9.9761961,
+      "timeoutSeconds": 120,
+      "processCpuSeconds": 3.859375,
+      "evidenceDirectory": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000",
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 6,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\PAYLOAD.OK",
+        "bytes": 206570,
+        "sha256": "82e7d560c38f6bc5b0c4a6d9ecd7383102f594594abebcdff86e5ad91fbd9bbf"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\CASES.FIX",
+        "bytes": 9328,
+        "sha256": "7ed9d2dd93cabcef3809bdf7937e1bf0e919ff2381eea220336161a95a92dc64"
+      }
+    },
+    {
+      "batch": "cross",
+      "cpu": "68020",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 37.8210434,
+      "timeoutSeconds": 120,
+      "processCpuSeconds": 18.796875,
+      "evidenceDirectory": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020",
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 6,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\PAYLOAD.OK",
+        "bytes": 1800,
+        "sha256": "c20c555bfb1c928b1e21209dbba9887426e62c2010818d758974ec22b4be8f81"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\CASES.FIX",
+        "bytes": 9328,
+        "sha256": "14fd65c83959b0d9ad246c07c662d285d1bd6f5e23a9d0cc31a401deb431e68b"
+      }
+    },
+    {
+      "batch": "large",
+      "cpu": "68020",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 5.65204,
+      "timeoutSeconds": 120,
+      "processCpuSeconds": 2.5,
+      "evidenceDirectory": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020",
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 6,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\PAYLOAD.OK",
+        "bytes": 206570,
+        "sha256": "82e7d560c38f6bc5b0c4a6d9ecd7383102f594594abebcdff86e5ad91fbd9bbf"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\CASES.FIX",
+        "bytes": 9328,
+        "sha256": "7ed9d2dd93cabcef3809bdf7937e1bf0e919ff2381eea220336161a95a92dc64"
+      }
+    },
+    {
+      "batch": "cross",
+      "cpu": "68040",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 20.2596941,
+      "timeoutSeconds": 120,
+      "processCpuSeconds": 10.5625,
+      "evidenceDirectory": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040",
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 6,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\PAYLOAD.OK",
+        "bytes": 1800,
+        "sha256": "4b4c6a96625a093c8917289b1aa0336d88ee731b967c15fd3ff43c36608b7a84"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\CASES.FIX",
+        "bytes": 9328,
+        "sha256": "14fd65c83959b0d9ad246c07c662d285d1bd6f5e23a9d0cc31a401deb431e68b"
+      }
+    },
+    {
+      "batch": "large",
+      "cpu": "68040",
+      "completed": true,
+      "guestReturn": "0 0\n",
+      "jit": false,
+      "seconds": 6.8338834,
+      "timeoutSeconds": 120,
+      "processCpuSeconds": 3.859375,
+      "evidenceDirectory": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040",
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0",
+      "qualification": {
+        "passed": true,
+        "invocations": 6,
+        "failures": [],
+        "memoryDeltas": [
+          -208,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\PAYLOAD.OK",
+        "bytes": 206570,
+        "sha256": "32e26042a1c0df4d6d461bdde61eb3dfb4bdf773963299281e7ae130813ffcc6"
+      },
+      "request": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\CASES.FIX",
+        "bytes": 9328,
+        "sha256": "7ed9d2dd93cabcef3809bdf7937e1bf0e919ff2381eea220336161a95a92dc64"
+      }
+    }
+  ],
+  "priorQualification": {
+    "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\docs\\Commands\\Workbench31MorphOS320\\exe2arc-original-dos-qualification-20261017.json",
+    "bytes": 252696,
+    "sha256": "818aabdba7d97e30ba868daa0e4939606382cce9f9d9721d59e7310a2a723a65"
+  },
+  "installed": {
+    "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Exe2Arc",
+    "bytes": 14652,
+    "sha256": "6a045b00a39a6ed91a4a1593df18ed585f4e7f1a71f4b3543dce882c4494bed6"
+  },
+  "investigation": {
+    "oldAttempt": {
+      "batch": "cross",
+      "cpu": "68000",
+      "completed": false,
+      "guestReturn": null,
+      "jit": false,
+      "seconds": 45.2935357,
+      "romSha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+      "winuaeSha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+      "winuaeVersion": "6.0.3.0"
+    },
+    "partialReceipt": {
+      "expectedRows": 6,
+      "completeRows": [
+        {
+          "index": 0,
+          "image": 0,
+          "returnCode": 0,
+          "ioErr": 0,
+          "payloadBytes": 96
+        },
+        {
+          "index": 1,
+          "image": 1,
+          "returnCode": 0,
+          "ioErr": 0,
+          "payloadBytes": 96
+        },
+        {
+          "index": 2,
+          "image": 0,
+          "returnCode": 0,
+          "ioErr": 0,
+          "payloadBytes": 96
+        },
+        {
+          "index": 3,
+          "image": 1,
+          "returnCode": 0,
+          "ioErr": 0,
+          "payloadBytes": 96
+        },
+        {
+          "index": 4,
+          "image": 0,
+          "returnCode": 0,
+          "ioErr": 0,
+          "payloadBytes": 32
+        }
+      ],
+      "trailingBytes": 0
+    },
+    "controlReceiptVisibleSeconds": 32.5108442,
+    "progressAfter45": [
+      {
+        "seconds": 47.7683311,
+        "receiptBytes": 1544,
+        "processCpuSeconds": 18.296875
+      },
+      {
+        "seconds": 52.8888475,
+        "receiptBytes": 1544,
+        "processCpuSeconds": 20.3125
+      }
+    ],
+    "configUnchangedExceptCpuAndOutputDirectory": true,
+    "reason": "The fixed 45-second host deadline expired during the second scan; the identical combined batch completes with a 120-second deadline."
+  },
+  "tools": [
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\Commands\\Exe2ArcOsQualification\\qualify-winuae.py",
+      "bytes": 13178,
+      "sha256": "e9d9b011ae81363c6403b27ae8494a4276d5abd6aee909d5e2bb72f1a8903782"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\Commands\\Exe2ArcOsQualification\\confirm-winuae.ps1",
+      "bytes": 4764,
+      "sha256": "009b6187c31244b7ab8ec600deec5c1ef5d2ed169314a9a2135a28acc4595c95"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\Commands\\Exe2ArcOsQualification\\raw.py",
+      "bytes": 1630,
+      "sha256": "0c0ef06197ea8b8ab9c020abca6e4d1bb4b498bb4bb3e3353aa77c492c01ac17"
+    }
+  ],
+  "evidence": [
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\progress.json",
+      "bytes": 1307,
+      "sha256": "5818fc5e34aa0a95b86f7259f49077ce311fbb806570aa0033ad1d4d1fac5c39"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\result.json",
+      "bytes": 522,
+      "sha256": "f8a9bab8e353464c3d4f403a58bd4302e4258af00c10eb2e5a85d1ef86c12a3b"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\run.uae",
+      "bytes": 432,
+      "sha256": "b9e42dabfd70708ec67f4061419cba1d4378aafe83e042697d413fef9c7cb048"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\ACE.IN",
+      "bytes": 128,
+      "sha256": "d38bf6a544d7dc2773335a0a5ef7ab295f0600859d336d681bb953368e884094"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\ARJ.IN",
+      "bytes": 128,
+      "sha256": "38b4bd564e4b9f8c6eb084a65fe85e0e52f7179b7be374445f8835095dbac0df"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\BADZIP.IN",
+      "bytes": 160,
+      "sha256": "98e516007c2ff2a03e07cb9ac961b67894922c3f5af0bd0525b887df759e9193"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\BIG.IN",
+      "bytes": 102445,
+      "sha256": "49df4d52413391c7729ab2c499cf191b5bd079fd2ac6c042e371a9f0b291cd1a"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\C\\UAEquit",
+      "bytes": 4448,
+      "sha256": "3090972d4f3c8cb9cdc403a59ced6d7b89f844ff3c876cec776f2270219aa17e"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\CAB.IN",
+      "bytes": 128,
+      "sha256": "46c81dc3a9f13a39c3195263be9d24aa74b2f635dbb964a35af7d63e6d2be0ba"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\CASES.FIX",
+      "bytes": 9328,
+      "sha256": "14fd65c83959b0d9ad246c07c662d285d1bd6f5e23a9d0cc31a401deb431e68b"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\CROSS.IN",
+      "bytes": 102430,
+      "sha256": "5f8e042aaee14b254ea2feac92abd4c61ec1175373592ae74dbd42d58922f5ff"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\done.txt",
+      "bytes": 5,
+      "sha256": "8221ac66be71558c921fb44cfb66f7997699aea754d917763882d6d9eddc836e"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\EMPTY.IN",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\EXE2ARCB",
+      "bytes": 14680,
+      "sha256": "dba3d909870a275cf2cb8009bd7914c4b28d16a3a93f6656738fb95b20e0193b"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\EXE2ARCC",
+      "bytes": 14652,
+      "sha256": "6a045b00a39a6ed91a4a1593df18ed585f4e7f1a71f4b3543dce882c4494bed6"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\Exe2ArcQualification",
+      "bytes": 5036,
+      "sha256": "652914a7205ae824e7e9b946ae067403102b51ade979724b3e62f64432fee667"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\guest-return.txt",
+      "bytes": 4,
+      "sha256": "0ccdb5a77ba5bf7687f2565a8ed97dfb9c1af45503c496fb646312239fab5101"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\LHA.IN",
+      "bytes": 200,
+      "sha256": "0826856eae462ae2df5346a90f47457135d4663cbe6b6acbef57fe86028833f7"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\LZH.IN",
+      "bytes": 128,
+      "sha256": "8ffccb2ddeb26a7654297864d98a9b3a6adcf062dfd6d4709fb8727fb239ea14"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\PAYLOAD.OK",
+      "bytes": 1800,
+      "sha256": "c20c555bfb1c928b1e21209dbba9887426e62c2010818d758974ec22b4be8f81"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\RANDOM.IN",
+      "bytes": 256,
+      "sha256": "5341e6b2646979a70e57653007a1f310169421ec9bdd9f1a5648f75ade005af1"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\RAR.IN",
+      "bytes": 128,
+      "sha256": "c23650161fdc45ff7d799a1e28fbf7d586b092afcfa5e35bd9538476ccea2320"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\S\\Startup-Sequence",
+      "bytes": 130,
+      "sha256": "6b53a148f96e571f892ee2496cef120ab7c1487d19382139917c70c12fc2a1f6"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\SHORTZIP.IN",
+      "bytes": 160,
+      "sha256": "3738d29d44897c9f3c7ce0e6eee401e6679373fbd622bf78457064f463fae536"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\ZERO.IN",
+      "bytes": 128,
+      "sha256": "3a010cbd2c8e6f6812099735d5b2d750760d1841774e677804663f1b6a012de3"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68000\\sys\\ZIP.IN",
+      "bytes": 160,
+      "sha256": "0a630633423dbf2d3ee1a963e0bb3607c293206b5b1d7eff8761fd2eca265b2e"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\progress.json",
+      "bytes": 907,
+      "sha256": "556eb1ca5932f3785195e9e210b9521fa6601a196adb07e0ea8a88745da86f69"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\result.json",
+      "bytes": 522,
+      "sha256": "2f7b6af877ca3b6bae10b24824015423371eb62610550c75a39a1cb81d75c049"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\run.uae",
+      "bytes": 432,
+      "sha256": "e286377c8ba9b3e9def868c6e9dd8979b1d6daa6a5311d7cde4dbab9eac9c5f9"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\ACE.IN",
+      "bytes": 128,
+      "sha256": "d38bf6a544d7dc2773335a0a5ef7ab295f0600859d336d681bb953368e884094"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\ARJ.IN",
+      "bytes": 128,
+      "sha256": "38b4bd564e4b9f8c6eb084a65fe85e0e52f7179b7be374445f8835095dbac0df"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\BADZIP.IN",
+      "bytes": 160,
+      "sha256": "98e516007c2ff2a03e07cb9ac961b67894922c3f5af0bd0525b887df759e9193"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\BIG.IN",
+      "bytes": 102445,
+      "sha256": "49df4d52413391c7729ab2c499cf191b5bd079fd2ac6c042e371a9f0b291cd1a"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\C\\UAEquit",
+      "bytes": 4448,
+      "sha256": "3090972d4f3c8cb9cdc403a59ced6d7b89f844ff3c876cec776f2270219aa17e"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\CAB.IN",
+      "bytes": 128,
+      "sha256": "46c81dc3a9f13a39c3195263be9d24aa74b2f635dbb964a35af7d63e6d2be0ba"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\CASES.FIX",
+      "bytes": 9328,
+      "sha256": "14fd65c83959b0d9ad246c07c662d285d1bd6f5e23a9d0cc31a401deb431e68b"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\CROSS.IN",
+      "bytes": 102430,
+      "sha256": "5f8e042aaee14b254ea2feac92abd4c61ec1175373592ae74dbd42d58922f5ff"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\done.txt",
+      "bytes": 5,
+      "sha256": "8221ac66be71558c921fb44cfb66f7997699aea754d917763882d6d9eddc836e"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\EMPTY.IN",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\EXE2ARCB",
+      "bytes": 14680,
+      "sha256": "dba3d909870a275cf2cb8009bd7914c4b28d16a3a93f6656738fb95b20e0193b"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\EXE2ARCC",
+      "bytes": 14652,
+      "sha256": "6a045b00a39a6ed91a4a1593df18ed585f4e7f1a71f4b3543dce882c4494bed6"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\Exe2ArcQualification",
+      "bytes": 5036,
+      "sha256": "652914a7205ae824e7e9b946ae067403102b51ade979724b3e62f64432fee667"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\guest-return.txt",
+      "bytes": 4,
+      "sha256": "0ccdb5a77ba5bf7687f2565a8ed97dfb9c1af45503c496fb646312239fab5101"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\LHA.IN",
+      "bytes": 200,
+      "sha256": "0826856eae462ae2df5346a90f47457135d4663cbe6b6acbef57fe86028833f7"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\LZH.IN",
+      "bytes": 128,
+      "sha256": "8ffccb2ddeb26a7654297864d98a9b3a6adcf062dfd6d4709fb8727fb239ea14"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\PAYLOAD.OK",
+      "bytes": 1800,
+      "sha256": "c20c555bfb1c928b1e21209dbba9887426e62c2010818d758974ec22b4be8f81"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\RANDOM.IN",
+      "bytes": 256,
+      "sha256": "5341e6b2646979a70e57653007a1f310169421ec9bdd9f1a5648f75ade005af1"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\RAR.IN",
+      "bytes": 128,
+      "sha256": "c23650161fdc45ff7d799a1e28fbf7d586b092afcfa5e35bd9538476ccea2320"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\S\\Startup-Sequence",
+      "bytes": 130,
+      "sha256": "6b53a148f96e571f892ee2496cef120ab7c1487d19382139917c70c12fc2a1f6"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\SHORTZIP.IN",
+      "bytes": 160,
+      "sha256": "3738d29d44897c9f3c7ce0e6eee401e6679373fbd622bf78457064f463fae536"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\ZERO.IN",
+      "bytes": 128,
+      "sha256": "3a010cbd2c8e6f6812099735d5b2d750760d1841774e677804663f1b6a012de3"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68020\\sys\\ZIP.IN",
+      "bytes": 160,
+      "sha256": "0a630633423dbf2d3ee1a963e0bb3607c293206b5b1d7eff8761fd2eca265b2e"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\progress.json",
+      "bytes": 496,
+      "sha256": "71fffe1c3aa792c14a35fa2e899de5c03801099018fb39154d860f1544b5b519"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\result.json",
+      "bytes": 520,
+      "sha256": "c23decfadb71df4534ce7b1689ade0b294dd4913336bbc5427ee38c6b3d7208e"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\run.uae",
+      "bytes": 432,
+      "sha256": "4f79aa1b471ae5402030ac727517afdba7dba91048a5069cafbd82dbc747169f"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\ACE.IN",
+      "bytes": 128,
+      "sha256": "d38bf6a544d7dc2773335a0a5ef7ab295f0600859d336d681bb953368e884094"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\ARJ.IN",
+      "bytes": 128,
+      "sha256": "38b4bd564e4b9f8c6eb084a65fe85e0e52f7179b7be374445f8835095dbac0df"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\BADZIP.IN",
+      "bytes": 160,
+      "sha256": "98e516007c2ff2a03e07cb9ac961b67894922c3f5af0bd0525b887df759e9193"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\BIG.IN",
+      "bytes": 102445,
+      "sha256": "49df4d52413391c7729ab2c499cf191b5bd079fd2ac6c042e371a9f0b291cd1a"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\C\\UAEquit",
+      "bytes": 4448,
+      "sha256": "3090972d4f3c8cb9cdc403a59ced6d7b89f844ff3c876cec776f2270219aa17e"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\CAB.IN",
+      "bytes": 128,
+      "sha256": "46c81dc3a9f13a39c3195263be9d24aa74b2f635dbb964a35af7d63e6d2be0ba"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\CASES.FIX",
+      "bytes": 9328,
+      "sha256": "14fd65c83959b0d9ad246c07c662d285d1bd6f5e23a9d0cc31a401deb431e68b"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\CROSS.IN",
+      "bytes": 102430,
+      "sha256": "5f8e042aaee14b254ea2feac92abd4c61ec1175373592ae74dbd42d58922f5ff"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\done.txt",
+      "bytes": 5,
+      "sha256": "8221ac66be71558c921fb44cfb66f7997699aea754d917763882d6d9eddc836e"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\EMPTY.IN",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\EXE2ARCB",
+      "bytes": 14680,
+      "sha256": "dba3d909870a275cf2cb8009bd7914c4b28d16a3a93f6656738fb95b20e0193b"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\EXE2ARCC",
+      "bytes": 14652,
+      "sha256": "6a045b00a39a6ed91a4a1593df18ed585f4e7f1a71f4b3543dce882c4494bed6"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\Exe2ArcQualification",
+      "bytes": 5036,
+      "sha256": "652914a7205ae824e7e9b946ae067403102b51ade979724b3e62f64432fee667"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\guest-return.txt",
+      "bytes": 4,
+      "sha256": "0ccdb5a77ba5bf7687f2565a8ed97dfb9c1af45503c496fb646312239fab5101"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\LHA.IN",
+      "bytes": 200,
+      "sha256": "0826856eae462ae2df5346a90f47457135d4663cbe6b6acbef57fe86028833f7"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\LZH.IN",
+      "bytes": 128,
+      "sha256": "8ffccb2ddeb26a7654297864d98a9b3a6adcf062dfd6d4709fb8727fb239ea14"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\PAYLOAD.OK",
+      "bytes": 1800,
+      "sha256": "4b4c6a96625a093c8917289b1aa0336d88ee731b967c15fd3ff43c36608b7a84"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\RANDOM.IN",
+      "bytes": 256,
+      "sha256": "5341e6b2646979a70e57653007a1f310169421ec9bdd9f1a5648f75ade005af1"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\RAR.IN",
+      "bytes": 128,
+      "sha256": "c23650161fdc45ff7d799a1e28fbf7d586b092afcfa5e35bd9538476ccea2320"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\S\\Startup-Sequence",
+      "bytes": 130,
+      "sha256": "6b53a148f96e571f892ee2496cef120ab7c1487d19382139917c70c12fc2a1f6"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\SHORTZIP.IN",
+      "bytes": 160,
+      "sha256": "3738d29d44897c9f3c7ce0e6eee401e6679373fbd622bf78457064f463fae536"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\ZERO.IN",
+      "bytes": 128,
+      "sha256": "3a010cbd2c8e6f6812099735d5b2d750760d1841774e677804663f1b6a012de3"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\cross-68040\\sys\\ZIP.IN",
+      "bytes": 160,
+      "sha256": "0a630633423dbf2d3ee1a963e0bb3607c293206b5b1d7eff8761fd2eca265b2e"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\progress.json",
+      "bytes": 493,
+      "sha256": "13560cfa3634b600a223831148b9b24c94abdacb9cd21fad06c863ca26461d08"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\result.json",
+      "bytes": 520,
+      "sha256": "8475ae030933e56fb3281fd97de16655f50b107548b268e09cd6edd8d80473c0"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\run.uae",
+      "bytes": 432,
+      "sha256": "ee016185a76f39c91906da23372079fc64f47c86ea2d4c13057a2f8890d640ea"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\ACE.IN",
+      "bytes": 128,
+      "sha256": "d38bf6a544d7dc2773335a0a5ef7ab295f0600859d336d681bb953368e884094"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\ARJ.IN",
+      "bytes": 128,
+      "sha256": "38b4bd564e4b9f8c6eb084a65fe85e0e52f7179b7be374445f8835095dbac0df"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\BADZIP.IN",
+      "bytes": 160,
+      "sha256": "98e516007c2ff2a03e07cb9ac961b67894922c3f5af0bd0525b887df759e9193"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\BIG.IN",
+      "bytes": 102445,
+      "sha256": "49df4d52413391c7729ab2c499cf191b5bd079fd2ac6c042e371a9f0b291cd1a"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\C\\UAEquit",
+      "bytes": 4448,
+      "sha256": "3090972d4f3c8cb9cdc403a59ced6d7b89f844ff3c876cec776f2270219aa17e"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\CAB.IN",
+      "bytes": 128,
+      "sha256": "46c81dc3a9f13a39c3195263be9d24aa74b2f635dbb964a35af7d63e6d2be0ba"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\CASES.FIX",
+      "bytes": 9328,
+      "sha256": "7ed9d2dd93cabcef3809bdf7937e1bf0e919ff2381eea220336161a95a92dc64"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\CROSS.IN",
+      "bytes": 102430,
+      "sha256": "5f8e042aaee14b254ea2feac92abd4c61ec1175373592ae74dbd42d58922f5ff"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\done.txt",
+      "bytes": 5,
+      "sha256": "8221ac66be71558c921fb44cfb66f7997699aea754d917763882d6d9eddc836e"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\EMPTY.IN",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\EXE2ARCB",
+      "bytes": 14680,
+      "sha256": "dba3d909870a275cf2cb8009bd7914c4b28d16a3a93f6656738fb95b20e0193b"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\EXE2ARCC",
+      "bytes": 14652,
+      "sha256": "6a045b00a39a6ed91a4a1593df18ed585f4e7f1a71f4b3543dce882c4494bed6"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\Exe2ArcQualification",
+      "bytes": 5036,
+      "sha256": "652914a7205ae824e7e9b946ae067403102b51ade979724b3e62f64432fee667"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\guest-return.txt",
+      "bytes": 4,
+      "sha256": "0ccdb5a77ba5bf7687f2565a8ed97dfb9c1af45503c496fb646312239fab5101"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\LHA.IN",
+      "bytes": 200,
+      "sha256": "0826856eae462ae2df5346a90f47457135d4663cbe6b6acbef57fe86028833f7"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\LZH.IN",
+      "bytes": 128,
+      "sha256": "8ffccb2ddeb26a7654297864d98a9b3a6adcf062dfd6d4709fb8727fb239ea14"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\PAYLOAD.OK",
+      "bytes": 206570,
+      "sha256": "82e7d560c38f6bc5b0c4a6d9ecd7383102f594594abebcdff86e5ad91fbd9bbf"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\RANDOM.IN",
+      "bytes": 256,
+      "sha256": "5341e6b2646979a70e57653007a1f310169421ec9bdd9f1a5648f75ade005af1"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\RAR.IN",
+      "bytes": 128,
+      "sha256": "c23650161fdc45ff7d799a1e28fbf7d586b092afcfa5e35bd9538476ccea2320"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\S\\Startup-Sequence",
+      "bytes": 130,
+      "sha256": "6b53a148f96e571f892ee2496cef120ab7c1487d19382139917c70c12fc2a1f6"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\SHORTZIP.IN",
+      "bytes": 160,
+      "sha256": "3738d29d44897c9f3c7ce0e6eee401e6679373fbd622bf78457064f463fae536"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\ZERO.IN",
+      "bytes": 128,
+      "sha256": "3a010cbd2c8e6f6812099735d5b2d750760d1841774e677804663f1b6a012de3"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68000\\sys\\ZIP.IN",
+      "bytes": 160,
+      "sha256": "0a630633423dbf2d3ee1a963e0bb3607c293206b5b1d7eff8761fd2eca265b2e"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\progress.json",
+      "bytes": 197,
+      "sha256": "26159392cb522f1e93334d4a8a74b5f9c219c0e3f16dc530b85591d579e40b13"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\result.json",
+      "bytes": 513,
+      "sha256": "f1eb1f29bb3213678fc780673cf27dcf66f9ce834af70dadcd0c6f08ee71c063"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\run.uae",
+      "bytes": 432,
+      "sha256": "7651b640898ce948752cd8ccb3c382123cbc3c104372099af121865c9b069d1f"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\ACE.IN",
+      "bytes": 128,
+      "sha256": "d38bf6a544d7dc2773335a0a5ef7ab295f0600859d336d681bb953368e884094"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\ARJ.IN",
+      "bytes": 128,
+      "sha256": "38b4bd564e4b9f8c6eb084a65fe85e0e52f7179b7be374445f8835095dbac0df"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\BADZIP.IN",
+      "bytes": 160,
+      "sha256": "98e516007c2ff2a03e07cb9ac961b67894922c3f5af0bd0525b887df759e9193"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\BIG.IN",
+      "bytes": 102445,
+      "sha256": "49df4d52413391c7729ab2c499cf191b5bd079fd2ac6c042e371a9f0b291cd1a"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\C\\UAEquit",
+      "bytes": 4448,
+      "sha256": "3090972d4f3c8cb9cdc403a59ced6d7b89f844ff3c876cec776f2270219aa17e"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\CAB.IN",
+      "bytes": 128,
+      "sha256": "46c81dc3a9f13a39c3195263be9d24aa74b2f635dbb964a35af7d63e6d2be0ba"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\CASES.FIX",
+      "bytes": 9328,
+      "sha256": "7ed9d2dd93cabcef3809bdf7937e1bf0e919ff2381eea220336161a95a92dc64"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\CROSS.IN",
+      "bytes": 102430,
+      "sha256": "5f8e042aaee14b254ea2feac92abd4c61ec1175373592ae74dbd42d58922f5ff"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\done.txt",
+      "bytes": 5,
+      "sha256": "8221ac66be71558c921fb44cfb66f7997699aea754d917763882d6d9eddc836e"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\EMPTY.IN",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\EXE2ARCB",
+      "bytes": 14680,
+      "sha256": "dba3d909870a275cf2cb8009bd7914c4b28d16a3a93f6656738fb95b20e0193b"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\EXE2ARCC",
+      "bytes": 14652,
+      "sha256": "6a045b00a39a6ed91a4a1593df18ed585f4e7f1a71f4b3543dce882c4494bed6"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\Exe2ArcQualification",
+      "bytes": 5036,
+      "sha256": "652914a7205ae824e7e9b946ae067403102b51ade979724b3e62f64432fee667"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\guest-return.txt",
+      "bytes": 4,
+      "sha256": "0ccdb5a77ba5bf7687f2565a8ed97dfb9c1af45503c496fb646312239fab5101"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\LHA.IN",
+      "bytes": 200,
+      "sha256": "0826856eae462ae2df5346a90f47457135d4663cbe6b6acbef57fe86028833f7"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\LZH.IN",
+      "bytes": 128,
+      "sha256": "8ffccb2ddeb26a7654297864d98a9b3a6adcf062dfd6d4709fb8727fb239ea14"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\PAYLOAD.OK",
+      "bytes": 206570,
+      "sha256": "82e7d560c38f6bc5b0c4a6d9ecd7383102f594594abebcdff86e5ad91fbd9bbf"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\RANDOM.IN",
+      "bytes": 256,
+      "sha256": "5341e6b2646979a70e57653007a1f310169421ec9bdd9f1a5648f75ade005af1"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\RAR.IN",
+      "bytes": 128,
+      "sha256": "c23650161fdc45ff7d799a1e28fbf7d586b092afcfa5e35bd9538476ccea2320"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\S\\Startup-Sequence",
+      "bytes": 130,
+      "sha256": "6b53a148f96e571f892ee2496cef120ab7c1487d19382139917c70c12fc2a1f6"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\SHORTZIP.IN",
+      "bytes": 160,
+      "sha256": "3738d29d44897c9f3c7ce0e6eee401e6679373fbd622bf78457064f463fae536"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\ZERO.IN",
+      "bytes": 128,
+      "sha256": "3a010cbd2c8e6f6812099735d5b2d750760d1841774e677804663f1b6a012de3"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68020\\sys\\ZIP.IN",
+      "bytes": 160,
+      "sha256": "0a630633423dbf2d3ee1a963e0bb3607c293206b5b1d7eff8761fd2eca265b2e"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\progress.json",
+      "bytes": 200,
+      "sha256": "18f12240a7e834d1fce889703adcac5990581962e1c86dea3bbf24336cf1a579"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\result.json",
+      "bytes": 520,
+      "sha256": "abbcb138bf76c1c97942a1cce23e73a0acfcc7a7784810feb7386de03923bfc1"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\run.uae",
+      "bytes": 432,
+      "sha256": "770c30aca72f1ac667a1d88a28ddd4a077580ec82dd4e299fa9af23715e28472"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\ACE.IN",
+      "bytes": 128,
+      "sha256": "d38bf6a544d7dc2773335a0a5ef7ab295f0600859d336d681bb953368e884094"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\ARJ.IN",
+      "bytes": 128,
+      "sha256": "38b4bd564e4b9f8c6eb084a65fe85e0e52f7179b7be374445f8835095dbac0df"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\BADZIP.IN",
+      "bytes": 160,
+      "sha256": "98e516007c2ff2a03e07cb9ac961b67894922c3f5af0bd0525b887df759e9193"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\BIG.IN",
+      "bytes": 102445,
+      "sha256": "49df4d52413391c7729ab2c499cf191b5bd079fd2ac6c042e371a9f0b291cd1a"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\C\\UAEquit",
+      "bytes": 4448,
+      "sha256": "3090972d4f3c8cb9cdc403a59ced6d7b89f844ff3c876cec776f2270219aa17e"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\CAB.IN",
+      "bytes": 128,
+      "sha256": "46c81dc3a9f13a39c3195263be9d24aa74b2f635dbb964a35af7d63e6d2be0ba"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\CASES.FIX",
+      "bytes": 9328,
+      "sha256": "7ed9d2dd93cabcef3809bdf7937e1bf0e919ff2381eea220336161a95a92dc64"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\CROSS.IN",
+      "bytes": 102430,
+      "sha256": "5f8e042aaee14b254ea2feac92abd4c61ec1175373592ae74dbd42d58922f5ff"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\done.txt",
+      "bytes": 5,
+      "sha256": "8221ac66be71558c921fb44cfb66f7997699aea754d917763882d6d9eddc836e"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\EMPTY.IN",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\EXE2ARCB",
+      "bytes": 14680,
+      "sha256": "dba3d909870a275cf2cb8009bd7914c4b28d16a3a93f6656738fb95b20e0193b"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\EXE2ARCC",
+      "bytes": 14652,
+      "sha256": "6a045b00a39a6ed91a4a1593df18ed585f4e7f1a71f4b3543dce882c4494bed6"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\Exe2ArcQualification",
+      "bytes": 5036,
+      "sha256": "652914a7205ae824e7e9b946ae067403102b51ade979724b3e62f64432fee667"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\guest-return.txt",
+      "bytes": 4,
+      "sha256": "0ccdb5a77ba5bf7687f2565a8ed97dfb9c1af45503c496fb646312239fab5101"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\LHA.IN",
+      "bytes": 200,
+      "sha256": "0826856eae462ae2df5346a90f47457135d4663cbe6b6acbef57fe86028833f7"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\LZH.IN",
+      "bytes": 128,
+      "sha256": "8ffccb2ddeb26a7654297864d98a9b3a6adcf062dfd6d4709fb8727fb239ea14"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\PAYLOAD.OK",
+      "bytes": 206570,
+      "sha256": "32e26042a1c0df4d6d461bdde61eb3dfb4bdf773963299281e7ae130813ffcc6"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\RANDOM.IN",
+      "bytes": 256,
+      "sha256": "5341e6b2646979a70e57653007a1f310169421ec9bdd9f1a5648f75ade005af1"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\RAR.IN",
+      "bytes": 128,
+      "sha256": "c23650161fdc45ff7d799a1e28fbf7d586b092afcfa5e35bd9538476ccea2320"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\S\\Startup-Sequence",
+      "bytes": 130,
+      "sha256": "6b53a148f96e571f892ee2496cef120ab7c1487d19382139917c70c12fc2a1f6"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\SHORTZIP.IN",
+      "bytes": 160,
+      "sha256": "3738d29d44897c9f3c7ce0e6eee401e6679373fbd622bf78457064f463fae536"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\ZERO.IN",
+      "bytes": 128,
+      "sha256": "3a010cbd2c8e6f6812099735d5b2d750760d1841774e677804663f1b6a012de3"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\large-68040\\sys\\ZIP.IN",
+      "bytes": 160,
+      "sha256": "0a630633423dbf2d3ee1a963e0bb3607c293206b5b1d7eff8761fd2eca265b2e"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-winuae-heavy-20261018\\results.json",
+      "bytes": 3296,
+      "sha256": "5fa1cece20863d217624abbaf158b85f8f30e6a703c01853389a822e9976158b"
+    }
+  ]
+}

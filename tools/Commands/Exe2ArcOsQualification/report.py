@@ -119,6 +119,10 @@ Harness sources: `tools/Commands/Exe2ArcOsQualification/`; orchestration: `tools
 
 Accepted evidence: `artifacts/exe2arc-os-v2-20261017` and `artifacts/exe2arc-os-cross-split-20261017`. Earlier `exe2arc-os-20261017` and `exe2arc-os-cross-20261017` experiments remain available. Machine-readable report: [qualification receipt](exe2arc-original-dos-qualification-20261017.json).
 '''
+    followup = dest.parent/'exe2arc-winuae-cross-window-qualification-20261018.md'
+    if followup.exists():
+        text = text.replace('## Result',
+            '> Follow-up (2026-10-18): [Independent WinUAE qualification is complete on all three CPUs](exe2arc-winuae-cross-window-qualification-20261018.md), including cross-window and multi-chunk cases. The results below retain the original 2026-10-17 scope.\n\n## Result', 1)
     dest.with_suffix('.md').write_text(text,encoding='utf-8')
     print(dict(native=result['nativeInvocations'],winuae=result['winuaeInvocations'],passed=True))
 

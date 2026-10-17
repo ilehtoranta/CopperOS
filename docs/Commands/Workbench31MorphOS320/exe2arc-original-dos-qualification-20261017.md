@@ -1,5 +1,7 @@
 # Exe2Arc original DOS qualification — 2026-10-17
 
+> Follow-up (2026-10-18): [Independent WinUAE qualification is complete on all three CPUs](exe2arc-winuae-cross-window-qualification-20261018.md), including cross-window and multi-chunk cases. The results below retain the original 2026-10-17 scope.
+
 ## Result
 
 **Pass.** The installed receiver-fixed executable (14,652 bytes) and the repaired-source compiler control (14,680 bytes) pass 32 original-DOS contracts on MC68000, MC68020 and MC68040. This adds native OS qualification to the [runtime qualification](exe2arc-runtime-qualification-20261017.md); the compiler saving remains **28 bytes**, already counted there. Exe2Arc is MorphOS-only, so there is no Workbench 3.1 command size ratio.
