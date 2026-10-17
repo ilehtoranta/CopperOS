@@ -88,8 +88,18 @@ def compile_stage(inputs, compiler, stage, names, policy, selected=None, peephol
 def comparable(case):
     # Instruction count, stack footprint and compiler-owned context are measured
     # separately. Every command-visible observation remains in the comparison.
-    return {key: value for key, value in case.items()
-            if key not in ('instructions', 'stackBytesWritten', 'peakStackBytes', 'compilerInvocationContext')}
+    result = {key: value for key, value in case.items()
+              if key not in ('instructions', 'stackBytesWritten', 'peakStackBytes', 'compilerInvocationContext')}
+    if 'taskListStackPointerReads' in result:
+        # This is the instruction's address in the generated image, which
+        # necessarily changes with code layout. Keep every observed SP value,
+        # read count, and output byte in the comparison. The runtime fixture
+        # independently checks that the instruction reads live A7 and that the
+        # printed value equals that observation within the configured stack.
+        result['taskListStackPointerReads'] = [
+            {key: value for key, value in read.items() if key != 'ProgramCounter'}
+            for read in result['taskListStackPointerReads']]
+    return result
 
 
 def receipt(stage, name, cpu, suite, runner):
