@@ -1,5 +1,9 @@
 # Dir ignored-option format correction — 2026-10-17
 
+Follow-up: the [receiver classification fix](dir-value-type-receiver-size-20261017.md)
+reduces shipping Dir to 6,164 bytes and installs it after qualification. The
+measurements and held installation below describe the earlier checkpoint.
+
 **Fixed the format ABI mismatch and corrected the vector fixture.** Both
 Workbench and private MorphOS profiles pass on 68000, 68020 and 68040,
 including the expanded original-DOS corpus and independent WinUAE checks.

@@ -1,5 +1,34 @@
 # Dir original DOS qualification
 
+## Receiver size correction follow-up
+
+`../investigate_dir_size.py --stage STAGE` captures the installed/fixed maps
+and changed-method disassembly using a locally supplied Capstone 5.0.6 decoder
+under `STAGE/decoder`. Build an isolated compiler baseline from `69d01d1` into
+`STAGE/compiler-baseline` before this audit. Apply the portable receiver patch
+in that isolated checkout and build `STAGE/compiler-candidate` separately.
+
+`../qualify_dir_receiver_size.py prepare --stage STAGE` freezes identical
+corrected command CIL/SDK inputs, compiles both compilers and runs both profile
+vectors. Baseline images must reproduce the preceding format-fix checkpoint.
+`native --stage STAGE` reuses the same 27-contract original-DOS corpus and caps.
+Run the auditor controls and WinUAE extended confirmations as below. Run
+`negative_controls` to rebind/recheck the six historical faulty images.
+
+The dated `check` step also requires the 900-test focused compiler receipt and
+the retained baseline-control receipts at `STAGE/tests`. `integrate` copies
+the two new test files into the primary compiler checkout, verifies its
+equivalent pending receiver source changes remain untouched, and saves the
+portable patch/integration receipt. Then a normal filtered Dir build using
+the candidate CLI must reproduce the candidate into `STAGE/default-build/C`.
+
+`publish` rechecks strict size reduction, all receipts and the initial installed
+inventory, stages all 61 accepted images and replaces only Dir. `report` binds
+that publication and writes the dated report. These modes are checkpoint
+specific; adapt dates, source/compiler provenance and receipts for another run.
+The accepted checkpoint and its qualifications are documented in
+`docs/Commands/Workbench31MorphOS320/dir-value-type-receiver-size-20261017.md`.
+
 ## Formatting correction follow-up
 
 `../qualify_dir_format_fix.py` records the subsequent `%lc` correction and

@@ -1,0 +1,134 @@
+diff --git a/Compiler/Backend/CilStackAnalyzer.cs b/Compiler/Backend/CilStackAnalyzer.cs
+index 59b023e..83396c6 100644
+--- a/Compiler/Backend/CilStackAnalyzer.cs
++++ b/Compiler/Backend/CilStackAnalyzer.cs
+@@ -1731,7 +1731,10 @@ internal static class CilStackAnalyzer
+ 					method.DisplayName.Split("::", StringSplitOptions.None)[0]);
+ 				return module.IsTransparentScalarType(declaringType)
+ 					? CilStackValueKind.Int32
+-					: CilStackValueKind.Reference;
++					// An unboxed value-type receiver is a byref, not an object header.
++					: module.IsValueTypeMethod(method)
++						? CilStackValueKind.ManagedPointer
++						: CilStackValueKind.Reference;
+ 			}
+ 
+ 			index--;
+diff --git a/Compiler/Metadata/CompilationModule.cs b/Compiler/Metadata/CompilationModule.cs
+index f9b367b..582caf5 100644
+--- a/Compiler/Metadata/CompilationModule.cs
++++ b/Compiler/Metadata/CompilationModule.cs
+@@ -2859,16 +2859,18 @@ internal sealed class CompilationModule : IDisposable
+ 		(element.IsSupportedScalar && element.Size == 4 ||
+ 		 IsTransparentScalarType(element));
+ 
+-	public bool IsValueTypeConstructor(CilMethod method)
++	public bool IsValueTypeConstructor(CilMethod method) =>
++		method.Name == ".ctor" && IsValueTypeMethod(method);
++
++	public bool IsValueTypeMethod(CilMethod method)
+ 	{
+ 		if (!string.IsNullOrEmpty(method.ModuleName) &&
+ 			!string.Equals(method.ModuleName, _assemblyName, StringComparison.Ordinal))
+ 		{
+-			return GetCallerModule(method, 0).IsValueTypeConstructor(method);
++			return GetCallerModule(method, 0).IsValueTypeMethod(method);
+ 		}
+ 
+-		return method.Name == ".ctor" &&
+-			!method.DeclaringType.IsNil &&
++		return !method.DeclaringType.IsNil &&
+ 			IsValueTypeDefinition(Reader.GetTypeDefinition(method.DeclaringType));
+ 	}
+ 
+diff --git a/Compiler.Tests/ValueTypeReceiverRootTests.cs b/Compiler.Tests/ValueTypeReceiverRootTests.cs
+new file mode 100644
+--- /dev/null
++++ b/Compiler.Tests/ValueTypeReceiverRootTests.cs
+@@ -0,0 +1,68 @@
++using System.Reflection.Emit;
++using System.Runtime.CompilerServices;
++using CopperSharp.Compiler.Backend;
++using CopperSharp.Compiler.Metadata;
++
++namespace CopperSharp.Compiler.Tests;
++
++public sealed class ValueTypeReceiverRootTests
++{
++	[Theory]
++	[InlineData(nameof(ValueTypeReceiverRootFixtures.StructEntry), false)]
++	[InlineData(nameof(ValueTypeReceiverRootFixtures.GenericStructEntry), false)]
++	[InlineData(nameof(ValueTypeReceiverRootFixtures.ExternalStructEntry), false)]
++	[InlineData(nameof(ValueTypeReceiverRootFixtures.ClassEntry), true)]
++	public void OnlyObjectReceiversBecomeObjectRoots(string entry, bool isObject)
++	{
++		using var module = new CompilationModule(typeof(ValueTypeReceiverRootFixtures).Assembly.Location,
++			managedAssemblyPaths: [typeof(MultiModule.ExternalStructReceiverRootProbe).Assembly.Location]);
++		var caller = module.ResolveEntryPoint($"CopperSharp.Compiler.Tests.ValueTypeReceiverRootFixtures::{entry}");
++		var method = caller.Instructions.Where(i => i.OpCode == OpCodes.Call || i.OpCode == OpCodes.Callvirt)
++			.Select(i => module.ResolveMethodToken((int)i.Operand!, caller, i.Offset).Definition)
++			.Single(m => m?.Name == "ReadAfterCall")!;
++		var function = CilMachineIrBuilder.Build(method, module);
++		var argument = Assert.Single(function.Blocks.SelectMany(b => b.Instructions),
++			i => i.Operation == M68kMachineOperation.Argument && i.ArgumentIndex == 0);
++		var receiver = function.Values[Assert.Single(argument.Definitions)];
++		Assert.Equal(isObject ? CilStackValueKind.Reference : CilStackValueKind.ManagedPointer, receiver.Kind);
++		Assert.Equal(isObject, receiver.IsGcReference);
++		var live = M68kLivenessAnalysis.AnalyzeInstructions(function, M68kLivenessAnalysis.Analyze(function));
++		var plan = M68kSafepointPlanner.Create(function, live);
++		Assert.NotEmpty(plan.Safepoints);
++		Assert.Equal(isObject, plan.RootSlotByValue.ContainsKey(receiver.Id));
++	}
++}
++
++public static class ValueTypeReceiverRootFixtures
++{
++	[MethodImpl(MethodImplOptions.NoInlining)]
++	public static void CallBoundary(int value) { }
++	public static int StructEntry() { var value = new StructReceiverRootProbe { Value = 42, Other = 7 }; return value.ReadAfterCall(); }
++	public static int GenericStructEntry() { var value = new GenericStructReceiverRootProbe<int> { Value = 42, Other = 7 }; return value.ReadAfterCall(); }
++	public static int ExternalStructEntry() { var value = new MultiModule.ExternalStructReceiverRootProbe { Value = 42, Other = 7 }; return value.ReadAfterCall(); }
++	public static int ClassEntry() => new ClassReceiverRootProbe { Value = 42, Other = 7 }.ReadAfterCall();
++}
++
++public struct StructReceiverRootProbe
++{
++	public int Value;
++	public int Other;
++	[MethodImpl(MethodImplOptions.NoInlining)]
++	public int ReadAfterCall() { ValueTypeReceiverRootFixtures.CallBoundary(Other); return Value; }
++}
++
++public struct GenericStructReceiverRootProbe<T>
++{
++	public int Value;
++	public T Other;
++	[MethodImpl(MethodImplOptions.NoInlining)]
++	public int ReadAfterCall() { ValueTypeReceiverRootFixtures.CallBoundary(Value); return Value; }
++}
++
++public sealed class ClassReceiverRootProbe
++{
++	public int Value;
++	public int Other;
++	[MethodImpl(MethodImplOptions.NoInlining)]
++	public int ReadAfterCall() { ValueTypeReceiverRootFixtures.CallBoundary(Other); return Value; }
++}
+diff --git a/Compiler.Tests.MultiModule/ExternalStructReceiverRootProbe.cs b/Compiler.Tests.MultiModule/ExternalStructReceiverRootProbe.cs
+new file mode 100644
+--- /dev/null
++++ b/Compiler.Tests.MultiModule/ExternalStructReceiverRootProbe.cs
+@@ -0,0 +1,13 @@
++using System.Runtime.CompilerServices;
++
++namespace CopperSharp.Compiler.Tests.MultiModule;
++
++public struct ExternalStructReceiverRootProbe
++{
++	public int Value;
++	public int Other;
++	[MethodImpl(MethodImplOptions.NoInlining)]
++	public int ReadAfterCall() { CallBoundary(Other); return Value; }
++	[MethodImpl(MethodImplOptions.NoInlining)]
++	private static void CallBoundary(int value) { }
++}
