@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>CopperOS.Exe2ArcQualification.Host</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Host.cs" />
+    <Compile Include="Bind.cs" />
+    <Reference Include="$(FrozenRunner)/Copper*.dll" />
+    <Reference Include="$(FrozenRunner)/Hst*.dll" />
+    <Reference Include="$(FrozenRunner)/Hjg.Pngcs.dll" />
+    <Reference Include="$(FrozenRunner)/Microsoft.Extensions.ObjectPool.dll" />
+  </ItemGroup>
+</Project>
