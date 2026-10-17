@@ -240,13 +240,13 @@ public static class NativeMorphOSExe2ArcCommand
         {
             if (requested == Exe2ArcArchiveType.Unspecified)
             {
-                DOS.PutStr("\r\033[KDid not find archive data.\n");
+                DOS.PutStr("\r\u001b[KDid not find archive data.\n");
                 return true;
             }
 
-            DOS.PutStr("\r\033[KDid not find archive of type '");
+            DOS.PutStr("\r\u001b[KDid not find archive of type '");
             if (type.IsNotNull)
-                DOS.VPrintf("%s", type);
+                DOS.PutStr(CString.FromPointer(type.Raw));
             DOS.PutStr("'.\nMaybe it is an archive of another type?\n");
             PrintValidTypes();
             return true;
@@ -255,7 +255,7 @@ public static class NativeMorphOSExe2ArcCommand
         if (status == Exe2ArcIoStatus.OffsetZero ||
             status == Exe2ArcIoStatus.MatchedNotPositioned)
         {
-            DOS.PutStr("\r\033[KArchive position is unsafe.\n");
+            DOS.PutStr("\r\u001b[KArchive position is unsafe.\n");
             return true;
         }
 
@@ -278,9 +278,9 @@ public static class NativeMorphOSExe2ArcCommand
     private static void PrintUnknownType(APTR type, APTR dosBase)
     {
         DOS.DOSLibraryBase = dosBase;
-        DOS.PutStr("\r\033[KDid not find archive of type '");
+        DOS.PutStr("\r\u001b[KDid not find archive of type '");
         if (type.IsNotNull)
-            DOS.VPrintf("%s", type);
+            DOS.PutStr(CString.FromPointer(type.Raw));
         DOS.PutStr("'.\n");
         PrintValidTypes();
     }

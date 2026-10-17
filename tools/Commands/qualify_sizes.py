@@ -48,6 +48,7 @@ def suites():
                       'copy-single-target-native-entry-vector-fixture+single-command',
                       'copy-target-dispatch-native-entry-vector-fixture+recursive-command']
     result['Execute'] = ['wb31-execute-native-entry-vector-fixture']
+    result['Exe2Arc'] = ['exe2arc-native-entry-vector-fixture']
     return result
 
 

@@ -1,11 +1,12 @@
 using System.Security.Cryptography;
+using System.Reflection;
 using System.Text.Json;
 using Copper68k;
 using CopperOS.Commands.NativeExecution;
 
 namespace CopperOS.Commands.Exe2ArcFrontendNativeExecution;
 
-internal static class Program
+internal static class FrontendRuntimeSuite
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -13,7 +14,7 @@ internal static class Program
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
 
-    public static int Main(string[] args)
+    public static int Run(string[] args)
     {
         FrontendFixture? fixture = null;
         string? imageHash = null;
@@ -24,7 +25,7 @@ internal static class Program
         {
             Require(args.Length == 4,
                 "usage: Exe2ArcFrontendNativeExecution <hunk> <68000|68020|68040> <report.json> exe2arc-frontend-native-smoke");
-            Require(args[3] == FrontendCases.Suite, "Unknown fixture suite.");
+            Require(args[3] is FrontendCases.Suite or FrontendCases.RuntimeSuite or FrontendCases.TypeDiagnosticSuite, "Unknown fixture suite.");
             var model = args[1] switch
             {
                 "68000" => M68kCpuModel.M68000,
@@ -38,7 +39,7 @@ internal static class Program
             imageBytes = new FileInfo(args[0]).Length;
             var image = HunkImage.Load(args[0], FrontendFixture.LoadAddress);
             Require(image.Sha256 == imageHash, "HUNK changed during admission.");
-            fixture = new(image, model);
+            fixture = new(image, model, args[3] == FrontendCases.RuntimeSuite, args[3] == FrontendCases.TypeDiagnosticSuite);
             fixture.Run();
             Require(Hash(args[0]) == imageHash, "HUNK changed during execution.");
             status = "passed";
@@ -46,7 +47,7 @@ internal static class Program
         catch (Exception error)
         {
             failure = error.ToString();
-            Console.Error.WriteLine($"FAIL Exe2Arc frontend smoke: {error.Message}");
+            Console.Error.WriteLine($"FAIL Exe2Arc runtime fixture: {error.Message}");
         }
 
         var report = new
@@ -54,16 +55,21 @@ internal static class Program
             schemaVersion = 1,
             status,
             suite = args.ElementAtOrDefault(3),
-            expectedSuite = FrontendCases.Suite,
+            expectedSuite = args.ElementAtOrDefault(3),
             cpu = args.ElementAtOrDefault(1),
             inputHunk = args.ElementAtOrDefault(0),
             imageSha256 = imageHash,
             imageBytes,
             failure,
-            instructionExecutor = "Copper68k 1.4.0",
+            instructionExecutor = "Copper68k " + typeof(FrontendRuntimeSuite).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>().Single(a => a.Key == "Copper68kPackageVersion").Value,
+            instructionCoreSha256 = Hash(typeof(M68kCoreFactory).Assembly.Location),
+            managedExecutorSha256 = Hash(typeof(FrontendRuntimeSuite).Assembly.Location),
+            compilerMapSha256 = args.Length > 0 && File.Exists(args[0]+".map") ? Hash(args[0]+".map") : null,
+            imageLoads = 1,
+            sharedImageWrites = 0,
             evidence = new
             {
-                fixture = "supplied DOS/Exec vectors for parser and result-allocation failure paths",
+                fixture = "supplied DOS/Exec vectors; inert input files, checked output bytes and exact allocation/file/message ownership",
                 realKickstartExecution = false,
                 realCopperStartExecution = false,
                 realDosParser = false,
@@ -71,7 +77,7 @@ internal static class Program
                 originalGuestExecution = false,
                 redirectedOutputParity = false,
                 shippingOrPureApproval = false,
-                scope = "Full resident Exe2Arc entry ownership smoke for parser failure paths only; no input file is opened. Unknown-type and filesystem paths remain open."
+                scope = args.ElementAtOrDefault(3) == FrontendCases.RuntimeSuite ? "Full shipping entry: seven scanner/extractor paths, failure injection, CLI/Workbench startup, resource cleanup and repeated/instruction-interleaved invocation. No original-command parity claim." : args.ElementAtOrDefault(3) == FrontendCases.TypeDiagnosticSuite ? "Type diagnostic probe only." : "Parser failure and result-allocation smoke only."
             },
             cases = fixture?.Results ?? [],
             lastFailure = fixture?.LastFailure,
@@ -88,7 +94,7 @@ internal static class Program
             return 1;
         }
         if (status != "passed") return 1;
-        Console.WriteLine($"PASS {args[1]}: {fixture!.Results.Count} Exe2Arc frontend smoke invocations; no guest or shipping claim.");
+        Console.WriteLine($"PASS {args[1]}: {fixture!.Results.Count} Exe2Arc runtime fixture invocations; no guest or shipping claim.");
         return 0;
     }
 

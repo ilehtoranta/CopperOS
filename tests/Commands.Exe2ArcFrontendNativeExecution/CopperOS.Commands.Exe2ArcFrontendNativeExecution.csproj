@@ -10,7 +10,11 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Copper68k" Version="1.4.0" />
+    <PackageReference Include="Copper68k" Version="1.5.1" />
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>Copper68kPackageVersion</_Parameter1>
+      <_Parameter2>1.5.1</_Parameter2>
+    </AssemblyAttribute>
     <Compile Include="..\Commands.NativeExecution\HunkImage.cs" Link="HunkImage.cs" />
   </ItemGroup>
 </Project>

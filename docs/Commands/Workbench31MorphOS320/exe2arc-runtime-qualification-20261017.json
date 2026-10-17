@@ -1,0 +1,3653 @@
+{
+  "freeze": {
+    "source": {
+      "root": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS",
+      "commit": "77cbb90df4c2a9e995b43f759601bebb9c9db7b4",
+      "status": [
+        " M src/Commands/Exe2Arc/Exe2ArcZipScanner.cs",
+        " M src/Commands/Exe2Arc/Native/NativeMorphOSExe2ArcCommand.cs",
+        " M src/Commands/Execute/Native/Workbench31ExecuteCommand.cs",
+        " M src/System/Shell/CopperOS.Shell.csproj",
+        " M src/System/Shell/DosShellNativeChildCore.cs",
+        " M src/System/Shell/DosShellNativePlatform.cs",
+        " M src/System/Shell/ResidentCommand.cs",
+        " M src/System/Shell/ShellScriptEngine.cs",
+        " M src/System/Shell/ShellScriptFrame.cs",
+        " M src/System/Shell/ShellTextParser.cs",
+        " M tests/Commands.Exe2ArcFrontendNativeExecution/CopperOS.Commands.Exe2ArcFrontendNativeExecution.csproj",
+        " M tests/Commands.Exe2ArcFrontendNativeExecution/FrontendBus.cs",
+        " M tests/Commands.Exe2ArcFrontendNativeExecution/FrontendCases.cs",
+        " M tests/Commands.Exe2ArcFrontendNativeExecution/FrontendFixture.cs",
+        " M tests/Commands.Exe2ArcFrontendNativeExecution/FrontendInvocation.cs",
+        " M tests/Commands.Exe2ArcFrontendNativeExecution/Program.cs",
+        " M tests/Commands.NativeExecution/CopperOS.Commands.NativeExecution.csproj",
+        " M tests/Commands.NativeExecution/Program.cs",
+        " M tests/Commands/EchoCommandTests.cs",
+        " M tests/Commands/Exe2ArcTestIo.cs",
+        " M tests/Commands/Exe2ArcZipScannerTests.cs",
+        " M tests/Commands/ResidentCommandTests.cs",
+        " M tests/Commands/ShellScriptEngineTests.cs",
+        " M tools/Commands/qualify_sizes.py",
+        "?? src/System/Shell/DosShellNativeForegroundCore.cs",
+        "?? src/System/Shell/DosShellNativePlatform.Foreground.cs",
+        "?? src/System/Shell/ShellVariableExpansion.cs",
+        "?? tests/Commands.Exe2ArcFrontendNativeExecution/README.md",
+        "?? tests/Commands.Exe2ArcFrontendNativeExecution/StandaloneProgram.cs",
+        "?? tests/Commands/ShellPackedNameBoundaryTests.cs",
+        "?? tools/Commands/qualify_exe2arc_runtime.py",
+        "?? tools/ImageBuilder/README.md",
+        "?? tools/ImageBuilder/build_storage_proof.ps1",
+        "?? tools/ImageBuilder/build_system_image.py",
+        "?? tools/ImageBuilder/build_system_proof.ps1",
+        "?? tools/ImageBuilder/tests/",
+        "?? tools/SystemImage.NativeRoot/"
+      ],
+      "trackedPatchSha256": "8b986b45dde29037ae598853a2ef442756c73ccbb25675dc4de47f25da64250e",
+      "untrackedFiles": [
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\src\\System\\Shell\\DosShellNativeForegroundCore.cs",
+          "bytes": 8500,
+          "sha256": "678989a5a572e8f63f5988d5d6d8a085b1f3128130e1ee6dd8504ec9db48ded0"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\src\\System\\Shell\\DosShellNativePlatform.Foreground.cs",
+          "bytes": 4140,
+          "sha256": "ed65849a62cad41bf7e9915962262bf7a0abd35b1475ab2bbe76411f8df196ae"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\src\\System\\Shell\\ShellVariableExpansion.cs",
+          "bytes": 3666,
+          "sha256": "98e2aefb6fdd472e9951236f64c7cfbcd0233e2b08540d471140c0e45fc4e3eb"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tests\\Commands.Exe2ArcFrontendNativeExecution\\README.md",
+          "bytes": 2494,
+          "sha256": "7258d2b3e4abed113d4bf60d5e749d912f0559f0721ab5db68e1b9884cc5b064"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tests\\Commands.Exe2ArcFrontendNativeExecution\\StandaloneProgram.cs",
+          "bytes": 188,
+          "sha256": "c191d131a4803eb915cb69dfd0817d4de3b8cf5b7e6c0cf8d561c4e096d3a9be"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tests\\Commands\\ShellPackedNameBoundaryTests.cs",
+          "bytes": 991,
+          "sha256": "2f80634709996430346e43e9fc67964b581b657ed8444a391f1d0d67cc01a306"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\Commands\\qualify_exe2arc_runtime.py",
+          "bytes": 15447,
+          "sha256": "9d2683ddf70b9dbd499413aa55dfa3b4ceac1dad78daa35700dc5d0eeebf08ec"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\ImageBuilder\\README.md",
+          "bytes": 3729,
+          "sha256": "8f1af009ce55e761d150867f86ac75e2fd5f8ba71fd2c1a93f792f8c65df1211"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\ImageBuilder\\build_storage_proof.ps1",
+          "bytes": 5083,
+          "sha256": "24602306aa3548be236d7a96fceaed408c22f0f8fccd590f0b4f32bdaa1cb8dc"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\ImageBuilder\\build_system_image.py",
+          "bytes": 10034,
+          "sha256": "220f281a57724a7e1fd10b4843612ef1c0bcba24f43c66400fe2beb8029db99c"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\ImageBuilder\\build_system_proof.ps1",
+          "bytes": 6542,
+          "sha256": "33c690b993651f535692263117e5fa2dab1eee01da13040b15eb6e3a17ea1546"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\ImageBuilder\\tests\\test_system_image.py",
+          "bytes": 4800,
+          "sha256": "73a7f7b7eefe7a64c018dd545c54cd521dad32f13fc3d9d513f5c5994baa194f"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\SystemImage.NativeRoot\\CopperOS.SystemImage.NativeRoot.csproj",
+          "bytes": 720,
+          "sha256": "ac54b942c8fba0c41a1b475fb7ce68c7c982f76534d0a0f7786006f0ac039215"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\SystemImage.NativeRoot\\NativeFfsFile.cs",
+          "bytes": 5128,
+          "sha256": "594513926286856d6d260210435055d93729908e2bedf6c52c19f8a57eafadd8"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\SystemImage.NativeRoot\\SingleHunkStreamLoader.cs",
+          "bytes": 4847,
+          "sha256": "feeee892f0ca87040f0f0d34bca6ece81d47a2ac9201288497588353a6a90447"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\SystemImage.NativeRoot\\StorageProbe.cs",
+          "bytes": 5886,
+          "sha256": "5bb67fd6c53ca19b2e18b2cbdc9e1e920d70bbdebfb6c7acab66af42d39c61f1"
+        },
+        {
+          "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\SystemImage.NativeRoot\\SystemBootstrap.cs",
+          "bytes": 8816,
+          "sha256": "766a5a781fbc64d4a713b84bcb4df6b1948a8d0c7ed39b8290cc42aae16e1d85"
+        }
+      ]
+    },
+    "compilerFix": "9eaa2aa",
+    "previousProof": {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\docs\\Commands\\Workbench31MorphOS320\\receiver-classification-rollout-20261017.json",
+      "bytes": 2580960,
+      "sha256": "70c26507dd1178ab7b2ca9161894c7732cd4927b017d4415489a71eee5d593ca"
+    },
+    "files": [
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\cil\\CopperOS.Commands.Common.dll",
+        "bytes": 9216,
+        "sha256": "0c9ead95a3e7c540e59448cf4af22dd30e4f5afb58bc809b5374b2a8777f5bc1"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\cil\\CopperOS.Commands.Exe2Arc.deps.json",
+        "bytes": 2119,
+        "sha256": "3871df20c0063481d669184a41aacdb37af7d81efaf72185f1f22e4e8150cccd"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\cil\\CopperOS.Commands.Exe2Arc.dll",
+        "bytes": 29696,
+        "sha256": "83cf814fd3de9dd1ae65274817c9d543965c8f69c52a2b84678e7bc3d577a2a5"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\cil\\CopperOS.Commands.Exe2Arc.pdb",
+        "bytes": 46828,
+        "sha256": "b26ed985fc5b0c6628899ccb5f607888d2e18f8b4b6f3cbb77c2d52d66a2c881"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\cil\\CopperSharp.Compiler.dll",
+        "bytes": 2739200,
+        "sha256": "79f04458781074d93f7590a9343833d5ac1a7ce06dc690e55cab707ecdf59c1f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\cil\\CopperSharp.Sdk.Amiga.dll",
+        "bytes": 548864,
+        "sha256": "57cd895ff588259a51407aa6b2bc68462bdcb9b626067f702a8941b72c994306"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\cil\\CopperSharp.Sdk.Amiga.Support.dll",
+        "bytes": 155648,
+        "sha256": "cd8c8c6a04020e04bbb6cbc5cad8bc99f6f5f19babe437b822ad1e481f58033c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-build.log",
+        "bytes": 364,
+        "sha256": "be802d015df71e35448929915207eed025ea77bdc4e72296bc1b11d07f00758d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\Build.csproj",
+        "bytes": 3641,
+        "sha256": "6c7e80a87a9fdb999dfd75cdfb01a578b3cd6049b012e86b50bbc21daf65ac79"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\obj\\Build.csproj.nuget.dgspec.json",
+        "bytes": 22148,
+        "sha256": "914dca02324ea1dc141c11d677f08fdc0b9419fd22f65c70c12197551ed43a20"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\obj\\Build.csproj.nuget.g.props",
+        "bytes": 1302,
+        "sha256": "bb050d3edf04cd08b92e7087ba52772594bce53bea63d6716bc327c00291520c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\obj\\Build.csproj.nuget.g.targets",
+        "bytes": 150,
+        "sha256": "971cc9b535384849b5c661d776cd7a80833a416265e32e8968e06c367368b8b5"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\obj\\project.assets.json",
+        "bytes": 21481,
+        "sha256": "05040269a2ce823b126693956049dae8acf1ea746ff25aa99c54fb378865744a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\obj\\project.nuget.cache",
+        "bytes": 254,
+        "sha256": "812b66490a5ad192859d20fb61a3e0a1f703153213b06af3ae20f538a274c726"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\obj\\Release\\net10.0\\.NETCoreApp,Version=v10.0.AssemblyAttributes.cs",
+        "bytes": 200,
+        "sha256": "93d67476196ebfc80d1d7d8844b91146cfd678d105f5ce635eb900ca40610c9b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\obj\\Release\\net10.0\\Build.AssemblyInfo.cs",
+        "bytes": 1051,
+        "sha256": "317fd2dad99a0b9706bbc1dd210da7c15a67a64e88aba7a382784a56aa290cea"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\obj\\Release\\net10.0\\Build.AssemblyInfoInputs.cache",
+        "bytes": 66,
+        "sha256": "1e55a461b6246f992c0e3922aca61241892aef03b05b328e7a3b2025a9b5b278"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\obj\\Release\\net10.0\\Build.assets.cache",
+        "bytes": 228,
+        "sha256": "674d69234c96bfec0e693a3abc5557919e7870004678d519c0f53f81c9c012e5"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\obj\\Release\\net10.0\\Build.csproj.AssemblyReference.cache",
+        "bytes": 2794,
+        "sha256": "2a003b8842bf9ac1f04404179cd00fe118adf0ff236e7b5e01dc04ea87063b4f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\obj\\Release\\net10.0\\Build.csproj.CoreCompileInputs.cache",
+        "bytes": 66,
+        "sha256": "245be6a2126065c57767d906640542123557395e2ca81a98e3b372c4e40d758a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\obj\\Release\\net10.0\\Build.csproj.FileListAbsolute.txt",
+        "bytes": 1878,
+        "sha256": "10b3ccc9a23dedc43adadebe6ba7b36412d78fafb54dd40d10f75870c438d0a5"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\obj\\Release\\net10.0\\Build.csproj.Up2Date",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\obj\\Release\\net10.0\\Build.GeneratedMSBuildEditorConfig.editorconfig",
+        "bytes": 867,
+        "sha256": "288e96096727647ff4c68ba9cb81d24350e7fa4048834f60a13c6659a0e81345"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\obj\\Release\\net10.0\\Build.GlobalUsings.g.cs",
+        "bytes": 239,
+        "sha256": "a3c6048bb4d922b1799a9977f84362a3787b68810cac67aa86ac3aa23295f227"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\obj\\Release\\net10.0\\Build.sourcelink.json",
+        "bytes": 160,
+        "sha256": "c95e365296a668eea0d4b32974ec4fbb255a14aa0ed9538f57c6be3ef2db0afb"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\obj\\Release\\net10.0\\CopperOS.Commands.Exe2Arc.dll",
+        "bytes": 29696,
+        "sha256": "83cf814fd3de9dd1ae65274817c9d543965c8f69c52a2b84678e7bc3d577a2a5"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\obj\\Release\\net10.0\\CopperOS.Commands.Exe2Arc.pdb",
+        "bytes": 46828,
+        "sha256": "b26ed985fc5b0c6628899ccb5f607888d2e18f8b4b6f3cbb77c2d52d66a2c881"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\obj\\Release\\net10.0\\ref\\CopperOS.Commands.Exe2Arc.dll",
+        "bytes": 14336,
+        "sha256": "b299b3c7ce1d6d2b96d3f29f755880fff74355f8d12091593a758d91bc5f6619"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\obj\\Release\\net10.0\\refint\\CopperOS.Commands.Exe2Arc.dll",
+        "bytes": 14336,
+        "sha256": "b299b3c7ce1d6d2b96d3f29f755880fff74355f8d12091593a758d91bc5f6619"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\source\\0-Exe2ArcEntry.cs",
+        "bytes": 1211,
+        "sha256": "49e736ab9d0f3356582c8d9ffd24fbd8bd37bdd975da99f4ce3fa89a88459437"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\source\\1-Exe2ArcForwardScanner.cs",
+        "bytes": 8579,
+        "sha256": "a09e487072afc824950fb23b15473baa70102aea6c872edcd1ce5b854520299c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\source\\10-Exe2ArcTypeSelection.cs",
+        "bytes": 5791,
+        "sha256": "cc693a895efce4c9eeaa9d5e51a52c5996b2893165ce37c4e3b1993a1ec78ec1"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\source\\11-Exe2ArcZipRecordExtractor.cs",
+        "bytes": 8691,
+        "sha256": "a06951e5fef227359d199021872079d3540de5e08bd35110d72c98fac612b601"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\source\\12-Exe2ArcZipRecordRewriter.cs",
+        "bytes": 3998,
+        "sha256": "f5359ff813d315a7e51c06168e26364dfb8a9968a0e56737275191bb61712fc6"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\source\\13-Exe2ArcZipScanner.cs",
+        "bytes": 6930,
+        "sha256": "aef241fd80d53ba59b8a66e84d8d6e6f667d67a678c0936510a64770d0715a5e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\source\\14-NativeExe2ArcArgumentGate.cs",
+        "bytes": 1369,
+        "sha256": "54433fccb7fe80133c94325b4a7d17a2562a9f8afbe7e22f6a3cf1d6ddc63b39"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\source\\15-NativeExe2ArcIo.cs",
+        "bytes": 2547,
+        "sha256": "aecd99c77ca03959113ea37718d756c2d8e9f5bfc9f1b77e83bef0c24b41bd7f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\source\\16-NativeExe2ArcOutputIo.cs",
+        "bytes": 2183,
+        "sha256": "428c9eece2eed963b7177042eaa9ca3037f89409a3de201c00c1e393788cae2a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\source\\17-NativeMorphOSExe2ArcCommand.cs",
+        "bytes": 11786,
+        "sha256": "75db1b425e030e28c0fd1ff49aa4011c92abd67578188eb8916ba9eba1d23605"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\source\\2-Exe2ArcHeaderProbe.cs",
+        "bytes": 13938,
+        "sha256": "cc928e043574e85205f23f7d2630adfb867fad40f572b4fa21a2194bb37aa042"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\source\\3-Exe2ArcIo.cs",
+        "bytes": 5166,
+        "sha256": "bcc711ed8e009f06ca1690f224a00e1ee39898b5be266568a919e3555eb475d0"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\source\\4-Exe2ArcLhaScanner.cs",
+        "bytes": 2588,
+        "sha256": "048025e7f8714f45e113c6d3758b2eced3dd9dc440ceb84b71ce0b1774e872da"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\source\\5-Exe2ArcOutputName.cs",
+        "bytes": 3794,
+        "sha256": "f57809c783371bae71660590d02866b4d389e61aab597c99fcef6eb1001f97f9"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\source\\6-Exe2ArcOutputSelection.cs",
+        "bytes": 2417,
+        "sha256": "9c9379bd39be5295b7fc43bf2873b0fa1f691ffd7c93d4721c1ecc3774d17bd0"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\source\\7-Exe2ArcPayloadCopy.cs",
+        "bytes": 2566,
+        "sha256": "408de9299f807965674252100a074a092ac1d8a371590c3c532175af56b72f19"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\source\\8-Exe2ArcResultPolicy.cs",
+        "bytes": 4706,
+        "sha256": "6e2934d941383cdaffa83d205246b4585f2423c5128f5c6b93e31228a4157287"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\command-source\\source\\9-Exe2ArcScannerSelection.cs",
+        "bytes": 5496,
+        "sha256": "8a4bc82d1571f2a4c34115daacb2d83df9437439f6676674e2df8beb7d1a5e19"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compile.rsp",
+        "bytes": 897,
+        "sha256": "00bb668fa345d6dda01e427957b4b35a1d8042342e67d59da7c6dfdd4b3cbcad"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Compiler.Cli.deps.json",
+        "bytes": 3147,
+        "sha256": "86e23bf0099d1213fdccd265e9919e1f50dd7ffc55f81325fa6af1b265a07544"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Compiler.Cli.dll",
+        "bytes": 43008,
+        "sha256": "7679aa3a9b1b4f93375f5845ea4b2a102fa40ca4e221c399bd8dc24820f91ee9"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Compiler.Cli.exe",
+        "bytes": 162816,
+        "sha256": "304cdf67dc3f73f9b03fa8d380f7a7bd9ba0b5ab6e32119043e132d72e679212"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Compiler.Cli.pdb",
+        "bytes": 17532,
+        "sha256": "c217286c645b579875a62b76b609500511d72a252ff3775c9ea196fbe8c95368"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Compiler.Cli.runtimeconfig.json",
+        "bytes": 342,
+        "sha256": "c230a317a54dd960bcbeb5f347f52e18dc665a26f7efda2159fced9a5ac7e097"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Compiler.deps.json",
+        "bytes": 474,
+        "sha256": "d651184124dad028a376cf7b5ca4eccfeb34028d34acf9eafdcc8d988663b3cf"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Compiler.dll",
+        "bytes": 2363392,
+        "sha256": "16b470ec23d2dc9e4c458d30b2108a635983e9990f44dfdb4dc7f429da1cd5b9"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Compiler.pdb",
+        "bytes": 579404,
+        "sha256": "f4a972add235382448a138656770556a971adf1172ab15e5c71a5ee6d79c1478"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Compiler.xml",
+        "bytes": 72597,
+        "sha256": "b8c4783b0c33fc11893a1ca0babc7ab9bbc3e6ae6a5139be87147428e32676fd"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Runtime.AmigaPal.deps.json",
+        "bytes": 1985,
+        "sha256": "cdc73abfefc1a6f7569138e8f937d90a9c64a8835d04deeb4cd4aac4637d785e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Runtime.AmigaPal.dll",
+        "bytes": 23552,
+        "sha256": "4c30adf49f9640953a679e2ed456727537562a422160e2e23bccb8ea155aa996"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Runtime.AmigaPal.pdb",
+        "bytes": 23824,
+        "sha256": "64706bf649e64e1355935939a3b1a160585ae482dbebe5a03748b2a6fdf3fbc2"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Runtime.AmigaPal.xml",
+        "bytes": 4451,
+        "sha256": "13bc46577399a0bc026096a2f3012cfd31d3f588ae337d4a0745b97638bf2562"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Runtime.Managed.deps.json",
+        "bytes": 944,
+        "sha256": "be8b89cce39dd6b1be2179e1764016d004bf7f8e23695925f51cb8eda581d9e2"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Runtime.Managed.dll",
+        "bytes": 51200,
+        "sha256": "1bb571f1499b5799f301adc864283a8c5cc780d36c1e99dc0788e49bd06e5d8d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Runtime.Managed.pdb",
+        "bytes": 41596,
+        "sha256": "0acd3012f5e8030e14216c64e3bc60311a8cf325c834107cef89d5ceca981c81"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Sdk.Amiga.deps.json",
+        "bytes": 926,
+        "sha256": "307826aa9833768f5a6520ef075d5c93a2ab83e0b11e151bf5a7ee9d17002e64"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Sdk.Amiga.dll",
+        "bytes": 548864,
+        "sha256": "65420d2d8d31775dd565a2eafd5f6ce6603d5d3f0466222f63301016239086d5"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Sdk.Amiga.pdb",
+        "bytes": 68404,
+        "sha256": "724a5af4d253f573f70850422292a0aa7e497e73e0c3604fc701853ed33f31b7"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Sdk.Amiga.xml",
+        "bytes": 509463,
+        "sha256": "31b25a17b60d608634a1486b295442ffbbe9a7d29b141c71107944a4052f3219"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Targets.Amiga.deps.json",
+        "bytes": 2566,
+        "sha256": "652a23de576cdcc4525506ccf1dd81bc5f53be83e6771e469f440e9bcf47b26b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Targets.Amiga.dll",
+        "bytes": 42496,
+        "sha256": "f7b25290ad183ffa5bee0c0c29d269000e13ebe8f0fbb67cb33aff17b37640d0"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Targets.Amiga.pdb",
+        "bytes": 18896,
+        "sha256": "6e8c8b36b47c6b67f01d79438a655abcf79a084019dc26363311ee09319d2143"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-baseline\\CopperSharp.Targets.Amiga.xml",
+        "bytes": 528,
+        "sha256": "fc02d0a5c2add9d6d342a7642d704aaf39b68aba77065ab4e75f00f3b7853ab5"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Compiler.Cli.deps.json",
+        "bytes": 3147,
+        "sha256": "86e23bf0099d1213fdccd265e9919e1f50dd7ffc55f81325fa6af1b265a07544"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Compiler.Cli.dll",
+        "bytes": 43008,
+        "sha256": "2ea86c8a972841c0d56f49dae4e0da277256adfdcb7391f81a3262fe84c3c188"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Compiler.Cli.exe",
+        "bytes": 162816,
+        "sha256": "304cdf67dc3f73f9b03fa8d380f7a7bd9ba0b5ab6e32119043e132d72e679212"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Compiler.Cli.pdb",
+        "bytes": 17532,
+        "sha256": "3b66bf819f765d31c781b6373d5a041d56fb81e4b0f34a2a7c842ef90eb02fec"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Compiler.Cli.runtimeconfig.json",
+        "bytes": 342,
+        "sha256": "c230a317a54dd960bcbeb5f347f52e18dc665a26f7efda2159fced9a5ac7e097"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Compiler.deps.json",
+        "bytes": 474,
+        "sha256": "d651184124dad028a376cf7b5ca4eccfeb34028d34acf9eafdcc8d988663b3cf"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Compiler.dll",
+        "bytes": 2363392,
+        "sha256": "555d6412bec7c5a522a996efd249673998ab6cfac1e09190ec1f4c5a398c5790"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Compiler.pdb",
+        "bytes": 579436,
+        "sha256": "c8b2fd7487c4b1f12576a3d52c46c5afa26d75cf224b10ab3cf27382e6607702"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Compiler.xml",
+        "bytes": 72597,
+        "sha256": "b8c4783b0c33fc11893a1ca0babc7ab9bbc3e6ae6a5139be87147428e32676fd"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Runtime.AmigaPal.deps.json",
+        "bytes": 1985,
+        "sha256": "cdc73abfefc1a6f7569138e8f937d90a9c64a8835d04deeb4cd4aac4637d785e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Runtime.AmigaPal.dll",
+        "bytes": 23552,
+        "sha256": "d04f9ee886300664b2887bcf002a7280f5ed2fb67ac8ecdcdb6edea3c06d6cec"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Runtime.AmigaPal.pdb",
+        "bytes": 23824,
+        "sha256": "b67d9eb00ee963efb5a8d5676346a363a776772369230ac626604836d7255bbe"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Runtime.AmigaPal.xml",
+        "bytes": 4451,
+        "sha256": "13bc46577399a0bc026096a2f3012cfd31d3f588ae337d4a0745b97638bf2562"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Runtime.Managed.deps.json",
+        "bytes": 944,
+        "sha256": "be8b89cce39dd6b1be2179e1764016d004bf7f8e23695925f51cb8eda581d9e2"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Runtime.Managed.dll",
+        "bytes": 51200,
+        "sha256": "72d7645a9364d9f4a1db1e68da0db3bedbba36403fc58608b433784173148753"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Runtime.Managed.pdb",
+        "bytes": 41596,
+        "sha256": "5805e38b93cfad113802e7b701db121b1f2937a511b3ff53537c50e6cfa15d1e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Sdk.Amiga.deps.json",
+        "bytes": 926,
+        "sha256": "307826aa9833768f5a6520ef075d5c93a2ab83e0b11e151bf5a7ee9d17002e64"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Sdk.Amiga.dll",
+        "bytes": 548864,
+        "sha256": "20ed3d4b3155458811883c27602a6d3b021ae7dd11cc85d31a5e614a9392b26e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Sdk.Amiga.pdb",
+        "bytes": 68404,
+        "sha256": "953b5e2f348268350484705030a03c892738e0e04b235c910b8bf8fbefaeb91c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Sdk.Amiga.xml",
+        "bytes": 509463,
+        "sha256": "31b25a17b60d608634a1486b295442ffbbe9a7d29b141c71107944a4052f3219"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Targets.Amiga.deps.json",
+        "bytes": 2566,
+        "sha256": "652a23de576cdcc4525506ccf1dd81bc5f53be83e6771e469f440e9bcf47b26b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Targets.Amiga.dll",
+        "bytes": 42496,
+        "sha256": "57770f5aff2875777c4c4f5622339d73f2447fd3067e6bcef00a1c012cf0347e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Targets.Amiga.pdb",
+        "bytes": 18896,
+        "sha256": "85345d07431fedaddcb42bfe40d69e0ca60b9b1bd586b55db2174eb9ed5cb2e8"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\compiler-candidate\\CopperSharp.Targets.Amiga.xml",
+        "bytes": 528,
+        "sha256": "fc02d0a5c2add9d6d342a7642d704aaf39b68aba77065ab4e75f00f3b7853ab5"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\dependencies\\CopperOS.Commands.Common.dll",
+        "bytes": 9216,
+        "sha256": "0c9ead95a3e7c540e59448cf4af22dd30e4f5afb58bc809b5374b2a8777f5bc1"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\dependencies\\CopperSharp.Compiler.dll",
+        "bytes": 2739200,
+        "sha256": "79f04458781074d93f7590a9343833d5ac1a7ce06dc690e55cab707ecdf59c1f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\dependencies\\CopperSharp.Sdk.Amiga.dll",
+        "bytes": 548864,
+        "sha256": "57cd895ff588259a51407aa6b2bc68462bdcb9b626067f702a8941b72c994306"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\dependencies\\CopperSharp.Sdk.Amiga.Support.dll",
+        "bytes": 155648,
+        "sha256": "cd8c8c6a04020e04bbb6cbc5cad8bc99f6f5f19babe437b822ad1e481f58033c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\AddBuffers",
+        "bytes": 1084,
+        "sha256": "65def8103fcfdd36e0fdb29abfba96a0fd8ddec671ddcf2370ca24f83a8198b7"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\AddDataTypes",
+        "bytes": 7624,
+        "sha256": "0e49b059ebb60843a6b29cc22fa8a5e6a5eaf917efb01777e741df05468f1b97"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Assign",
+        "bytes": 2056,
+        "sha256": "ea3e50cb068c1447b0b88ad8bdc6efa4afa433f01b7112a34542a46b4c226704"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Avail",
+        "bytes": 1564,
+        "sha256": "0ab4605033255cf6373c22ffe1a0ef4696eb7b8dfdba8ec45c1a94e95dc0d9c8"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Beep",
+        "bytes": 268,
+        "sha256": "c98218c490f10230a5d76c75288f3fc69ad2c647e279a6555bd8b8679127a0a6"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\BindDrivers",
+        "bytes": 2096,
+        "sha256": "2f97f20baba4afacd69d30a2cdafc7acee9e558ad0dfcf7c60666ecef3a0e73b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Break",
+        "bytes": 1364,
+        "sha256": "efddc444d95dcae15c6b1867ae7c92b2633aa41def3b7e9ea2dcbdb3f62c45b8"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\ChangeTaskPri",
+        "bytes": 1360,
+        "sha256": "d5ba815e6bef4673934b962835e6e28cdd0ee36e876a3436457d7c3b48b7557f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Check2090",
+        "bytes": 504,
+        "sha256": "a9b14ebacf905c4c97ff3f191d3c1b4c6f0b4ce70e4b1e451d016496372daaf8"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Copy",
+        "bytes": 15236,
+        "sha256": "0539c9bc65ae6d6adf2adf38a286beaba6a455a937e37dd022b2c28676dc7378"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Date",
+        "bytes": 2528,
+        "sha256": "36bc575cd0c626b7fa7e392fd0abc1bb5dcfd329b4bfb6640eb751142512d6e0"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Delete",
+        "bytes": 5612,
+        "sha256": "efd9a743cf9f53747ce3dd710bd85d6e9cf990f0357b6b515cc9970cc5c3fcd3"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\DevList",
+        "bytes": 1196,
+        "sha256": "1f71a12e6df8f6071d39da3dbb69418aa8c380cc38481e7292aced5a0a0fb29d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Dir",
+        "bytes": 6164,
+        "sha256": "375986a78d6dad236d9b831ef6e74bc342b18363e0b162d69f36bc526be72963"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\DiskChange",
+        "bytes": 1188,
+        "sha256": "51255cba5806eeddaac3e6e61af13c7be095dcaf76928bb9210dbac2611e3ec5"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\DiskFree",
+        "bytes": 1976,
+        "sha256": "2b190942f66dcae8c9d6675844e566ce008fa32e82b1b2adcaf1f4b107f21c8d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\DosList",
+        "bytes": 9736,
+        "sha256": "14f10d06710308ca800803937f7a8ef38086290cb574fd22fbf27b604f516c0d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Eval",
+        "bytes": 9568,
+        "sha256": "663550a933ff9d978630f311fa35aa6a5a4f5d183a6514eb15ebb6f7a15f1045"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Exe2Arc",
+        "bytes": 14708,
+        "sha256": "80f20051347d74f63af387c13b6d357f9298be9ec9525df0ebe69677031bffc1"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Execute",
+        "bytes": 5812,
+        "sha256": "59a8c698feff71ba68d937a40d962731013a5d11242aa584c04c663a3fb3cdaf"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\ExtractKickstart",
+        "bytes": 2640,
+        "sha256": "7747130cbe37ef8c52952a0c9fa326f92d93faa11c220a08f3d046478cfe6523"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\FileNote",
+        "bytes": 2048,
+        "sha256": "890dee7c890f03dfc8b8eccdeb7ab5d6c470985966201b550efbbdd5792d8cc5"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\FindResident",
+        "bytes": 1060,
+        "sha256": "bc894bf4bdfd6dd929ff731a483b1512ec669b09bf7465bf48707b5592f53380"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Format",
+        "bytes": 7696,
+        "sha256": "4cfe7b53e594c27f0f7617eb9ced8c532cd738b767cb3b0f86bd475281d4fb6d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\GuessBootDev",
+        "bytes": 2080,
+        "sha256": "1d2ac577530ba43652fb1e73206eced1ca54dbf19384ae5a9e51c960e47f411f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\IconPos",
+        "bytes": 2424,
+        "sha256": "7db39a9d37973a073afd05ab968796e84ba94a05e54fb2dfb8c87b613d956b52"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Info",
+        "bytes": 3420,
+        "sha256": "3fc511ad36ea8e98bab0b0aa7df079bf31d8d73c43b5f22b746f65c101c28eb2"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Join",
+        "bytes": 2228,
+        "sha256": "7fe7cde7842fac135ea8fc104aad93a328170aafe29245da1aa9a93490a72334"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\LibList",
+        "bytes": 1204,
+        "sha256": "dcc1535abf1523c7d6fd9c0b4aef371b12e26edee223f156a0a8e5982cd85497"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\List",
+        "bytes": 4616,
+        "sha256": "1464c01b94c15aa5bf99f596c5641c1c3dfb8464a5fb155f5c8307edc7062549"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\LoadMonDrvs",
+        "bytes": 2528,
+        "sha256": "5bcdbbdac55db2e0d7a07ad513e79a4d6b94dc2910893cbdc5fded6d54006b20"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Lock",
+        "bytes": 1556,
+        "sha256": "2e34fa7a0645091c9d4da503b743eb941ac934817cb23b7351331ec8a3c61327"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\MakeDir",
+        "bytes": 1244,
+        "sha256": "e5d77765cad3db7953d06a7d698590600b1c787479f9e4b43c791c374f5b4cf3"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\MakeLink",
+        "bytes": 1792,
+        "sha256": "88b2f93432ed2cda0ee850be50449e93d1805fa6d627e4da270e034e75e27807"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\ModList",
+        "bytes": 2424,
+        "sha256": "20a109e789fe381f378876b2099cfda69adb58fef99cf04b75945b937b010890"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Mount",
+        "bytes": 11156,
+        "sha256": "8b7a876516fa6abc560f8aecfba6324e4b2259c552d3af7367fc75ee12d3c1b5"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\PathPart",
+        "bytes": 2084,
+        "sha256": "f4c511205e1418a7b99fcb0e621a202b74c112544313376a1d933beece126ccc"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\PortList",
+        "bytes": 1460,
+        "sha256": "45391e88dbf38ba990c6dd2ccc72066439459e92eacad9dc05b5f371f8b72377"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Protect",
+        "bytes": 3264,
+        "sha256": "19e56c1a3916da1e947d1b9cf5b861b7b557f846326df85dbc21c44a772ced2b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Quote",
+        "bytes": 6040,
+        "sha256": "626b0e57b7d198fada3a0d23bd9b2e571a7a0f3ada48bdf880d01e5d054df521"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Reboot",
+        "bytes": 516,
+        "sha256": "ba1d8a80d16ee8eef517b2b3234b9a5ac38e4a50bef1353b785af2c8cd74076c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Relabel",
+        "bytes": 1060,
+        "sha256": "a9e050245828737435099ba055eca6edcd4eae9bfbb9df7aa6f50e351940d866"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Rename",
+        "bytes": 2592,
+        "sha256": "53475580d41a5413d4d9cea7f3e14ba887c06d263a74399c9bea983203298e37"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\RequestChoice",
+        "bytes": 2204,
+        "sha256": "6b00ec0a7d21257a2643fd85021d4fec3eff82fa4e4d37e97de948c87b7b4ac2"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\RequestFile",
+        "bytes": 2952,
+        "sha256": "1a972022dc3dc8930f94552be436c1666aa0bbfef980d32834be589aa6ebe273"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\ResList",
+        "bytes": 1076,
+        "sha256": "d5c913bd1f0b7f511950d61a2153046c50b5cd1151daaafeb78793f13c0f5ed2"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Search",
+        "bytes": 5256,
+        "sha256": "62f74e3ea6497076ada5fa34630be2c2aef0d53cf8b5ba532cb7db1a2887d28f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\SetClock",
+        "bytes": 1680,
+        "sha256": "26844e8011e81b0aea8d7799aa92207a7892e94582707643e68722381b4c9119"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\SetDate",
+        "bytes": 1816,
+        "sha256": "b2ef66a3ba7cf7ba4057cf0005e12316a9e2a49a996ae3190b80d3a1ac79405a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\SetFont",
+        "bytes": 2644,
+        "sha256": "ee5a3d65cc0a297c39c97474d18ed2760f2e30db496f5d3c9da349299c7ea04b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\SetKeyboard",
+        "bytes": 1616,
+        "sha256": "4aa4195934525152642a937e6a6786165c354ada639c4e4248845c647e7a37e7"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Status",
+        "bytes": 3564,
+        "sha256": "344ef7e9ed15352de05b70f259197a4b0a2f6e5e398edd1a4da476e92ee8c0f0"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\TaskList",
+        "bytes": 14076,
+        "sha256": "d97892531fb646e143ab6efd512209ef4a6afec63097be6376dcf76414772495"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Touch",
+        "bytes": 2120,
+        "sha256": "319be14383d67fba41b60c90bf005535360ef435f99b6b212896b2032f6edcb8"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Type",
+        "bytes": 4696,
+        "sha256": "2bfe809c94ae6d2d4fe9ccd7f8c56fddc008f83268aa2f588c47db770ab279af"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Version",
+        "bytes": 8548,
+        "sha256": "cd4c81d3fc1e86dd2d70fac65a7d2b4c417108099498989595b14d4f37842dd4"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Wait",
+        "bytes": 2356,
+        "sha256": "4c0ac9a4ab9c6eba4602a91148cd758223136c373213cc6c4e8331d3548afd6a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\WaitForLib",
+        "bytes": 1300,
+        "sha256": "cf09789437087c63eb364729b2e35c6c903c44de076aab85a991ce95cdd2b86f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\WaitForNotification",
+        "bytes": 1980,
+        "sha256": "830c867fcdd4ad8f4268eff5d167a2c0dbdcf455544160d9fc79ab467b8669da"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\WaitForPort",
+        "bytes": 1392,
+        "sha256": "333e0eac21c03e186cb44fe716c96285011851330d6267d1b64b2e6032142705"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Which",
+        "bytes": 3896,
+        "sha256": "a157132c98c3c106718671e34363551babb1c93b7c26d50c69a158c28cc1ec62"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\original\\baseline\\C\\Exe2Arc",
+        "bytes": 14708,
+        "sha256": "80f20051347d74f63af387c13b6d357f9298be9ec9525df0ebe69677031bffc1"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\original\\baseline\\C\\Exe2Arc.map",
+        "bytes": 162308,
+        "sha256": "6aa0016447cf86783a2e3944be62f9881a0cd925e53fc397b54b774c5b005292"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\original\\candidate\\C\\Exe2Arc",
+        "bytes": 14680,
+        "sha256": "e4ab1b74e8ac93a02c5f0ee55bc1d85fd9c96fa85c891f60aac9eb923d1aa262"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\original\\candidate\\C\\Exe2Arc.map",
+        "bytes": 161760,
+        "sha256": "8db779c0ef3bf039cae3194bcb247abf6afe5678cc0137bc6ea99a7303e0f340"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner\\Copper68k.dll",
+        "bytes": 892416,
+        "sha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner\\CopperFloat.dll",
+        "bytes": 28672,
+        "sha256": "4dcca673e38589763d9488dd38c34034780944d4da9bfda943a34dc1a64ad235"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner\\CopperOS.Commands.NativeExecution.deps.json",
+        "bytes": 2844,
+        "sha256": "b59cbbb259287411a4c0801eaa95465ead3e20fe0e0f50fd7b6a8acde4da6bbe"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner\\CopperOS.Commands.NativeExecution.dll",
+        "bytes": 2721792,
+        "sha256": "bf6a6628e3c82def35e56d765c57f937dbe3c1f8c93f264bdb1afb8872a4b0d9"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner\\CopperOS.Commands.NativeExecution.exe",
+        "bytes": 162816,
+        "sha256": "bc3029712200d3314576c56632d170aff1649eba21c19695209757fdb1ea940d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner\\CopperOS.Commands.NativeExecution.pdb",
+        "bytes": 1172980,
+        "sha256": "d2790077f2c0d583c2e098ac129130dbb3b7d3e980f2b287083460601e0a428b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner\\CopperOS.Commands.NativeExecution.runtimeconfig.json",
+        "bytes": 342,
+        "sha256": "c230a317a54dd960bcbeb5f347f52e18dc665a26f7efda2159fced9a5ac7e097"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner\\CopperSharp.Compiler.dll",
+        "bytes": 2739200,
+        "sha256": "79f04458781074d93f7590a9343833d5ac1a7ce06dc690e55cab707ecdf59c1f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner\\CopperSharp.Sdk.Amiga.dll",
+        "bytes": 548864,
+        "sha256": "57cd895ff588259a51407aa6b2bc68462bdcb9b626067f702a8941b72c994306"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner\\CopperSharp.Sdk.Amiga.Support.dll",
+        "bytes": 155648,
+        "sha256": "cd8c8c6a04020e04bbb6cbc5cad8bc99f6f5f19babe437b822ad1e481f58033c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-build.log",
+        "bytes": 2681,
+        "sha256": "d1518a07856120c3417c9f0803d190423503f90943ae9011106328be3afd79e3"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\Build.csproj",
+        "bytes": 28695,
+        "sha256": "fe87bb0bc1f52f865861d761a00318e416606d9390810cd36e35e74656898ef4"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\Build.csproj.nuget.dgspec.json",
+        "bytes": 22311,
+        "sha256": "5bd74a496a657abd8bb3261ea94974aac09ea4ddc6ee114f5269029771a2c5c9"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\Build.csproj.nuget.g.props",
+        "bytes": 1302,
+        "sha256": "bb050d3edf04cd08b92e7087ba52772594bce53bea63d6716bc327c00291520c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\Build.csproj.nuget.g.targets",
+        "bytes": 150,
+        "sha256": "971cc9b535384849b5c661d776cd7a80833a416265e32e8968e06c367368b8b5"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\project.assets.json",
+        "bytes": 23347,
+        "sha256": "42ddd0ac35813d760eb558aece7ffc89f74d66a1bc587f8640a4663c3bede811"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\project.nuget.cache",
+        "bytes": 442,
+        "sha256": "13bb4cce629a499525cadd311969c941625bf10146f9cce0c238b7a46833a69b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\Release\\net10.0\\.NETCoreApp,Version=v10.0.AssemblyAttributes.cs",
+        "bytes": 200,
+        "sha256": "93d67476196ebfc80d1d7d8844b91146cfd678d105f5ce635eb900ca40610c9b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\Release\\net10.0\\apphost.exe",
+        "bytes": 162816,
+        "sha256": "bc3029712200d3314576c56632d170aff1649eba21c19695209757fdb1ea940d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\Release\\net10.0\\Build.AssemblyInfo.cs",
+        "bytes": 1168,
+        "sha256": "60fbc79ac6889a4b4b4f022e235c6aa9f81c67d7316b53a279abc69e837ded9e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\Release\\net10.0\\Build.AssemblyInfoInputs.cache",
+        "bytes": 66,
+        "sha256": "613fa5ca735de9471f50d74a0a1e5659ac699e21d602550a9eaaf5eb46b4e489"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\Release\\net10.0\\Build.assets.cache",
+        "bytes": 1292,
+        "sha256": "5538041534f5bfe4932ef5a4e5cea9512a252e3079f2c8ffbd9ea187a2e42351"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\Release\\net10.0\\Build.csproj.AssemblyReference.cache",
+        "bytes": 2761,
+        "sha256": "d3027ffcd6d07f35afdc7ef77cffcbf1ce8cfb211413377278eba43e27231f16"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\Release\\net10.0\\Build.csproj.CoreCompileInputs.cache",
+        "bytes": 66,
+        "sha256": "8180b2b407cd79d1e558732b4469c77c96379a8b7924d6ebe3e049880e2d5a06"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\Release\\net10.0\\Build.csproj.FileListAbsolute.txt",
+        "bytes": 2322,
+        "sha256": "2758bdab2d08753968e92cbd2aef4463dd6273fc775602798fa06f49e568162e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\Release\\net10.0\\Build.csproj.Up2Date",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\Release\\net10.0\\Build.GeneratedMSBuildEditorConfig.editorconfig",
+        "bytes": 866,
+        "sha256": "b5ba05c2e7a9cc99355175aedf34405a89d4eff22cedbe09971a1dcc13d1412c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\Release\\net10.0\\Build.genruntimeconfig.cache",
+        "bytes": 66,
+        "sha256": "18b5016c8057f9f42eee29c55fce8218a25ba5f1428fdc72fc6b341f21ad8a67"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\Release\\net10.0\\Build.GlobalUsings.g.cs",
+        "bytes": 239,
+        "sha256": "a3c6048bb4d922b1799a9977f84362a3787b68810cac67aa86ac3aa23295f227"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\Release\\net10.0\\Build.sourcelink.json",
+        "bytes": 160,
+        "sha256": "c95e365296a668eea0d4b32974ec4fbb255a14aa0ed9538f57c6be3ef2db0afb"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\Release\\net10.0\\CopperOS.Commands.NativeExecution.dll",
+        "bytes": 2721792,
+        "sha256": "bf6a6628e3c82def35e56d765c57f937dbe3c1f8c93f264bdb1afb8872a4b0d9"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\Release\\net10.0\\CopperOS.Commands.NativeExecution.pdb",
+        "bytes": 1172980,
+        "sha256": "d2790077f2c0d583c2e098ac129130dbb3b7d3e980f2b287083460601e0a428b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\Release\\net10.0\\ref\\CopperOS.Commands.NativeExecution.dll",
+        "bytes": 484352,
+        "sha256": "66f52a194c8cdb08cfdaaf24aa731aa32381e543f9dc3feaa47f29fbe3758682"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\obj\\Release\\net10.0\\refint\\CopperOS.Commands.NativeExecution.dll",
+        "bytes": 484352,
+        "sha256": "66f52a194c8cdb08cfdaaf24aa731aa32381e543f9dc3feaa47f29fbe3758682"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\0-NativeMorphOSAddDataTypesCommand.cs",
+        "bytes": 52010,
+        "sha256": "78b32a9e6ec5bd09b7c97611fc59aa9dfb1a04f5ace48130d2c3a550c4c5ec2a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\1-NativeWorkbench31AddDataTypesCommand.cs",
+        "bytes": 11295,
+        "sha256": "061744689b06c15721cc3a88eaecb336c4bd1d865a5f81b61efce4e4b4bb6c1d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\10-NativeMorphOSCopyLoop.cs",
+        "bytes": 1604,
+        "sha256": "d0cd6c58b8dad59379ae95cf60e55bc000209fcb58a4646ae4492d3aa75d70de"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\100-CopyRecursiveTrace.cs",
+        "bytes": 3669,
+        "sha256": "a78dd6f546c57b073dacbff16b05f226762b08f794b7116b84c3160c99c6be96"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\101-CopyResultPolicyProbeSuite.cs",
+        "bytes": 3098,
+        "sha256": "12595acc1199c049ee1d8c4296e0df339618af786f8a07ae21f5ee6f4237a139"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\102-CopySingleCommandParser.cs",
+        "bytes": 2757,
+        "sha256": "4df9ed6bdc77e689271464ef06ce36c14ca462a0bb6f02d48c60b76942e93c44"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\103-CopySingleTargetProbeSuite.cs",
+        "bytes": 9304,
+        "sha256": "20cb3b7e55185bcdd3fd4e7a825cb8e7c828961aea84a781dc88bd2bfe2736fb"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\104-CopySoftLinkProbeSuite.cs",
+        "bytes": 6671,
+        "sha256": "690019f07736ef0ca659dd0e1a20d69bf8b51972caf4d2ce6784ff9cbc6478b1"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\105-CopyTraversalProbeSuite.cs",
+        "bytes": 6142,
+        "sha256": "f8b7d30d6e662b4c078067d64c9a3585734e5a3371e2f43a9e2266d442094b83"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\106-CopyTraversalWorkProbeSuite.cs",
+        "bytes": 35047,
+        "sha256": "8c89198ab50dfa268cad0bf8c6e7120bcab9f7d55203c913e620dcb7d01ffea9"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\107-CopyWorkPreparationProbeSuite.cs",
+        "bytes": 4803,
+        "sha256": "a03d17adc1e77daaada38b54cfc31648fc0776c1c388bd4d4c412f643284fa8d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\108-CopyWorkProbeSuite.cs",
+        "bytes": 12954,
+        "sha256": "c77f34ac8e1c7e27a8aa20ba3ac0835daf61bed58b29d19450afe1cd77ca3bbe"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\109-DateEntrySuite.cs",
+        "bytes": 11167,
+        "sha256": "e0cab376e0b2c78b3171192ecc1860c5bf33d326c00ac5d1a9a882701ea65716"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\11-NativeMorphOSCopyModeSelection.cs",
+        "bytes": 3410,
+        "sha256": "52abdbe8e6c7f8e0de2d386740cb4136aadfb07372bb4d61af2fb3e8e07a7033"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\110-DeleteCommandProbeSuite.cs",
+        "bytes": 13562,
+        "sha256": "a51229d660c0feb70847ffca59229509aee22919ecd5790a39b7e54531fc3487"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\111-DeleteObjectProbeSuite.cs",
+        "bytes": 3774,
+        "sha256": "0a3c006514c8e67642e85a3e6070040f85ffe8a16910829e8360b40fb9646287"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\112-DevListEntrySuite.cs",
+        "bytes": 10187,
+        "sha256": "e353afeaaf1a613fdf1996cc74963983727dc2eb1ec7729d300775662cd1f4c2"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\113-DirEntrySuite.cs",
+        "bytes": 48992,
+        "sha256": "004bd23334bebdec74a3ee8011a1224fbd5fb7f6bb1936be698598bf4dfd1f13"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\114-DiskChangeEntrySuite.cs",
+        "bytes": 8652,
+        "sha256": "18c862d6a2940b864f40ac05fca711a41b0dbcf056cf28d72d47263cf9e24ed5"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\115-DiskFreeEntrySuite.cs",
+        "bytes": 13253,
+        "sha256": "09e7b5854cb7f8eea81310751763a124cdfde7329295451ce33b82821831738f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\116-DosListEntrySuite.cs",
+        "bytes": 53348,
+        "sha256": "c8069ebc42b76f77bf83ae380982daa6fd38a0610059a427c6135d970084b748"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\117-DosListTraversalProbeSuite.cs",
+        "bytes": 4997,
+        "sha256": "7a8ae986182ef4f765ac320ba8879bd57abe68c7172fb2d0763c0d92056ba287"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\118-EvalEntrySuite.cs",
+        "bytes": 15678,
+        "sha256": "e4a4db0727e934d69f02b335fd035cf84ffe0ab206230e22afe30846041252d3"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\119-ExecuteEntrySuite.cs",
+        "bytes": 46107,
+        "sha256": "0da63b881579d9e33868d75fe57089cc0fcfc4741090f4b9413888e4e62fdc78"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\12-NativeMorphOSCopyPatternClassifier.cs",
+        "bytes": 1185,
+        "sha256": "cbf0b597a498bda916e7879970ab992e77e5c0e879bf02ef08f3c01f5b4967ee"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\120-ExtractKickstartEntrySuite.cs",
+        "bytes": 22481,
+        "sha256": "a2b612ba80bfc26053bef40e2c4f508c158908f1a92f785bf71c8f074b001441"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\121-FileNoteEntrySuite.cs",
+        "bytes": 12594,
+        "sha256": "1d93352f8e3bdd10d83cd09a2f1d195f9d2609dd5512525d9cc26c95c5c8ae62"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\122-FindResidentEntrySuite.cs",
+        "bytes": 8095,
+        "sha256": "0155826840c80b2971d7216f8d8f35696c76915db5963ad5a2d4fad7ec9daeb4"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\123-FormatEntrySuite.cs",
+        "bytes": 25707,
+        "sha256": "4da9eab393b523c9a826174c521b5f3d7ad40374c18b34b1ac268746dad45a69"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\124-GuessBootDevEntrySuite.cs",
+        "bytes": 16430,
+        "sha256": "ef5b59858b07257b150c62e13ff81765ef242faa7262b5af2e12527b7af5b210"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\125-HunkImage.cs",
+        "bytes": 8891,
+        "sha256": "55a9fa98421353ec7f00243ac98962fcaf9c41b8c95994396430aed9a7ec85fe"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\126-IconPosEntrySuite.cs",
+        "bytes": 23095,
+        "sha256": "425539c6590335ef7d2a7c20392b25a8590ef162011b4a0c63134ac8e8b669f2"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\127-InfoEntrySuite.cs",
+        "bytes": 73101,
+        "sha256": "bc3b54db7911b32d92ac6640a7ff091111c2101bbc12b43616ce0ec805bd0206"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\128-JoinEntrySuite.cs",
+        "bytes": 19750,
+        "sha256": "a92b86d3cfe3e1e3993631292c85a2c0724f159c92e6ae39363453f0582df419"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\129-LibListEntrySuite.cs",
+        "bytes": 10302,
+        "sha256": "84879004a9ee0b9ab1a57112fd9c53247e29fbe69c5c9871fdcf9674171c1659"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\13-NativeMorphOSDevListCommand.cs",
+        "bytes": 5629,
+        "sha256": "bf2d8aa28b566ead5cab62250736b66bb2aaf69d8efe5a8183824ce73e0907d6"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\130-ListEntrySuite.cs",
+        "bytes": 39154,
+        "sha256": "99d9b5bd826694afea588eab6d2545543ed17615abc86c5ae7c4ca508026120e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\131-LoadMonDrvsEntrySuite.cs",
+        "bytes": 22642,
+        "sha256": "a9157d3cabdd36362c88e1581a3b55c94f0fee2b33009883eeceeb47a2eaec39"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\132-LoadResourceActionsRuntimeSuite.cs",
+        "bytes": 33554,
+        "sha256": "ae84d971bd4c3e505594195731067337d38e17d468ee7d979f78b7decef43ff8"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\133-LoadResourceHookRuntimeSuite.cs",
+        "bytes": 18374,
+        "sha256": "aa609e70695696da6dd3a9c064f9392d0eb2182c398475c514554e9c8d1a281e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\134-LoadResourceLaunchRuntimeSuite.cs",
+        "bytes": 17901,
+        "sha256": "051e93b51623a2120195aadb03cc15f8a1561af3f4651cd4e2ddcda40c13abf6"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\135-LoadResourceProtocolRuntimeSuite.cs",
+        "bytes": 19075,
+        "sha256": "f7ef0cda429876460fb9a6fa4307e487be4130f95cd8ea1f366e8f106054cf3f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\136-LoadResourceRegistryRuntimeSuite.cs",
+        "bytes": 13990,
+        "sha256": "ee5f9c8c557a6c30880d78bf6ad43cd809a4f6cfb2fe8c85e47fa8f58688082a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\137-LoadResourceWorkerRuntimeSuite.cs",
+        "bytes": 31439,
+        "sha256": "3c2cd1451f76478a3f0a39c91d0561f47ac113f7ecab0cbcc2a74376631105c7"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\138-LockEntrySuite.cs",
+        "bytes": 11424,
+        "sha256": "08091822fb636fd5eb34eeb298d12bee42b58281742c6d48b8ffe1711ce17b00"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\139-MakeDirEntrySuite.cs",
+        "bytes": 18518,
+        "sha256": "230758e0b216eb6f85460747d83cd77e80caab94ea94ad43161abb1c49b357b4"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\14-NativeMorphOSDirCommand.cs",
+        "bytes": 35526,
+        "sha256": "555415cd90fcd9885fc338f3719edd5c4c20f6aa6e6c8d22641083656e3d57f8"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\140-MakeLinkEntrySuite.cs",
+        "bytes": 12075,
+        "sha256": "424d735aa14d121b0c7064bc54a3c6708fa2177069d6bd71f2d000034ee57d03"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\141-ModListEntrySuite.cs",
+        "bytes": 13509,
+        "sha256": "c8f0fda1ad1f14f43f517834a6bc25fb29fa81b886d35f81049bb433ca29b879"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\142-MorphOSDateEntrySuite.cs",
+        "bytes": 17742,
+        "sha256": "15585fb7713d28f0b71b4ea24ae8d7375545740d75f0111c86d6251748065e26"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\143-MorphOSRenameSuite.cs",
+        "bytes": 23619,
+        "sha256": "6f305c6f86f3cad72d6ac4557dc7d97f3448d6e20c0bc7cdc8161391bde629c0"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\144-MorphOSSetDateEntrySuite.cs",
+        "bytes": 14255,
+        "sha256": "4ee94af15b35dab064ee194dc68963387732f450b1b903bae2b6a9bf7c781a9f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\145-MorphOSSetKeyboardEntrySuite.cs",
+        "bytes": 16835,
+        "sha256": "89c979b29c0f26371e1558620ef195f6cb2f08d219c3e48f55df8f3dec435f9e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\146-MorphOSWaitEntrySuite.cs",
+        "bytes": 15062,
+        "sha256": "a0ee1afac43bf384a01c1ce33892dc2880e73c23ee06888160aeecf3beec818f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\147-MountEntrySuite.cs",
+        "bytes": 10733,
+        "sha256": "5a3207b17c723542b5b26179c51fa66ea70450397a88f3c6f480716a1aab066c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\148-NativeIoSuite.cs",
+        "bytes": 26139,
+        "sha256": "77f78d3d89de1395bd831add4841c075b45ac2f7c06ea7b39c09df70afe8eee6"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\149-PathPartEntrySuite.cs",
+        "bytes": 12916,
+        "sha256": "53fcf8a4ffbbd12c138fee66b3056f61ecfcd1e51b8ef373121399cd0a8e0e98"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\15-NativeWorkbench31DirCommand.cs",
+        "bytes": 621,
+        "sha256": "c13291bfd3524a1d9c945110fc7c08b84b965a18ad4ae23925be3a5a74b6001a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\150-PortListEntrySuite.cs",
+        "bytes": 10979,
+        "sha256": "013898f28b009e6f5035f8bef53d6970dfdf051f4ddbcb7d5aaeeaba4768c221"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\151-Program.cs",
+        "bytes": 311955,
+        "sha256": "e4e869bffc256763bb84b58bc8dee50d71181f90b08d1d00c8c0b179b71434a4"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\152-ProtectEntrySuite.cs",
+        "bytes": 14385,
+        "sha256": "21a9b23bbb550eff1251a0ee591788244c0bdee689210be5e77427eb49cd6003"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\153-QuoteForwardProbeSuite.cs",
+        "bytes": 6832,
+        "sha256": "8470e307b167aa9b2adb353b9a09d1bda595ee455efafffdff9fcc8d50a5b521"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\154-QuoteNativeEntrySuite.cs",
+        "bytes": 8597,
+        "sha256": "0e8bbc7b67fb38a5f0ec9f8a693c8b58ce89b08f36e7d834a592db0a5a51dad2"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\155-RebootEntrySuite.cs",
+        "bytes": 5013,
+        "sha256": "9a24deb82a7e0fe683587067fef03c9d860db1455ef77a7225ef75ea9dd0475a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\156-RelabelEntrySuite.cs",
+        "bytes": 4546,
+        "sha256": "ad8031a3fcb0f5f7bf95b5cec892b7e7a62f6806e71e1faffd41c53086af430c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\157-RelabelReferenceSuite.cs",
+        "bytes": 20393,
+        "sha256": "f48ce4cfa84228fba46427c98ac4a2466818b1e21582848750718b7a04ad0c77"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\158-RequestChoiceEntrySuite.cs",
+        "bytes": 16590,
+        "sha256": "be50e5f719ac79c60d2d9930209d60cc516164f7725e7642cd044760c53547d4"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\159-RequestFileEntrySuite.cs",
+        "bytes": 19579,
+        "sha256": "8745ae82d93d9b3974d2dfc9941dee716cf4ee90d6225e8e8f2d2e157f2ccbdb"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\16-NativeMorphOSDiskChangeCommand.cs",
+        "bytes": 2063,
+        "sha256": "677f7d17ebf96b09e397cfb98d63f73567d519e9d1dd348b6e34809a1ebae726"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\160-ResidentContextFixture.cs",
+        "bytes": 3392,
+        "sha256": "1d72e6ede2962b1078bb653f9ed3830b6dd0d5dcec16d4cf8f2ad5fc7d518bb0"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\161-ResListEntrySuite.cs",
+        "bytes": 9249,
+        "sha256": "e5afff413f57f12dc23df903566e6e68f63bf9d1d24cee4a2326df7c968368d7"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\162-SearchEntryInvocation.cs",
+        "bytes": 1120,
+        "sha256": "b24634e8e30c6f9fdd508f18cf1b86881fcc77bc0b981cd8e55277df59911292"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\163-SearchEntrySuite.cs",
+        "bytes": 78528,
+        "sha256": "7e8e34ad5f11c5c37405e85410d7165860a68a34990fb0190423c4d7b972ccd8"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\164-SearchLineProbeSuite.cs",
+        "bytes": 6651,
+        "sha256": "93058f1b7a3ff83386c65887805fe66d558313d54473300003a3cf630821fddc"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\165-SearchLiteralProbeSuite.cs",
+        "bytes": 5728,
+        "sha256": "1a42421da05dff23de9d75910023c8a132bff5d4bd2b087e201a22765c5c78b2"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\166-SetClockEntrySuite.cs",
+        "bytes": 18658,
+        "sha256": "70abb2b1501fb6eae5e86f5e6a06d6f8efbe81409c93683d0072421d8947b30c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\167-SetDateEntrySuite.cs",
+        "bytes": 17118,
+        "sha256": "fafa4291ce667cb96675b8dc9b82e20e8159d1d7bf5ce8d40dce5b6e5f503b7c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\168-SetDateInvocationState.cs",
+        "bytes": 157,
+        "sha256": "5c1298610e0e27e37183b33f9024fc2aa99c480f197a6ba8ddce903afc7b1a94"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\169-SetFontEntrySuite.cs",
+        "bytes": 21884,
+        "sha256": "d5d6fa4f526c2f0651cacc562af4cc1cf83e84a3a5492f9e5cf1ba44ba02e41e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\17-NativeMorphOSDiskFreeCommand.cs",
+        "bytes": 7389,
+        "sha256": "bfd718f2fe24c65d9f7c386b437a9309897dcdbf97cfacbea76ca97076527acb"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\170-SetKeyboardEntrySuite.cs",
+        "bytes": 11909,
+        "sha256": "f52303ce0ff56e83051aa32f22dc2ef49027ddcd14b50c0c28ce89b1c4d8c2ea"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\171-StatusEntrySuite.cs",
+        "bytes": 20076,
+        "sha256": "bcefad426452adfd39734370cbb5885012df1d04eec8633717e0899f6083e3f4"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\172-TaskListEntrySuite.cs",
+        "bytes": 78313,
+        "sha256": "893548c68968820940ead2eaf277eb1a9cf503b09c60a9d4a5a18ed6c9843b6c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\173-TouchEntrySuite.cs",
+        "bytes": 13746,
+        "sha256": "9463dcdb6614ed66b21d62ab26e717e80cb9310396dc1b288ab2c3e4635e4272"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\174-TypeNativeEntrySuite.cs",
+        "bytes": 26835,
+        "sha256": "fc11c70b98374a78f883f46b023ece030c9e991294cfe014ac6e048a13032948"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\175-TypeTextIoProbeSuite.cs",
+        "bytes": 9654,
+        "sha256": "6f5ceb879432546c60aa0470d06b5349df25e4cb1a9bec1fc2165c9c60539984"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\176-TypeTextProbeSuite.cs",
+        "bytes": 5701,
+        "sha256": "bfab54930df9f5e320193d94836f43932fe52bfae5eb011502821b9ada06971b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\177-VersionEntrySuite.cs",
+        "bytes": 207507,
+        "sha256": "ea0a4553abe43467310c28ef7fe5ad42d6060594e201cd127c0838db7da2b5bc"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\178-WaitEntrySuite.cs",
+        "bytes": 12643,
+        "sha256": "ae620a29dae1783d870d111d1314250d5b1a38a7337fd6e06df2b5a58d3de712"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\179-WaitForLibEntrySuite.cs",
+        "bytes": 7965,
+        "sha256": "81f4cace7555fd61537778d2b59f9c11810d6e4e202ab6213f572c215f9972a3"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\18-NativeMorphOSDosListCommand.cs",
+        "bytes": 53010,
+        "sha256": "ae5191cb1ad846df7e4783988d4d46bf898a1c7225bd9e5651841700302b17d0"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\180-WaitForNotificationEntrySuite.cs",
+        "bytes": 11541,
+        "sha256": "a0137458e5e4d079a7c9497992a5420f1dda396ce7a680e457ed1aca81a39cfb"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\181-WaitForPortEntrySuite.cs",
+        "bytes": 8603,
+        "sha256": "acc851e0914b45ef76d20ba456dd77575b32df47ba11a98def01c3dd818fd3bf"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\182-WhichEntrySuite.cs",
+        "bytes": 38862,
+        "sha256": "a51fa9f13791a94505b5c9123da011f411333cac772017a6da45cc15d4fdf396"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\183-Workbench31BindDriversEntrySuite.cs",
+        "bytes": 23829,
+        "sha256": "e497a583e991998440d6b190cd29fcde4c896309229c3d4b7f0fcc2fa4e7b38b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\184-Workbench31ProcessEntrySuite.cs",
+        "bytes": 11515,
+        "sha256": "22c3a685d02039b0291ec9307ecfa6b9300c295e73db087f80b081c7570732e7"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\185-Workbench31RequestChoiceEntrySuite.cs",
+        "bytes": 5457,
+        "sha256": "839075b4eddb8c514e596e604c19b886e8289cd051df733ef4df68e2083ad519"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\186-WorkbenchMakeDirEntrySuite.cs",
+        "bytes": 3944,
+        "sha256": "8510c72ee43fae5d8926ac1c0fafdba30a90c9d4f30d78c2f5139503ffe4bb3a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\187-WorkbenchMakeLinkEntrySuite.cs",
+        "bytes": 9811,
+        "sha256": "0262a558df658bb1d26777b1809580390d2d440ef3cf53aba15feb83dc08ca53"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\188-WorkbenchRenameStartupSuite.cs",
+        "bytes": 26352,
+        "sha256": "7473433c3cb67f04c52afa73eaf9cec4c93ddfb5bd58a64c1a5fc2fd1aad2467"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\19-NativeWorkbench31ExtractKickstartCommand.cs",
+        "bytes": 10671,
+        "sha256": "3d7db0743254b65361f87532008fdae1c05f95a0fae39f7742ed135e2a27259f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\2-NativeMorphOSAssignCommand.cs",
+        "bytes": 6057,
+        "sha256": "a4e989b3b5e6201911baa080e57d04dbb691da304ba2c5f7c9597c2dce852bd2"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\20-NativeMorphOSFormatCommand.cs",
+        "bytes": 32962,
+        "sha256": "cf36a0d239c269e560f2875c9d582f701c09c136f21209b2357f7be6190ed317"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\21-NativeWorkbench31GuessBootDevCommand.cs",
+        "bytes": 8211,
+        "sha256": "35a3aafc28e4dcf3b0a3e6a797d2718395d6270cec8d346fb4d383bba04f20ee"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\22-NativeWorkbench31IconPosCommand.cs",
+        "bytes": 9252,
+        "sha256": "a2938a3114a4276aeea43ff2506e3972cd6accd1791bba4d29ede2ada01a0f15"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\23-NativeWorkbench31InfoCommand.cs",
+        "bytes": 15933,
+        "sha256": "c68af1e3853a0e9db449b704654dcffae0db02875a5815e2153364ba722d4afa"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\24-NativeMorphOSJoinAppendLoop.cs",
+        "bytes": 785,
+        "sha256": "53de0bffa3eb97d49f47aaafb446299f511af56ca650809924bcede954e42468"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\25-NativeMorphOSJoinCommand.cs",
+        "bytes": 7804,
+        "sha256": "b941593fb51f1722fa91e4eccbfa1c1d241146a79eedc915e41eefc020e0fb19"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\26-NativeWorkbench31JoinCommand.cs",
+        "bytes": 550,
+        "sha256": "574d309659cfaa9148315db32118fd0ce1b6c430937367b93d28b624bdc5f21c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\27-NativeMorphOSLibListCommand.cs",
+        "bytes": 5687,
+        "sha256": "e3e7f9f72d754c884522af3bfc01dfaa2493cc8209e3b26d02ec260bb569a8cd"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\28-NativeMorphOSListCommand.cs",
+        "bytes": 24342,
+        "sha256": "6687d7d9d04226400a5a0489418cc7fa9c92089bd533dbd88b87f911b5340839"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\29-NativeWorkbench31ListCommand.cs",
+        "bytes": 701,
+        "sha256": "72eb0ff3c43a5d8340e85618389295d9daa128fa2419223b0ae5c50a7a138848"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\3-NativeWorkbench31AssignCommand.cs",
+        "bytes": 6321,
+        "sha256": "1c4ff1d75bb9857ddb66025f7676c991f515ad2378311590b2f12ce24e083b12"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\30-NativeMorphOSLoadMonDrvsCommand.cs",
+        "bytes": 11101,
+        "sha256": "b0cbfef6c1564f9bab43130435cd12352e9b21c1b4e447990a683190f1fc33e7"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\31-NativeMorphOSLockCommand.cs",
+        "bytes": 4492,
+        "sha256": "98e9948c5013756c496f97d22c3ceda780717c518978d65475f3e9d0b60793be"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\32-NativeMorphOSMakeDirCommand.cs",
+        "bytes": 9600,
+        "sha256": "eaf92ee84e7a15797351ebeb81bf2ef3d989e6a37f82a5641212aa766bf8cdb2"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\33-Workbench31MakeDirCommand.cs",
+        "bytes": 4002,
+        "sha256": "de13a40a351e10270354177c3728d9295798597d0a606c53512ce1d08291a28e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\34-NativeMorphOSModListCommand.cs",
+        "bytes": 9276,
+        "sha256": "c5b4b4cd25619034a59d7c54fb87f1406ef8f41468acf6bca2546588d83b4694"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\35-NativeMorphOSMountCommand.cs",
+        "bytes": 61381,
+        "sha256": "0dd5435f3c30999a205bba3b2ef37e1121ffccec1ca9efcfda23b2bab3de244d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\36-NativeWorkbench31MountCommand.cs",
+        "bytes": 1457,
+        "sha256": "4e70325e9aa2c7d9f477566179858588db76b898c20315cc8e35eac68836873b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\37-NativeMorphOSPortListCommand.cs",
+        "bytes": 6631,
+        "sha256": "931c89f9e122fa2f059874dcf8d98d63c2989739df5720e2a86251314b71c02d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\38-NativeMorphOSProtectCommand.cs",
+        "bytes": 9952,
+        "sha256": "ab00353e0a19569f3dd0eacaa000a211a9331e240af94de7cbe4e1a5526c3207"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\39-NativeMorphOSRebootCommand.cs",
+        "bytes": 1591,
+        "sha256": "a07b3bbad7acfdb2c24242f99d3b8adf89d067db5ddda5ff37c873fd51017e4b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\4-NativeMorphOSAvailCommand.cs",
+        "bytes": 8225,
+        "sha256": "65fc515d73685cde4464f4aba59968f0b9b1ccd538d116cb533206364a51d684"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\40-NativeMorphOSRequestChoiceCommand.cs",
+        "bytes": 11632,
+        "sha256": "7f1c6170dc39b39a8e1cb6895f101f8a7059badb44dbdb0aad6c6d0205029fb7"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\41-NativeWorkbench31RequestChoiceCommand.cs",
+        "bytes": 7804,
+        "sha256": "773f35bd525ef2dfd47e332234a99a3a04f911cc28f505685a2466bef0cdf626"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\42-NativeMorphOSRequestFileCommand.cs",
+        "bytes": 10688,
+        "sha256": "41df9c02fe8bf1c80cbdb96742b26f605be92c0984bc284bf66a6f39465cb461"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\43-NativeWorkbench31RequestFileCommand.cs",
+        "bytes": 10307,
+        "sha256": "df714149204fdc273dcd2ac25080b36b89cb6fb32e7274eaf96d178892429e26"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\44-NativeMorphOSResListCommand.cs",
+        "bytes": 4749,
+        "sha256": "68de017b29eb5fffa3a6c8647cfd6df160976abf34af76393c8b696dfa6f44ea"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\45-NativeMorphOSSearchCommand.cs",
+        "bytes": 50216,
+        "sha256": "c1703c57ee8b7c45f9007a7c5dba301f867adfe3cb4419e6bc61b7bfae7cd7b2"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\46-NativeMorphOSSearchSoftLinks.cs",
+        "bytes": 4741,
+        "sha256": "bdc025239118c308a80b6d7d3309b51053acb0bd55233c3a8515b5961495603d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\47-NativeWorkbench31SearchCommand.cs",
+        "bytes": 603,
+        "sha256": "7913813bdc5a687ea688b7fea704de5408264309965278b44fa0bad940a642dd"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\48-NativeMorphOSSetClockCommand.cs",
+        "bytes": 9226,
+        "sha256": "8e82e9aeffbd6c61f8ad5c2942a984aa7539e5e90b753da7814b9cc5563c023e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\49-NativeWorkbench31SetClockCommand.cs",
+        "bytes": 6356,
+        "sha256": "3db73f431158ff78272839f27e3288440a3b19dc21fbe735dedc815510d6a97f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\5-NativeMorphOSBindDriversCommand.cs",
+        "bytes": 15518,
+        "sha256": "f651504522e3df3dfde23a164f863b5d29d77dd05acb555de6862d85872dd854"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\50-NativeWorkbench31SetFontCommand.cs",
+        "bytes": 10909,
+        "sha256": "d8817d5b508ac7d2d5b2706acc1d76e0a5ced51099d764574b3a39d83060c2ce"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\51-NativeMorphOSSetKeyboardCommand.cs",
+        "bytes": 12770,
+        "sha256": "6930d289249fac0decff6036e3491fa6feaff4fd99609b8f2a2642abcf2ce0aa"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\52-NativeSetKeyboardCommand.cs",
+        "bytes": 6233,
+        "sha256": "1d9f246421246cab6c34a5102a6a83e988a8d7094d7a84d04b3fe44396456045"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\53-NativeMorphOSStatusCommand.cs",
+        "bytes": 12173,
+        "sha256": "0c08e2b34f02acce20fb4549aca1b8a2a405c53c8a59f12c24e823ca77418bdd"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\54-NativeMorphOSTouchCommand.cs",
+        "bytes": 8789,
+        "sha256": "6b146dae96536136bc46195f2d3cd5307244f3337547f1915914a72422ed1630"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\55-FrontendBus.cs",
+        "bytes": 10410,
+        "sha256": "5b1b74409239670a311ff6e443afe1b415494db373ec5f82a7dde86bc2812e48"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\56-FrontendCases.cs",
+        "bytes": 12435,
+        "sha256": "5b3bd7d9812a3a1f24f12abfd471bf0d7c06657c7120cf15ab64e28685fdd983"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\57-FrontendFixture.cs",
+        "bytes": 19708,
+        "sha256": "574297e55e32430bda56cc42405ac10da7e2f505ad18fb98745df3bb1152d0e2"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\58-FrontendInvocation.cs",
+        "bytes": 2383,
+        "sha256": "f1fbf59b4c443e791444fec7151d5ab500bffecfb2471f7d576df1893758be46"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\59-Program.cs",
+        "bytes": 5120,
+        "sha256": "47af679f19ea52edca33fb4cb5480b06acd000b5bfe908de87abd6bcf3e756b3"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\6-NativeWorkbench31BindDriversCommand.cs",
+        "bytes": 14084,
+        "sha256": "db61194648739e5abe00561ecd4a76085769ae14642c8491097c740f4d6c680e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\60-AddBuffersEntrySuite.cs",
+        "bytes": 5149,
+        "sha256": "d4c46d49a304861ec174770204b0020bcdf03c3133985f11b1c3f7a6369eb7fd"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\61-AddBuffersReferenceSuite.cs",
+        "bytes": 16925,
+        "sha256": "15481383acf18c1752c05a5a81ead4062d14b414ecc272528c6cf7883d776663"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\62-AddDataTypesListEntrySuite.cs",
+        "bytes": 128881,
+        "sha256": "f822584f18bea84d006d5a0fcabe83d36b7efb58f602eb24144c173fcc19fde6"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\63-ArgumentBoundarySuite.cs",
+        "bytes": 7153,
+        "sha256": "73329352c05456dc1b5ef589c8f115b358d4a009679333a932fd09299e05f697"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\64-AssignEntrySuite.cs",
+        "bytes": 18245,
+        "sha256": "54eb07c0aced6213ae6c7174da9266056fd395e7d19e6a616a18cb49be3f339c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\65-AvailEntrySuite.cs",
+        "bytes": 17651,
+        "sha256": "de16d4d18eb16396c5e4045e10695ab901ef1551b4f5668f5865cbfaa209c133"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\66-BeepEntrySuite.cs",
+        "bytes": 2283,
+        "sha256": "9c5689d6e9cdecf2fe9a112568b50250fca2ba69addfe57f73dc0127fae9c5a0"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\67-BindDriversEntrySuite.cs",
+        "bytes": 46426,
+        "sha256": "0333312cf8a9315313927d2f3656faeac9bb64dd99a885bde81930657609701f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\68-BreakEntrySuite.cs",
+        "bytes": 18572,
+        "sha256": "38db1b2fd70604f33a5137fa8868b02f2dcd400366c779aa43354eed8c39fa80"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\69-ChangeTaskPriEntrySuite.cs",
+        "bytes": 14753,
+        "sha256": "81b78c128aeaddf111b23ba59b8a6c3991ee9fabb1f31b78fd8a0d09fff57ade"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\7-NativeWorkbench31Check2090Command.cs",
+        "bytes": 2020,
+        "sha256": "3c78396dfe7ab62b4f119aff4f858c4d8caebb0682c4c48f4a3e739e095b430c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\70-Check2090EntrySuite.cs",
+        "bytes": 4806,
+        "sha256": "3287fe68088803955c854b019e21eaf789bb76c10f03d578ac6591b92478a222"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\71-CommandTestBus.cs",
+        "bytes": 20216,
+        "sha256": "df8c064a16b8348ca4a88bb3a9915dcbe5c88446df9cf0c7af0bfccdb6f5a914"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\72-CopyArgumentGateEntrySuite.cs",
+        "bytes": 29615,
+        "sha256": "983e6d0b7cd5d703a38fb88ca36b90d8118b84c104fc7474a1108b88c00f4f47"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\73-CopyDestinationDirectoriesProbeSuite.cs",
+        "bytes": 6932,
+        "sha256": "67b7abb7df145dd9a9a9f796f70cffa1ee35facc2e34bbbef78c24afda746753"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\74-CopyDestinationProbeSuite.cs",
+        "bytes": 7960,
+        "sha256": "b798cea85ffb879202ea3d9f80e6fc46286db0ded50b4b9a53d5bd2a1dbbaa2e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\75-CopyDirectoryCommandOutput.cs",
+        "bytes": 2309,
+        "sha256": "33f31d85c72b31bec8163457f8009c80fee9222265f32cac72ba557344808b98"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\76-CopyDirectoryEntryProbeSuite.cs",
+        "bytes": 3400,
+        "sha256": "0c24a9cff7f253732638af37e877a333574ac41a0f11e7d97bf1c6b468b7d14f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\77-CopyDirectoryExitProbeSuite.cs",
+        "bytes": 6412,
+        "sha256": "8d97fb33e1551f778428516e64275104c54adbc3e719ff8684b383b276e18654"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\78-CopyDirectoryOperationProbeSuite.cs",
+        "bytes": 6226,
+        "sha256": "dccc640262260a299d969f6d379fde93fcf34ce1bc95b7e390536939cd972cdd"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\79-CopyDirectProbeSuite.cs",
+        "bytes": 4307,
+        "sha256": "db9bad88e9c91cd0afebc80dad382b015cdf89628f9fe6a7d845d30a769cb7b8"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\8-NativeCommandArguments.cs",
+        "bytes": 7115,
+        "sha256": "4e1f078f88fb5253db90957c95ed00699d088e81474b8909a88c722866a94dee"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\80-CopyFileOperationProbeSuite.cs",
+        "bytes": 5778,
+        "sha256": "75bbb1eb09708283cc2b3bd77fcccca4fe5171052f331f362d5f0250d9e318cf"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\81-CopyFilePairProbeSuite.cs",
+        "bytes": 9441,
+        "sha256": "756c4a3ca2f72f6f9381e1e8c8a5a6457dccaef5e1018e2297603835ca06cb91"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\82-CopyFileTransferProbeSuite.cs",
+        "bytes": 5451,
+        "sha256": "e226a3b16e692e88457443f6172d2eedae884b30aec3e10f27079e7020f78b2d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\83-CopyFlatTraversalProbeSuite.cs",
+        "bytes": 6519,
+        "sha256": "34ac73dcab11a14ae96f76929c78bc9c88ccadd09b58b1d2a31948b37c4e9d54"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\84-CopyLinkOperationProbeSuite.cs",
+        "bytes": 3299,
+        "sha256": "54074ad29366f87943b2c36466a58ebdd464b2f132937723d6a8bbd7e0564574"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\85-CopyLoopGuardProbeSuite.cs",
+        "bytes": 2678,
+        "sha256": "23fa646dd2264442c480f34f810a0ddf91f5ba096226e9622201dfd729294dda"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\86-CopyLoopProbeSuite.cs",
+        "bytes": 8196,
+        "sha256": "397e0f9a9f4e7ad2ce2e5d0bca6cd4b01b6703fc6714436749a63efbf9e29b1a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\87-CopyMatchStepProbeSuite.cs",
+        "bytes": 6280,
+        "sha256": "18002411cc47d994dc0d0ee62a317a1467bc8292f6758ec09a6ecaa833b60ca5"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\88-CopyMetadataProbeSuite.cs",
+        "bytes": 7550,
+        "sha256": "ced994d4bd3005027192ca591c8ae064d2aef86c0654d73cea732ddde21b7c19"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\89-CopyModeSelectionProbeSuite.cs",
+        "bytes": 5813,
+        "sha256": "8f886ee88f65017ff247fffa672a5ed1b834e7114e00536de7a056875d150e19"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\9-NativeCommandIo.cs",
+        "bytes": 2798,
+        "sha256": "20e6c4b6484bc5542c214fa388e6b8a10e2c561a952b749d2e6b138a0a9999f0"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\90-CopyNonFileSystemProbeSuite.cs",
+        "bytes": 3543,
+        "sha256": "f9309796d7bdec079528bd4dadd3ca05450cfca8b60172d76c0a4f47ea39c8ae"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\91-CopyOpenDestinationProbeSuite.cs",
+        "bytes": 3203,
+        "sha256": "bdbf0f9a3309cc8b1275817ea724abe7f87e567cc441211aa6b6e6dd40a2ab2e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\92-CopyOutputProbeSuite.cs",
+        "bytes": 3888,
+        "sha256": "4b4044fdf0c4a6c5f3c9642b8bd58d16413442e500a3ef99420a482860831a4e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\93-CopyParsedDeleteProbeSuite.cs",
+        "bytes": 3382,
+        "sha256": "df43d23f950c4c4d01a2c8b1e8ad0cab37bad36f4796a7f8d66f13611e96b271"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\94-CopyParsedMakeDirectoryProbeSuite.cs",
+        "bytes": 2947,
+        "sha256": "b64df77750e8f07269c89492f2207cb3483e11a70e815988e18007ef3a5831d4"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\95-CopyPatternClassifierProbeSuite.cs",
+        "bytes": 4328,
+        "sha256": "2ebf252862724363674835895b67229fac091b18ddcac2785ccfebe666c8b1b4"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\96-CopyRecursiveCommandDos.cs",
+        "bytes": 11347,
+        "sha256": "7c4e37b2b244dfa45ce82eab395af22e7a8c96e49514aa3c4a996c4b83f88ddf"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\97-CopyRecursiveFileDos.cs",
+        "bytes": 9780,
+        "sha256": "6541ae89ade3fc488157fd3568dcc4a184fba791edc945538e549194c926fa8f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\98-CopyRecursiveFileSystem.cs",
+        "bytes": 7649,
+        "sha256": "9c10118522845cb2b2aaf3bbeb27c6935eadc8f812a45b6ddcbb32756a34b842"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\runner-source\\source\\99-CopyRecursiveMatcherDos.cs",
+        "bytes": 5211,
+        "sha256": "3fda5e62e1f74dc592c9b38513f726641f0a33d649a5bbbaf26f515927b75b29"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-results\\components.trx",
+        "bytes": 349201,
+        "sha256": "bbd731cb13134149dc4c32bba1053afaffa591388109af0d4ad7250d964603ae"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\CopperOS.Exe2Arc.Qualification.Tests.deps.json",
+        "bytes": 17759,
+        "sha256": "b65a7e4fda54a18b585169eb588cf7424b0670500d6b3810260af618e501c93c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\CopperOS.Exe2Arc.Qualification.Tests.dll",
+        "bytes": 78336,
+        "sha256": "f8387f6fc74aef4fb1841322e6d71d8b9997e4d21afbb23bafbb2db85c8a7b62"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\CopperOS.Exe2Arc.Qualification.Tests.pdb",
+        "bytes": 77212,
+        "sha256": "998979883171e54cf2b1dda7c98574c24985c6de7557542ae01c75a7f6a451b2"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\CopperOS.Exe2Arc.Qualification.Tests.runtimeconfig.json",
+        "bytes": 390,
+        "sha256": "a217d17be0661abf2717a26937c6e379c33542cb6f292fd3fc5a2d5113a9d6dc"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\CopperSharp.Compiler.dll",
+        "bytes": 2739200,
+        "sha256": "79f04458781074d93f7590a9343833d5ac1a7ce06dc690e55cab707ecdf59c1f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\CopperSharp.Sdk.Amiga.dll",
+        "bytes": 548864,
+        "sha256": "57cd895ff588259a51407aa6b2bc68462bdcb9b626067f702a8941b72c994306"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\CopperSharp.Sdk.Amiga.Support.dll",
+        "bytes": 155648,
+        "sha256": "cd8c8c6a04020e04bbb6cbc5cad8bc99f6f5f19babe437b822ad1e481f58033c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\cs\\Microsoft.TestPlatform.CommunicationUtilities.resources.dll",
+        "bytes": 16440,
+        "sha256": "b983773dc5112854fe411fa22223e929c7fa230a1a843fcc58023237aca326f4"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\cs\\Microsoft.TestPlatform.CoreUtilities.resources.dll",
+        "bytes": 16944,
+        "sha256": "26be9bb3a8932ba04014e4ae9b8f20a0222a3e2c1a1b41cec11d49bff609ce72"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\cs\\Microsoft.TestPlatform.CrossPlatEngine.resources.dll",
+        "bytes": 21040,
+        "sha256": "2f776bf0e946ffcd3f8a38af2653137785eb55db3cdb0c5a392bbe07d2ccc082"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\cs\\Microsoft.VisualStudio.TestPlatform.Common.resources.dll",
+        "bytes": 20520,
+        "sha256": "cd637384e1b3973be3c18409ed886f8234e2e3c3a65edf7d721d154e26aa64f3"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\cs\\Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll",
+        "bytes": 23624,
+        "sha256": "12b0829d24f6f53f0e22fcbe370d3f91b67bbcaca7f0d82323d08cd7752f4519"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\de\\Microsoft.TestPlatform.CommunicationUtilities.resources.dll",
+        "bytes": 16928,
+        "sha256": "d11f2a5262947fc1b6d426a6e1828325cedf40fee28e29ed856804ec9ef3f15c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\de\\Microsoft.TestPlatform.CoreUtilities.resources.dll",
+        "bytes": 16952,
+        "sha256": "403e0eaf8528656c0b47c31cd5fe9a25b8fd733adccb8e6d47a09f28658b5283"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\de\\Microsoft.TestPlatform.CrossPlatEngine.resources.dll",
+        "bytes": 21048,
+        "sha256": "7ad3c45f58aa4d030fd5d65d9d4ac9cabbc06d79d071c29727b5376cd3459d77"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\de\\Microsoft.VisualStudio.TestPlatform.Common.resources.dll",
+        "bytes": 21064,
+        "sha256": "ca308a5d314fa7d7e9cae94083cc1f62375ac225094d289961d9bce49b564b65"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\de\\Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll",
+        "bytes": 24136,
+        "sha256": "e91489bb7ec3e2e97d19cf32bc5e3f7fc57e994e0315f0870fd2024ccb2cf337"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\es\\Microsoft.TestPlatform.CommunicationUtilities.resources.dll",
+        "bytes": 16928,
+        "sha256": "ddbdd3bf9afe6ddd3babd4f0358ab2f4697fc5d5ec72b60cb772085af9bf9859"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\es\\Microsoft.TestPlatform.CoreUtilities.resources.dll",
+        "bytes": 16952,
+        "sha256": "7ec8e83494a8a50f1158c85d29b98e87c85d74ad5c4d94e2e9656e1cf60b0dff"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\es\\Microsoft.TestPlatform.CrossPlatEngine.resources.dll",
+        "bytes": 21032,
+        "sha256": "67063a36cfcae95b3ea4646b88c3cf3642f0914dfc06ecc5fc4d3f77e0e97e64"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\es\\Microsoft.VisualStudio.TestPlatform.Common.resources.dll",
+        "bytes": 21040,
+        "sha256": "b5340851bd9cb979d497f67123d09f91ba20ac9d2b3e0e17076fd2abd615c933"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\es\\Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll",
+        "bytes": 24120,
+        "sha256": "f19c11474e9074d5407f9b5a78cfb0bc1b4aeb90ffec819a676f63509cec443a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\fr\\Microsoft.TestPlatform.CommunicationUtilities.resources.dll",
+        "bytes": 16952,
+        "sha256": "044cf1373cc4527fff78adb5ad70489532303b58ba0de2c059c422926af46c4b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\fr\\Microsoft.TestPlatform.CoreUtilities.resources.dll",
+        "bytes": 16944,
+        "sha256": "78d675cbab45a56cc8916466ba13f16fab18a44fd3ad4481c8f5f4e13b1f8b5d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\fr\\Microsoft.TestPlatform.CrossPlatEngine.resources.dll",
+        "bytes": 21040,
+        "sha256": "3fe869c312793444f9509af17ca0b14f444cbddef60a47251f441a5d7859a05f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\fr\\Microsoft.VisualStudio.TestPlatform.Common.resources.dll",
+        "bytes": 21048,
+        "sha256": "5a8f4f4ea8b5a332883a67202877bd19100b21d766bf0443ffec21610dfb2ecf"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\fr\\Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll",
+        "bytes": 24096,
+        "sha256": "ba030af725dea6bceb72c4eb49ccc3520222a97ea0fae812e16b7ba78450b98a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\it\\Microsoft.TestPlatform.CommunicationUtilities.resources.dll",
+        "bytes": 16928,
+        "sha256": "b023b85f510d1e5c6d5183ba51614ea1b6dee5c25ab287773bebc8cdb36e3168"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\it\\Microsoft.TestPlatform.CoreUtilities.resources.dll",
+        "bytes": 16928,
+        "sha256": "a1ac732615a7dc5c59e01a1570da23210ede65ef24d5bb101294cf68481fe984"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\it\\Microsoft.TestPlatform.CrossPlatEngine.resources.dll",
+        "bytes": 21048,
+        "sha256": "b6b4b25e77f51f4ef5252512d1ea2cd8025ff388852ea93897b136bcc33bb5e0"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\it\\Microsoft.VisualStudio.TestPlatform.Common.resources.dll",
+        "bytes": 21040,
+        "sha256": "b9f6be59cc1c05594f9b19db9e72add58d6b37661397f81a62d4fee37e7be621"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\it\\Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll",
+        "bytes": 24096,
+        "sha256": "93911f7a3c20cecd88ddb85dfdaaa9bf768e72a0fa5f745f3f3ae40dc78da66b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\ja\\Microsoft.TestPlatform.CommunicationUtilities.resources.dll",
+        "bytes": 16928,
+        "sha256": "5db61a11e8c40176f0293658e48bc955ebed6a3dd46d3808aacc762f71732544"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\ja\\Microsoft.TestPlatform.CoreUtilities.resources.dll",
+        "bytes": 17440,
+        "sha256": "1ded53cdfde469bbb90d12f371891d3789a835e976557541c43166f027f7f111"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\ja\\Microsoft.TestPlatform.CrossPlatEngine.resources.dll",
+        "bytes": 22088,
+        "sha256": "f6d2748ee250f131374c306d7dc8a905464dbda3f75e857d333946c7ff89494c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\ja\\Microsoft.VisualStudio.TestPlatform.Common.resources.dll",
+        "bytes": 21552,
+        "sha256": "c55083e71e3a5bb8dbe36e10eb12b301ccfd809e8fe1187350beb6774c7f794b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\ja\\Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll",
+        "bytes": 24632,
+        "sha256": "c2c077136e3ccfd8a249758979c0f754fe3c8a35b0c6478aa7a87ea38a817690"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\ko\\Microsoft.TestPlatform.CommunicationUtilities.resources.dll",
+        "bytes": 16944,
+        "sha256": "7026d9d93b3fb7b521fc4a35fcb8348020fe466c054309e8ec0d27e84a555cb9"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\ko\\Microsoft.TestPlatform.CoreUtilities.resources.dll",
+        "bytes": 16936,
+        "sha256": "fdc5422bb6f99cb357515ac6edd47c6f495da1da0eca43b7f85fdb7fd1c2492a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\ko\\Microsoft.TestPlatform.CrossPlatEngine.resources.dll",
+        "bytes": 21560,
+        "sha256": "e5231e879c215210cfe0b6d8f5740f8ecb2b08afa98ee4055fff6ba10ddac96c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\ko\\Microsoft.VisualStudio.TestPlatform.Common.resources.dll",
+        "bytes": 21048,
+        "sha256": "e90ac368f79ea0e99f44fe1133db10af08c3653749056362822b2c8f414ccd64"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\ko\\Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll",
+        "bytes": 24120,
+        "sha256": "4f427ed5c7c78043c7a9a7c9dc659133d96f6100ca9ba8719857709832e4bb58"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\Microsoft.TestPlatform.CommunicationUtilities.dll",
+        "bytes": 137776,
+        "sha256": "e38a359aa502bb1867d6092dca9aba5c130dd6f9111decea8156aa746b2c69e6"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\Microsoft.TestPlatform.CoreUtilities.dll",
+        "bytes": 98336,
+        "sha256": "f6e2495c44640d8915b2aefc938f391c970300266da014350ff35512a448ee84"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\Microsoft.TestPlatform.CrossPlatEngine.dll",
+        "bytes": 316960,
+        "sha256": "d55399bc66dc5b451d60ad82662452ca4a5f735918135dfc91ca9b5e3e38a6ab"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\Microsoft.TestPlatform.PlatformAbstractions.dll",
+        "bytes": 51232,
+        "sha256": "7b919ce4429c3b7b8fa2c36fd641b70b2f459a30ecb7c65fd80f437673cec930"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\Microsoft.TestPlatform.Utilities.dll",
+        "bytes": 67104,
+        "sha256": "01ffd64d25a4bd905aef9594d2aa700e020273a90a77a8720af6bec8b4fd5444"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\Microsoft.VisualStudio.CodeCoverage.Shim.dll",
+        "bytes": 17464,
+        "sha256": "a753bc15f23a957f4f91a059376e4472c6bacd1503622de4b9b2b079ad8ea289"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\Microsoft.VisualStudio.TestPlatform.Common.dll",
+        "bytes": 248352,
+        "sha256": "059aa2f335c3f7b14ac3fb7caa1625bc2767581b9548e9ff53a246c7f2f94d6a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\Microsoft.VisualStudio.TestPlatform.ObjectModel.dll",
+        "bytes": 334392,
+        "sha256": "f83e38ee9020baa42e284e2299e233070ffa86ce4b10213583f9b7c8a521bcd0"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\Newtonsoft.Json.dll",
+        "bytes": 712464,
+        "sha256": "22c649f75fce5be7c7ccda8880473b634ef69ecf33f5d1ab8ad892caf47d5a07"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\pl\\Microsoft.TestPlatform.CommunicationUtilities.resources.dll",
+        "bytes": 16928,
+        "sha256": "0d1c05f1c3dfa21fbaca7537910bea9a54a52a9a800caf1c7d46691fb3a41eaa"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\pl\\Microsoft.TestPlatform.CoreUtilities.resources.dll",
+        "bytes": 16936,
+        "sha256": "4b7843359aea21962c73c7474d374410fe8d039a30ac7902f5f09a19a52c778a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\pl\\Microsoft.TestPlatform.CrossPlatEngine.resources.dll",
+        "bytes": 21536,
+        "sha256": "2f82d58fb67a8261ad060a2633b872c7867f48608368144db3a93bf4debe2444"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\pl\\Microsoft.VisualStudio.TestPlatform.Common.resources.dll",
+        "bytes": 21048,
+        "sha256": "911ef37ee7d78eb7132581aeaeb7753e81589600535c3c2244b1c447b61e1a5a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\pl\\Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll",
+        "bytes": 24136,
+        "sha256": "88993b0056f183385a9e9e67931932bce0e564d288164ad43b2cc1bf6cacfb1c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\pt-BR\\Microsoft.TestPlatform.CommunicationUtilities.resources.dll",
+        "bytes": 16416,
+        "sha256": "f2292ef0dd72f1a95892714f17e5d49259452e27332d54dbff308236a50d7d40"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\pt-BR\\Microsoft.TestPlatform.CoreUtilities.resources.dll",
+        "bytes": 16928,
+        "sha256": "119f896f964ce17da4558c72b728d832fa19abc2dcf12bbed7cc386b741edd6b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\pt-BR\\Microsoft.TestPlatform.CrossPlatEngine.resources.dll",
+        "bytes": 21048,
+        "sha256": "ea5d8ecffcb9371d3e559e1d477ebdf5e7c3bd0663746fdccebd9330df2b9008"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\pt-BR\\Microsoft.VisualStudio.TestPlatform.Common.resources.dll",
+        "bytes": 21048,
+        "sha256": "b33e6b979805fa9047ebfb7722c4c3b07b1d3706acc108883b8c30d77d10db72"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\pt-BR\\Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll",
+        "bytes": 24120,
+        "sha256": "976fae7c172b9170340633a3fe1a3f0ec6fc0731f4bf089ddaf611d60d446f40"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\ru\\Microsoft.TestPlatform.CommunicationUtilities.resources.dll",
+        "bytes": 17440,
+        "sha256": "4b29d6fadb5b709c5c90f25a8934e6c3c58027cf35aa28c6ef7100ab30f9cd39"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\ru\\Microsoft.TestPlatform.CoreUtilities.resources.dll",
+        "bytes": 17464,
+        "sha256": "67820043048cca339e29b563b1ed9da9f7d702b67c0cadd0b643f5781bc78789"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\ru\\Microsoft.TestPlatform.CrossPlatEngine.resources.dll",
+        "bytes": 23072,
+        "sha256": "4970c26bed952eccea42fbd3c7064bdd690eb5a7e538a77ce78ffed487877d9b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\ru\\Microsoft.VisualStudio.TestPlatform.Common.resources.dll",
+        "bytes": 23096,
+        "sha256": "fcaedb770d94be752a6c9befe5d2b8219bb8d1bfce83f2dc9011fa4b7eebd00a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\ru\\Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll",
+        "bytes": 26168,
+        "sha256": "f7084df5889cd4a8d141f73be63b267519ae4daa75c6394cf39c4a96fba35d68"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\testhost.dll",
+        "bytes": 49696,
+        "sha256": "92cbdf52db5249112f9f53f1fcdaf9f9aa3fce467141c688a31a7fe095e4d304"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\testhost.exe",
+        "bytes": 150576,
+        "sha256": "fb63eb314f25584a532683de7abf4ca8a0b43103f3699f5d5d87317338eeda76"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\tr\\Microsoft.TestPlatform.CommunicationUtilities.resources.dll",
+        "bytes": 16952,
+        "sha256": "ef6bf78a0fd4613b1ffe8dc560b0f2f5cf2c05724fc8aed314f9ced18a90cf03"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\tr\\Microsoft.TestPlatform.CoreUtilities.resources.dll",
+        "bytes": 16928,
+        "sha256": "a4d0c1d36f10425e39cdaade487220a9808e6f6954998644c57011fbeb3a33a0"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\tr\\Microsoft.TestPlatform.CrossPlatEngine.resources.dll",
+        "bytes": 21024,
+        "sha256": "6ad665b04f30253b05acdbcf02196af45332a95091e112e55d2f2379273d9cac"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\tr\\Microsoft.VisualStudio.TestPlatform.Common.resources.dll",
+        "bytes": 20536,
+        "sha256": "96efbcb535b02ad348598505210ae60b3d24ba7b8d364547ec89d353e891fae2"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\tr\\Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll",
+        "bytes": 23608,
+        "sha256": "5a392fba8650b4b574e5e7c42615f5c6d2a879c3838cf5b5219856185b33c8f5"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\xunit.abstractions.dll",
+        "bytes": 21928,
+        "sha256": "3166dc70323fb30ccf1cedb0fe86f2ad122c46d254542342d90386efc4c9285c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\xunit.assert.dll",
+        "bytes": 187088,
+        "sha256": "bcd9711b22d227ac8cd4c1568e72433a0f576d2ec8aae64ac508081892015b1d"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\xunit.core.dll",
+        "bytes": 70352,
+        "sha256": "2f7feeec8c6dec7df684c25fb80aadb292b963d09723460f03d53c5ad2088acc"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\xunit.execution.dotnet.dll",
+        "bytes": 279760,
+        "sha256": "e70febe547c15f8155db3e2d95c3ba4445a59cbc21a3e7541ab22ed49d3dcf7b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\xunit.runner.visualstudio.testadapter.dll",
+        "bytes": 1251840,
+        "sha256": "98a7395cd6abd03d0ac8eeb82d720c24db00602f047ca49bd6e88e77fc6d1153"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\zh-Hans\\Microsoft.TestPlatform.CommunicationUtilities.resources.dll",
+        "bytes": 16416,
+        "sha256": "61e5b362940ca90e3b89a452218fb1d3882aea679a1b73e6ad868d0ac1bb88fc"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\zh-Hans\\Microsoft.TestPlatform.CoreUtilities.resources.dll",
+        "bytes": 16928,
+        "sha256": "4a8c0ef1c60069942082fa7493dbe683033e14e15dff09c8ba8c230e2a4443c6"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\zh-Hans\\Microsoft.TestPlatform.CrossPlatEngine.resources.dll",
+        "bytes": 20008,
+        "sha256": "0b12a586cd3759757f641a6219f491aff7c5fbdf603a6339b98faa57ce6eb7c0"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\zh-Hans\\Microsoft.VisualStudio.TestPlatform.Common.resources.dll",
+        "bytes": 20040,
+        "sha256": "8fb34ecf4343a77647006f0ad1fb41e8c4dd48cf38fe97b93c345b743f538908"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\zh-Hans\\Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll",
+        "bytes": 23072,
+        "sha256": "396cc3c959cfc9f24bbe7a2d38846dfb97b696a9610eb95234306cbcdebd4f06"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\zh-Hant\\Microsoft.TestPlatform.CommunicationUtilities.resources.dll",
+        "bytes": 16416,
+        "sha256": "b411fe26d281ec982d0432f1b0bce2c1c86f200d17e837bbbe91086f8e38270f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\zh-Hant\\Microsoft.TestPlatform.CoreUtilities.resources.dll",
+        "bytes": 16952,
+        "sha256": "a9012f419d3b66a730d635760f63fea1721a63b2105a4146c2d1309bb6f31b14"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\zh-Hant\\Microsoft.TestPlatform.CrossPlatEngine.resources.dll",
+        "bytes": 20552,
+        "sha256": "540bee11c69534fc48bb4a9626683a6203e9f1f4bae15ff72069eaf9f65f5e81"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\zh-Hant\\Microsoft.VisualStudio.TestPlatform.Common.resources.dll",
+        "bytes": 20024,
+        "sha256": "d69e7127de46141b6406fd968d4a66271dda99271701f912d56ce6813af48cf2"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\bin\\Release\\net10.0\\zh-Hant\\Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll",
+        "bytes": 23096,
+        "sha256": "b90f264a4d72987fd0aa0d11fc51dd248f831740bcd72d281045e16936fda16b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\Build.csproj",
+        "bytes": 4864,
+        "sha256": "4a885e36ea335051b45aa2922dbc64ff15ed638cb489cf0e38584e3e3c357f10"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\obj\\Build.csproj.nuget.dgspec.json",
+        "bytes": 22567,
+        "sha256": "5eccec3055396fdc177c3697283cb2a26dc5f03bdfe1c9765e8ce596d192745c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\obj\\Build.csproj.nuget.g.props",
+        "bytes": 2790,
+        "sha256": "36ad58928e6902f5646525c8eff56e89a81c084f47718c90cd569ed2bc52281a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\obj\\Build.csproj.nuget.g.targets",
+        "bytes": 1183,
+        "sha256": "4b5930b4f9b354f5f072bdb75e4c3f83e9d95f1c03b4f92b34fe7964620bd2c4"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\obj\\project.assets.json",
+        "bytes": 61943,
+        "sha256": "93c00c2c742e2f1edc7a2fe7ecb001d21fb4dc31c0bcffc3c371d75ecc282197"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\obj\\project.nuget.cache",
+        "bytes": 1747,
+        "sha256": "4168679670f75c86675e2eea81723f9a19b3c0bf45e2dc492922c9801fbabc20"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\obj\\Release\\net10.0\\.NETCoreApp,Version=v10.0.AssemblyAttributes.cs",
+        "bytes": 200,
+        "sha256": "93d67476196ebfc80d1d7d8844b91146cfd678d105f5ce635eb900ca40610c9b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\obj\\Release\\net10.0\\Build.AssemblyInfo.cs",
+        "bytes": 1084,
+        "sha256": "1fdc35076ec66228427631a26aac120e29022c77eb668024a133f10b2f403242"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\obj\\Release\\net10.0\\Build.AssemblyInfoInputs.cache",
+        "bytes": 66,
+        "sha256": "a0dbe318710e8ebd30baacdaef13e8b399a8d0588ccff583729309631a499c67"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\obj\\Release\\net10.0\\Build.assets.cache",
+        "bytes": 31229,
+        "sha256": "4f5d0f67f5359a77d96ae8ceb0c9d51904a7be498a5b44bf9e827d199a9ccf82"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\obj\\Release\\net10.0\\Build.csproj.AssemblyReference.cache",
+        "bytes": 10509,
+        "sha256": "682176ea4fc05d4554072115259d8dea907a3261e0e18b2a3340d499c03d0996"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\obj\\Release\\net10.0\\Build.csproj.CoreCompileInputs.cache",
+        "bytes": 66,
+        "sha256": "73156a2ad1fc223371a6e972b426cfc179f57971e7a2f15561d00beb0ab5491f"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\obj\\Release\\net10.0\\Build.csproj.FileListAbsolute.txt",
+        "bytes": 15764,
+        "sha256": "0174bb9a0f257ad92d37854a0007e8b731aa7e7e504f385e6446a10fce911ed3"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\obj\\Release\\net10.0\\Build.csproj.Up2Date",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\obj\\Release\\net10.0\\Build.GeneratedMSBuildEditorConfig.editorconfig",
+        "bytes": 864,
+        "sha256": "12f77c8a0daa01aff927cc565a5f562a6f40835b739fbf843dbb5ca0b39c0282"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\obj\\Release\\net10.0\\Build.genruntimeconfig.cache",
+        "bytes": 66,
+        "sha256": "dd4f136fe8a6b5ab972722cc0290d1b1fdc98d8fe4603d7a2821f103dc29ebc5"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\obj\\Release\\net10.0\\Build.GlobalUsings.g.cs",
+        "bytes": 260,
+        "sha256": "bc157bfcc147099886e678131c99ae69211e8650751a8d7b5fe5b410a5b6e421"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\obj\\Release\\net10.0\\Build.sourcelink.json",
+        "bytes": 160,
+        "sha256": "c95e365296a668eea0d4b32974ec4fbb255a14aa0ed9538f57c6be3ef2db0afb"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\obj\\Release\\net10.0\\CopperOS.Exe2Arc.Qualification.Tests.dll",
+        "bytes": 78336,
+        "sha256": "f8387f6fc74aef4fb1841322e6d71d8b9997e4d21afbb23bafbb2db85c8a7b62"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\obj\\Release\\net10.0\\CopperOS.Exe2Arc.Qualification.Tests.pdb",
+        "bytes": 77212,
+        "sha256": "998979883171e54cf2b1dda7c98574c24985c6de7557542ae01c75a7f6a451b2"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\obj\\Release\\net10.0\\ref\\CopperOS.Exe2Arc.Qualification.Tests.dll",
+        "bytes": 37376,
+        "sha256": "4598afa5dd74fec24c1eef738e47052248887a064f2d1c6ce8094be5abac67c9"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\obj\\Release\\net10.0\\refint\\CopperOS.Exe2Arc.Qualification.Tests.dll",
+        "bytes": 37376,
+        "sha256": "4598afa5dd74fec24c1eef738e47052248887a064f2d1c6ce8094be5abac67c9"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\0-Exe2ArcForwardScanner.cs",
+        "bytes": 8579,
+        "sha256": "a09e487072afc824950fb23b15473baa70102aea6c872edcd1ce5b854520299c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\1-Exe2ArcHeaderProbe.cs",
+        "bytes": 13938,
+        "sha256": "cc928e043574e85205f23f7d2630adfb867fad40f572b4fa21a2194bb37aa042"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\10-Exe2ArcZipRecordExtractor.cs",
+        "bytes": 8691,
+        "sha256": "a06951e5fef227359d199021872079d3540de5e08bd35110d72c98fac612b601"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\11-Exe2ArcZipRecordRewriter.cs",
+        "bytes": 3998,
+        "sha256": "f5359ff813d315a7e51c06168e26364dfb8a9968a0e56737275191bb61712fc6"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\12-Exe2ArcZipScanner.cs",
+        "bytes": 6930,
+        "sha256": "aef241fd80d53ba59b8a66e84d8d6e6f667d67a678c0936510a64770d0715a5e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\13-Exe2ArcForwardScannerTests.cs",
+        "bytes": 20318,
+        "sha256": "ecd89d3e23e2ab7928af0af07d62c04fb3ee9d6f685ced0c8fb5579478980b8c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\14-Exe2ArcHeaderProbeTests.cs",
+        "bytes": 16285,
+        "sha256": "82148dd1ad8cbd35a02893fc7bb18ec6648b0c04f27586e74dc7287c7d848c26"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\15-Exe2ArcLhaScannerTests.cs",
+        "bytes": 3085,
+        "sha256": "c8f90960d7c71a9fab995cb375fc67c535a38be0869f7e76fe91c5dbbda6eab0"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\16-Exe2ArcOutputNameTests.cs",
+        "bytes": 4847,
+        "sha256": "65619ff35a4dabe17fc82f8e65316d3eb8f0b17a112cc86da254aa33bcad081e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\17-Exe2ArcOutputSelectionTests.cs",
+        "bytes": 8205,
+        "sha256": "9ee9f007db4d7831c2ea3df0e5be4d87043707dee87c28d9b3a7070e0e7e21ba"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\18-Exe2ArcPayloadCopyTests.cs",
+        "bytes": 7681,
+        "sha256": "ac6e7b91f746f7371b8e03f02620a8d4f88cf91c81912f505d6b61ab3d3207f1"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\19-Exe2ArcResultPolicyTests.cs",
+        "bytes": 3924,
+        "sha256": "4f2a4b1e42eac3edbec6fe3575867b737e3facd5ad12be368c817c0863c81159"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\2-Exe2ArcIo.cs",
+        "bytes": 5166,
+        "sha256": "bcc711ed8e009f06ca1690f224a00e1ee39898b5be266568a919e3555eb475d0"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\20-Exe2ArcScannerSelectionTests.cs",
+        "bytes": 4583,
+        "sha256": "a33f4171b02c8f2d183c1e4ba318d6e5e07188d296f4ffd3b4e02aaa0dd6be0c"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\21-Exe2ArcTestIo.cs",
+        "bytes": 14356,
+        "sha256": "42041b9fb1f2ec30c6d60242ea2f8d0847b9ebe0e72ccba333cf612bb4258e4e"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\22-Exe2ArcTypeSelectionTests.cs",
+        "bytes": 3715,
+        "sha256": "c540368f417d9a06bdde76849a4477f1ec524edef2cb95ec68cdb8ec318151f1"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\23-Exe2ArcZipRecordExtractorTests.cs",
+        "bytes": 4280,
+        "sha256": "650aa7c55a37c8747d1684c1c215e29d2699c6cfb5b4df6a28690d5168f9285b"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\24-Exe2ArcZipRecordRewriterTests.cs",
+        "bytes": 5770,
+        "sha256": "c684c6f4cb0f146fb6030c7160deae89cf2c84ea03f71d2f07fab326db618dda"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\25-Exe2ArcZipScannerTests.cs",
+        "bytes": 3387,
+        "sha256": "8c1950bdcef116917529e040e6dbd2295ea3949332ad35180981d09ad9a9085a"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\3-Exe2ArcLhaScanner.cs",
+        "bytes": 2588,
+        "sha256": "048025e7f8714f45e113c6d3758b2eced3dd9dc440ceb84b71ce0b1774e872da"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\4-Exe2ArcOutputName.cs",
+        "bytes": 3794,
+        "sha256": "f57809c783371bae71660590d02866b4d389e61aab597c99fcef6eb1001f97f9"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\5-Exe2ArcOutputSelection.cs",
+        "bytes": 2417,
+        "sha256": "9c9379bd39be5295b7fc43bf2873b0fa1f691ffd7c93d4721c1ecc3774d17bd0"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\6-Exe2ArcPayloadCopy.cs",
+        "bytes": 2566,
+        "sha256": "408de9299f807965674252100a074a092ac1d8a371590c3c532175af56b72f19"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\7-Exe2ArcResultPolicy.cs",
+        "bytes": 4706,
+        "sha256": "6e2934d941383cdaffa83d205246b4585f2423c5128f5c6b93e31228a4157287"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\8-Exe2ArcScannerSelection.cs",
+        "bytes": 5496,
+        "sha256": "8a4bc82d1571f2a4c34115daacb2d83df9437439f6676674e2df8beb7d1a5e19"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-source\\source\\9-Exe2ArcTypeSelection.cs",
+        "bytes": 5791,
+        "sha256": "cc693a895efce4c9eeaa9d5e51a52c5996b2893165ce37c4e3b1993a1ec78ec1"
+      },
+      {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-tests.log",
+        "bytes": 823,
+        "sha256": "1a79538c34b90224c767a76e612abc02e3307605d6b172e7c406f4b20305b05f"
+      }
+    ]
+  },
+  "installedBefore": {
+    "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\installed\\C\\Exe2Arc",
+    "bytes": 14708,
+    "sha256": "80f20051347d74f63af387c13b6d357f9298be9ec9525df0ebe69677031bffc1"
+  },
+  "candidate": {
+    "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\repaired\\candidate\\C\\Exe2Arc",
+    "bytes": 14652,
+    "sha256": "6a045b00a39a6ed91a4a1593df18ed585f4e7f1a71f4b3543dce882c4494bed6"
+  },
+  "compilerComparisons": {
+    "baseline": {
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\repaired\\baseline\\C\\Exe2Arc",
+        "bytes": 14680,
+        "sha256": "dba3d909870a275cf2cb8009bd7914c4b28d16a3a93f6656738fb95b20e0193b"
+      },
+      "response": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\repaired\\baseline\\compile.rsp",
+        "bytes": 1006,
+        "sha256": "8453e5ead2de89b4e67dabc5135541b181e407f41dc9bad2ed150831e594d1f6"
+      },
+      "records": {
+        "RESIDENT-CONTEXT": {
+          "bytes": 8,
+          "placement": "stack"
+        },
+        "CODE-SIZE": {
+          "mode": "off"
+        },
+        "GENERATED-SIZE": {
+          "passes": "none"
+        },
+        "METRICS": {
+          "artifact-bytes": 14680,
+          "code-bytes": 14514,
+          "rom-bytes": 14514,
+          "rom-code-bytes": 13852,
+          "rom-rodata-bytes": 662,
+          "initialized-ram-bytes": 0,
+          "bss-bytes": 0,
+          "symbols": 99,
+          "relocations": 28,
+          "loops": 14,
+          "framework-features": 0,
+          "managed-allocation-sites": 0
+        },
+        "PEEPHOLE": {
+          "mode": "FixedPoint",
+          "analyzed-bytes": 624028,
+          "batches": 107,
+          "rewrites": 1460,
+          "rounds": 357,
+          "method-ranges": 96,
+          "converged": "yes",
+          "terminal-groups": 0,
+          "terminal-merged-copies": 0,
+          "terminal-inverted-branches": 0,
+          "terminal-trampolines": 0,
+          "terminal-gross-bytes-removed": 0,
+          "terminal-branch-bytes-added": 0,
+          "terminal-net-bytes-saved": 0,
+          "return-condition-targets": 0,
+          "return-condition-tests-removed": 0,
+          "return-condition-tests-inserted": 0,
+          "return-condition-net-bytes-saved": 0,
+          "identical-method-groups": 0,
+          "identical-method-thunks": 0,
+          "identical-method-gross-bytes-removed": 0,
+          "identical-method-jump-bytes-added": 0,
+          "identical-method-net-bytes-saved": 0
+        },
+        "MACHINE": {
+          "scc": 97,
+          "devirtualized-calls": 0,
+          "inlined-calls": 81,
+          "single-use-inlined-calls": 0,
+          "retained-methods": 96,
+          "estimated-cost-before": 299350,
+          "estimated-cost-after": 291642
+        },
+        "AGGREGATE-FORWARDING": {
+          "return-buffers": 2,
+          "private-locals": 3,
+          "temporary-homes-removed": 3,
+          "temporary-frame-bytes-removed": 84
+        },
+        "BULK-COPY": {
+          "calls": 0,
+          "static-copy-bytes": 0,
+          "return-calls": 0,
+          "return-bytes": 0,
+          "local-calls": 0,
+          "local-bytes": 0,
+          "argument-calls": 0,
+          "argument-bytes": 0,
+          "unclassified-calls": 0,
+          "unclassified-bytes": 0,
+          "managed-providers": 0,
+          "external-providers": 0
+        }
+      },
+      "reachableMethods": 99,
+      "largestMethods": [
+        {
+          "offset": 308,
+          "bytes": 1688,
+          "method": "CopperOS.Commands.Native.NativeMorphOSExe2ArcCommand::Run"
+        },
+        {
+          "offset": 3920,
+          "bytes": 1232,
+          "method": "CopperOS.Commands.Exe2ArcZipRecordExtractor::Extract<CopperOS.Commands.Native.NativeExe2ArcIo>"
+        },
+        {
+          "offset": 8842,
+          "bytes": 1176,
+          "method": "CopperOS.Commands.Exe2ArcZipScanner::Scan<CopperOS.Commands.Native.NativeExe2ArcIo>"
+        },
+        {
+          "offset": 11114,
+          "bytes": 986,
+          "method": "CopperOS.Commands.Exe2ArcForwardScanner::Scan<CopperOS.Commands.Native.NativeExe2ArcIo>"
+        },
+        {
+          "offset": 6556,
+          "bytes": 552,
+          "method": "CopperOS.Commands.Exe2ArcScannerSelection::ScanOne<CopperOS.Commands.Native.NativeExe2ArcIo>"
+        },
+        {
+          "offset": 10186,
+          "bytes": 470,
+          "method": "CopperOS.Commands.Exe2ArcLhaScanner::Scan<CopperOS.Commands.Native.NativeExe2ArcIo>"
+        },
+        {
+          "offset": 5152,
+          "bytes": 402,
+          "method": "CopperOS.Commands.Exe2ArcPayloadCopy::Copy<CopperOS.Commands.Native.NativeExe2ArcIo>"
+        },
+        {
+          "offset": 3248,
+          "bytes": 382,
+          "method": "CopperOS.Commands.Exe2ArcOutputName::TryBuild<CopperOS.Commands.Native.NativeExe2ArcOutputIo>"
+        },
+        {
+          "offset": 12950,
+          "bytes": 332,
+          "method": "CopperOS.Commands.Exe2ArcHeaderProbe::TryInspectArj<CopperOS.Commands.Native.NativeExe2ArcIo>"
+        },
+        {
+          "offset": 5858,
+          "bytes": 312,
+          "method": "CopperOS.Commands.Native.NativeCommandArguments::TryRead"
+        }
+      ]
+    },
+    "candidate": {
+      "image": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\repaired\\candidate\\C\\Exe2Arc",
+        "bytes": 14652,
+        "sha256": "6a045b00a39a6ed91a4a1593df18ed585f4e7f1a71f4b3543dce882c4494bed6"
+      },
+      "response": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\repaired\\candidate\\compile.rsp",
+        "bytes": 1007,
+        "sha256": "cb360f199b37c47bf07413087c59e5ec246b18387d56665d48af4a8b1e81ac2f"
+      },
+      "records": {
+        "RESIDENT-CONTEXT": {
+          "bytes": 8,
+          "placement": "stack"
+        },
+        "CODE-SIZE": {
+          "mode": "off"
+        },
+        "GENERATED-SIZE": {
+          "passes": "none"
+        },
+        "METRICS": {
+          "artifact-bytes": 14652,
+          "code-bytes": 14486,
+          "rom-bytes": 14486,
+          "rom-code-bytes": 13824,
+          "rom-rodata-bytes": 662,
+          "initialized-ram-bytes": 0,
+          "bss-bytes": 0,
+          "symbols": 99,
+          "relocations": 28,
+          "loops": 14,
+          "framework-features": 0,
+          "managed-allocation-sites": 0
+        },
+        "PEEPHOLE": {
+          "mode": "FixedPoint",
+          "analyzed-bytes": 623612,
+          "batches": 107,
+          "rewrites": 1460,
+          "rounds": 357,
+          "method-ranges": 96,
+          "converged": "yes",
+          "terminal-groups": 0,
+          "terminal-merged-copies": 0,
+          "terminal-inverted-branches": 0,
+          "terminal-trampolines": 0,
+          "terminal-gross-bytes-removed": 0,
+          "terminal-branch-bytes-added": 0,
+          "terminal-net-bytes-saved": 0,
+          "return-condition-targets": 0,
+          "return-condition-tests-removed": 0,
+          "return-condition-tests-inserted": 0,
+          "return-condition-net-bytes-saved": 0,
+          "identical-method-groups": 0,
+          "identical-method-thunks": 0,
+          "identical-method-gross-bytes-removed": 0,
+          "identical-method-jump-bytes-added": 0,
+          "identical-method-net-bytes-saved": 0
+        },
+        "MACHINE": {
+          "scc": 97,
+          "devirtualized-calls": 0,
+          "inlined-calls": 81,
+          "single-use-inlined-calls": 0,
+          "retained-methods": 96,
+          "estimated-cost-before": 299350,
+          "estimated-cost-after": 291642
+        },
+        "AGGREGATE-FORWARDING": {
+          "return-buffers": 2,
+          "private-locals": 3,
+          "temporary-homes-removed": 3,
+          "temporary-frame-bytes-removed": 84
+        },
+        "BULK-COPY": {
+          "calls": 0,
+          "static-copy-bytes": 0,
+          "return-calls": 0,
+          "return-bytes": 0,
+          "local-calls": 0,
+          "local-bytes": 0,
+          "argument-calls": 0,
+          "argument-bytes": 0,
+          "unclassified-calls": 0,
+          "unclassified-bytes": 0,
+          "managed-providers": 0,
+          "external-providers": 0
+        }
+      },
+      "reachableMethods": 99,
+      "largestMethods": [
+        {
+          "offset": 308,
+          "bytes": 1688,
+          "method": "CopperOS.Commands.Native.NativeMorphOSExe2ArcCommand::Run"
+        },
+        {
+          "offset": 3906,
+          "bytes": 1232,
+          "method": "CopperOS.Commands.Exe2ArcZipRecordExtractor::Extract<CopperOS.Commands.Native.NativeExe2ArcIo>"
+        },
+        {
+          "offset": 8814,
+          "bytes": 1176,
+          "method": "CopperOS.Commands.Exe2ArcZipScanner::Scan<CopperOS.Commands.Native.NativeExe2ArcIo>"
+        },
+        {
+          "offset": 11086,
+          "bytes": 986,
+          "method": "CopperOS.Commands.Exe2ArcForwardScanner::Scan<CopperOS.Commands.Native.NativeExe2ArcIo>"
+        },
+        {
+          "offset": 6528,
+          "bytes": 552,
+          "method": "CopperOS.Commands.Exe2ArcScannerSelection::ScanOne<CopperOS.Commands.Native.NativeExe2ArcIo>"
+        },
+        {
+          "offset": 10158,
+          "bytes": 470,
+          "method": "CopperOS.Commands.Exe2ArcLhaScanner::Scan<CopperOS.Commands.Native.NativeExe2ArcIo>"
+        },
+        {
+          "offset": 5138,
+          "bytes": 402,
+          "method": "CopperOS.Commands.Exe2ArcPayloadCopy::Copy<CopperOS.Commands.Native.NativeExe2ArcIo>"
+        },
+        {
+          "offset": 3234,
+          "bytes": 382,
+          "method": "CopperOS.Commands.Exe2ArcOutputName::TryBuild<CopperOS.Commands.Native.NativeExe2ArcOutputIo>"
+        },
+        {
+          "offset": 12922,
+          "bytes": 332,
+          "method": "CopperOS.Commands.Exe2ArcHeaderProbe::TryInspectArj<CopperOS.Commands.Native.NativeExe2ArcIo>"
+        },
+        {
+          "offset": 5830,
+          "bytes": 312,
+          "method": "CopperOS.Commands.Native.NativeCommandArguments::TryRead"
+        }
+      ]
+    }
+  },
+  "qualification": {
+    "command": "Exe2Arc",
+    "beforeBytes": 14680,
+    "afterBytes": 14652,
+    "savedBytes": 28,
+    "checks": [
+      {
+        "cpu": "68000",
+        "suite": "exe2arc-native-entry-vector-fixture",
+        "passed": true,
+        "baselineFailure": null,
+        "candidateFailure": null,
+        "differentCases": [],
+        "invocations": 63,
+        "instructionsBefore": 13844949,
+        "instructionsAfter": 13843861,
+        "peakStackBefore": 940,
+        "peakStackAfter": 940,
+        "coreVersion": "Copper68k 1.5.1",
+        "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+      },
+      {
+        "cpu": "68020",
+        "suite": "exe2arc-native-entry-vector-fixture",
+        "passed": true,
+        "baselineFailure": null,
+        "candidateFailure": null,
+        "differentCases": [],
+        "invocations": 63,
+        "instructionsBefore": 13844949,
+        "instructionsAfter": 13843861,
+        "peakStackBefore": 940,
+        "peakStackAfter": 940,
+        "coreVersion": "Copper68k 1.5.1",
+        "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+      },
+      {
+        "cpu": "68040",
+        "suite": "exe2arc-native-entry-vector-fixture",
+        "passed": true,
+        "baselineFailure": null,
+        "candidateFailure": null,
+        "differentCases": [],
+        "invocations": 63,
+        "instructionsBefore": 13844949,
+        "instructionsAfter": 13843861,
+        "peakStackBefore": 940,
+        "peakStackAfter": 940,
+        "coreVersion": "Copper68k 1.5.1",
+        "coreSha256": "99173918a4da1cd5446d8f6e115e6b5c4d0a8f1c7f9173261c754988d3cbcb8f"
+      }
+    ],
+    "passed": true,
+    "qualified": true,
+    "accept": true
+  },
+  "negativeControls": [
+    {
+      "cpu": "68000",
+      "suite": "exe2arc-native-entry-vector-fixture",
+      "expectedCase": "extract-zip",
+      "rejected": true,
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\original-68000-exe2arc-native-entry-vector-fixture.json",
+        "bytes": 5994,
+        "sha256": "66515d38309092005706c16d2050ed3e60925c21c6f73a9b2d36559ead42b5ad"
+      }
+    },
+    {
+      "cpu": "68000",
+      "suite": "exe2arc-type-diagnostic-native-probe",
+      "expectedCase": "unknown-type",
+      "rejected": true,
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\original-68000-exe2arc-type-diagnostic-native-probe.json",
+        "bytes": 4921,
+        "sha256": "a0f22bbc519f14d9bf5adeb0b0c506a42ae57aef61d6adff089e90c6232af381"
+      }
+    },
+    {
+      "cpu": "68000",
+      "suite": "exe2arc-type-diagnostic-native-probe",
+      "expectedCase": "embedded-nul-diagnostic",
+      "rejected": true,
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\nul-literal-68000.json",
+        "bytes": 3343,
+        "sha256": "f20092c0ad9de2bac65070a588030a5f7996baf8f9b80b8469457175711240d9"
+      }
+    },
+    {
+      "cpu": "68020",
+      "suite": "exe2arc-native-entry-vector-fixture",
+      "expectedCase": "extract-zip",
+      "rejected": true,
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\original-68020-exe2arc-native-entry-vector-fixture.json",
+        "bytes": 6118,
+        "sha256": "bce75d73ef0608b0c64938ee7dcc5b245faf132df2a594e0d5ab73adcad5438f"
+      }
+    },
+    {
+      "cpu": "68020",
+      "suite": "exe2arc-type-diagnostic-native-probe",
+      "expectedCase": "unknown-type",
+      "rejected": true,
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\original-68020-exe2arc-type-diagnostic-native-probe.json",
+        "bytes": 5045,
+        "sha256": "e5b0cff0ba40ecba20c7febabfd364cf365fd827f2e32ecfccfe055c56997bfd"
+      }
+    },
+    {
+      "cpu": "68020",
+      "suite": "exe2arc-type-diagnostic-native-probe",
+      "expectedCase": "embedded-nul-diagnostic",
+      "rejected": true,
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\nul-literal-68020.json",
+        "bytes": 3343,
+        "sha256": "f77ac4b3a5ae31b77b4ab9f229b61daf9c8f41b0d187d83bd1ff92cb44c836f3"
+      }
+    },
+    {
+      "cpu": "68040",
+      "suite": "exe2arc-native-entry-vector-fixture",
+      "expectedCase": "extract-zip",
+      "rejected": true,
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\original-68040-exe2arc-native-entry-vector-fixture.json",
+        "bytes": 6298,
+        "sha256": "536d0da1af419a10e0ed11810e81f0f0f94351dd360bb6d117e75f25a663d532"
+      }
+    },
+    {
+      "cpu": "68040",
+      "suite": "exe2arc-type-diagnostic-native-probe",
+      "expectedCase": "unknown-type",
+      "rejected": true,
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\original-68040-exe2arc-type-diagnostic-native-probe.json",
+        "bytes": 5225,
+        "sha256": "b8ba070c098f4d52f8f83b4cc067ef4f75d8ea96b72eec85be258fd216e1833d"
+      }
+    },
+    {
+      "cpu": "68040",
+      "suite": "exe2arc-type-diagnostic-native-probe",
+      "expectedCase": "embedded-nul-diagnostic",
+      "rejected": true,
+      "receipt": {
+        "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\nul-literal-68040.json",
+        "bytes": 3343,
+        "sha256": "31e3c22407845bc2b34369da355fb970d226cbe80b2b704165f408cd7c8fd253"
+      }
+    }
+  ],
+  "receipts": [
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\original-68000-exe2arc-native-entry-vector-fixture.json",
+      "bytes": 5994,
+      "sha256": "66515d38309092005706c16d2050ed3e60925c21c6f73a9b2d36559ead42b5ad"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\original-68000-exe2arc-type-diagnostic-native-probe.json",
+      "bytes": 4921,
+      "sha256": "a0f22bbc519f14d9bf5adeb0b0c506a42ae57aef61d6adff089e90c6232af381"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\original-68020-exe2arc-native-entry-vector-fixture.json",
+      "bytes": 6118,
+      "sha256": "bce75d73ef0608b0c64938ee7dcc5b245faf132df2a594e0d5ab73adcad5438f"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\original-68020-exe2arc-type-diagnostic-native-probe.json",
+      "bytes": 5045,
+      "sha256": "e5b0cff0ba40ecba20c7febabfd364cf365fd827f2e32ecfccfe055c56997bfd"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\original-68040-exe2arc-native-entry-vector-fixture.json",
+      "bytes": 6298,
+      "sha256": "536d0da1af419a10e0ed11810e81f0f0f94351dd360bb6d117e75f25a663d532"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\original-68040-exe2arc-type-diagnostic-native-probe.json",
+      "bytes": 5225,
+      "sha256": "b8ba070c098f4d52f8f83b4cc067ef4f75d8ea96b72eec85be258fd216e1833d"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\repaired\\baseline\\execution\\Exe2Arc.68000.exe2arc-native-entry-vector-fixture.json",
+      "bytes": 357318,
+      "sha256": "a4009a6e74d4008fde19cc332ba81a2d83734d7ebc6808b6ad55460b0b5b5a85"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\repaired\\baseline\\execution\\Exe2Arc.68020.exe2arc-native-entry-vector-fixture.json",
+      "bytes": 357318,
+      "sha256": "c88d1f1381c0b419e1f731b674cc7e8da9edfce4767c59fdfa27bf361d50bf04"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\repaired\\baseline\\execution\\Exe2Arc.68040.exe2arc-native-entry-vector-fixture.json",
+      "bytes": 357318,
+      "sha256": "d3b22b4dc706343534f234205af03ae8a3546518ff13b51a8d41ccd78a0ee945"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\repaired\\candidate\\execution\\Exe2Arc.68000.exe2arc-native-entry-vector-fixture.json",
+      "bytes": 357319,
+      "sha256": "796309229133f4d884b9da8a8879636933d6dacbd7b78be1874e57d3311a3506"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\repaired\\candidate\\execution\\Exe2Arc.68020.exe2arc-native-entry-vector-fixture.json",
+      "bytes": 357319,
+      "sha256": "19f898fcdac8bad02c9da03f38862a861ce7ff19bed994885f2eb6a7be768664"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\repaired\\candidate\\execution\\Exe2Arc.68040.exe2arc-native-entry-vector-fixture.json",
+      "bytes": 357319,
+      "sha256": "baa4a10c7c4287d72a0a38bb69d88e78c24c0454915a6411494d3fc03b7796aa"
+    }
+  ],
+  "componentTests": [
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\unit-results\\components.trx",
+      "bytes": 349201,
+      "sha256": "bbd731cb13134149dc4c32bba1053afaffa591388109af0d4ad7250d964603ae"
+    }
+  ],
+  "componentTestCounts": {
+    "total": "221",
+    "executed": "221",
+    "passed": "221",
+    "failed": "0",
+    "error": "0",
+    "timeout": "0",
+    "aborted": "0",
+    "inconclusive": "0",
+    "passedButRunAborted": "0",
+    "notRunnable": "0",
+    "notExecuted": "0",
+    "disconnected": "0",
+    "warning": "0",
+    "completed": "0",
+    "inProgress": "0",
+    "pending": "0"
+  },
+  "totalBefore": 221948,
+  "totalAfter": 221892,
+  "nulLiteralControl": {
+    "source": {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\repaired\\candidate\\C\\Exe2Arc",
+      "bytes": 14652,
+      "sha256": "6a045b00a39a6ed91a4a1593df18ed585f4e7f1a71f4b3543dce882c4494bed6"
+    },
+    "mutant": {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\artifacts\\exe2arc-runtime-v8-20261017\\nul-literal-control",
+      "bytes": 14652,
+      "sha256": "0832b6e3f4522323b04d24dbd9af40a88e82cde163c0f0bba4093866d8cc44e1"
+    },
+    "replacements": 3
+  },
+  "tools": [
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\Commands\\qualify_exe2arc_runtime.py",
+      "bytes": 16913,
+      "sha256": "617baa86992c6dbde42106d8859119089a292ceacc4e5ae55f0e04d2a0c2ca48"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\tools\\Commands\\qualify_sizes.py",
+      "bytes": 11395,
+      "sha256": "ee72a615604519b8185e26155fbfda6a52db96c8612df988fded17b21c8e6967"
+    }
+  ],
+  "installedInventory": [
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\AddBuffers",
+      "bytes": 1084,
+      "sha256": "65def8103fcfdd36e0fdb29abfba96a0fd8ddec671ddcf2370ca24f83a8198b7"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\AddDataTypes",
+      "bytes": 7624,
+      "sha256": "0e49b059ebb60843a6b29cc22fa8a5e6a5eaf917efb01777e741df05468f1b97"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Assign",
+      "bytes": 2056,
+      "sha256": "ea3e50cb068c1447b0b88ad8bdc6efa4afa433f01b7112a34542a46b4c226704"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Avail",
+      "bytes": 1564,
+      "sha256": "0ab4605033255cf6373c22ffe1a0ef4696eb7b8dfdba8ec45c1a94e95dc0d9c8"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Beep",
+      "bytes": 268,
+      "sha256": "c98218c490f10230a5d76c75288f3fc69ad2c647e279a6555bd8b8679127a0a6"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\BindDrivers",
+      "bytes": 2096,
+      "sha256": "2f97f20baba4afacd69d30a2cdafc7acee9e558ad0dfcf7c60666ecef3a0e73b"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Break",
+      "bytes": 1364,
+      "sha256": "efddc444d95dcae15c6b1867ae7c92b2633aa41def3b7e9ea2dcbdb3f62c45b8"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\ChangeTaskPri",
+      "bytes": 1360,
+      "sha256": "d5ba815e6bef4673934b962835e6e28cdd0ee36e876a3436457d7c3b48b7557f"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Check2090",
+      "bytes": 504,
+      "sha256": "a9b14ebacf905c4c97ff3f191d3c1b4c6f0b4ce70e4b1e451d016496372daaf8"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Copy",
+      "bytes": 15236,
+      "sha256": "0539c9bc65ae6d6adf2adf38a286beaba6a455a937e37dd022b2c28676dc7378"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Date",
+      "bytes": 2528,
+      "sha256": "36bc575cd0c626b7fa7e392fd0abc1bb5dcfd329b4bfb6640eb751142512d6e0"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Delete",
+      "bytes": 5612,
+      "sha256": "efd9a743cf9f53747ce3dd710bd85d6e9cf990f0357b6b515cc9970cc5c3fcd3"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\DevList",
+      "bytes": 1196,
+      "sha256": "1f71a12e6df8f6071d39da3dbb69418aa8c380cc38481e7292aced5a0a0fb29d"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Dir",
+      "bytes": 6164,
+      "sha256": "375986a78d6dad236d9b831ef6e74bc342b18363e0b162d69f36bc526be72963"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\DiskChange",
+      "bytes": 1188,
+      "sha256": "51255cba5806eeddaac3e6e61af13c7be095dcaf76928bb9210dbac2611e3ec5"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\DiskFree",
+      "bytes": 1976,
+      "sha256": "2b190942f66dcae8c9d6675844e566ce008fa32e82b1b2adcaf1f4b107f21c8d"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\DosList",
+      "bytes": 9736,
+      "sha256": "14f10d06710308ca800803937f7a8ef38086290cb574fd22fbf27b604f516c0d"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Eval",
+      "bytes": 9568,
+      "sha256": "663550a933ff9d978630f311fa35aa6a5a4f5d183a6514eb15ebb6f7a15f1045"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Exe2Arc",
+      "bytes": 14652,
+      "sha256": "6a045b00a39a6ed91a4a1593df18ed585f4e7f1a71f4b3543dce882c4494bed6"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Execute",
+      "bytes": 5812,
+      "sha256": "59a8c698feff71ba68d937a40d962731013a5d11242aa584c04c663a3fb3cdaf"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\ExtractKickstart",
+      "bytes": 2640,
+      "sha256": "7747130cbe37ef8c52952a0c9fa326f92d93faa11c220a08f3d046478cfe6523"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\FileNote",
+      "bytes": 2048,
+      "sha256": "890dee7c890f03dfc8b8eccdeb7ab5d6c470985966201b550efbbdd5792d8cc5"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\FindResident",
+      "bytes": 1060,
+      "sha256": "bc894bf4bdfd6dd929ff731a483b1512ec669b09bf7465bf48707b5592f53380"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Format",
+      "bytes": 7696,
+      "sha256": "4cfe7b53e594c27f0f7617eb9ced8c532cd738b767cb3b0f86bd475281d4fb6d"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\GuessBootDev",
+      "bytes": 2080,
+      "sha256": "1d2ac577530ba43652fb1e73206eced1ca54dbf19384ae5a9e51c960e47f411f"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\IconPos",
+      "bytes": 2424,
+      "sha256": "7db39a9d37973a073afd05ab968796e84ba94a05e54fb2dfb8c87b613d956b52"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Info",
+      "bytes": 3420,
+      "sha256": "3fc511ad36ea8e98bab0b0aa7df079bf31d8d73c43b5f22b746f65c101c28eb2"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Join",
+      "bytes": 2228,
+      "sha256": "7fe7cde7842fac135ea8fc104aad93a328170aafe29245da1aa9a93490a72334"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\LibList",
+      "bytes": 1204,
+      "sha256": "dcc1535abf1523c7d6fd9c0b4aef371b12e26edee223f156a0a8e5982cd85497"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\List",
+      "bytes": 4616,
+      "sha256": "1464c01b94c15aa5bf99f596c5641c1c3dfb8464a5fb155f5c8307edc7062549"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\LoadMonDrvs",
+      "bytes": 2528,
+      "sha256": "5bcdbbdac55db2e0d7a07ad513e79a4d6b94dc2910893cbdc5fded6d54006b20"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Lock",
+      "bytes": 1556,
+      "sha256": "2e34fa7a0645091c9d4da503b743eb941ac934817cb23b7351331ec8a3c61327"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\MakeDir",
+      "bytes": 1244,
+      "sha256": "e5d77765cad3db7953d06a7d698590600b1c787479f9e4b43c791c374f5b4cf3"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\MakeLink",
+      "bytes": 1792,
+      "sha256": "88b2f93432ed2cda0ee850be50449e93d1805fa6d627e4da270e034e75e27807"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\ModList",
+      "bytes": 2424,
+      "sha256": "20a109e789fe381f378876b2099cfda69adb58fef99cf04b75945b937b010890"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Mount",
+      "bytes": 11156,
+      "sha256": "8b7a876516fa6abc560f8aecfba6324e4b2259c552d3af7367fc75ee12d3c1b5"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\PathPart",
+      "bytes": 2084,
+      "sha256": "f4c511205e1418a7b99fcb0e621a202b74c112544313376a1d933beece126ccc"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\PortList",
+      "bytes": 1460,
+      "sha256": "45391e88dbf38ba990c6dd2ccc72066439459e92eacad9dc05b5f371f8b72377"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Protect",
+      "bytes": 3264,
+      "sha256": "19e56c1a3916da1e947d1b9cf5b861b7b557f846326df85dbc21c44a772ced2b"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Quote",
+      "bytes": 6040,
+      "sha256": "626b0e57b7d198fada3a0d23bd9b2e571a7a0f3ada48bdf880d01e5d054df521"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Reboot",
+      "bytes": 516,
+      "sha256": "ba1d8a80d16ee8eef517b2b3234b9a5ac38e4a50bef1353b785af2c8cd74076c"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Relabel",
+      "bytes": 1060,
+      "sha256": "a9e050245828737435099ba055eca6edcd4eae9bfbb9df7aa6f50e351940d866"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Rename",
+      "bytes": 2592,
+      "sha256": "53475580d41a5413d4d9cea7f3e14ba887c06d263a74399c9bea983203298e37"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\RequestChoice",
+      "bytes": 2204,
+      "sha256": "6b00ec0a7d21257a2643fd85021d4fec3eff82fa4e4d37e97de948c87b7b4ac2"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\RequestFile",
+      "bytes": 2952,
+      "sha256": "1a972022dc3dc8930f94552be436c1666aa0bbfef980d32834be589aa6ebe273"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\ResList",
+      "bytes": 1076,
+      "sha256": "d5c913bd1f0b7f511950d61a2153046c50b5cd1151daaafeb78793f13c0f5ed2"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Search",
+      "bytes": 5256,
+      "sha256": "62f74e3ea6497076ada5fa34630be2c2aef0d53cf8b5ba532cb7db1a2887d28f"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\SetClock",
+      "bytes": 1680,
+      "sha256": "26844e8011e81b0aea8d7799aa92207a7892e94582707643e68722381b4c9119"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\SetDate",
+      "bytes": 1816,
+      "sha256": "b2ef66a3ba7cf7ba4057cf0005e12316a9e2a49a996ae3190b80d3a1ac79405a"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\SetFont",
+      "bytes": 2644,
+      "sha256": "ee5a3d65cc0a297c39c97474d18ed2760f2e30db496f5d3c9da349299c7ea04b"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\SetKeyboard",
+      "bytes": 1616,
+      "sha256": "4aa4195934525152642a937e6a6786165c354ada639c4e4248845c647e7a37e7"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Status",
+      "bytes": 3564,
+      "sha256": "344ef7e9ed15352de05b70f259197a4b0a2f6e5e398edd1a4da476e92ee8c0f0"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\TaskList",
+      "bytes": 14076,
+      "sha256": "d97892531fb646e143ab6efd512209ef4a6afec63097be6376dcf76414772495"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Touch",
+      "bytes": 2120,
+      "sha256": "319be14383d67fba41b60c90bf005535360ef435f99b6b212896b2032f6edcb8"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Type",
+      "bytes": 4696,
+      "sha256": "2bfe809c94ae6d2d4fe9ccd7f8c56fddc008f83268aa2f588c47db770ab279af"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Version",
+      "bytes": 8548,
+      "sha256": "cd4c81d3fc1e86dd2d70fac65a7d2b4c417108099498989595b14d4f37842dd4"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Wait",
+      "bytes": 2356,
+      "sha256": "4c0ac9a4ab9c6eba4602a91148cd758223136c373213cc6c4e8331d3548afd6a"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\WaitForLib",
+      "bytes": 1300,
+      "sha256": "cf09789437087c63eb364729b2e35c6c903c44de076aab85a991ce95cdd2b86f"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\WaitForNotification",
+      "bytes": 1980,
+      "sha256": "830c867fcdd4ad8f4268eff5d167a2c0dbdcf455544160d9fc79ab467b8669da"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\WaitForPort",
+      "bytes": 1392,
+      "sha256": "333e0eac21c03e186cb44fe716c96285011851330d6267d1b64b2e6032142705"
+    },
+    {
+      "path": "C:\\Users\\ilkle\\Koodit\\GIT\\CopperOS\\out\\C\\Which",
+      "bytes": 3896,
+      "sha256": "a157132c98c3c106718671e34363551babb1c93b7c26d50c69a158c28cc1ec62"
+    }
+  ]
+}

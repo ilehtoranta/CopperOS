@@ -37,7 +37,7 @@ public static class Exe2ArcZipScanner
         if (!Exe2ArcIoBounds.HasScratch(ref io, scratch, scratchCapacity))
             return Exe2ArcIoStatus.InvalidBuffer;
 
-        int seek = io.Seek(input, 0, 2);
+        int seek = io.Seek(input, 0, (int)DosConstants.OffsetEnd);
         observation = Exe2ArcIoBounds.Observe(ref io,
             Exe2ArcIoStage.WindowSeek, seek, 0, 0);
         if (seek < 0)

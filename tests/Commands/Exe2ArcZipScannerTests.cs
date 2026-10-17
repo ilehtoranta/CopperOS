@@ -16,6 +16,8 @@ public sealed class Exe2ArcZipScannerTests
             out uint correction, out var observed);
 
         Assert.Equal(Exe2ArcIoStatus.Completed, status);
+        var firstSeek = state.Calls.First(call => call.Operation == "Seek");
+        Assert.Equal((int)DosConstants.OffsetEnd, firstSeek.Mode);
         Assert.Equal(30u, offset);
         Assert.Equal(130u, length);
         Assert.Equal(30u, correction);

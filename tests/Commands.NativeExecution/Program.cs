@@ -25,6 +25,8 @@ internal static class Program
             return LoadResourceActionsRuntimeSuite.Run(args);
         if (args.Length == 4 && args[3] == LoadResourceLaunchRuntimeSuite.Suite)
             return LoadResourceLaunchRuntimeSuite.Run(args);
+        if (args.Length == 4 && args[3] is CopperOS.Commands.Exe2ArcFrontendNativeExecution.FrontendCases.RuntimeSuite or CopperOS.Commands.Exe2ArcFrontendNativeExecution.FrontendCases.Suite or CopperOS.Commands.Exe2ArcFrontendNativeExecution.FrontendCases.TypeDiagnosticSuite)
+            return CopperOS.Commands.Exe2ArcFrontendNativeExecution.FrontendRuntimeSuite.Run(args);
         if (args.Length == 4 && args[3] == ExecuteEntrySuite.Suite)
             return ExecuteEntrySuite.Run(args);
         if (args.Length == 5 && args[3] == AddBuffersReferenceSuite.Suite)

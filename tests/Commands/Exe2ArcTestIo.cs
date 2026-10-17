@@ -212,7 +212,7 @@ internal sealed class Exe2ArcTestIoState
     internal int Seek(BPTR file, int position, int mode)
     {
         Assert.Equal(Input.Raw, file.Raw);
-        Assert.True(mode is -1 or 0 or 2);
+        Assert.True(mode is -1 or 0 or 1);
         int occurrence = Next("Seek");
         int result = Cursor;
         if (Faults.TryGetValue(("Seek", occurrence), out var fault))
@@ -220,7 +220,7 @@ internal sealed class Exe2ArcTestIoState
         if (result >= 0)
         {
             long next = mode == -1 ? position
-                : mode == 2 ? (long)InputBytes.Length + position
+                : mode == 1 ? (long)InputBytes.Length + position
                 : (long)Cursor + position;
             Assert.InRange(next, 0, InputBytes.Length);
             Cursor = (int)next;

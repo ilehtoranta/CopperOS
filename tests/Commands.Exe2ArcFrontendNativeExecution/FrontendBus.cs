@@ -9,7 +9,7 @@ internal sealed class FrontendBus : IM68kBus
 {
     private readonly Dictionary<uint, Action<M68kCpuState>> gateways = new();
     private readonly Dictionary<uint, Allocation> allocations = new();
-    private uint nextAllocation = 0x60000;
+    private uint nextAllocation = 0x200000;
     private uint imageStart;
     private uint imageLength;
     private byte[] imageSnapshot = [];
@@ -115,9 +115,13 @@ internal sealed class FrontendBus : IM68kBus
         var start = Offset(address, 1);
         var end = start;
         while (end < Memory.Length && Memory[end] != 0 && end - start < 4096)
+        {
+            CheckRead(address + (uint)(end-start), 1, M68kBusAccessKind.CpuDataRead);
             end++;
+        }
         Require(end < Memory.Length && Memory[end] == 0,
             "Unterminated guest C string.");
+        CheckRead(address + (uint)(end - start), 1, M68kBusAccessKind.CpuDataRead);
         return Encoding.Latin1.GetString(Memory, start, end - start);
     }
 
@@ -131,6 +135,7 @@ internal sealed class FrontendBus : IM68kBus
         Memory.AsSpan((int)address - 16, checked((int)bytes + 32)).Fill(0xa7);
         Memory.AsSpan((int)address, checked((int)bytes)).Clear();
         allocations.Add(address, new(owner, address, bytes, kind));
+        owner.Allocations.Add(kind+":"+bytes);
         return address;
     }
 
@@ -148,8 +153,16 @@ internal sealed class FrontendBus : IM68kBus
                 .IndexOfAnyExcept((byte)0xa7) < 0,
             $"{kind} allocation guard changed.");
         allocations.Remove(address);
+        owner.Releases.Add(kind+":"+allocation.Size);
         Memory.AsSpan((int)address, checked((int)allocation.Size)).Fill(0xdd);
     }
+
+    public void ValidateSpan(FrontendInvocation owner, uint address, int bytes, string kind)
+    {
+        Require(allocations.Values.Any(a => ReferenceEquals(a.Owner, owner) && a.Kind == kind && Contains(a.Address, a.Size, address, bytes)),
+            $"Invalid {kind} span ${address:X8}+{bytes}.");
+    }
+    public void ValidateRead(uint address, int bytes) => CheckRead(address, bytes, M68kBusAccessKind.CpuDataRead);
 
     public void AssertReleased(FrontendInvocation owner) => Require(
         allocations.Values.All(a => !ReferenceEquals(a.Owner, owner)),
@@ -170,18 +183,23 @@ internal sealed class FrontendBus : IM68kBus
         _ = Offset(address, bytes);
         var instruction = kind == M68kBusAccessKind.CpuInstructionFetch;
         var image = Contains(imageStart, imageLength, address, bytes);
-        var vector = gateways.Keys.Any(g => Contains(g, instruction ? 10u : 6u,
-            address, bytes));
+        // The 040 fetches aligned longwords starting at an eight-byte
+        // half-line boundary. Admit only the fetch span covering the six-byte
+        // stub and its existing four-byte prefetch tail.
+        // Data reads and actual instruction PCs keep their original bounds.
+        var vector = gateways.Keys.Any(g => instruction
+            ? Contains(g & ~7u, ((g + 13u) & ~3u) - (g & ~7u), address, bytes)
+            : Contains(g, 6u, address, bytes));
         var caller = instruction && Contains(0x2000, 8, address, bytes);
         var shared = Contains(4, 4, address, bytes) ||
             Contains(0x4000, 0x200, address, bytes);
-        var process = Contains(0x30000, 0x800, address, bytes);
+        var process = Current is not null && Contains(Current.Process, 0x800, address, bytes);
         var stack = Current is not null && Contains(Current.StackTop - Current.StackBytes,
             Current.StackBytes, address, bytes);
         var owned = Current is not null && allocations.Values.Any(a =>
             ReferenceEquals(a.Owner, Current) && Contains(a.Address, a.Size,
                 address, bytes));
-        var staticInput = Contains(0x35000, 0x1000, address, bytes);
+        var staticInput = Current is not null && Contains(Current.Arguments, 0x2000, address, bytes);
         Require(image || vector || caller || shared || process || stack || owned ||
             staticInput, $"Read outside fixture-owned storage at ${address:X8}.");
     }
@@ -195,11 +213,12 @@ internal sealed class FrontendBus : IM68kBus
             "Native write without an active invocation.");
         var stack = Contains(current.StackTop - current.StackBytes, current.StackBytes,
             address, bytes);
-        var process = Contains(0x30000, 0x800, address, bytes);
+        var process = Current is not null && Contains(Current.Process, 0x800, address, bytes);
         var owned = allocations.Values.Any(a => ReferenceEquals(a.Owner, current) &&
             a.Kind != "RDArgs" && Contains(a.Address, a.Size, address, bytes));
         Require(stack || process || owned,
             $"Native write outside invocation storage at ${address:X8}.");
+        if (stack) current.MinStack = Math.Min(current.MinStack, address);
         NativeWrites++;
     }
 

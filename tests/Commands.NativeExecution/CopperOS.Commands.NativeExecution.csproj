@@ -70,5 +70,10 @@
     <Compile Include="..\..\src\Commands\BindDrivers\Native\NativeMorphOSBindDriversCommand.cs" Link="NativeMorphOSBindDriversCommand.cs" />
     <Compile Include="..\..\src\Commands\BindDrivers\Native\NativeWorkbench31BindDriversCommand.cs" Link="NativeWorkbench31BindDriversCommand.cs" />
     <Compile Include="..\..\src\Commands\LoadMonDrvs\Native\NativeMorphOSLoadMonDrvsCommand.cs" Link="NativeMorphOSLoadMonDrvsCommand.cs" />
+    <Compile Include="..\Commands.Exe2ArcFrontendNativeExecution\Program.cs" Link="Exe2Arc\Program.cs" />
+    <Compile Include="..\Commands.Exe2ArcFrontendNativeExecution\FrontendCases.cs" Link="Exe2Arc\FrontendCases.cs" />
+    <Compile Include="..\Commands.Exe2ArcFrontendNativeExecution\FrontendFixture.cs" Link="Exe2Arc\FrontendFixture.cs" />
+    <Compile Include="..\Commands.Exe2ArcFrontendNativeExecution\FrontendInvocation.cs" Link="Exe2Arc\FrontendInvocation.cs" />
+    <Compile Include="..\Commands.Exe2ArcFrontendNativeExecution\FrontendBus.cs" Link="Exe2Arc\FrontendBus.cs" />
   </ItemGroup>
 </Project>
