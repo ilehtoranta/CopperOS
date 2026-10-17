@@ -123,7 +123,8 @@ public static class NativeMorphOSDirCommand
                     {
                         var ignored = default(NameRow);
                         ignored.Name = value;
-                        DOS.VPrintf("%c option ignored\n",
+                        // NameRow stores a long; plain %c consumes a word on Amiga DOS.
+                        DOS.VPrintf("%lc option ignored\n",
                             NameRow.AddressOf(ref ignored));
                     }
                 }

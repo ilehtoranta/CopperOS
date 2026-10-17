@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>CopperOS.DirQualification.Guest</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Guest.cs" />
+    <Reference Include="CopperSharp.Sdk.Amiga"><HintPath>$(FrozenInputs)/CopperSharp.Sdk.Amiga.dll</HintPath></Reference>
+    <Reference Include="CopperSharp.Compiler"><HintPath>$(FrozenInputs)/CopperSharp.Compiler.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

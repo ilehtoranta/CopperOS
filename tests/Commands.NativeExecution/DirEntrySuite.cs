@@ -124,6 +124,12 @@ internal sealed partial class ProbeFixture
             DirCase("opt-d", new(Option: "D"), "OPT D", DirOutput(new(Dirs: true))),
             DirCase("unknown-option", new(Option: "X"), "OPT X",
                 "X option ignored\n" + DirOutput(new())),
+            DirCase("unknown-option-z", new(Option: "Z"), "OPT Z",
+                "Z option ignored\n" + DirOutput(new())),
+            DirCase("unknown-option-lower", new(Option: "z"), "OPT z",
+                "z option ignored\n" + DirOutput(new())),
+            DirCase("multiple-unknown-options", new(Option: "Z?"), "OPT Z?",
+                "Z option ignored\n? option ignored\n" + DirOutput(new())),
             DirCase("empty", new(Empty: true), "", ""),
             DirCase("large-exall-directory", new(Entries: LargeDirEntries),
                 "", largeOutput),
@@ -811,10 +817,15 @@ internal sealed partial class ProbeFixture
         {
             var format = Bus.CString(state.D[1]);
             var args = state.D[2];
-            if (format == "%c option ignored\n")
+            if (format is "%c option ignored\n" or "%lc option ignored\n")
             {
+                // RawDoFmt consumes a word for %c and a long for %lc.
+                // Preserve that distinction so the old long-cell/%c ABI bug fails.
+                var character = unchecked((byte)(format[1] == 'l'
+                    ? Bus.Long(args) : Bus.Word(args)));
                 invocation.Output.Write(Encoding.Latin1.GetBytes(
-                    ((char)Bus.Long(args)).ToString() + " option ignored\n"));
+                    (character == 0 ? "" : ((char)character).ToString()) +
+                    " option ignored\n"));
             }
             else if (format == "%s (dir)")
             {
