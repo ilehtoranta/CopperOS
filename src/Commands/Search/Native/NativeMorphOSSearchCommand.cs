@@ -30,6 +30,7 @@ public static class NativeMorphOSSearchCommand
     private const uint PathBytes = 512;
     private const uint PatternBytes = 1024;
     private const uint UserPatternBytes = 1024;
+    private const uint LiteralPatternLengthOffset = PatternBytes;
     private const uint InputBytes = 8192;
     private const uint OutputBytes = 8192;
     private const uint MaximumContiguousFileBytes = 0x7fff0000u;
@@ -195,6 +196,9 @@ public static class NativeMorphOSSearchCommand
             {
                 CopyBytes(search, pattern, searchLength, 0);
                 APTR.WriteUInt8(pattern, unchecked((int)searchLength), 0);
+                // Literal mode no longer needs the pattern compiler's source
+                // scratch. Keep its immutable length in that invocation-owned slot.
+                APTR.WriteUInt32(userPattern, 0, searchLength);
             }
 
             var from = ReadPointer(ref arguments, 0);
@@ -1089,12 +1093,14 @@ public static class NativeMorphOSSearchCommand
     private static bool LiteralContains(APTR text, uint length, APTR pattern,
         bool caseSensitive, bool useLocale, uint locale)
     {
-        var patternLength = CStringLength(pattern, PatternBytes - 1);
+        // Literal preparation reuses the dead compiler-source scratch
+        // for this length. FILE/PATTERN never enter the literal matcher.
+        var patternLength = APTR.ReadUInt32(pattern, unchecked((int)LiteralPatternLengthOffset));
         if (patternLength == 0 || patternLength > length) return false;
         for (var start = 0u; start <= length - patternLength; start++)
         {
-            var matched = true;
-            for (var index = 0u; index < patternLength; index++)
+            var index = 0u;
+            for (; index < patternLength; index++)
             {
                 var left = APTR.ReadUInt8(text, unchecked((int)(start + index)));
                 var right = APTR.ReadUInt8(pattern, unchecked((int)index));
@@ -1106,10 +1112,9 @@ public static class NativeMorphOSSearchCommand
                         ? LocaleUpper(locale, right) : Fold(right);
                 }
                 if (left == right) continue;
-                matched = false;
                 break;
             }
-            if (matched) return true;
+            if (index == patternLength) return true;
         }
         return false;
     }

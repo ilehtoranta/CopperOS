@@ -308,13 +308,25 @@ internal sealed partial class ProbeFixture
                     SuccessfulWritesBeforeFailure: 1), "SRC:one.txt needle",
                 "     1> " + multipleChunks[..8192], outputFailureResult,
                 outputFailureError)];
+        var maximumLiteral = new string('n', 1022);
+        cases = [.. cases,
+            Search("literal-many-short-lines",
+                new(Content: string.Concat(Enumerable.Repeat("miss\n", 64)) +
+                    "needle\n"), "SRC:one.txt needle", "    65> needle\n"),
+            Search("literal-maximum-length",
+                new(Search: maximumLiteral,
+                    Content: maximumLiteral[..^1] + "\n" + maximumLiteral + "\n"),
+                "SRC:one.txt literal", "     2> " + maximumLiteral + "\n"),
+            Search("literal-empty-pattern", new(Search: "",
+                Content: "alpha\n\nlast"), "SRC:one.txt empty", "",
+                DOS.RETURN_WARN)];
         var reports = new List<object>();
         foreach (var test in cases) reports.AddRange(Execute([test], false));
         reports.AddRange(Execute([
             Search("interleaved-left", new(), "SRC:one.txt needle QUICK",
                 "     2> Needle\n"),
-            Search("interleaved-right", new(NoNumber: true),
-                "SRC:one.txt needle NONUM", "Needle\n")
+            Search("interleaved-right", new(NoNumber: true, Search: "last"),
+                "SRC:one.txt last NONUM", "last\n")
         ], true));
         Bus.AssertImageUnchanged();
         return reports;
@@ -333,7 +345,9 @@ internal sealed partial class ProbeFixture
         var definition = invocation.Definition.Search!;
         var control = invocation.Process + 0x200;
         var from = control + 64;
-        var search = control + 80;
+        // Reserve the full 1,024-byte argument string without overlapping the
+        // path, DeviceProc or traversal-chain fixtures in this process slot.
+        var search = control + 2048;
         var path = control + 600;
         var lines = control + 1120;
         invocation.SearchEntryLayout = new(control, from, search, path, lines);
