@@ -35,7 +35,8 @@ def request(cases):
     return bytes(raw)
 
 
-def verify_run(stage, directory):
+def verify_run(stage, directory, reference_stage=None):
+    reference_stage = stage if reference_stage is None else reference_stage
     result = read(directory/'result.json')
     cpu, batch = result['cpu'], result['batch']
     assert cpu in CPUS and batch in LIGHT+HEAVY
@@ -52,13 +53,13 @@ def verify_run(stage, directory):
     for name in names: assert (sysdir/name).read_bytes()==(stage/'inputs'/name).read_bytes()
     config = (directory/'run.uae').read_text(encoding='utf-8-sig').splitlines()
     # Require the original hardware/execution recipe; only the output directory changes.
-    old = (stage/'winuae/retry-cross-68000/run.uae').read_text(encoding='utf-8-sig').splitlines()
+    old = (reference_stage/'winuae/retry-cross-68000/run.uae').read_text(encoding='utf-8-sig').splitlines()
     normalize = lambda lines: [line for line in lines if not line.startswith(('filesystem2=', 'cpu_type=', 'cpu_model='))]
     assert normalize(config)==normalize(old)
     assert 'cpu_type='+cpu in config and 'cpu_model='+cpu in config
     assert [line for line in config if line.startswith('filesystem2=')]==['filesystem2=rw,DH0:Exe2ArcQualification:'+str(sysdir)+',1']
-    assert (sysdir/'S/Startup-Sequence').read_bytes()==(stage/'winuae/typed-68000/sys/S/Startup-Sequence').read_bytes()
-    assert (sysdir/'C/UAEquit').read_bytes()==(stage/'winuae/typed-68000/sys/C/UAEquit').read_bytes()
+    assert (sysdir/'S/Startup-Sequence').read_bytes()==(reference_stage/'winuae/typed-68000/sys/S/Startup-Sequence').read_bytes()
+    assert (sysdir/'C/UAEquit').read_bytes()==(reference_stage/'winuae/typed-68000/sys/C/UAEquit').read_bytes()
     raw = (sysdir/'PAYLOAD.OK').read_bytes()
     qualification = audit(cases,raw)
     assert qualification['passed'], (directory,qualification)

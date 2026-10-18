@@ -48,6 +48,10 @@
   <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Eval' and '$(CopperOSCodeSizePasses)' == ''">
     <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts,InlineMemoryHelpers,ShareArithmeticCores,SimplifyLoopPhis</CopperOSCodeSizePasses>
   </PropertyGroup>
+  <!-- Exe2Arc: unchanged-CIL scan qualification, 2026-10-18. -->
+  <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Exe2Arc' and '$(CopperOSCodeSizePasses)' == ''">
+    <CopperOSCodeSizePasses>SimplifyLoopPhis,RemoveRedundantTransport,CompactPrivateStackCopies,CompactGuestMemory,NarrowOperations,InlineMemoryHelpers,InlineSingleUseMethods,ElideUnusedRegisterArguments,ClusterInternalCalls,ReuseIncomingArgumentHomes</CopperOSCodeSizePasses>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(CopperOSCommandName)' == 'Execute' and '$(CopperOSCodeSizePasses)' == ''">
     <CopperOSCodeSizePasses>ElideUnusedRegisterArguments,ReuseIncomingArgumentHomes,ForwardReadOnlyAggregateLocals,InlineSingleUseMethods,ClusterInternalCalls,ShareIdenticalMethods,ShareReturnSequences,RemoveRedundantTransport,CompactGuestMemory,NarrowOperations,EliminateRedundantInitialization,SizeFirstCosts,InlineMemoryHelpers,ShareArithmeticCores,SimplifyLoopPhis</CopperOSCodeSizePasses>
   </PropertyGroup>
