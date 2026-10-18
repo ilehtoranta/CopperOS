@@ -3809,6 +3809,16 @@ internal sealed partial class ProbeFixture
                 invocation.CopyFileTransferLayout!.Buffer = buffer;
                 return buffer;
             }
+            if (invocation.Definition.CopySoftLink is not null)
+            {
+                Require(invocation.Allocations == 0 && state.D[0] == 512 &&
+                    state.D[1] == (uint)Exec.MemoryFlags.Public,
+                    "Soft-link probe buffer allocation differs.");
+                invocation.Allocations++;
+                invocation.AllocationRequests.Add(state.D[0]);
+                if (invocation.Definition.AllocationFailure) return 0;
+                return Bus.Allocate(invocation, 512, "Exec", false);
+            }
             if(recursiveCommandRoot&&RecursiveHasLinkDevice(invocation.Definition.CopyTraversalWork!.SingleFailure)&&invocation.Allocations>=3)
             {
                 Require(state.D[0]==512&&state.D[1]==(uint)Exec.MemoryFlags.Public&&invocation.Allocations<5,
