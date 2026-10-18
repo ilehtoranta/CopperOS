@@ -23,6 +23,7 @@ internal sealed class Exe2ArcTestIoState
     internal int Cursor;
     internal int Initialized;
     internal int ByteReads;
+    internal List<int>? ReadOffsets;
     internal int MappingCalls;
     internal int IoErrCalls;
     internal int SetIoErrCalls;
@@ -315,6 +316,7 @@ internal sealed class Exe2ArcTestIoState
         long index = (long)address.Raw - Scratch.Raw + offset;
         Assert.InRange(index, 0, Initialized - 1);
         ByteReads++;
+        ReadOffsets?.Add((int)index);
         return Storage[GuardBytes + (int)index];
     }
 

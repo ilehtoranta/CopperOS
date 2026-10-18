@@ -57,6 +57,17 @@ public static class Exe2ArcHeaderProbe
             fileOffset, fileLength, 7, out uint remaining))
             return false;
 
+        if (!MatchesMappedRar4(ref memory, header))
+            return false;
+
+        payloadLength = remaining;
+        return true;
+    }
+
+    // The caller has proved the fixed header span mapped and in range.
+    internal static bool MatchesMappedRar4<TMemory>(ref TMemory memory, APTR header)
+        where TMemory : struct, IAmigaGuestMemory
+    {
         if (memory.ReadUInt8(header, 0) != 0x52 ||
             memory.ReadUInt8(header, 1) != 0x61 ||
             memory.ReadUInt8(header, 2) != 0x72 ||
@@ -66,7 +77,6 @@ public static class Exe2ArcHeaderProbe
             memory.ReadUInt8(header, 6) != 0x00)
             return false;
 
-        payloadLength = remaining;
         return true;
     }
 
@@ -99,6 +109,14 @@ public static class Exe2ArcHeaderProbe
             fileOffset, fileLength, 20, out uint remaining))
             return false;
 
+        return TryInspectMappedCabinet(ref memory, header, remaining, out payloadLength);
+    }
+
+    // The caller has proved the fixed header span mapped and in range.
+    internal static bool TryInspectMappedCabinet<TMemory>(ref TMemory memory, APTR header, uint remaining, out uint payloadLength)
+        where TMemory : struct, IAmigaGuestMemory
+    {
+        payloadLength = 0;
         if (memory.ReadUInt8(header, 0) != (byte)'M' ||
             memory.ReadUInt8(header, 1) != (byte)'S' ||
             memory.ReadUInt8(header, 2) != (byte)'C' ||
@@ -143,6 +161,17 @@ public static class Exe2ArcHeaderProbe
             fileOffset, fileLength, 14, out uint remaining))
             return false;
 
+        if (!MatchesMappedAce(ref memory, header))
+            return false;
+
+        payloadLength = remaining;
+        return true;
+    }
+
+    // The caller has proved the fixed header span mapped and in range.
+    internal static bool MatchesMappedAce<TMemory>(ref TMemory memory, APTR header)
+        where TMemory : struct, IAmigaGuestMemory
+    {
         if (memory.ReadUInt8(header, 7) != (byte)'*' ||
             memory.ReadUInt8(header, 8) != (byte)'*' ||
             memory.ReadUInt8(header, 9) != (byte)'A' ||
@@ -152,7 +181,6 @@ public static class Exe2ArcHeaderProbe
             memory.ReadUInt8(header, 13) != (byte)'*')
             return false;
 
-        payloadLength = remaining;
         return true;
     }
 
@@ -187,6 +215,14 @@ public static class Exe2ArcHeaderProbe
             fileOffset, fileLength, 4, out uint remaining))
             return false;
 
+        return TryInspectMappedArj(ref memory, header, headerBytes, remaining, out payloadLength);
+    }
+
+    // The caller has proved the fixed header span mapped and in range.
+    internal static bool TryInspectMappedArj<TMemory>(ref TMemory memory, APTR header, uint headerBytes, uint remaining, out uint payloadLength)
+        where TMemory : struct, IAmigaGuestMemory
+    {
+        payloadLength = 0;
         if (memory.ReadUInt8(header, 0) != 0x60 ||
             memory.ReadUInt8(header, 1) != 0xea)
             return false;
@@ -256,6 +292,17 @@ public static class Exe2ArcHeaderProbe
             !memory.IsMapped(scanWindow, headerBytes))
             return false;
 
+        if (!MatchesMappedLzh(ref memory, candidate, scanWindow))
+            return false;
+
+        payloadLength = remaining;
+        return true;
+    }
+
+    // The caller has proved the fixed header span mapped and in range.
+    internal static bool MatchesMappedLzh<TMemory>(ref TMemory memory, APTR candidate, APTR scanWindow)
+        where TMemory : struct, IAmigaGuestMemory
+    {
         if (memory.ReadUInt8(candidate, 2) != (byte)'-' ||
             memory.ReadUInt8(candidate, 3) != (byte)'l' ||
             (memory.ReadUInt8(candidate, 4) != (byte)'h' &&
@@ -264,7 +311,6 @@ public static class Exe2ArcHeaderProbe
             memory.ReadUInt8(scanWindow, 20) > 2)
             return false;
 
-        payloadLength = remaining;
         return true;
     }
 

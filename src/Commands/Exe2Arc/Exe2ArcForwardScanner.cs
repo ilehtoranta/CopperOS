@@ -12,6 +12,8 @@ namespace CopperOS.Commands;
 /// remain nonnegative signed LONGs. This bounded component domain is not a
 /// claim about the original command's large-file behavior. The input may be
 /// repositioned on every outcome; the caller retains all handle ownership.
+/// The caller keeps the admitted scratch allocation mapped until return; byte
+/// reads and the borrowed file operations must not revoke that allocation.
 /// </remarks>
 public static class Exe2ArcForwardScanner
 {
@@ -126,27 +128,11 @@ public static class Exe2ArcForwardScanner
                 return Exe2ArcIoStatus.IoStopped;
 
             uint lastCandidate = windowBytes - headerBytes;
-            for (uint index = 0; index <= lastCandidate; index++)
+            uint index = FindCandidate(ref io, scratch, lastCandidate, windowStart,
+                fileLength, kind, out uint length);
+            if (index != uint.MaxValue)
             {
-                APTR candidate = new(scratch.Raw + index);
                 uint offset = windowStart + index;
-                uint length;
-                bool recognized = kind switch
-                {
-                    ScanKind.Cabinet => Exe2ArcHeaderProbe.TryInspectCabinet(ref io,
-                        candidate, headerBytes, offset, fileLength, out length),
-                    ScanKind.Ace => Exe2ArcHeaderProbe.TryInspectAce(ref io, candidate,
-                        headerBytes, offset, fileLength, out length),
-                    ScanKind.Arj => Exe2ArcHeaderProbe.TryInspectArj(ref io, candidate,
-                        headerBytes, offset, fileLength, out length),
-                    ScanKind.Lzh => Exe2ArcHeaderProbe.TryInspectLzh(ref io, candidate,
-                        scratch, headerBytes, offset, fileLength, out length),
-                    _ => Exe2ArcHeaderProbe.TryInspectRar4(ref io, candidate,
-                        headerBytes, offset, fileLength, out length),
-                };
-                if (!recognized)
-                    continue;
-
                 // Source-observed intermediate seek is relative to the end of
                 // this read, not a direct seek to the selected candidate.
                 seek = io.Seek(input, -(int)index, 0);
@@ -173,6 +159,74 @@ public static class Exe2ArcForwardScanner
             windowStart += lastCandidate + 1;
         }
         return Exe2ArcIoStatus.NoMatch;
+    }
+
+    // Scan admits the entire scratch span once. For index <= windowBytes -
+    // headerBytes, every fixed header fits both the mapped scratch and file.
+    // No I/O or mapping change occurs between these byte probes. ARJ retains
+    // its variable-length CRC-tail checks in the admitted predicate.
+    private static uint FindCandidate<TIo>(ref TIo io, APTR scratch,
+        uint lastCandidate, uint windowStart, uint fileLength, ScanKind kind,
+        out uint length) where TIo : struct, IExe2ArcIo
+    {
+        length = 0;
+        switch (kind)
+        {
+            case ScanKind.Cabinet:
+                for (uint index = 0; index <= lastCandidate; index++)
+                {
+                    APTR candidate = new(scratch.Raw + index);
+                    if (Exe2ArcHeaderProbe.TryInspectMappedCabinet(ref io, candidate, fileLength - windowStart - index, out length))
+                    {
+                        return index;
+                    }
+                }
+                break;
+            case ScanKind.Ace:
+                for (uint index = 0; index <= lastCandidate; index++)
+                {
+                    APTR candidate = new(scratch.Raw + index);
+                    if (Exe2ArcHeaderProbe.MatchesMappedAce(ref io, candidate))
+                    {
+                        length = fileLength - windowStart - index;
+                        return index;
+                    }
+                }
+                break;
+            case ScanKind.Arj:
+                for (uint index = 0; index <= lastCandidate; index++)
+                {
+                    APTR candidate = new(scratch.Raw + index);
+                    if (Exe2ArcHeaderProbe.TryInspectMappedArj(ref io, candidate, 50, fileLength - windowStart - index, out length))
+                    {
+                        return index;
+                    }
+                }
+                break;
+            case ScanKind.Lzh:
+                for (uint index = 0; index <= lastCandidate; index++)
+                {
+                    APTR candidate = new(scratch.Raw + index);
+                    if (Exe2ArcHeaderProbe.MatchesMappedLzh(ref io, candidate, scratch))
+                    {
+                        length = fileLength - windowStart - index;
+                        return index;
+                    }
+                }
+                break;
+            default:
+                for (uint index = 0; index <= lastCandidate; index++)
+                {
+                    APTR candidate = new(scratch.Raw + index);
+                    if (Exe2ArcHeaderProbe.MatchesMappedRar4(ref io, candidate))
+                    {
+                        length = fileLength - windowStart - index;
+                        return index;
+                    }
+                }
+                break;
+        }
+        return uint.MaxValue;
     }
 
     private enum ScanKind : byte

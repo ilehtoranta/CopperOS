@@ -51,6 +51,7 @@ internal sealed class FrontendFixture(HunkImage image, M68kCpuModel model, bool 
                 for (int i=0; i<5; i++) cpu.State.A[i+2] = invocation.Preserved[i+6] = 0xaaaa0000u+(uint)i;
             }
             var done = new bool[cpus.Count];
+            var observations = new object[cpus.Count];
             while (done.Any(d => !d))
             for (int index=0; index<cpus.Count; index++)
             {
@@ -67,8 +68,11 @@ internal sealed class FrontendFixture(HunkImage image, M68kCpuModel model, bool 
                     cpu.ExecuteInstruction();
                     if (cpu.State.ProgramCounter == ReturnAddress) { done[index] = true; break; }
                 } while (!interleaved);
-                if (done[index]) Complete(invocation, interleaved);
+                if (done[index]) observations[index] = Complete(invocation, interleaved);
             }
+            // Faster code may change which interleaved invocation finishes first.
+            // Publish in request order so comparisons keep each invocation's identity.
+            Results.AddRange(observations);
         }
         catch (Exception error)
         {
@@ -80,7 +84,7 @@ internal sealed class FrontendFixture(HunkImage image, M68kCpuModel model, bool 
         finally { foreach (var cpu in cpus) cpu.Dispose(); bus.Current = null; }
     }
 
-    private void Complete(FrontendInvocation invocation, bool interleaved)
+    private object Complete(FrontendInvocation invocation, bool interleaved)
     {
         var d = invocation.Definition; var cpu = invocation.Cpu!;
         invocation.Result = unchecked((int)cpu.D[0]); invocation.FinalSp = cpu.A[7];
@@ -112,14 +116,14 @@ internal sealed class FrontendFixture(HunkImage image, M68kCpuModel model, bool 
         Require(invocation.Allocations.Order().SequenceEqual(invocation.Releases.Order()), "Allocation release set differs.");
         bus.AssertReleased(invocation); bus.AssertImageUnchanged();
         Require(bus.Memory.AsSpan((int)(invocation.StackTop-invocation.StackBytes)-16,16).IndexOfAnyExcept((byte)0xcd)<0 && bus.Memory.AsSpan((int)invocation.StackTop,16).IndexOfAnyExcept((byte)0xcd)<0, "Stack guard changed.");
-        Results.Add(new { name = d.Id, instructionInterleaved = interleaved, result = invocation.Result, ioErr = invocation.IoErr,
+        return new { name = d.Id, instructionInterleaved = interleaved, result = invocation.Result, ioErr = invocation.IoErr,
             stdoutHex = Convert.ToHexStringLower(Encoding.Latin1.GetBytes(invocation.Stdout.ToString())),
             outputHex = Convert.ToHexStringLower(invocation.Output.ToArray()), instructions = invocation.Instructions,
             configuredStackBytes = invocation.StackBytes, stackBytesWritten = invocation.StackTop-invocation.MinStack,
             peakStackBytes = invocation.StackTop-invocation.MinStack, entryStackRestored = true,
             readArgsCalls = invocation.ReadArgsCalls, freeArgsCalls = invocation.FreeArgsCalls, faults = invocation.Faults,
             openPaths = invocation.OpenPaths, deletedPaths = invocation.DeletedPaths, allocations = invocation.Allocations,
-            releases = invocation.Releases, transfers = invocation.Transfers, events = invocation.Events });
+            releases = invocation.Releases, transfers = invocation.Transfers, events = invocation.Events };
     }
 
     private void Register(uint address, string name, Action<M68kCpuState> handler)
