@@ -448,15 +448,15 @@ public static class NativeMorphOSSearchCommand
             }
             var length = offset - start;
             var delimiter = (byte)0;
-            var hasDelimiter = offset > start && offset <= sourceLength &&
+            // The admitted loop consumes at least one byte and cannot exceed sourceLength.
+            var hasDelimiter =
                 APTR.ReadUInt8(source, unchecked((int)(offset - 1))) == (byte)'\n';
             if (hasDelimiter)
             {
                 delimiter = (byte)'\n';
                 length--;
             }
-            else if (SupportsMorphOS && useLocale && offset > start &&
-                     offset <= sourceLength)
+            else if (SupportsMorphOS && useLocale)
             {
                 delimiter = APTR.ReadUInt8(source,
                     unchecked((int)(offset - 1)));
@@ -466,9 +466,9 @@ public static class NativeMorphOSSearchCommand
                     delimiter = 0;
             }
             var outputLineNumber = lineNumber;
-            if (!SupportsMorphOS || !useLocale || (offset > start &&
+            if (!SupportsMorphOS || !useLocale ||
                 APTR.ReadUInt8(source, unchecked((int)(offset - 1))) ==
-                    (byte)'\n'))
+                    (byte)'\n')
                 lineNumber++;
             var line = APTR.FromPointer(source.Raw + start);
             if (patternMode)
@@ -739,7 +739,7 @@ public static class NativeMorphOSSearchCommand
                 if (value == (byte)'\n' || value == 0 ||
                     localeControlDelimiter) break;
             }
-            var hasDelimiter = offset > start &&
+            var hasDelimiter =
                 (APTR.ReadUInt8(source, unchecked((int)(offset - 1))) ==
                     (byte)'\n' ||
                  APTR.ReadUInt8(source, unchecked((int)(offset - 1))) == 0 ||
@@ -749,10 +749,9 @@ public static class NativeMorphOSSearchCommand
                 trailingLineOffset = start;
                 break;
             }
-            var delimiter = hasDelimiter
-                ? APTR.ReadUInt8(source, unchecked((int)(offset - 1)))
-                : (byte)0;
-            var length = offset - start - (hasDelimiter ? 1u : 0u);
+            // The incomplete-line path already returned to the caller.
+            var delimiter = APTR.ReadUInt8(source, unchecked((int)(offset - 1)));
+            var length = offset - start - 1u;
             var lineNumber = state.LineNumber;
             var line = APTR.FromPointer(source.Raw + start);
             if (patternMode)
@@ -823,21 +822,25 @@ public static class NativeMorphOSSearchCommand
                 DOS.FPuts(DOS.Output(), ": ");
             }
         }
-        for (var i = 0u; i < length; i++)
+        // Both callers supply the nonzero invocation-owned OutputBytes buffer.
+        // Admit one chunk, then convert its bytes without a per-byte flush test.
+        var offset = 0u;
+        while (offset < length)
         {
-            if (used == capacity &&
-                !WriteBuffer(output, destination, used, out ioError))
-                return false;
-            if (used == capacity) used = 0;
-            var value = APTR.ReadUInt8(line, unchecked((int)i));
-            var printable = SupportsMorphOS && useLocale
-                ? Locale.IsPrint(locale, value) != 0
-                : value >= 0x20 && value <= 0x7e;
-            APTR.WriteUInt8(destination, unchecked((int)used++),
-                printable ? value : (byte)'.');
+            used = length - offset;
+            if (used > capacity) used = capacity;
+            for (var i = 0u; i < used; i++)
+            {
+                var value = APTR.ReadUInt8(line, unchecked((int)(offset + i)));
+                var printable = SupportsMorphOS && useLocale
+                    ? Locale.IsPrint(locale, value) != 0
+                    : value >= 0x20 && value <= 0x7e;
+                APTR.WriteUInt8(destination, unchecked((int)i),
+                    printable ? value : (byte)'.');
+            }
+            if (!WriteBuffer(output, destination, used, out ioError)) return false;
+            offset += used;
         }
-        if (used != 0 && !WriteBuffer(output, destination, used, out ioError))
-            return false;
         APTR.WriteUInt8(destination, 0, (byte)'\n');
         return WriteBuffer(output, destination, 1, out ioError);
     }

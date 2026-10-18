@@ -155,6 +155,12 @@ internal sealed partial class ProbeFixture
             ];
         }
 
+        foreach (var length in new[] { 0, 1, 79, 80 })
+            cases = [.. cases, ListCase("comment-boundary-" + length,
+                new(NoHead: true, NoDates: true, Entries:
+                    [new("note.txt", false, 6, 22, 0,
+                        Comment: new string('x', length))]),
+                "SRC:dir NODATES NOHEAD")];
         var reports = new List<object>();
         foreach (var test in cases) reports.AddRange(Execute([test], false));
         reports.AddRange(Execute([

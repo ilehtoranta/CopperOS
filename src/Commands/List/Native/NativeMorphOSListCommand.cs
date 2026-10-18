@@ -511,13 +511,22 @@ public static class NativeMorphOSListCommand
     {
         var result = APTR.FromPointer(workspace.Raw + CommentTextOffset);
         var source = APTR.FromPointer(fib.Raw + FileInfoBlock.CommentOffset);
-        var length = CStringLength(source, 80);
+        // FIB comment and output workspace are disjoint. Scan and copy once.
+        var value = APTR.ReadUInt8(source, 0);
         var target = 0u;
-        if (length != 0)
-            APTR.WriteUInt8(result, unchecked((int)target++), (byte)':');
-        for (var index = 0u; index < length; index++)
-            APTR.WriteUInt8(result, unchecked((int)target++),
-                APTR.ReadUInt8(source, unchecked((int)index)));
+        if (value != 0)
+        {
+            APTR.WriteUInt8(result, 0, (byte)':');
+            var index = 0u;
+            do
+            {
+                APTR.WriteUInt8(result, unchecked((int)(index + 1)), value);
+                index++;
+            }
+            while (index < 80 && (value = APTR.ReadUInt8(source,
+                       unchecked((int)index))) != 0);
+            target = index + 1;
+        }
         APTR.WriteUInt8(result, unchecked((int)target), 0);
         return result.Raw;
     }

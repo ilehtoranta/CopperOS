@@ -24,7 +24,7 @@ internal sealed record SearchEntryCase(string Path = "SRC:one.txt",
     int CtrlDSignalCall = 0, bool Seek64FileSize = false,
     bool Seek64Failure = false, bool OpenFailure = false,
     bool FlushFailure = false, bool WriteFailure = false,
-    int WriteChunkBytes = 0);
+    int WriteChunkBytes = 0, int SuccessfulWritesBeforeFailure = 0);
 
 internal sealed record SearchTraversalStep(string Name, int EntryType,
     byte Flags, uint DirectoryLock, string DirectoryPath);
@@ -294,6 +294,20 @@ internal sealed partial class ProbeFixture
             Search("output-short-writes", new(WriteChunkBytes: 2),
                 "SRC:one.txt needle", "     2> Needle\n")
         ];
+        foreach (var length in new[] { 8191, 8192, 8193, 16385 })
+        {
+            var text = "Needle" + new string('x', length - 6);
+            cases = [.. cases, Search("output-boundary-" + length,
+                new(Content: text + "\n"), "SRC:one.txt needle",
+                "     1> " + text + "\n")];
+        }
+        var multipleChunks = "Needle" + new string('x', 16379);
+        cases = [.. cases,
+            Search("output-second-chunk-failure",
+                new(Content: multipleChunks + "\n", WriteFailure: true,
+                    SuccessfulWritesBeforeFailure: 1), "SRC:one.txt needle",
+                "     1> " + multipleChunks[..8192], outputFailureResult,
+                outputFailureError)];
         var reports = new List<object>();
         foreach (var test in cases) reports.AddRange(Execute([test], false));
         reports.AddRange(Execute([
@@ -1061,7 +1075,8 @@ internal sealed partial class ProbeFixture
             Require(invocation.SearchEntryLayout!.BufferedOutput.Length == 0,
                 "Search mixed buffered output with raw Write without flushing.");
             var definition = invocation.Definition.Search!;
-            if (definition.WriteFailure)
+            if (definition.WriteFailure && invocation.SearchWriteCalls >
+                definition.SuccessfulWritesBeforeFailure)
             {
                 invocation.IoError = (int)DOS.Error.DiskFull;
                 return uint.MaxValue;
@@ -1252,8 +1267,10 @@ internal sealed partial class ProbeFixture
             $"Search parser/workspace/matcher ownership differs for {invocation.Definition.Name} (alloc={invocation.SearchAllocMemCalls}/{expectedAllocations}, free={invocation.SearchFreeMemCalls}/{expectedAllocations}, opens={invocation.SearchFileOpenCalls}).");
         if (definition.FlushFailure || definition.WriteFailure)
         {
-            Require(layout.OutputFlushCalls == 1 &&
-                invocation.SearchWriteCalls == (definition.FlushFailure ? 0 : 1) &&
+            Require(layout.OutputFlushCalls ==
+                    1 + definition.SuccessfulWritesBeforeFailure &&
+                invocation.SearchWriteCalls == (definition.FlushFailure ? 0 :
+                    1 + definition.SuccessfulWritesBeforeFailure) &&
                 invocation.SearchFileOpenCalls == 1 &&
                 invocation.SearchFileCloseCalls == 1 &&
                 invocation.SearchReadCalls == 1 &&
