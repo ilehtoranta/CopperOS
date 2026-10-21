@@ -5,6 +5,26 @@ namespace CopperOS.Commands.Tests;
 
 public sealed class ResidentCommandTests
 {
+    [Theory]
+    [InlineData("C:Assign PURE", "Assign", "C:Assign", 1u)]
+    [InlineData("SYS:C/Execute", "Execute", "SYS:C/Execute", 0u)]
+    public void Resident_filename_only_uses_its_file_part_as_the_resident_name(
+        string commandLine, string name, string file, uint force)
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        APTR source = platform.Store.PutAt(16, commandLine);
+        var invocation = CreateInvocation(source, commandLine.Length);
+        var result = ResidentCommand.Execute(ref platform, in invocation,
+            new APTR(80), 128, new APTR(480), 64, new APTR(560), 128,
+            new APTR(704), 64);
+        Assert.Equal((int)ShellCommandResult.Ok, result);
+        Assert.Equal(name, platform.Store.ResidentName);
+        Assert.Equal(file, platform.Store.ResidentFile);
+        Assert.Equal(force, platform.Store.ResidentForce);
+        Assert.Equal(1u, platform.Store.ResidentReplace);
+        Assert.Equal(1, platform.Store.FreeArgsCount);
+    }
+
     [Fact]
     public void Resident_copies_names_and_forwards_mutation_flags()
     {

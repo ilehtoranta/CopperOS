@@ -5,50 +5,247 @@ namespace CopperOS.Commands.Tests;
 
 public sealed class ShellScriptEngineTests
 {
-	[Fact]
-	public void Interactive_readargs_error_preserves_diagnostics_and_accepts_the_next_command()
-	{
-		EchoCommandTests.TestShellPlatform platform = new();
-		platform.Store.ScriptText = "Stack bad\nEcho after\n";
-		platform.Store.ScriptPromptText = "> ";
-		var frame = InitializeFrame(ref platform,
-			ShellScriptFrameFlags.Active | ShellScriptFrameFlags.Interactive);
-		var workspace = CreateWorkspace();
-		Assert.Equal(ShellScriptStepStatus.Executed,
-			ShellScriptEngine.Step(ref platform, frame, in workspace, out var failed));
-		Assert.Equal((int)ShellCommandResult.Error, failed.CommandResult);
-		Assert.Equal((int)DOS.Error.BadNumber, platform.Store.PublishedDiagnostics.IoError);
-		Assert.Equal(ShellScriptStepStatus.Executed,
-			ShellScriptEngine.Step(ref platform, frame, in workspace, out var next));
-		Assert.Equal((int)ShellCommandResult.Ok, next.CommandResult);
-		Assert.Equal("> > after\n", platform.Store.OutputText);
-	}
+    [Theory]
+    [InlineData("Echo ordinary\n", false)]
+    [InlineData(".KEY value\n", true)]
+    [InlineData(".BRA {\nEcho ordinary\n", false)]
+    public void Pre_scan_does_not_require_unused_numeric_storage(string script, bool expectedKey)
+    {
+        EchoCommandTests.TestShellPlatform platform = new(); platform.Store.ScriptText = script;
+        var frame = InitializePreScanFrame(ref platform, APTR.Null, 0);
+        var source = platform.Store.PutAt(7700, "S:scan"); var workspace = CreateWorkspace();
+        var commandWorkspace = workspace.CommandWorkspace;
+        commandWorkspace.ErrorCodes = APTR.Null; commandWorkspace.ErrorCodeCapacity = 0;
+        workspace.CommandWorkspace = commandWorkspace;
+        var result = ShellScriptPreScanner.Prepare(ref platform, new APTR(8), frame,
+            new BPTR(1), source, 6, new APTR(7800), 64, in workspace, out var needed);
+        Assert.NotEqual(ShellScriptPreScanResult.Failed, result); Assert.Equal(expectedKey, needed);
+    }
 
-	[Theory]
-	[InlineData(10)]
-	[InlineData(20)]
-	public void Interactive_async_child_error_accepts_the_next_command(int childResult)
-	{
-		EchoCommandTests.TestShellPlatform platform = new();
-		platform.Store.ScriptText = "external\nEcho after\n";
-		platform.Store.ScriptExternalPending = true;
-		platform.Store.ScriptPromptText = "> ";
-		var frame = InitializeFrame(ref platform,
-			ShellScriptFrameFlags.Active | ShellScriptFrameFlags.Interactive);
-		var workspace = CreateWorkspace();
-		Assert.Equal(ShellScriptStepStatus.Waiting,
-			ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
-		platform.Store.ContinuationObservedState = ShellProcessContinuationState.Completed;
-		platform.Store.ContinuationResult = childResult;
-		Assert.Equal(ShellScriptStepStatus.Executed,
-			ShellScriptEngine.Step(ref platform, frame, in workspace, out var failed));
-		Assert.Equal(childResult, failed.CommandResult);
-		Assert.Equal(childResult, platform.Store.PublishedDiagnostics.ReturnCode);
-		Assert.Equal(ShellScriptStepStatus.Executed,
-			ShellScriptEngine.Step(ref platform, frame, in workspace, out var next));
-		Assert.Equal((int)ShellCommandResult.Ok, next.CommandResult);
-		Assert.Equal("> > after\n", platform.Store.OutputText);
-	}
+
+    [Fact]
+    public void Lazy_command_substitution_resumes_after_a_foreground_child()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptText = "Echo before`external`after\n";
+        platform.Store.ScriptExternalPending = true;
+        var frame = InitializeFrame(ref platform);
+        var workspace = CreatePromptWorkspace();
+        workspace.PromptTemplate = APTR.Null; workspace.PromptTemplateCapacity = 0;
+        var waiting = ShellScriptEngine.Run(ref platform, frame, in workspace, 16);
+        Assert.Equal(ShellScriptStepStatus.Waiting, waiting.Status);
+        Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame, out var suspended));
+        Assert.Equal(1u, suspended.CurrentLine);
+        Assert.Equal(ShellScriptDeferredCommandKind.CommandExpansion, suspended.DeferredCommand.Kind);
+        platform.Store.ContinuationObservedState = ShellProcessContinuationState.Completed;
+        var run = ShellScriptEngine.Run(ref platform, frame, in workspace, 32);
+        Assert.Equal(ShellScriptStepStatus.EndOfFile, run.Status);
+        Assert.Equal("beforeafter\n", platform.Store.OutputText);
+        Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame, out var completed));
+        Assert.Equal(1, platform.Store.LazyPromptAllocations);
+        Assert.True(completed.PendingCommand.IsNull);
+        Assert.Equal(ShellScriptDeferredCommandKind.None, completed.DeferredCommand.Kind);
+    }
+
+
+    [Theory]
+    [InlineData("Echo ordinary\n", "ordinary\n", 0)]
+    [InlineData("Echo prefix`Echo value`suffix\n", "prefixvaluesuffix\n", 1)]
+    [InlineData("Echo `Echo one`-`Echo two`\nEcho `Echo three`\n", "one-two\nthree\n", 1)]
+    public void Noninteractive_prompt_storage_is_obtained_only_for_backticks(string script, string expected, int allocations)
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptText = script;
+        var frame = InitializeFrame(ref platform);
+        var workspace = CreatePromptWorkspace();
+        workspace.PromptTemplate = APTR.Null; workspace.PromptTemplateCapacity = 0;
+        var run = ShellScriptEngine.Run(ref platform, frame, in workspace, 80);
+        Assert.Equal(ShellScriptStepStatus.EndOfFile, run.Status);
+        Assert.Equal(expected, platform.Store.OutputText);
+        Assert.Equal(allocations, platform.Store.LazyPromptAllocations);
+    }
+
+    [Fact]
+    public void Failed_lazy_prompt_allocation_does_not_publish_expansion_state()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptText = "Echo `Echo value`\n";
+        platform.Store.LazyPromptFailure = true;
+        var frame = InitializeFrame(ref platform);
+        var workspace = CreatePromptWorkspace();
+        workspace.PromptTemplate = APTR.Null; workspace.PromptTemplateCapacity = 0;
+        Assert.Equal(ShellScriptStepStatus.PlatformFailure,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame, out var state));
+        Assert.Equal(ShellScriptDeferredCommandKind.None, state.DeferredCommand.Kind);
+        Assert.Equal(ShellScriptPromptExpansionPhase.None, state.PromptExpansion.Phase);
+        Assert.Equal(0, platform.Store.LazyPromptAllocations);
+    }
+
+    [Fact]
+    public void Indented_commands_resolve_aliases_from_the_first_command_token()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptText = "  \tprobe hello\n";
+        platform.Store.ScriptAliasReplacement = "Echo hello";
+        var frame = InitializeFrame(ref platform);
+        var workspace = CreatePromptWorkspace();
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal("probe hello", platform.Store.LastScriptAliasSource);
+        Assert.Equal("hello\n", platform.Store.OutputText);
+    }
+
+    [Theory]
+    [InlineData("Echo $message", "hello disk\n")]
+    [InlineData("Echo \"$message\"", "hello disk\n")]
+    [InlineData("Echo ${message}suffix", "hello disksuffix\n")]
+    [InlineData("Echo $global", "global value\n")]
+    [InlineData("Echo $missing", "$missing\n")]
+    [InlineData("Echo *$message", "$message\n")]
+    [InlineData("Echo \"$message $message\"", "hello disk hello disk\n")]
+    public void Reader_expands_environment_variables_before_dispatch(string text, string expected)
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptText = text + "\n";
+        platform.Store.LocalVariableName = "message";
+        platform.Store.LocalVariableValue = "hello disk";
+        platform.Store.GlobalVariableName = "global";
+        platform.Store.GlobalVariableValue = "global value";
+        var frame = InitializeFrame(ref platform);
+        var workspace = CreatePromptWorkspace();
+        var run = ShellScriptEngine.Run(ref platform, frame, in workspace, 8);
+        Assert.Equal(ShellScriptStepStatus.EndOfFile, run.Status);
+        Assert.Equal(expected, platform.Store.OutputText);
+    }
+
+    [Fact]
+    public void Local_variable_wins_and_inserted_values_are_not_expanded_recursively()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptText = "Echo $message\n";
+        platform.Store.LocalVariableName = "message";
+        platform.Store.LocalVariableValue = "$message";
+        platform.Store.GlobalVariableName = "message";
+        platform.Store.GlobalVariableValue = "global";
+        var frame = InitializeFrame(ref platform);
+        var workspace = CreatePromptWorkspace();
+        var run = ShellScriptEngine.Run(ref platform, frame, in workspace, 8);
+        Assert.Equal(ShellScriptStepStatus.EndOfFile, run.Status);
+        Assert.Equal("$message\n", platform.Store.OutputText);
+    }
+
+    [Theory]
+    [InlineData("Quit 20")]
+    [InlineData("EndCLI")]
+    [InlineData("EndShell")]
+    public void Skipped_branch_does_not_terminate_the_reader(string command)
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptText = command + "\nElse\nEcho continued\n";
+        var frame = InitializeFrame(ref platform, ShellScriptFrameFlags.Active |
+            ShellScriptFrameFlags.Skipping | ShellScriptFrameFlags.ConditionFalse);
+        var workspace = CreateWorkspace();
+
+        Assert.Equal(ShellScriptStepStatus.Skipped,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(0, platform.Store.ControlCount);
+        Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame, out var state));
+        Assert.Equal(0u, (uint)(state.Flags & (ShellScriptFrameFlags.EndRequested |
+            ShellScriptFrameFlags.QuitRequested)));
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out var next));
+        Assert.Equal(ShellInternalCommand.Else, next.Command);
+    }
+
+    [Theory]
+    [InlineData(ShellControlAction.EndCli, false, 0)]
+    [InlineData(ShellControlAction.EndCli, true, 0)]
+    [InlineData(ShellControlAction.EndShell, false, 0)]
+    [InlineData(ShellControlAction.EndShell, true, 0)]
+    [InlineData(ShellControlAction.Quit, false, 5)]
+    [InlineData(ShellControlAction.Quit, true, 5)]
+    public void Recorded_exit_finishes_before_another_prompt_or_input_read(
+        ShellControlAction action, bool interactive, int result)
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        var flags = ShellScriptFrameFlags.Active |
+            (interactive ? ShellScriptFrameFlags.Interactive : 0);
+        var frame = InitializeFrame(ref platform, flags);
+        Assert.True(ShellScriptFrameCodec.TryRecordControl(ref platform, frame,
+            action, result));
+        platform.Store.ScriptReadFailure = true;
+        var workspace = CreateWorkspace();
+
+        var run = ShellScriptEngine.Run(ref platform, frame, in workspace, 8);
+
+        Assert.Equal(ShellScriptStepStatus.EndOfFile, run.Status);
+        Assert.Equal(result, run.Result);
+        Assert.Equal(string.Empty, platform.Store.OutputText);
+        Assert.Equal(0, platform.Store.ScriptSignalPollCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Missing_command_is_not_launched_and_interactive_reader_recovers(bool interactive)
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptText = "missingcommand\nEcho recovery\n";
+        platform.Store.ScriptLookupKind = ShellScriptLookupKind.NotFound;
+        platform.Store.ScriptLookupPath = string.Empty;
+        var flags = ShellScriptFrameFlags.Active |
+            (interactive ? ShellScriptFrameFlags.Interactive : 0);
+        var frame = InitializeFrame(ref platform, flags);
+        var workspace = CreateWorkspace();
+        Assert.Equal(interactive ? ShellScriptStepStatus.Executed : ShellScriptStepStatus.FailureLimitExceeded,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out var missing));
+        Assert.Equal((int)ShellCommandResult.Error, missing.CommandResult);
+        Assert.Equal(0, platform.Store.ScriptExecuteCount);
+        if (interactive)
+        {
+            var run = ShellScriptEngine.Run(ref platform, frame, in workspace, 8);
+            Assert.Equal(ShellScriptStepStatus.EndOfFile, run.Status);
+            Assert.Contains("recovery\n", platform.Store.OutputText);
+        }
+    }
+
+    [Fact]
+    public void Interactive_reader_continues_after_synchronous_command_error()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptText = "Stack bad\nEcho recovery\n";
+        var frame = InitializeFrame(ref platform,
+            ShellScriptFrameFlags.Active | ShellScriptFrameFlags.Interactive);
+        var workspace = CreateWorkspace();
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out var failed));
+        Assert.Equal((int)ShellCommandResult.Error, failed.CommandResult);
+        var run = ShellScriptEngine.Run(ref platform, frame, in workspace, 8);
+        Assert.Equal(ShellScriptStepStatus.EndOfFile, run.Status);
+        Assert.Contains("recovery\n", platform.Store.OutputText);
+    }
+
+    [Fact]
+    public void Interactive_reader_continues_after_asynchronous_child_error()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptText = "external\nEcho recovery\n";
+        platform.Store.ScriptExternalPending = true;
+        platform.Store.ContinuationResult = (int)ShellCommandResult.Error;
+        var frame = InitializeFrame(ref platform,
+            ShellScriptFrameFlags.Active | ShellScriptFrameFlags.Interactive);
+        var workspace = CreateWorkspace();
+        Assert.Equal(ShellScriptStepStatus.Waiting,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        platform.Store.ContinuationObservedState = ShellProcessContinuationState.Completed;
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out var failed));
+        Assert.Equal((int)ShellCommandResult.Error, failed.CommandResult);
+        var run = ShellScriptEngine.Run(ref platform, frame, in workspace, 8);
+        Assert.Equal(ShellScriptStepStatus.EndOfFile, run.Status);
+        Assert.Contains("recovery\n", platform.Store.OutputText);
+    }
 
     [Fact]
     public void Interactive_prompt_is_preflighted_then_emitted_as_literal_segments()
@@ -100,6 +297,90 @@ public sealed class ShellScriptEngineTests
 		Assert.Equal(0, platform.Store.PromptWriteCount);
 		Assert.Equal(1, platform.Store.ScriptDeleteCount);
 	}
+
+    [Theory]
+    [InlineData("Echo prefix`Echo value`suffix\n", "prefixvaluesuffix\n")]
+    [InlineData("Echo \"`Echo 2500000`\"\n", "2500000\n")]
+    [InlineData("Echo `Echo one`-`Echo two`\n", "one-two\n")]
+    [InlineData("Echo before`Echo NOLINE`after\n", "beforeafter\n")]
+    [InlineData("Echo *`literal*`\n", "`literal`\n")]
+    [InlineData("Echo `Echo value` ; `external`\n", "value\n")]
+    [InlineData("`Echo NOLINE`\nEcho complete\n", "complete\n")]
+    public void Script_command_substitution_captures_output_before_parsing_arguments(string script, string expected)
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptText = script;
+        var frame = InitializeFrame(ref platform);
+        var workspace = CreatePromptWorkspace();
+        var run = ShellScriptEngine.Run(ref platform, frame, in workspace, 48);
+        Assert.Equal(ShellScriptStepStatus.EndOfFile, run.Status);
+        Assert.Equal(expected, platform.Store.OutputText);
+    }
+
+    [Fact]
+    public void Command_substitution_uses_the_line_capacity_instead_of_the_prompt_limit()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptText = new string(' ', 300) + "Echo `Echo value`\n";
+        var frame = InitializeFrame(ref platform);
+        var workspace = CreatePromptWorkspace();
+        workspace.Line = new APTR(6000);
+        workspace.LineCapacity = 1024;
+        workspace.PromptTemplate = new APTR(7100);
+        workspace.PromptTemplateCapacity = 1028;
+        var run = ShellScriptEngine.Run(ref platform, frame, in workspace, 32);
+        Assert.Equal(ShellScriptStepStatus.EndOfFile, run.Status);
+        Assert.Equal("value\n", platform.Store.OutputText);
+    }
+
+    [Fact]
+    public void Script_command_substitution_resumes_after_a_foreground_child()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptText = "Echo before`external`after\n";
+        platform.Store.ScriptExternalPending = true;
+        var frame = InitializeFrame(ref platform);
+        var workspace = CreatePromptWorkspace();
+        var waiting = ShellScriptEngine.Run(ref platform, frame, in workspace, 16);
+        Assert.Equal(ShellScriptStepStatus.Waiting, waiting.Status);
+        Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame, out var suspended));
+        Assert.Equal(1u, suspended.CurrentLine);
+        Assert.Equal(ShellScriptDeferredCommandKind.CommandExpansion, suspended.DeferredCommand.Kind);
+        platform.Store.ContinuationObservedState = ShellProcessContinuationState.Completed;
+        var run = ShellScriptEngine.Run(ref platform, frame, in workspace, 32);
+        Assert.Equal(ShellScriptStepStatus.EndOfFile, run.Status);
+        Assert.Equal("beforeafter\n", platform.Store.OutputText);
+        Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame, out var completed));
+        Assert.True(completed.PendingCommand.IsNull);
+        Assert.Equal(ShellScriptDeferredCommandKind.None, completed.DeferredCommand.Kind);
+    }
+
+    [Fact]
+    public void Failed_command_capture_cannot_return_a_successful_script_result()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptText = "Echo `Echo value`\n";
+        platform.Store.RedirectionOutputFailure = true;
+        var frame = InitializeFrame(ref platform);
+        var workspace = CreatePromptWorkspace();
+        var run = ShellScriptEngine.Run(ref platform, frame, in workspace, 16);
+        Assert.Equal(ShellScriptStepStatus.PlatformFailure, run.Status);
+        Assert.Equal((int)ShellCommandResult.Error, run.Result);
+    }
+
+    [Theory]
+    [InlineData("Echo `external`\n")]
+    [InlineData("If \"`external`\" GE \"1\" VAL\n")]
+    public void Skipped_branches_do_not_run_command_substitutions(string script)
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ScriptText = script;
+        var frame = InitializeFrame(ref platform, ShellScriptFrameFlags.Active | ShellScriptFrameFlags.Skipping);
+        var workspace = CreatePromptWorkspace();
+        Assert.Equal(ShellScriptStepStatus.Skipped, ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(0, platform.Store.ScriptExecuteCount);
+        Assert.Equal(string.Empty, platform.Store.OutputText);
+    }
 
 	[Fact]
 	public void Interactive_prompt_continues_after_malformed_backtick_command()
@@ -740,6 +1021,25 @@ public sealed class ShellScriptEngineTests
 		Assert.Equal((int)ShellCommandResult.Ok, result.Result);
 		Assert.Equal(3u, result.Steps);
 		Assert.Equal(1, platform.Store.ScriptExecuteCount);
+	}
+
+	[Theory]
+	[InlineData(".KEY value\n", true)]
+	[InlineData(".key value\n", true)]
+	[InlineData(".KEY value", true)]
+	[InlineData("Echo ordinary\n", false)]
+	[InlineData("; comment\n.KEY value\n", false)]
+	public void Pre_scan_reports_only_first_line_key_storage(string script, bool expected)
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.ScriptText = script;
+		var frame = InitializePreScanFrame(ref platform, APTR.Null, 0);
+		var source = platform.Store.PutAt(7700, "S:scan");
+		var workspace = CreateWorkspace();
+		var result = ShellScriptPreScanner.Prepare(ref platform, new APTR(8), frame,
+			new BPTR(1), source, 6, new APTR(7800), 64, in workspace, out var needed);
+		Assert.NotEqual(ShellScriptPreScanResult.Failed, result);
+		Assert.Equal(expected, needed);
 	}
 
 	[Fact]

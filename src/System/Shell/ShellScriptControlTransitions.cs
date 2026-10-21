@@ -38,11 +38,10 @@ public static class ShellScriptControlTransitions
         {
             if (Overlaps(record, ShellScriptControlCodec.Size,
                     frameState.ControlTop, ShellScriptControlCodec.Size) ||
-                !ShellScriptControlCodec.TryReadLink(ref platform,
-                    frameState.ControlTop, out _, out _, out var parentFlags))
+                !TryReadSkipping(ref platform, frameState.ControlTop.Raw,
+                    out var parentSkipping))
                 return false;
-            effectiveSkipping |= (parentFlags &
-                ShellScriptBlockFlags.Skipping) != 0;
+            effectiveSkipping |= parentSkipping != 0;
         }
 
         ShellScriptBlockState block = new()
@@ -91,11 +90,10 @@ public static class ShellScriptControlTransitions
         var blockParent = APTR.FromPointer(blockParentRaw);
         if (blockParent.IsNotNull)
         {
-            if (!ShellScriptControlCodec.TryReadLink(ref platform, blockParent,
-                    out _, out _, out var parentFlags))
+            if (!TryReadSkipping(ref platform, blockParentRaw,
+                    out var parentSkipping))
                 return false;
-            effectiveSkipping |= (parentFlags &
-                ShellScriptBlockFlags.Skipping) != 0;
+            effectiveSkipping |= parentSkipping != 0;
         }
         return ShellScriptFrameCodec.TryRecordControl(
                 ref platform, frame, ShellControlAction.Else, 0) &&
@@ -136,8 +134,8 @@ public static class ShellScriptControlTransitions
                 return false;
             conditionFalse = (parentFlags &
                 ShellScriptBlockFlags.ConditionFalse) != 0 ? 1u : 0u;
-            skipping = (parentFlags & ShellScriptBlockFlags.Skipping) != 0
-                ? 1u : 0u;
+            if (!TryReadSkipping(ref platform, blockParentRaw, out skipping))
+                return false;
             elseSeen = (parentFlags & ShellScriptBlockFlags.ElseSeen) != 0
                 ? 1u : 0u;
         }
@@ -153,6 +151,25 @@ public static class ShellScriptControlTransitions
         ShellScriptFrameCodec.TrySetControlTopRaw(
             ref platform, frame, controlTopRaw);
         return false;
+    }
+
+    // Each record stores its own branch decision. A true inner IF must not
+    // discard a false ancestor when entering, switching, or closing a block.
+    private static bool TryReadSkipping<TPlatform>(ref TPlatform platform,
+        uint recordRaw, out uint skipping)
+        where TPlatform : struct, IShellPlatform
+    {
+        skipping = 0;
+        while (recordRaw != 0)
+        {
+            if (!ShellScriptControlCodec.TryReadLinkRaw(ref platform,
+                    recordRaw, out var parentRaw, out _, out var flags))
+                return false;
+            if ((flags & ShellScriptBlockFlags.Skipping) != 0)
+                skipping = 1;
+            recordRaw = parentRaw;
+        }
+        return true;
     }
 
     private static bool Overlaps(

@@ -72,6 +72,8 @@ public static class ShellCommandDispatcher
                 return FailatCommand.Execute(ref platform, in invocation,
                     workspace.Token, workspace.TokenCapacity);
             case ShellInternalCommand.Fault:
+                if (workspace.ErrorCodes.IsNull && workspace.ErrorCodeCapacity == FaultCommand.MaximumErrorCodes * 4)
+                    return FaultCommand.ExecuteUsingReadArgs(ref platform, in invocation, workspace.Token, workspace.TokenCapacity);
                 return FaultCommand.Execute(ref platform, in invocation,
                     workspace.Token, workspace.TokenCapacity,
                     workspace.ErrorCodes, workspace.ErrorCodeCapacity);

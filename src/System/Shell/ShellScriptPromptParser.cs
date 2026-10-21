@@ -50,9 +50,23 @@ public static class ShellScriptPromptParser
         in ShellScriptPromptCursor cursor,
         out ShellScriptPromptSegment segment)
         where TPlatform : struct, IShellPlatform
+        => TryNextCore(ref platform, in template, in cursor, MaximumTemplateLength,
+            0, out segment);
+
+    public static bool TryNextCommand<TPlatform>(ref TPlatform platform,
+        in ShellScriptPromptTemplate template, in ShellScriptPromptCursor cursor,
+        out ShellScriptPromptSegment segment)
+        where TPlatform : struct, IShellPlatform
+        => TryNextCore(ref platform, in template, in cursor,
+            ShellTextParser.MaximumSourceLength, 1, out segment);
+
+    private static bool TryNextCore<TPlatform>(ref TPlatform platform,
+        in ShellScriptPromptTemplate template, in ShellScriptPromptCursor cursor,
+        uint maximumLength, uint commandLine, out ShellScriptPromptSegment segment)
+        where TPlatform : struct, IShellPlatform
     {
         segment = default;
-        if (template.Length > MaximumTemplateLength ||
+        if (template.Length > maximumLength ||
             cursor.Position > template.Length ||
             (template.Length != 0 &&
                 (template.Text.IsNull ||
@@ -75,7 +89,11 @@ public static class ShellScriptPromptParser
             var close = commandStart;
             while (close < template.Length &&
                 Read(ref platform, template.Text, close) != (byte)'`')
+            {
+                if (commandLine != 0 && Read(ref platform, template.Text, close) == (byte)'*' &&
+                    close + 1 < template.Length) close++;
                 close++;
+            }
             if (close == template.Length) return false;
 
             segment.Kind = ShellScriptPromptSegmentKind.Command;
@@ -85,10 +103,14 @@ public static class ShellScriptPromptParser
             return true;
         }
 
-        var end = start + 1;
+        var end = start;
         while (end < template.Length &&
             Read(ref platform, template.Text, end) != (byte)'`')
+        {
+            if (commandLine != 0 && Read(ref platform, template.Text, end) == (byte)'*' &&
+                end + 1 < template.Length) end++;
             end++;
+        }
 
         segment.Kind = ShellScriptPromptSegmentKind.Literal;
         segment.Text = At(template.Text, start);

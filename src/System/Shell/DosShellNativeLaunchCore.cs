@@ -770,9 +770,9 @@ internal static class DosShellNativeLaunchCore
 	{
 		stackBytes = 0;
 		if (requestedPresent > 1 ||
-			(requestedPresent == 0 && inheritedStack < 0)) return false;
+			(requestedPresent == 0 && (inheritedStack < 0 || inheritedStack > MaximumStack / 4))) return false;
 		var selected = requestedPresent != 0 ? requestedStack :
-			inheritedStack == 0 ? DefaultStack : unchecked((uint)inheritedStack);
+			inheritedStack == 0 ? DefaultStack : unchecked((uint)inheritedStack) << 2;
 		if (selected < 64 || selected > MaximumStack) return false;
 		stackBytes = selected;
 		return true;

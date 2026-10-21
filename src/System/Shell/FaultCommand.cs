@@ -21,18 +21,33 @@ public static class FaultCommand
         APTR errorCodeBuffer,
         uint errorCodeCapacity)
         where TPlatform : struct, IShellPlatform
+        => ExecuteCore(ref platform, in invocation, tokenBuffer, tokenCapacity,
+            errorCodeBuffer, errorCodeCapacity, false);
+
+    internal static int ExecuteUsingReadArgs<TPlatform>(ref TPlatform platform,
+        in CommandInvocation invocation, APTR tokenBuffer, uint tokenCapacity)
+        where TPlatform : struct, IShellPlatform
+        => ExecuteCore(ref platform, in invocation, tokenBuffer, tokenCapacity,
+            APTR.Null, MaximumErrorCodes * 4, true);
+
+    private static int ExecuteCore<TPlatform>(ref TPlatform platform,
+        in CommandInvocation invocation, APTR tokenBuffer, uint tokenCapacity,
+        APTR errorCodeBuffer, uint errorCodeCapacity, bool useReadArgsStorage)
+        where TPlatform : struct, IShellPlatform
     {
         if (invocation.Output.IsNull || tokenBuffer.IsNull ||
-            errorCodeBuffer.IsNull || tokenCapacity == 0 ||
+            tokenCapacity == 0 ||
             errorCodeCapacity < 4 ||
             errorCodeCapacity > MaximumErrorCodes * 4 ||
-            errorCodeBuffer.Raw > uint.MaxValue - errorCodeCapacity ||
-            !platform.IsMapped(errorCodeBuffer, errorCodeCapacity))
+            (!useReadArgsStorage && (errorCodeBuffer.IsNull ||
+             errorCodeBuffer.Raw > uint.MaxValue - errorCodeCapacity ||
+             !platform.IsMapped(errorCodeBuffer, errorCodeCapacity))))
             return (int)ShellCommandResult.Fail;
 
         uint codeCapacity = errorCodeCapacity / 4;
-        if (!FaultErrorCodeBufferCodec.TryCreate(ref platform,
-                errorCodeBuffer, errorCodeCapacity, out var codes))
+        var codes = default(FaultErrorCodeBuffer);
+        if (!useReadArgsStorage && !FaultErrorCodeBufferCodec.TryCreate(ref platform,
+                errorCodeBuffer, errorCodeCapacity, out codes))
             return (int)ShellCommandResult.Fail;
         if (!ReadArgsCommandSupport.Prepare(ref platform, tokenBuffer,
                 tokenCapacity, ReadArgsCommandTemplate.Fault,
@@ -57,6 +72,13 @@ public static class FaultCommand
             platform.FreeArgs(rdArgs);
             return (int)ShellCommandResult.Error;
         }
+
+        // ReadArgs owns both the pointer list and its numeric values until FreeArgs.
+        // Flatten only each list slot already validated by the cursor; the next
+        // pointer and terminal word remain intact. FreeArgs uses its allocation
+        // chain, independently of these caller-owned result values.
+        if (useReadArgsStorage)
+            codes = new FaultErrorCodeBuffer { Base = listAddress, CapacityBytes = errorCodeCapacity };
 
         FaultReadArgsCodeCursor cursor = new()
         {
@@ -92,15 +114,14 @@ public static class FaultCommand
                 return (int)ShellCommandResult.Fail;
             }
         }
-        platform.FreeArgs(rdArgs);
         if (codes.Count == 0)
+        {
+            platform.FreeArgs(rdArgs);
             return (int)ShellCommandResult.Error;
-
-        return platform.TryWriteFault(
-                invocation.Output,
-                errorCodeBuffer,
-                codes.Count)
-            ? (int)ShellCommandResult.Ok
-            : (int)ShellCommandResult.Fail;
+        }
+        if (!useReadArgsStorage) platform.FreeArgs(rdArgs);
+        var written = platform.TryWriteFault(invocation.Output, codes.Base, codes.Count);
+        if (useReadArgsStorage) platform.FreeArgs(rdArgs);
+        return written ? (int)ShellCommandResult.Ok : (int)ShellCommandResult.Fail;
     }
 }

@@ -216,8 +216,10 @@ public static class Workbench31ExecuteCommand
             var length = CStringLength(line, LineCapacity);
             var action = ProcessLine(ref st, line, length);
             if (action == LineAction.Fail) { failed = true; break; }
+            // Preserve each contiguous line as one transfer. Size-one FWrite
+            // elements otherwise cause one filesystem transaction per byte.
             if (action == LineAction.Emit && st.OutLength > 0)
-                DOS.FWrite(st.Temp, APTR.FromPointer(st.Work.Raw + (uint)OutOffset), 1, st.OutLength);
+                DOS.Write(st.Temp, APTR.FromPointer(st.Work.Raw + (uint)OutOffset), (int)st.OutLength);
         }
         DOS.Close(script);
 
@@ -235,9 +237,10 @@ public static class Workbench31ExecuteCommand
         APTR.WriteUInt8(oldName, 0, 0);
         if (current.IsNotNull && current.Raw != standard.Raw)
         {
+            // The unread caller text is copied in blocks at its current cursor.
             int count;
-            while ((count = DOS.FRead(current, line, 1, LineCapacity)) > 0)
-                DOS.FWrite(st.Temp, line, 1, (uint)count);
+            while ((count = DOS.Read(current, line, LineCapacity)) > 0)
+                DOS.Write(st.Temp, line, count);
             ReadCommandFile(cli, oldName);
             DOS.Close(current);
         }

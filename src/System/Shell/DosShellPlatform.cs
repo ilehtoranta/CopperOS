@@ -54,7 +54,7 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 	private const uint ScriptCommandNameCapacity = 256;
 	private const uint ScriptTokenCapacity = 4096;
 	private const uint ScriptSmallCapacity = 512;
-	private const uint ScriptPromptCapacity = 256;
+	private const uint ScriptPromptCapacity = DosShellScriptRunnerCodec.PromptTemplateBytes;
 	private const uint ScriptErrorCodeCapacity = FaultCommand.MaximumErrorCodes * 4;
 	private const uint ScriptMaximumSteps = 4096;
 
@@ -359,7 +359,7 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 			InputOwned = 1,
 			CommandName = commandName, Token = token, First = first,
 			Second = second, Third = third, Fourth = fourth,
-			ErrorCodes = errorCodes, RedirectionCommand = redirectionCommand,
+			ErrorCodes = errorCodes, ErrorCodeBytes = ScriptErrorCodeCapacity, RedirectionCommand = redirectionCommand,
 			RedirectionInput = redirectionInput,
 			RedirectionOutput = redirectionOutput,
 			RedirectionError = redirectionError, AliasLine = aliasLine,
@@ -551,8 +551,8 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 			in redirectionWorkspace, in aliasWorkspace, in lookupWorkspace);
 		workspace.PromptTemplate = stored.PromptTemplate;
 		workspace.PromptTemplateCapacity = ScriptPromptCapacity;
-		workspace.PromptCapturePath = stored.ScriptTemporaryPath;
-		workspace.PromptCapturePathCapacity = ScriptSmallCapacity;
+		workspace.PromptCapturePath = APTR.FromPointer(stored.ScriptTemporaryPath.Raw + DosShellScriptRunnerCodec.PromptCapturePathOffset);
+		workspace.PromptCapturePathCapacity = ScriptSmallCapacity - DosShellScriptRunnerCodec.PromptCapturePathOffset;
 		if (DosCore.TryGetShellProcessContext(ref Dos, State, stored.Cli,
 			out var processContext))
 		{
@@ -770,7 +770,8 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 		WriteTaskTag(ref Dos, tags, 0, ExecConstants.TaskTagProgramCounter,
 			image.EntryPoint.Raw);
 		if (stackPresent > 1 ||
-			(stackPresent == 0 && inheritance.CliState.DefaultStack < 0))
+			(stackPresent == 0 && (inheritance.CliState.DefaultStack < 0 ||
+				inheritance.CliState.DefaultStack > 4 * 1024 * 1024)))
 		{
 			Dos.FreeGuest(tags, TagItem.Size * 5);
 			if (residentAcquired)
@@ -783,7 +784,7 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 		}
 		var inheritedStack = inheritance.CliState.DefaultStack;
 		var requestedStack = stackPresent != 0 ? stack : inheritedStack == 0
-			? 4096u : unchecked((uint)inheritedStack);
+			? 4096u : unchecked((uint)inheritedStack) << 2;
 		if (requestedStack < 64 || requestedStack > 16u * 1024u * 1024u)
 		{
 			Dos.FreeGuest(tags, TagItem.Size * 5);
@@ -1392,9 +1393,9 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 			return false;
 		if (!DosCore.TryGetShellProcessContext(ref Dos, State, cli,
 			out var processContext)) return false;
-		if (processContext.CliState.DefaultStack < 0) return false;
+		if (processContext.CliState.DefaultStack < 0 || processContext.CliState.DefaultStack > 4 * 1024 * 1024) return false;
 		var inheritedStack = processContext.CliState.DefaultStack == 0
-			? 4096u : unchecked((uint)processContext.CliState.DefaultStack);
+			? 4096u : unchecked((uint)processContext.CliState.DefaultStack) << 2;
 		if (inheritedStack < 64 || inheritedStack > 16u * 1024u * 1024u)
 			return false;
 		var nameLength = command.CommandNameLength;
@@ -1710,7 +1711,17 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 		Dos.ReadUInt8(path, unchecked((int)pathLength)) == 0 &&
 		DosCore.DeleteFile(ref Dos, State, path) != 0;
 
-	public bool TrySetScriptPromptCapture(APTR cli, APTR path,
+	public bool TryEnsureScriptPromptTemplate(APTR cli, out APTR buffer, out uint capacity)
+    {
+        buffer = APTR.Null; capacity = 0;
+        var runner = DosShellNativeBridge.FindScriptRunner(ref Dos, State, cli);
+        if (runner.IsNull || !DosShellNativeBridge.ReadScriptRunner(ref Dos, State, runner, out var value) ||
+            !DosShellScriptRunnerCore.EnsurePromptTemplate(ref Dos, runner, ref value)) return false;
+        buffer = value.PromptTemplate; capacity = DosShellScriptRunnerCodec.PromptTemplateBytes;
+        return true;
+    }
+
+    public bool TrySetScriptPromptCapture(APTR cli, APTR path,
 		uint pathLength, BPTR input) => cli.IsNotNull && path.IsNotNull &&
 		pathLength != 0 && pathLength < ScriptSmallCapacity &&
 		Dos.IsMapped(path, pathLength + 1) &&

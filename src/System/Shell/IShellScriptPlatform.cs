@@ -148,6 +148,9 @@ public interface IShellScriptPlatform
     /// <summary>Removes an unpublished Execute work-file after its handle closes.</summary>
     bool TryDeleteScriptPath(APTR cli, APTR path, uint pathLength);
 
+	/// <summary>Obtains the runner-owned buffer used by backtick expansion.</summary>
+	bool TryEnsureScriptPromptTemplate(APTR cli, out APTR buffer, out uint capacity);
+
 	/// <summary>Tracks prompt-capture path and reader ownership in the runner.</summary>
 	bool TrySetScriptPromptCapture(APTR cli, APTR path, uint pathLength,
 		BPTR input);

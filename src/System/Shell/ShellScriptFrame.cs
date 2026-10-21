@@ -60,6 +60,8 @@ public enum ShellScriptDeferredCommandKind : uint
 	None = 0,
 	ConditionalAnd = 1,
 	OutputConcatenation = 2,
+	CommandExpansion = 3,
+	ExpandedLine = 4,
 }
 
 /// <summary>
@@ -327,6 +329,15 @@ public static class ShellScriptFrameCodec
         state.Input = input;
         state.CurrentLine = 1;
         state.CurrentOffset = 0;
+        return WriteState(ref platform, frame, in state);
+    }
+
+    public static bool TrySetInteractiveMode<TPlatform>(ref TPlatform platform,
+        APTR frame, bool interactive) where TPlatform : struct, IShellPlatform
+    {
+        if (!TryRead(ref platform, frame, out var state)) return false;
+        if (interactive) state.Flags |= ShellScriptFrameFlags.Interactive;
+        else state.Flags &= ~ShellScriptFrameFlags.Interactive;
         return WriteState(ref platform, frame, in state);
     }
 
@@ -612,10 +623,10 @@ public static class ShellScriptFrameCodec
 		if (deferred.Kind == ShellScriptDeferredCommandKind.None)
 			return deferred.Text.Data.IsNull && deferred.Text.Length == 0 &&
 				deferred.NextLine == 0 && deferred.NextOffset == 0;
-		if ((deferred.Kind != ShellScriptDeferredCommandKind.ConditionalAnd &&
-			deferred.Kind !=
-				ShellScriptDeferredCommandKind.OutputConcatenation) ||
-			deferred.Text.Data.IsNull || deferred.Text.Length == 0 ||
+		if ((deferred.Kind < ShellScriptDeferredCommandKind.ConditionalAnd ||
+			deferred.Kind > ShellScriptDeferredCommandKind.ExpandedLine) ||
+			deferred.Text.Data.IsNull || (deferred.Text.Length == 0 &&
+			 deferred.Kind != ShellScriptDeferredCommandKind.ExpandedLine) ||
 			deferred.Text.Length > ShellTextParser.MaximumSourceLength ||
 			deferred.Text.Data.Raw > uint.MaxValue - deferred.Text.Length ||
 			deferred.NextLine == 0)
@@ -635,7 +646,7 @@ public static class ShellScriptFrameCodec
 		if ((uint)expansion.Phase >
 			(uint)ShellScriptPromptExpansionPhase.ReadingCapture ||
 			expansion.TemplateLength >
-				ShellScriptPromptParser.MaximumTemplateLength ||
+				ShellTextParser.MaximumSourceLength ||
 			expansion.Cursor.Position > expansion.TemplateLength)
 			return false;
 		if (expansion.Phase == ShellScriptPromptExpansionPhase.None)

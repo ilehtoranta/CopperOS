@@ -228,7 +228,7 @@ public readonly struct ShellScriptStartRequest
 /// is deliberately a stepper, not a scheduler: DOS owns input buffering,
 /// external lookup, process creation, and continuation policy.
 /// </summary>
-public static class ShellScriptEngine
+public static partial class ShellScriptEngine
 {
 	private static ShellScriptStepResult MakeStep(ShellScriptStepStatus status,
 		ShellInternalCommand command, int commandResult, uint line,
@@ -357,6 +357,19 @@ public static class ShellScriptEngine
             (state.Flags & ShellScriptFrameFlags.Active) == 0)
             return step.Status;
 
+		// Control commands finish the current script before another prompt or
+		// blocking read. Quit's explicit result is independent of LastResult.
+		if ((state.Flags & (ShellScriptFrameFlags.EndRequested |
+			ShellScriptFrameFlags.QuitRequested)) != 0)
+		{
+			var result = (state.Flags & ShellScriptFrameFlags.QuitRequested) != 0
+				? state.QuitResult : state.LastResult;
+			step = MakeStep(ShellScriptStepStatus.EndOfFile,
+				ShellInternalCommand.Unknown, result, state.CurrentLine,
+				state.CurrentOffset, 0);
+			return step.Status;
+		}
+
 		if (!platform.TryReadCliFailureLimit(state.Cli,
 			out var failureLimit) || failureLimit == 0 ||
 			(state.FailureLimit != failureLimit &&
@@ -483,7 +496,7 @@ public static class ShellScriptEngine
 				(state.DeferredCommand.Kind ==
 					ShellScriptDeferredCommandKind.ConditionalAnd &&
 					!MeetsFailureLimit(childResult, state.FailureLimit));
-			if (!continueDeferredCommand &&
+			if (!promptCommandPending && !continueDeferredCommand &&
 				((state.DeferredCommand.Kind !=
 					ShellScriptDeferredCommandKind.None &&
 				  !ShellScriptFrameCodec.TrySetDeferredCommand(ref platform,
@@ -525,8 +538,7 @@ public static class ShellScriptEngine
 				ShellScriptDeferredCommandKind.OutputConcatenation;
 			var childStatus = MeetsFailureLimit(childResult,
 				state.FailureLimit) && !promptCommandPending &&
-				!concatenationPending &&
-				(state.Flags & ShellScriptFrameFlags.Interactive) == 0
+				!concatenationPending && (state.Flags & ShellScriptFrameFlags.Interactive) == 0
 				? ShellScriptStepStatus.FailureLimitExceeded
 				: ShellScriptStepStatus.Executed;
 		step = MakeStep(
@@ -545,7 +557,11 @@ public static class ShellScriptEngine
         if (!platform.TryBeginCommandDiagnostics(state.Cli))
             return FailAfterRead(ref platform, frame, state, 0, out step);
 
-        if ((state.Flags & ShellScriptFrameFlags.Interactive) != 0)
+        if (state.DeferredCommand.Kind == ShellScriptDeferredCommandKind.CommandExpansion)
+            return StepCommandExpansion(ref platform, frame, in state, in workspace, out step);
+
+        if ((state.Flags & ShellScriptFrameFlags.Interactive) != 0 &&
+            state.DeferredCommand.Kind != ShellScriptDeferredCommandKind.ExpandedLine)
         {
 			var promptProgress = AdvanceInteractivePrompt(ref platform, frame,
 				in state, in workspace, out var promptCommand,
@@ -581,9 +597,11 @@ public static class ShellScriptEngine
 		if (fromDeferredCommand)
 		{
 			var deferred = state.DeferredCommand;
+			var emptyExpansion = deferred.Kind == ShellScriptDeferredCommandKind.ExpandedLine && deferred.Text.Length == 0;
+			if (emptyExpansion) platform.WriteUInt8(workspace.Line, 0, 0);
 			if (deferred.Text.Length >= workspace.LineCapacity ||
-				!TryRestoreDeferredText(ref platform, in deferred.Text,
-					workspace.Line, workspace.LineCapacity) ||
+				(!emptyExpansion && !TryRestoreDeferredText(ref platform, in deferred.Text,
+					workspace.Line, workspace.LineCapacity)) ||
 				!ShellScriptFrameCodec.TrySetDeferredCommand(ref platform,
 					frame, default))
 			{
@@ -873,6 +891,48 @@ public static class ShellScriptEngine
             return step.Status;
         }
 
+        if ((state.Flags & ShellScriptFrameFlags.Skipping) != 0)
+        {
+            var skipCursor = new ShellTextCursor(workspace.Line, lineLength);
+            var skipToken = ShellTextParser.NextToken(ref platform, ref skipCursor,
+                workspace.CommandName, workspace.CommandNameCapacity, out var skipNameLength, out _);
+            var skipCommand = skipToken == (int)ShellTextTokenResult.Token
+                ? ShellInternalCommandResolver.ResolveAvailable(ref platform, state.Cli,
+                    workspace.CommandName, skipNameLength) : ShellInternalCommand.Unknown;
+            if (skipCommand == ShellInternalCommand.If)
+            {
+                // Balance a nested IF without evaluating its operands or
+                // running command substitutions inside a discarded branch.
+                if (!platform.TryEvaluateIf(state.Cli, (uint)ShellIfCondition.PreviousResult,
+                        0, 0, 0, 0, APTR.Null, 0, APTR.Null, 0) ||
+                    !Advance(ref platform, frame, nextLine, nextOffset))
+                    return FailAfterRead(ref platform, frame, state, lineLength, out step);
+                step = MakeStep(ShellScriptStepStatus.Skipped, skipCommand,
+                    state.LastResult, nextLine, nextOffset, lineLength);
+                return step.Status;
+            }
+            if (!AllowedWhileSkipping(skipCommand))
+            {
+                if (!Advance(ref platform, frame, nextLine, nextOffset))
+                    return FailAfterRead(ref platform, frame, state, lineLength, out step);
+                step = MakeStep(ShellScriptStepStatus.Skipped, skipCommand,
+                    state.LastResult, nextLine, nextOffset, lineLength);
+                return step.Status;
+            }
+        }
+
+		if (state.DeferredCommand.Kind != ShellScriptDeferredCommandKind.ExpandedLine &&
+			HasCommandSubstitution(ref platform, workspace.Line, lineLength) &&
+			(state.Flags & ShellScriptFrameFlags.Skipping) == 0)
+		{
+			if (!StartCommandExpansion(ref platform, frame, state.Cli, in workspace,
+					lineLength, nextLine, nextOffset))
+				return FailAfterRead(ref platform, frame, state, lineLength, out step);
+			step = MakeStep(ShellScriptStepStatus.Empty, ShellInternalCommand.Unknown,
+				state.LastResult, state.CurrentLine, state.CurrentOffset, lineLength);
+			return step.Status;
+		}
+
 		var compoundSource = new ShellScriptTextSlice(workspace.Line,
 			lineLength);
 		var compoundStatus = ShellScriptCompoundParser.SplitFirstOperator(
@@ -948,6 +1008,7 @@ public static class ShellScriptEngine
                 return step.Status;
             }
         }
+        TrimCommandStart(ref platform, ref commandSource, ref commandLength);
         if (workspace.AliasExpansion.IsEnabled && commandLength != 0)
         {
             var aliasWorkspace = workspace.AliasExpansion;
@@ -1001,6 +1062,11 @@ public static class ShellScriptEngine
             }
         }
 
+        if (!ExpandVariables(ref platform, state.Cli, in workspace, ref commandSource, ref commandLength))
+        {
+            RecordFailureAndAdvance(ref platform, frame, nextLine, nextOffset, (int)ShellCommandResult.Error);
+            return FailAfterRead(ref platform, frame, state, lineLength, out step);
+        }
         var redirection = default(ShellRedirectionSpec);
         if (workspace.Redirection.IsEnabled)
         {
@@ -1141,7 +1207,13 @@ public static class ShellScriptEngine
         int commandResult;
         var platformSuccess = true;
         var pendingContinuation = APTR.Null;
-        if (command == ShellInternalCommand.Unknown)
+        if (command == ShellInternalCommand.Unknown && lookup.Kind == ShellScriptLookupKind.NotFound)
+        {
+            // A completed lookup that found no command is an ordinary command
+            // error. No executable path exists to pass to the launch boundary.
+            commandResult = (int)ShellCommandResult.Error;
+        }
+        else if (command == ShellInternalCommand.Unknown)
         {
             var externalCommand = new ShellScriptCommandInvocation
             {
@@ -1346,8 +1418,7 @@ public static class ShellScriptEngine
 		}
 
 		var commandStatus = !continueCompound && MeetsFailureLimit(commandResult,
-			afterCommand.FailureLimit) &&
-			(afterCommand.Flags & ShellScriptFrameFlags.Interactive) == 0
+			afterCommand.FailureLimit) && (afterCommand.Flags & ShellScriptFrameFlags.Interactive) == 0
 			? ShellScriptStepStatus.FailureLimitExceeded
 			: ShellScriptStepStatus.Executed;
 		step = MakeStep(
@@ -1518,7 +1589,9 @@ public static class ShellScriptEngine
 		if (count < 0 || unchecked((uint)count) > capacity)
 			return ShellScriptPromptProgress.Failed;
 		if (count != 0)
-			return platform.Write(state.Output, token, unchecked((uint)count)) == count
+			return (state.DeferredCommand.Kind == ShellScriptDeferredCommandKind.CommandExpansion
+				? AppendCommandCapture(ref platform, in workspace, token, unchecked((uint)count))
+				: platform.Write(state.Output, token, unchecked((uint)count)) == count)
 				? ShellScriptPromptProgress.Continue
 				: ShellScriptPromptProgress.Failed;
 		if (!platform.TryCloseScriptRedirection(state.Cli, captureInput) ||
@@ -1527,6 +1600,9 @@ public static class ShellScriptEngine
 				BPTR.Null) ||
 			!platform.TryDeleteScriptPath(state.Cli,
 				workspace.PromptCapturePath, expansion.CapturePathLength))
+			return ShellScriptPromptProgress.Failed;
+		if (state.DeferredCommand.Kind == ShellScriptDeferredCommandKind.CommandExpansion &&
+			!TrimCommandCapture(ref platform, in workspace))
 			return ShellScriptPromptProgress.Failed;
 		expansion.CaptureInput = BPTR.Null;
 		expansion.CapturePathLength = 0;
@@ -1557,6 +1633,7 @@ public static class ShellScriptEngine
 				? ShellScriptPromptProgress.Continue
 				: ShellScriptPromptProgress.Failed;
 		}
+		TrimCommandStart(ref platform, ref commandSource, ref commandLength);
 		var aliasWorkspace = workspace.AliasExpansion;
 		if (!aliasWorkspace.IsEnabled || !workspace.Redirection.IsEnabled ||
 			!platform.TryExpandScriptAlias(state.Cli, commandSource,
@@ -1572,6 +1649,8 @@ public static class ShellScriptEngine
 			commandSource = aliasWorkspace.Line;
 			commandLength = expandedLength;
 		}
+		if (!ExpandVariables(ref platform, state.Cli, in workspace, ref commandSource, ref commandLength))
+			return ShellScriptPromptProgress.Failed;
 		var redirectionWorkspace = workspace.Redirection;
 		if (!ShellRedirectionParser.Parse(ref platform, commandSource,
 			commandLength, in redirectionWorkspace, out var redirection,
@@ -1811,12 +1890,44 @@ public static class ShellScriptEngine
         return true;
     }
 
+    private static void TrimCommandStart<TPlatform>(ref TPlatform platform,
+        ref APTR source, ref uint length) where TPlatform : struct, IShellPlatform
+    {
+        while (length != 0 && platform.ReadUInt8(source) is (byte)' ' or (byte)'\t')
+        { source = APTR.FromPointer(source.Raw + 1); length--; }
+    }
+
+    private static bool ExpandVariables<TPlatform>(ref TPlatform platform, APTR cli,
+        in ShellScriptStepWorkspace workspace, ref APTR source, ref uint length)
+        where TPlatform : struct, IShellPlatform
+    {
+        if (!workspace.Redirection.IsEnabled || !workspace.AliasExpansion.IsEnabled) return true;
+        var output = workspace.Redirection.Command;
+        var capacity = workspace.Redirection.CommandCapacity;
+        var stable = workspace.AliasExpansion.Line;
+        if (source == output)
+        {
+            if (length >= workspace.AliasExpansion.Capacity) return false;
+            platform.Copy(source, stable, length);
+            source = stable;
+        }
+        if (!ShellVariableExpansion.TryExpand(ref platform, cli, source, length,
+            output, capacity, workspace.CommandName, workspace.CommandNameCapacity,
+            workspace.CommandWorkspace.Token, workspace.CommandWorkspace.TokenCapacity,
+            out var written, out var changed)) return false;
+        if (!changed) return true;
+        if (written >= workspace.AliasExpansion.Capacity) return false;
+        platform.Copy(output, stable, written);
+        platform.WriteUInt8(stable, (int)written, 0);
+        source = stable;
+        length = written;
+        return true;
+    }
+
     private static bool AllowedWhileSkipping(ShellInternalCommand command) =>
         command is ShellInternalCommand.If or ShellInternalCommand.Else or
         ShellInternalCommand.EndIf or ShellInternalCommand.EndSkip or
-        ShellInternalCommand.Lab or ShellInternalCommand.Skip or
-        ShellInternalCommand.EndCLI or ShellInternalCommand.EndShell or
-        ShellInternalCommand.Quit;
+        ShellInternalCommand.Lab or ShellInternalCommand.Skip;
 
     private static bool Advance<TPlatform>(
         ref TPlatform platform,

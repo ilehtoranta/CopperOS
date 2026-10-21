@@ -265,9 +265,8 @@ public static class ShellTextParser
             var expected = index < 4
                 ? (firstWord >> unchecked((int)((3u - index) * 8))) & 0xFFu
                 : (secondWord >> unchecked((int)((7u - index) * 8))) & 0xFFu;
-            // Text can begin at an odd address and end at the allocation edge.
-            // Reading one character must not issue an unaligned scalar access
-            // or read beyond the supplied span on a 68000.
+            // Text is byte addressed. A longword window at every character
+            // faults at odd addresses on 68000 and reads past short tokens.
             var actual = (uint)platform.ReadUInt8(value, unchecked((int)index));
             if (actual is >= (uint)'A' and <= (uint)'Z') actual += 32;
             if (expected is >= (uint)'A' and <= (uint)'Z') expected += 32;

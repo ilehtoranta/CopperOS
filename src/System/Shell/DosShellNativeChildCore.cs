@@ -14,7 +14,6 @@ internal static class DosShellNativeChildCore
 {
 	private const uint MaximumFromLength = 255;
 	private const uint MaximumArgumentLength = 65_535;
-	private const uint MaximumWaitPolls = 4096;
 
 	public static uint RunFromCurrentTask()
 	{
@@ -104,8 +103,7 @@ internal static class DosShellNativeChildCore
 					APTR.Null, 0, out result);
 			}
 		}
-		for (var poll = 0u; status == ShellScriptExecutionStatus.Pending &&
-			poll < MaximumWaitPolls; poll++)
+		while (status == ShellScriptExecutionStatus.Pending)
 		{
 			if (!shell.TryPrepareScriptWait(cli) ||
 				!shell.TryParkScriptWait(cli, uint.MaxValue) ||
@@ -123,8 +121,7 @@ internal static class DosShellNativeChildCore
 			status == ShellScriptExecutionStatus.Completed)
 		{
 			status = shell.TryStartInteractiveScript(cli, out result);
-			for (var poll = 0u; status == ShellScriptExecutionStatus.Pending &&
-				poll < MaximumWaitPolls; poll++)
+			while (status == ShellScriptExecutionStatus.Pending)
 			{
 				if (!shell.TryPrepareScriptWait(cli) ||
 					!shell.TryParkScriptWait(cli, uint.MaxValue) ||
@@ -158,7 +155,10 @@ internal static class DosShellNativeChildCore
 	private static uint Complete(ref CopperSharpNativeDosPlatform dos,
 		APTR task, uint result)
 	{
-		DosProcessCodec.WriteResult2(ref dos, task, unchecked((int)result));
+		// D0 is the command return code. pr_Result2 already contains the DOS
+		// error published by the runner; replacing it with D0 loses IoErr().
+		_ = dos;
+		_ = task;
 		return result;
 	}
 }

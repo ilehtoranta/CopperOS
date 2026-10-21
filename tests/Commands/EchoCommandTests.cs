@@ -1167,7 +1167,16 @@ public sealed class EchoCommandTests
             return !Store.ScriptDeleteFailure;
         }
 
-		public bool TrySetScriptPromptCapture(APTR cli, APTR path,
+		public bool TryEnsureScriptPromptTemplate(APTR cli, out APTR buffer, out uint capacity)
+        {
+            buffer = Store.LazyPromptFailure ? APTR.Null : new APTR(5000);
+            capacity = buffer.IsNull ? 0u : 1028u;
+            if (buffer.IsNull) return false;
+            if (!Store.LazyPromptAllocated) { Store.LazyPromptAllocated = true; Store.LazyPromptAllocations++; }
+            return IsMapped(buffer, capacity);
+        }
+
+        public bool TrySetScriptPromptCapture(APTR cli, APTR path,
 			uint pathLength, BPTR input) => cli.IsNotNull && path.IsNotNull &&
 			pathLength != 0 && pathLength < 512 &&
 			IsMapped(path, pathLength + 1) &&
@@ -1752,8 +1761,9 @@ public sealed class EchoCommandTests
                         StringComparison.OrdinalIgnoreCase) ? 16 :
                     tokenFlags == 0 && value.Equals("REPLACE",
                         StringComparison.OrdinalIgnoreCase) ? 20 :
-                    tokenFlags == 0 && value.Equals("FORCE",
-                        StringComparison.OrdinalIgnoreCase) ? 24 :
+                    tokenFlags == 0 && (value.Equals("FORCE",
+                        StringComparison.OrdinalIgnoreCase) || value.Equals("PURE",
+                        StringComparison.OrdinalIgnoreCase)) ? 24 :
                     tokenFlags == 0 && value.Equals("SYSTEM",
                         StringComparison.OrdinalIgnoreCase) ? 28 :
                     tokenFlags == 0 && value.Equals("DEFER",
@@ -2571,7 +2581,7 @@ public sealed class EchoCommandTests
             var cursor = new ShellTextCursor(argumentText, argumentLength);
             var token = new APTR(64);
             var count = 0;
-            var listAddress = new APTR(184);
+            var listAddress = new APTR(4200);
             while (true)
             {
                 var tokenResult = ShellTextParser.NextToken(ref this,
@@ -2580,11 +2590,11 @@ public sealed class EchoCommandTests
                 if (tokenResult == (int)ShellTextTokenResult.End)
                     break;
                 if (tokenResult != (int)ShellTextTokenResult.Token ||
-                    tokenFlags != 0 || count >= 8 ||
+                    tokenFlags != 0 || count >= 257 ||
                     !ShellNumberParser.TryParseUnsigned(ref this, token,
                         tokenLength, out var number))
                     return false;
-                var numberAddress = new APTR((uint)(220 + count * 4));
+                var numberAddress = new APTR((uint)(5300 + count * 4));
                 WriteUInt32(numberAddress, 0, number);
                 WriteUInt32(listAddress, count * 4, numberAddress.Raw);
                 count++;
@@ -2594,6 +2604,7 @@ public sealed class EchoCommandTests
             WriteUInt32(listAddress, count * 4, 0);
             WriteUInt32(resultArray, 0, listAddress.Raw);
             rdArgs = new APTR(240);
+            Store.FaultReadArgsCount = (uint)count;
             Store.ReadArgsCount++;
             return true;
         }
@@ -2760,7 +2771,14 @@ public sealed class EchoCommandTests
         public void FreeArgs(APTR rdArgs)
         {
             if (rdArgs.IsNotNull)
+            {
                 Store.FreeArgsCount++;
+                if (Store.ClobberFaultReadArgs)
+                {
+                    Clear(new APTR(4200), (Store.FaultReadArgsCount + 1) * 4);
+                    Clear(new APTR(5300), Store.FaultReadArgsCount * 4);
+                }
+            }
         }
 
         public bool TryGetLocalVariable(
@@ -2968,6 +2986,10 @@ public sealed class EchoCommandTests
     public sealed class GuestStore
     {
         public readonly byte[] Memory = new byte[8192];
+        public bool LazyPromptFailure, LazyPromptAllocated;
+        public int LazyPromptAllocations;
+        public bool ClobberFaultReadArgs;
+        public uint FaultReadArgsCount;
         public readonly List<byte> Output = new();
 		public readonly List<byte> PromptCapture = new();
 		public int PromptCaptureReadOffset;

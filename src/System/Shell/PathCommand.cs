@@ -183,7 +183,7 @@ public static class PathCommand
                 operation,
                 (optionMask & OptionQuiet) != 0 ? 1u : 0u)
             ? (int)ShellCommandResult.Ok
-            : (int)ShellCommandResult.Fail;
+            : (int)ShellCommandResult.Error;
     }
 
     private static bool RangesOverlap(

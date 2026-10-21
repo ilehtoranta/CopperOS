@@ -5,6 +5,76 @@ namespace CopperOS.Commands.Tests;
 
 public sealed class FailatFaultCommandTests
 {
+    private static ShellCommandWorkspace FaultReadArgsWorkspace() => new()
+    { Token = new APTR(80), TokenCapacity = 32, ErrorCodes = APTR.Null, ErrorCodeCapacity = FaultCommand.MaximumErrorCodes * 4 };
+
+    [Theory]
+    [InlineData(1)] [InlineData(2)] [InlineData(20)] [InlineData(256)]
+    public void Fault_can_use_ReadArgs_storage_at_full_capacity(int count)
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ClobberFaultReadArgs = true; platform.Store.FaultText = "translated\n";
+        var text = string.Join(" ", Enumerable.Repeat("205", count));
+        var source = platform.Store.PutAt(2048, text); var invocation = CreateInvocation(source, text.Length);
+        var workspace = FaultReadArgsWorkspace();
+        Assert.Equal((int)ShellCommandResult.Ok, ShellCommandDispatcher.Dispatch(ref platform, in invocation, ShellInternalCommand.Fault, in workspace));
+        Assert.Equal((uint)count, platform.Store.FaultCount); Assert.Equal(count, platform.Store.FaultCodes.Count);
+        Assert.All(platform.Store.FaultCodes, value => Assert.Equal(205u, value));
+        Assert.Equal(1, platform.Store.FreeArgsCount); Assert.Equal(0u, platform.ReadUInt32(new APTR(4200), 0));
+        Assert.Equal("translated\n", platform.Store.OutputText);
+    }
+
+    [Fact]
+    public void Fault_flat_storage_retains_numeric_zero_inside_the_list()
+    {
+        EchoCommandTests.TestShellPlatform platform = new(); platform.Store.ClobberFaultReadArgs = true;
+        var source = platform.Store.PutAt(2048, "205 0 103"); var invocation = CreateInvocation(source, 9);
+        var workspace = FaultReadArgsWorkspace();
+        Assert.Equal(0, ShellCommandDispatcher.Dispatch(ref platform, in invocation, ShellInternalCommand.Fault, in workspace));
+        Assert.Equal(new uint[] { 205, 0, 103 }, platform.Store.FaultCodes); Assert.Equal(1, platform.Store.FreeArgsCount);
+    }
+
+    [Theory]
+    [InlineData("")] [InlineData("205 bad")]
+    public void Fault_flat_storage_rejects_bad_input_without_output(string text)
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        var source = platform.Store.PutAt(2048, text); var invocation = CreateInvocation(source, text.Length);
+        var workspace = FaultReadArgsWorkspace();
+        Assert.Equal((int)ShellCommandResult.Error, ShellCommandDispatcher.Dispatch(ref platform, in invocation, ShellInternalCommand.Fault, in workspace));
+        Assert.Equal(0u, platform.Store.FaultCount); Assert.Empty(platform.Store.OutputText);
+    }
+
+    [Fact]
+    public void Fault_flat_storage_rejects_257_codes_before_printing()
+    {
+        EchoCommandTests.TestShellPlatform platform = new(); platform.Store.ClobberFaultReadArgs = true;
+        var text = string.Join(" ", Enumerable.Repeat("205", 257));
+        var source = platform.Store.PutAt(2048, text); var invocation = CreateInvocation(source, text.Length);
+        var workspace = FaultReadArgsWorkspace();
+        Assert.Equal((int)ShellCommandResult.Error, ShellCommandDispatcher.Dispatch(ref platform, in invocation, ShellInternalCommand.Fault, in workspace));
+        Assert.Empty(platform.Store.OutputText); Assert.Equal(1, platform.Store.FreeArgsCount);
+    }
+
+    [Fact]
+    public void Fault_flat_storage_frees_ReadArgs_after_output_failure()
+    {
+        EchoCommandTests.TestShellPlatform platform = new(); platform.Store.ClobberFaultReadArgs = true; platform.Store.FaultFailure = true;
+        var source = platform.Store.PutAt(2048, "205"); var invocation = CreateInvocation(source, 3);
+        var workspace = FaultReadArgsWorkspace();
+        Assert.Equal((int)ShellCommandResult.Fail, ShellCommandDispatcher.Dispatch(ref platform, in invocation, ShellInternalCommand.Fault, in workspace));
+        Assert.Equal(1, platform.Store.FreeArgsCount); Assert.Equal(0u, platform.ReadUInt32(new APTR(4200), 0));
+    }
+
+    [Fact]
+    public void Explicit_Fault_buffer_API_still_requires_its_buffer()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        var source = platform.Store.PutAt(2048, "205"); var invocation = CreateInvocation(source, 3);
+        Assert.Equal((int)ShellCommandResult.Fail, FaultCommand.Execute(ref platform, in invocation, new APTR(80), 32, APTR.Null, 1024));
+        Assert.Equal(0, platform.Store.ReadArgsCount);
+    }
+
     [Fact]
     public void Failat_updates_the_cli_failure_limit()
     {

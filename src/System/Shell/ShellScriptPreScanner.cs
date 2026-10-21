@@ -21,7 +21,17 @@ public static class ShellScriptPreScanner
         APTR sourcePath, uint sourcePathLength, APTR temporaryPath,
         uint temporaryPathCapacity, in ShellScriptStepWorkspace workspace)
         where TPlatform : struct, IShellPlatform, IShellScriptPlatform
+        => Prepare(ref platform, cli, frame, activeInput, sourcePath, sourcePathLength,
+            temporaryPath, temporaryPathCapacity, in workspace, out _);
+
+    public static ShellScriptPreScanResult Prepare<TPlatform>(
+        ref TPlatform platform, APTR cli, APTR frame, BPTR activeInput,
+        APTR sourcePath, uint sourcePathLength, APTR temporaryPath,
+        uint temporaryPathCapacity, in ShellScriptStepWorkspace workspace,
+        out bool needsKeyTemplate)
+        where TPlatform : struct, IShellPlatform, IShellScriptPlatform
     {
+        needsKeyTemplate = false;
         if (cli.IsNull || frame.IsNull || activeInput.IsNull ||
             sourcePath.IsNull || sourcePathLength == 0 ||
             temporaryPath.IsNull || !ValidWorkspace(ref platform, in workspace))
@@ -32,6 +42,9 @@ public static class ShellScriptPreScanner
             return ShellScriptPreScanResult.Failed;
         var probeOk = TryRead(ref platform, cli, probe, 1, 0, workspace.Line,
             workspace.LineCapacity, out var firstLength, out _, out _, out var probeEof);
+        needsKeyTemplate = probeOk && firstLength != 0 &&
+            ShellScriptDirective.TryParse(ref platform, workspace.Line, firstLength,
+                out var firstDirective, out _) && firstDirective == ShellScriptDirectiveKind.Key;
         var dot = probeOk && probeEof == 0 && firstLength != 0 &&
             platform.ReadUInt8(workspace.Line, 0) == (byte)'.';
         if (!platform.TryCloseScriptRedirection(cli, probe) || !probeOk)
@@ -116,12 +129,8 @@ public static class ShellScriptPreScanner
         workspace.CommandName.IsNotNull && workspace.CommandNameCapacity >= 2 &&
         workspace.CommandWorkspace.Token.IsNotNull &&
         workspace.CommandWorkspace.TokenCapacity >= 2 &&
-        workspace.CommandWorkspace.ErrorCodes.IsNotNull &&
-        workspace.CommandWorkspace.ErrorCodeCapacity >= 4 &&
         platform.IsMapped(workspace.Line, workspace.LineCapacity) &&
         platform.IsMapped(workspace.CommandName, workspace.CommandNameCapacity) &&
         platform.IsMapped(workspace.CommandWorkspace.Token,
-            workspace.CommandWorkspace.TokenCapacity) &&
-        platform.IsMapped(workspace.CommandWorkspace.ErrorCodes,
-            workspace.CommandWorkspace.ErrorCodeCapacity);
+            workspace.CommandWorkspace.TokenCapacity);
 }

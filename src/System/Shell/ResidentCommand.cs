@@ -83,6 +83,27 @@ public static class ResidentCommand
         var defer = NormalizeSwitchResult(parsed.Defer);
         var operationCount = remove + add + replace;
         var aliasOperation = parsed.Alias.IsNotNull;
+        // Classic startup files give only a full filename, e.g.
+        // Resident C:Assign PURE. ReadArgs places that in NAME; preserve the
+        // backing path and derive the public resident name from its FilePart.
+        if (!aliasOperation && remove == 0 && parsed.File.IsNull &&
+            FilePartOffset(ref platform, nameBuffer, nameLength) != 0)
+        {
+            if (!ReadArgsCommandSupport.CopyCString(ref platform, nameBuffer,
+                    fileBuffer, fileCapacity, out fileLength))
+                return (int)ShellCommandResult.Error;
+            parsed.File = fileBuffer;
+            parsed.Name = APTR.Null;
+        }
+        if (!aliasOperation && parsed.Name.IsNull && parsed.File.IsNotNull)
+        {
+            var part = FilePartOffset(ref platform, fileBuffer, fileLength);
+            if (!ReadArgsCommandSupport.CopyCString(ref platform,
+                    APTR.FromPointer(fileBuffer.Raw + part), nameBuffer,
+                    nameCapacity, out nameLength))
+                return (int)ShellCommandResult.Error;
+            parsed.Name = nameBuffer;
+        }
         if (operationCount > 1 ||
             (aliasOperation && (parsed.File.IsNotNull || remove != 0 ||
                 force != 0 || defer != 0)) ||
@@ -144,6 +165,18 @@ public static class ResidentCommand
 
     private static bool ValidSwitchResult(uint value) =>
         value == 0 || value == 1 || value == uint.MaxValue;
+
+    private static uint FilePartOffset<TPlatform>(ref TPlatform platform,
+        APTR text, uint length) where TPlatform : struct, IShellPlatform
+    {
+        var part = 0u;
+        for (var i = 0u; i < length; i++)
+        {
+            var value = platform.ReadUInt8(text, (int)i);
+            if (value == (byte)':' || value == (byte)'/') part = i + 1;
+        }
+        return part;
+    }
 
     private static uint NormalizeSwitchResult(uint value) => value == 0
         ? 0u : 1u;

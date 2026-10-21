@@ -222,7 +222,7 @@ public sealed class PathCommandTests
             new APTR(160),
             64);
 
-        Assert.Equal((int)ShellCommandResult.Fail, result);
+        Assert.Equal((int)ShellCommandResult.Error, result);
         Assert.Equal(0, platform.Store.CommandPathUpdateCount);
     }
 

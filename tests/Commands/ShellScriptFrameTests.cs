@@ -266,6 +266,31 @@ public sealed class ShellScriptFrameTests
     }
 
     [Fact]
+    public void False_outer_condition_remains_skipped_through_true_nested_blocks()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        APTR frame = new(3000);
+        ShellScriptFrameState initial = new() { Cli = new APTR(120), Flags = ShellScriptFrameFlags.Active };
+        Assert.True(ShellScriptFrameCodec.Initialize(ref platform, frame, in initial));
+        Assert.True(ShellScriptControlTransitions.TryOpen(ref platform, frame, new APTR(3200), ShellScriptBlockKind.If, 1, 0, 1));
+        Assert.True(ShellScriptControlTransitions.TryOpen(ref platform, frame, new APTR(3300), ShellScriptBlockKind.If, 2, 0, 0));
+        Assert.True(ShellScriptControlTransitions.TryOpen(ref platform, frame, new APTR(3400), ShellScriptBlockKind.If, 3, 0, 0));
+        Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame, out var state));
+        Assert.True((state.Flags & ShellScriptFrameFlags.Skipping) != 0);
+        Assert.True(ShellScriptControlTransitions.TryElse(ref platform, frame));
+        Assert.True(ShellScriptControlTransitions.TryClose(ref platform, frame, ShellScriptBlockKind.If, out _));
+        Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame, out state));
+        Assert.True((state.Flags & ShellScriptFrameFlags.Skipping) != 0);
+        Assert.True(ShellScriptControlTransitions.TryElse(ref platform, frame));
+        Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame, out state));
+        Assert.True((state.Flags & ShellScriptFrameFlags.Skipping) != 0);
+        Assert.True(ShellScriptControlTransitions.TryClose(ref platform, frame, ShellScriptBlockKind.If, out _));
+        Assert.True(ShellScriptControlTransitions.TryElse(ref platform, frame));
+        Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame, out state));
+        Assert.False((state.Flags & ShellScriptFrameFlags.Skipping) != 0);
+    }
+
+    [Fact]
     public void Control_transitions_reject_wrong_terminators_and_duplicate_else()
     {
         EchoCommandTests.TestShellPlatform platform = new();

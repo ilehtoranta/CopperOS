@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\..\CopperOS.Portable.props" />
+  <PropertyGroup>
+    <AssemblyName>CopperOS.Locale</AssemblyName>
+    <RootNamespace>CopperOS.Locale</RootNamespace>
+    <ImplicitUsings>false</ImplicitUsings>
+    <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
+  </PropertyGroup>
+</Project>
