@@ -12,6 +12,26 @@ namespace CopperOS.Shell.Dos;
 /// </summary>
 internal static class DosShellNativeLaunchCore
 {
+	// ROM DOS builds use the public loader and the state's installed library.
+	// Existing standalone provider qualifications retain their private loader.
+	private static BPTR LoadSegment(ref CopperSharpNativeDosPlatform dos, APTR state, APTR path)
+	{
+#if COPPERSTART_ROM_DOS
+		return dos.LoadSegmentNative(path);
+#else
+		return DosSegmentLoaderCore.Load(ref dos, state, path);
+#endif
+	}
+
+	private static void UnloadSegment(ref CopperSharpNativeDosPlatform dos, APTR state, BPTR segment)
+	{
+#if COPPERSTART_ROM_DOS
+		dos.UnloadSegmentNative(segment);
+#else
+		DosSegmentLoaderCore.Unload(ref dos, state, segment);
+#endif
+	}
+
 	private struct ShellLaunchResources
 	{
 		public BPTR Input;
@@ -256,7 +276,7 @@ internal static class DosShellNativeLaunchCore
 			return false;
 		}
 		else
-			segment = DosSegmentLoaderCore.Load(ref dos, state, path);
+			segment = LoadSegment(ref dos, state, path);
 
 		if (segment.IsNull || !DosCommandImageCore.TryInspect(ref dos, state,
 			segment, out var image))
@@ -437,7 +457,7 @@ internal static class DosShellNativeLaunchCore
 			residentAcquired = true;
 		}
 		else
-			segment = DosSegmentLoaderCore.Load(ref dos, state, path);
+			segment = LoadSegment(ref dos, state, path);
 
 		if (segment.IsNull || !DosCommandImageCore.TryInspect(ref dos, state,
 			segment, out var image))
@@ -446,7 +466,7 @@ internal static class DosShellNativeLaunchCore
 				DosShellNativeBridge.ReleaseResidentNativeRaw(ref dos, state,
 					residentEntryRaw);
 			else if (segment.IsNotNull)
-				DosSegmentLoaderCore.Unload(ref dos, state, segment);
+				UnloadSegment(ref dos, state, segment);
 			Free(ref dos, name, nameLength + 1);
 			Free(ref dos, path, lookup.PathLength + 1);
 			return false;
@@ -464,7 +484,7 @@ internal static class DosShellNativeLaunchCore
 				DosShellNativeBridge.ReleaseResidentNativeRaw(ref dos, state,
 					residentEntryRaw);
 			else if (segment.IsNotNull)
-				DosSegmentLoaderCore.Unload(ref dos, state, segment);
+				UnloadSegment(ref dos, state, segment);
 			Free(ref dos, name, nameLength + 1);
 			Free(ref dos, path, lookup.PathLength + 1);
 			return false;
@@ -486,7 +506,7 @@ internal static class DosShellNativeLaunchCore
 				DosShellNativeBridge.ReleaseResidentNativeRaw(ref dos, state,
 					residentEntryRaw);
 			else if (segment.IsNotNull)
-				DosSegmentLoaderCore.Unload(ref dos, state, segment);
+				UnloadSegment(ref dos, state, segment);
 			Free(ref dos, name, nameLength + 1);
 			Free(ref dos, path, lookup.PathLength + 1);
 			return false;
@@ -502,7 +522,7 @@ internal static class DosShellNativeLaunchCore
 				DosShellNativeBridge.ReleaseResidentNativeRaw(ref dos, state,
 					residentEntryRaw);
 			else if (segment.IsNotNull)
-				DosSegmentLoaderCore.Unload(ref dos, state, segment);
+				UnloadSegment(ref dos, state, segment);
 			Free(ref dos, name, nameLength + 1);
 			Free(ref dos, path, lookup.PathLength + 1);
 			return false;
@@ -531,7 +551,7 @@ internal static class DosShellNativeLaunchCore
 				DosShellNativeBridge.ReleaseResidentNativeRaw(ref dos, state,
 					residentEntryRaw);
 			else if (segment.IsNotNull)
-				DosSegmentLoaderCore.Unload(ref dos, state, segment);
+				UnloadSegment(ref dos, state, segment);
 			return false;
 		}
 
@@ -819,6 +839,6 @@ internal static class DosShellNativeLaunchCore
 		APTR state, BPTR segment)
 	{
 		if (segment.IsNotNull)
-			DosSegmentLoaderCore.Unload(ref dos, state, segment);
+			UnloadSegment(ref dos, state, segment);
 	}
 }

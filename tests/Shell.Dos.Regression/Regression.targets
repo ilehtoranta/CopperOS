@@ -1,0 +1,10 @@
+<Project>
+  <!-- Reuse CopperStart's process fixture and compile this Shell's production
+       rollback source, already linked by CopperStart.Exec.Tests. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'CopperStart.Exec.Tests'">
+    <DefineConstants>$(DefineConstants);COPPERSTART_ROM_DOS</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'CopperStart.Exec.Tests'">
+    <Compile Include="$(MSBuildThisFileDirectory)ShellRomRollbackTests.cs" />
+  </ItemGroup>
+</Project>
