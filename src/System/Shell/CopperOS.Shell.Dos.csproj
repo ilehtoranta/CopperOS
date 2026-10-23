@@ -10,6 +10,9 @@
     <AssemblyName>CopperOS.Shell.Dos</AssemblyName>
     <RootNamespace>CopperOS.Shell.Dos</RootNamespace>
     <ImplicitUsings>false</ImplicitUsings>
+    <!-- The production Shell uses the installed ROM DOS loader. The separate
+         NativeRoot project retains the standalone qualification loader. -->
+    <DefineConstants>$(DefineConstants);COPPERSTART_ROM_DOS</DefineConstants>
     <IsPackable>true</IsPackable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>1591</NoWarn>
