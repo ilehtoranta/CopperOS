@@ -69,6 +69,38 @@ public sealed class MuiNativeApplicationLoopTests
 		Assert.Equal(1u, platform.FreeCount);
 	}
 
+	[Fact]
+	public void NativeLoopContinuesInternalWorkWithoutWaitingOnZeroMask()
+	{
+		var platform = NewMemory();
+		platform.DispatchResult = 0;
+		platform.NativeApplicationLoopTestMode = true;
+		platform.NativeApplicationLoopQuitAfter = 2;
+
+		Assert.Equal(MuiNativeApplicationLoopCore.ReturnIdQuit,
+			MuiNativeApplicationLoopCore.Run(ref platform, Application));
+		Assert.Equal(2u, platform.DispatchCount);
+		Assert.Equal(0u, platform.WaitMuiSignalsCount);
+		Assert.Equal(1u, platform.FreeCount);
+	}
+
+	[Fact]
+	public void NativeLoopPollsCtrlCOnZeroMaskAndPreservesUnrelatedSignals()
+	{
+		var platform = NewMemory();
+		platform.DispatchResult = 0;
+		platform.NativeApplicationLoopTestMode = true;
+		platform.NativeApplicationLoopQuitAfter = 2;
+		platform.PendingSignals = SignalBreakCtrlC | 0x20;
+
+		Assert.Equal(MuiNativeApplicationLoopCore.ReturnIdQuit,
+			MuiNativeApplicationLoopCore.Run(ref platform, Application));
+		Assert.Equal(1u, platform.DispatchCount);
+		Assert.Equal(0u, platform.WaitMuiSignalsCount);
+		Assert.Equal(0x20u, platform.PendingSignals);
+		Assert.Equal(1u, platform.FreeCount);
+	}
+
 	private static MuiHeadlessTestPlatform NewMemory() =>
 		new(0x1000, 0x1000, 0x1400, Base);
 }

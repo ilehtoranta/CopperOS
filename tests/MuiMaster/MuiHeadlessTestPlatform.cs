@@ -110,6 +110,7 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 	public uint LastWaitMuiSignalsMask;
 	public bool NativeApplicationLoopTestMode;
 	public uint NativeApplicationLoopSignalMask;
+	public uint NativeApplicationLoopQuitAfter;
 	public uint WindowOpenCount;
 	public uint WindowCloseCount;
 	public uint WindowEventMask;
@@ -522,6 +523,7 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		LastWaitMuiSignalsMask = 0;
 		NativeApplicationLoopTestMode = false;
 		NativeApplicationLoopSignalMask = 0;
+		NativeApplicationLoopQuitAfter = 0;
 		WindowOpenCount = 0;
 		WindowCloseCount = 0;
 		WindowEventMask = 0;
@@ -901,6 +903,9 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 				{
 					Signals = NativeApplicationLoopSignalMask,
 				});
+		if (NativeApplicationLoopTestMode && NativeApplicationLoopQuitAfter != 0 &&
+			DispatchCount >= NativeApplicationLoopQuitAfter)
+			return MuiNativeApplicationLoopCore.ReturnIdQuit;
 		if (RouteHandleEventToCore && State.IsNotNull &&
 			LastDispatchMethod == MuiCommonControlPacketCore.HandleEvent)
 			return MuiCommonControlDispatcher.Dispatch(ref this, State, obj,

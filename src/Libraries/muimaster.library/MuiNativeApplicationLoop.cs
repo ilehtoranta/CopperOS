@@ -16,6 +16,7 @@ internal interface IMuiNativeApplicationLoopPlatform : IMuiGuestMemory
 	APTR Allocate(uint size, uint flags);
 	void Free(APTR address, uint size);
 	uint DoMethod(APTR obj, APTR message);
+	uint ReadSignals(uint signalMask);
 	uint WaitMuiSignals(uint signalMask);
 }
 
@@ -112,8 +113,11 @@ internal static class MuiNativeApplicationLoopCore
 				continue;
 			}
 
-			var receivedSignals = platform.WaitMuiSignals(waitState.Signals |
-				SignalBreakCtrlC);
+			// A zero NewInput mask requests another input iteration. Poll Ctrl-C
+			// without blocking so pending internal work can still make progress.
+			var receivedSignals = waitState.Signals == 0
+				? platform.ReadSignals(SignalBreakCtrlC)
+				: platform.WaitMuiSignals(waitState.Signals | SignalBreakCtrlC);
 			if ((receivedSignals & SignalBreakCtrlC) != 0)
 			{
 				result = ReturnIdQuit;

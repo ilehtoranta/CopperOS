@@ -6495,10 +6495,12 @@ public static class MuiCommonControlCore
 		var clamped = value < minimum ? minimum : (value > maximum ? maximum : value);
 		var current = unchecked((int)numeric.Value);
 		if (clamped == current) return true;
-		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
-			NumericValue, unchecked((uint)clamped), notify)) return false;
 		numeric.Value = unchecked((uint)clamped);
 		if (!PublishNumericState(ref platform, state, obj, numeric)) return false;
+		// Commit both representations before callbacks. A notification may change
+		// any Numeric field; publishing this snapshot afterwards would undo it.
+		if (notify && !MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+			NumericValue, unchecked((uint)clamped), true)) return false;
 		return platform.ScheduleRedraw(obj, 2);
 	}
 
@@ -6553,10 +6555,12 @@ public static class MuiCommonControlCore
 		var target = scale;
 		if (target < scaleMinimum) target = scaleMinimum;
 		if (target > scaleMaximum) target = scaleMaximum;
-		if (numeric.Reverse != 0)
-			target = scaleMaximum - (target - scaleMinimum);
-		return minimum + (int)((uint)(target - scaleMinimum) *
-			(uint)(maximum - minimum) / (uint)(scaleMaximum - scaleMinimum));
+		var span = unchecked((uint)(scaleMaximum - scaleMinimum));
+		var offset = unchecked((uint)(target - scaleMinimum));
+		if (numeric.Reverse != 0) offset = span - offset;
+		var scaled = MuiNumericScalingCore.ScaleOffset(offset, span,
+			unchecked((uint)(maximum - minimum)));
+		return unchecked((int)((uint)minimum + scaled));
 	}
 
 	public static int ValueToScale<TPlatform>(ref TPlatform platform, APTR state,
@@ -6571,11 +6575,12 @@ public static class MuiCommonControlCore
 		if (scaleMaximum <= scaleMinimum || maximum <= minimum) return scaleMinimum;
 		if (value < minimum) value = minimum;
 		if (value > maximum) value = maximum;
-		var result = scaleMinimum + (int)((uint)(value - minimum) *
-			(uint)(scaleMaximum - scaleMinimum) / (uint)(maximum - minimum));
-		if (numeric.Reverse != 0)
-			result = scaleMaximum - (result - scaleMinimum);
-		return result;
+		var span = unchecked((uint)(scaleMaximum - scaleMinimum));
+		var offset = MuiNumericScalingCore.ScaleOffset(
+			unchecked((uint)(value - minimum)),
+			unchecked((uint)(maximum - minimum)), span);
+		if (numeric.Reverse != 0) offset = span - offset;
+		return unchecked((int)((uint)scaleMinimum + offset));
 	}
 
 	// Decimal stringification into a caller-owned buffer. Returns character count

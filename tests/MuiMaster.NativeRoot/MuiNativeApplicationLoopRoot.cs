@@ -159,10 +159,24 @@ public struct MuiNativeApplicationLoopTestPlatform :
 				out var probe)) return MuiNativeApplicationLoopCore.ReturnIdQuit;
 		if (probe.DispatchCount != uint.MaxValue) probe.DispatchCount++;
 		var clearedSignals = default(MuiApplicationWindowSignalStorage);
+		if (probe.DispatchCount == 2 && probe.PendingSignals == 0)
+		{
+			MuiNativeApplicationLoopProbeCodec.Write(ref this, probe);
+			return MuiNativeApplicationLoopCore.ReturnIdQuit;
+		}
 		return MuiNativeApplicationLoopProbeCodec.Write(ref this, probe) &&
 			MuiApplicationWindowSignalStorageCodec.Write(ref this,
 				input.SignalStorage, clearedSignals) ? 0u :
 			MuiNativeApplicationLoopCore.ReturnIdQuit;
+	}
+
+	public uint ReadSignals(uint signalMask)
+	{
+		if (!MuiNativeApplicationLoopProbeCodec.TryRead(ref this,
+			out var probe)) return 0;
+		var received = probe.PendingSignals & signalMask;
+		probe.PendingSignals &= ~received;
+		return MuiNativeApplicationLoopProbeCodec.Write(ref this, probe) ? received : 0;
 	}
 
 	public uint WaitMuiSignals(uint signalMask)
@@ -193,12 +207,25 @@ public static class MuiNativeApplicationLoopRoot
 			APTR.FromPointer(0x00001200));
 		if (result != MuiNativeApplicationLoopCore.ReturnIdQuit ||
 			!MuiNativeApplicationLoopProbeCodec.TryRead(ref platform,
-				out probe) || probe.WaitCount != 1 || probe.DispatchCount != 1 ||
-			probe.LastWaitMask != MuiNativeApplicationLoopCore.SignalBreakCtrlC ||
+				out probe) || probe.WaitCount != 0 || probe.DispatchCount != 1 ||
+			probe.LastWaitMask != 0 ||
 			probe.PendingSignals != 0 || probe.AllocationCount != 1 ||
 			probe.FreeCount != 1 ||
 			probe.FreedFrame.Raw != MuiNativeApplicationLoopTestPlatform.FrameAddress)
 			return 2;
+		return 42;
+	}
+
+	public static uint ZeroMaskContinuesInternalWork()
+	{
+		var platform = default(MuiNativeApplicationLoopTestPlatform);
+		if (!MuiNativeApplicationLoopProbeCodec.Write(ref platform, default)) return 1;
+		var result = MuiNativeApplicationLoopCore.Run(ref platform,
+			APTR.FromPointer(0x00001200));
+		if (result != MuiNativeApplicationLoopCore.ReturnIdQuit ||
+			!MuiNativeApplicationLoopProbeCodec.TryRead(ref platform, out var probe) ||
+			probe.DispatchCount != 2 || probe.WaitCount != 0 ||
+			probe.AllocationCount != 1 || probe.FreeCount != 1) return 2;
 		return 42;
 	}
 }

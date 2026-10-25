@@ -166,6 +166,22 @@ internal static class MuiNativeReturnIdQueue
 
 internal static class MuiNativeApplicationInputWaitState
 {
+	// The native caller holds Forbid across queue inspection and wait-state
+	// publication. Preserve the wake mask for producers, but request immediate
+	// input iteration while local queues still contain work.
+	internal static bool TryPrepare<T>(ref T memory, APTR sidecarAddress,
+		APTR task, uint signalMask, out uint nextInputMask)
+		where T : struct, IMuiGuestMemory
+	{
+		nextInputMask = 0;
+		if (!TrySet(ref memory, sidecarAddress, task, signalMask) ||
+			!MuiNativeMuiObjectCodec.TryRead(ref memory, sidecarAddress,
+				out var sidecar)) return false;
+		if (sidecar.ReturnIdQueue.IsNull && sidecar.ApplicationPushQueue.IsNull)
+			nextInputMask = signalMask;
+		return true;
+	}
+
 	internal static bool TrySet<T>(ref T memory, APTR sidecarAddress,
 		APTR task, uint signalMask)
 		where T : struct, IMuiGuestMemory
@@ -1015,22 +1031,25 @@ internal static class MuiNativeApplicationInputCore
 					input.SignalStorage, signalStorage);
 			}
 		}
-		Exec.Forbid();
-		var memory = default(MuiNativeClassMemory);
-		MuiNativeApplicationInputWaitState.TrySet(ref memory, sidecarAddress,
-			currentTask, signalMask);
-		Exec.Permit();
-
 		if (!TryTakeReturnId(ref platform, sidecarAddress, out var hasValue,
 			out var returnId))
 		{
 			result = 0;
 			return true;
 		}
+		Exec.Forbid();
+		var memory = default(MuiNativeClassMemory);
+		if (MuiNativeApplicationInputWaitState.TryPrepare(ref memory,
+			sidecarAddress, currentTask, signalMask, out var nextInputMask))
+			MuiApplicationWindowSignalStorageCodec.Write(ref memory,
+				input.SignalStorage, new MuiApplicationWindowSignalStorage
+				{
+					Signals = nextInputMask,
+				});
+		Exec.Permit();
 		if (!hasValue) return false;
-		// Keep the class callback's signal output intact. It is the wait mask
-		// the caller needs after processing this input packet, even when a queued
-		// ReturnID takes precedence as the method result.
+		// A queued ReturnID takes precedence over the callback's method result.
+		// Pending queue entries have already suppressed the caller's wait above.
 		result = returnId;
 		return true;
 	}

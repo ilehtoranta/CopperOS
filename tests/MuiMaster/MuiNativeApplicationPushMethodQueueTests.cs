@@ -133,6 +133,33 @@ public sealed class MuiNativeApplicationPushMethodQueueTests
 		Assert.Equal(FirstRecord, unchanged.ApplicationPushQueue);
 	}
 
+	[Fact]
+	public void InputKeepsIteratingUntilThePushQueueIsEmpty()
+	{
+		var memory = NewMemory();
+		WriteLiveSidecar(ref memory);
+		WriteParameters(ref memory, FirstMethod, 1);
+		Assert.True(MuiNativeApplicationPushMethodQueue.TryEnqueue(ref memory,
+			Sidecar, FirstRecord, DestinationOne, 2, Parameters, out _));
+		Assert.True(MuiNativeApplicationPushMethodQueue.TryEnqueue(ref memory,
+			Sidecar, SecondRecord, DestinationTwo, 2, Parameters, out _));
+		Assert.True(MuiNativeApplicationPushMethodQueue.TryTakeNext(ref memory,
+			Sidecar, out _, out _, out _, out _));
+		var task = APTR.FromPointer(0x1B80);
+		Assert.True(MuiNativeApplicationInputWaitState.TryPrepare(ref memory,
+			Sidecar, task, 0x420, out var inputMask));
+		Assert.Equal(0u, inputMask);
+		Assert.True(MuiNativeApplicationInputWaitState.TryGet(ref memory,
+			Sidecar, out var wakeTask, out var wakeMask));
+		Assert.Equal(task, wakeTask);
+		Assert.Equal(0x420u, wakeMask);
+		Assert.True(MuiNativeApplicationPushMethodQueue.TryTakeNext(ref memory,
+			Sidecar, out _, out _, out _, out _));
+		Assert.True(MuiNativeApplicationInputWaitState.TryPrepare(ref memory,
+			Sidecar, task, 0x420, out inputMask));
+		Assert.Equal(0x420u, inputMask);
+	}
+
 	private static MuiHeadlessTestPlatform NewMemory() =>
 		new(0x1800, 0x400, 0, Sidecar);
 

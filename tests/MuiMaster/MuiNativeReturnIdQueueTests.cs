@@ -118,6 +118,30 @@ public sealed class MuiNativeReturnIdQueueTests
 		Assert.Equal(0u, storedMask);
 	}
 
+	[Fact]
+	public void InputDoesNotWaitUntilAllQueuedReturnIdsHaveBeenConsumed()
+	{
+		var memory = new MuiHeadlessTestPlatform(Sidecar.Raw, 0x200, 0, Sidecar);
+		Assert.True(MuiNativeMuiObjectCodec.Write(ref memory, Sidecar, NewLiveSidecar()));
+		Assert.True(MuiNativeReturnIdQueue.TryEnqueue(ref memory, Sidecar, First, 7));
+		Assert.True(MuiNativeReturnIdQueue.TryEnqueue(ref memory, Sidecar, Second, 9));
+		var task = APTR.FromPointer(0x1B00);
+		Assert.True(MuiNativeReturnIdQueue.TryDequeue(ref memory, Sidecar,
+			out _, out _, out _));
+		Assert.True(MuiNativeApplicationInputWaitState.TryPrepare(ref memory,
+			Sidecar, task, 0x420, out var inputMask));
+		Assert.Equal(0u, inputMask);
+		Assert.True(MuiNativeApplicationInputWaitState.TryGet(ref memory,
+			Sidecar, out var wakeTask, out var wakeMask));
+		Assert.Equal(task, wakeTask);
+		Assert.Equal(0x420u, wakeMask);
+		Assert.True(MuiNativeReturnIdQueue.TryDequeue(ref memory, Sidecar,
+			out _, out _, out _));
+		Assert.True(MuiNativeApplicationInputWaitState.TryPrepare(ref memory,
+			Sidecar, task, 0x420, out inputMask));
+		Assert.Equal(0x420u, inputMask);
+	}
+
 	private static MuiNativeMuiObjectRecord NewLiveSidecar() => new()
 	{
 		Signature = MuiNativeMuiObjectRecord.Magic,

@@ -89,8 +89,8 @@ internal static class MuiNativeDrawingPlatformCore
 	internal static APTR PushClip(ref MuiNativeClassPlatform platform,
 		APTR layer, int left, int top, int width, int height)
 	{
-		if (layer.IsNull || !FitsShort(left) || !FitsShort(top) ||
-			!FitsPositiveShort(width) || !FitsPositiveShort(height))
+		if (layer.IsNull || !MuiNativeRectangleClipRegion.ValidGeometry(
+			left, top, width, height))
 			return APTR.Null;
 		var layers = OpenLayers();
 		if (layers.IsNull) return APTR.Null;
@@ -108,16 +108,15 @@ internal static class MuiNativeDrawingPlatformCore
 			return APTR.Null;
 		}
 
-		var bounds = LayersRectangleCodec.Create((short)left, (short)top,
-			(short)(left + width - 1), (short)(top + height - 1));
-		LayersRegionCodec.WriteBounds(ref platform, region, bounds);
-		LayersRegionCodec.WriteFirst(ref platform, region, rectangle);
-		LayersRegionRectangleCodec.WriteNext(ref platform, rectangle,
-			APTR.Null);
-		LayersRegionRectangleCodec.WritePrevious(ref platform, rectangle,
-			APTR.Null);
-		LayersRegionRectangleCodec.WriteBounds(ref platform, rectangle,
-			bounds);
+		if (!MuiNativeRectangleClipRegion.TryInitialize(ref platform, region,
+			rectangle, left, top, width, height))
+		{
+			platform.Free(token, MuiNativeClipTokenRecord.Size);
+			platform.Free(rectangle, RegionRectangle.Size);
+			platform.Free(region, Region.Size);
+			CloseLayers(layers);
+			return APTR.Null;
+		}
 
 		var previous = MuiNativeDrawingCalls.InstallClipRegion(layers, layer,
 			region);

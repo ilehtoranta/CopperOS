@@ -330,6 +330,7 @@ internal struct MuiNativeClassPlatform : IMuiClassServicePlatform,
 	public uint DoMethod(APTR obj, APTR message) =>
 		MuiNativeBoopsiDispatch.DoMethod(ref this, obj, message);
 	public uint WaitMuiSignals(uint signalMask) => Exec.Wait(signalMask);
+	public uint ReadSignals(uint signalMask) => Exec.SetSignal(0, signalMask) & signalMask;
 	public uint CoerceMethod(APTR classPointer, APTR obj, APTR message) =>
 		MuiNativeBoopsiDispatch.CoerceMethod(ref this, classPointer, obj,
 			message);
