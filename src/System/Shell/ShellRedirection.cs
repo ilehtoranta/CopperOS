@@ -102,7 +102,7 @@ public static class ShellRedirectionParser
         in ShellRedirectionWorkspace workspace,
         out ShellRedirectionSpec spec,
         out uint commandLength)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         spec = default;
         commandLength = 0;
@@ -313,7 +313,7 @@ public static class ShellRedirectionParser
         APTR destination,
         uint destinationCapacity,
         out uint pathLength)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         pathLength = 0;
         if (destination.IsNull || destinationCapacity < 2 ||
@@ -362,7 +362,7 @@ public static class ShellRedirectionParser
         APTR destination,
         uint destinationCapacity,
         ref uint written)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         while (position < sourceLength)
         {
@@ -378,7 +378,7 @@ public static class ShellRedirectionParser
         APTR destination,
         uint capacity,
         ref uint written)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (written == 0 || IsWhitespace(platform.ReadUInt8(
                 destination, (int)(written - 1))))
@@ -393,7 +393,7 @@ public static class ShellRedirectionParser
         uint capacity,
         ref uint written,
         byte value)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (destination.IsNull || capacity == 0 || written >= capacity)
             return false;
@@ -405,7 +405,7 @@ public static class ShellRedirectionParser
         ref TPlatform platform,
         APTR source,
         uint length)
-        where TPlatform : struct, IShellPlatform =>
+        where TPlatform : struct, IAmigaGuestMemory =>
         length <= ShellTextParser.MaximumSourceLength &&
         (length == 0 || (!source.IsNull &&
             source.Raw <= uint.MaxValue - length &&
@@ -414,7 +414,7 @@ public static class ShellRedirectionParser
     private static bool ValidWorkspace<TPlatform>(
         ref TPlatform platform,
         in ShellRedirectionWorkspace workspace)
-        where TPlatform : struct, IShellPlatform =>
+        where TPlatform : struct, IAmigaGuestMemory =>
         ValidBuffer(ref platform, workspace.Command,
             workspace.CommandCapacity) &&
         OptionalBuffer(ref platform, workspace.InputPath,
@@ -428,7 +428,7 @@ public static class ShellRedirectionParser
         ref TPlatform platform,
         APTR address,
         uint capacity)
-        where TPlatform : struct, IShellPlatform =>
+        where TPlatform : struct, IAmigaGuestMemory =>
         (address.IsNull && capacity == 0) ||
         ValidBuffer(ref platform, address, capacity);
 
@@ -436,7 +436,7 @@ public static class ShellRedirectionParser
         ref TPlatform platform,
         APTR address,
         uint capacity)
-        where TPlatform : struct, IShellPlatform =>
+        where TPlatform : struct, IAmigaGuestMemory =>
         !address.IsNull && capacity >= 2 &&
         address.Raw <= uint.MaxValue - capacity &&
         platform.IsMapped(address, capacity);

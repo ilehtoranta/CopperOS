@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <CopperOSUseLocalCopperSharp>true</CopperOSUseLocalCopperSharp>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <Import Project="../../CopperOS.Portable.props" />
+  <ItemGroup>
+    <Compile Include="SystemBootstrap.cs" />
+    <Compile Include="KickstartShell.cs" />
+    <Compile Include="StorageProbe.cs" />
+    <Compile Include="SingleHunkStreamLoader.cs" />
+    <Compile Include="NativeFfsFile.cs" />
+    <Compile Include="../../src/System/Shell/*.cs" Link="Shell/%(Filename)%(Extension)" />
+    <ProjectReference Include="../../../CopperStart/src/CopperStart.Dos/CopperStart.Dos.csproj" />
+  </ItemGroup>
+</Project>

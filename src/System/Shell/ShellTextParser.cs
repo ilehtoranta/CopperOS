@@ -52,7 +52,7 @@ public static class ShellTextParser
         uint destinationCapacity,
         out uint tokenLength,
         out uint tokenFlags)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         tokenLength = 0;
         tokenFlags = 0;
@@ -155,7 +155,7 @@ public static class ShellTextParser
         uint destinationCapacity,
         out uint valueLength,
         out uint valueFlags)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         valueLength = 0;
         valueFlags = 0;
@@ -243,7 +243,7 @@ public static class ShellTextParser
         byte sixth,
         byte seventh,
         byte eighth = 0)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (length == 1) return second == 0 && Match1(ref platform, value, first);
         if (length == 2) return third == 0 && Match2(ref platform, value, first, second);
@@ -257,7 +257,7 @@ public static class ShellTextParser
 
     public static bool EqualsPacked<TPlatform>(ref TPlatform platform,
         APTR value, uint length, uint firstWord, uint secondWord)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (length == 0 || length > 8) return false;
         for (var index = 0u; index < length; index++)
@@ -276,24 +276,24 @@ public static class ShellTextParser
     }
 
     private static bool Match1<TPlatform>(ref TPlatform platform, APTR value, byte first)
-        where TPlatform : struct, IShellPlatform => EqualByte(ref platform, value, 0, first);
+        where TPlatform : struct, IAmigaGuestMemory => EqualByte(ref platform, value, 0, first);
     private static bool Match2<TPlatform>(ref TPlatform platform, APTR value, byte first, byte second)
-        where TPlatform : struct, IShellPlatform => Match1(ref platform, value, first) && EqualByte(ref platform, value, 1, second);
+        where TPlatform : struct, IAmigaGuestMemory => Match1(ref platform, value, first) && EqualByte(ref platform, value, 1, second);
     private static bool Match3<TPlatform>(ref TPlatform platform, APTR value, byte first, byte second, byte third)
-        where TPlatform : struct, IShellPlatform => Match2(ref platform, value, first, second) && EqualByte(ref platform, value, 2, third);
+        where TPlatform : struct, IAmigaGuestMemory => Match2(ref platform, value, first, second) && EqualByte(ref platform, value, 2, third);
     private static bool Match4<TPlatform>(ref TPlatform platform, APTR value, byte first, byte second, byte third, byte fourth)
-        where TPlatform : struct, IShellPlatform => Match3(ref platform, value, first, second, third) && EqualByte(ref platform, value, 3, fourth);
+        where TPlatform : struct, IAmigaGuestMemory => Match3(ref platform, value, first, second, third) && EqualByte(ref platform, value, 3, fourth);
     private static bool Match5<TPlatform>(ref TPlatform platform, APTR value, byte first, byte second, byte third, byte fourth, byte fifth)
-        where TPlatform : struct, IShellPlatform => Match4(ref platform, value, first, second, third, fourth) && EqualByte(ref platform, value, 4, fifth);
+        where TPlatform : struct, IAmigaGuestMemory => Match4(ref platform, value, first, second, third, fourth) && EqualByte(ref platform, value, 4, fifth);
     private static bool Match6<TPlatform>(ref TPlatform platform, APTR value, byte first, byte second, byte third, byte fourth, byte fifth, byte sixth)
-        where TPlatform : struct, IShellPlatform => Match5(ref platform, value, first, second, third, fourth, fifth) && EqualByte(ref platform, value, 5, sixth);
+        where TPlatform : struct, IAmigaGuestMemory => Match5(ref platform, value, first, second, third, fourth, fifth) && EqualByte(ref platform, value, 5, sixth);
     private static bool Match7<TPlatform>(ref TPlatform platform, APTR value, byte first, byte second, byte third, byte fourth, byte fifth, byte sixth, byte seventh)
-        where TPlatform : struct, IShellPlatform => Match6(ref platform, value, first, second, third, fourth, fifth, sixth) && EqualByte(ref platform, value, 6, seventh);
+        where TPlatform : struct, IAmigaGuestMemory => Match6(ref platform, value, first, second, third, fourth, fifth, sixth) && EqualByte(ref platform, value, 6, seventh);
     private static bool Match8<TPlatform>(ref TPlatform platform, APTR value, byte first, byte second, byte third, byte fourth, byte fifth, byte sixth, byte seventh, byte eighth)
-        where TPlatform : struct, IShellPlatform => Match7(ref platform, value, first, second, third, fourth, fifth, sixth, seventh) && EqualByte(ref platform, value, 7, eighth);
+        where TPlatform : struct, IAmigaGuestMemory => Match7(ref platform, value, first, second, third, fourth, fifth, sixth, seventh) && EqualByte(ref platform, value, 7, eighth);
 
     private static bool EqualByte<TPlatform>(ref TPlatform platform, APTR value,
-        int offset, byte expected) where TPlatform : struct, IShellPlatform
+        int offset, byte expected) where TPlatform : struct, IAmigaGuestMemory
     {
         var actual = (uint)platform.ReadUInt8(value, offset);
         var expectedValue = (uint)expected;
@@ -306,7 +306,7 @@ public static class ShellTextParser
         ref TPlatform platform,
         APTR source,
         uint position)
-        where TPlatform : struct, IShellPlatform =>
+        where TPlatform : struct, IAmigaGuestMemory =>
         platform.ReadUInt8(source, (int)position);
 
     private static bool IsWhitespace(byte value) =>
