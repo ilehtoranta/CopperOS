@@ -2,10 +2,16 @@
 
 Every binary produced for the CopperOS `C:` command directory is tagged during
 `dotnet publish` with `$VER: <command> <version> (<date>) CopperOS`. The
-`tools/Commands/build-c.ps1` full build uses version `1.0` and one build date
-for the complete command set; `-BinaryVersion` and `-BinaryDate` can override
-those defaults. Direct project publishes use the same `1.0` default and the
-UTC build date. The build needs Python 3; `build-c.ps1 -PythonExecutable`
+`src/Commands/CommandVersions.props` records the version and date independently
+for each command. Initial entries preserve the existing `1.0 (31.10.2026)`
+identifiers; they do not imply that all commands last changed on that date.
+When a fix or feature changes a command, increment its revision and update its
+date in that file. Use a major version increment when appropriate. For shared
+changes, update each affected command; unchanged commands keep their identifiers.
+The date describes the version change, not the build, so rebuilding is stable.
+Every command must have exactly one record. `-BinaryVersion` and `-BinaryDate`
+remain explicit build-wide overrides for special builds; ordinary builds and
+direct publishes use the individual records. The build needs Python 3; `build-c.ps1 -PythonExecutable`
 selects its interpreter when `python` is not available on `PATH`. A successful
 publish writes a sidecar receipt beside the
 compiler output and copies the versioned HUNK into the selected `C:` staging

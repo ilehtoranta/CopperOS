@@ -1,0 +1,249 @@
+<Project>
+  <!-- Update only the entries affected by a command change. -->
+  <ItemGroup>
+    <_CopperOSCommandVersion Include="AddBuffers" Condition="'$(CopperOSCommandName)' == 'AddBuffers'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="AddDataTypes" Condition="'$(CopperOSCommandName)' == 'AddDataTypes'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Assign" Condition="'$(CopperOSCommandName)' == 'Assign'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Avail" Condition="'$(CopperOSCommandName)' == 'Avail'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Beep" Condition="'$(CopperOSCommandName)' == 'Beep'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="BindDrivers" Condition="'$(CopperOSCommandName)' == 'BindDrivers'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Break" Condition="'$(CopperOSCommandName)' == 'Break'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="ChangeTaskPri" Condition="'$(CopperOSCommandName)' == 'ChangeTaskPri'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Check2090" Condition="'$(CopperOSCommandName)' == 'Check2090'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Copy" Condition="'$(CopperOSCommandName)' == 'Copy'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Date" Condition="'$(CopperOSCommandName)' == 'Date'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Delete" Condition="'$(CopperOSCommandName)' == 'Delete'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="DevList" Condition="'$(CopperOSCommandName)' == 'DevList'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Dir" Condition="'$(CopperOSCommandName)' == 'Dir'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="DiskChange" Condition="'$(CopperOSCommandName)' == 'DiskChange'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="DiskFree" Condition="'$(CopperOSCommandName)' == 'DiskFree'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="DosList" Condition="'$(CopperOSCommandName)' == 'DosList'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Eval" Condition="'$(CopperOSCommandName)' == 'Eval'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Exe2Arc" Condition="'$(CopperOSCommandName)' == 'Exe2Arc'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Execute" Condition="'$(CopperOSCommandName)' == 'Execute'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="ExtractKickstart" Condition="'$(CopperOSCommandName)' == 'ExtractKickstart'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="FileNote" Condition="'$(CopperOSCommandName)' == 'FileNote'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="FindResident" Condition="'$(CopperOSCommandName)' == 'FindResident'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Format" Condition="'$(CopperOSCommandName)' == 'Format'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="GuessBootDev" Condition="'$(CopperOSCommandName)' == 'GuessBootDev'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="IconPos" Condition="'$(CopperOSCommandName)' == 'IconPos'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Info" Condition="'$(CopperOSCommandName)' == 'Info'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Join" Condition="'$(CopperOSCommandName)' == 'Join'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="LibList" Condition="'$(CopperOSCommandName)' == 'LibList'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="List" Condition="'$(CopperOSCommandName)' == 'List'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="LoadMonDrvs" Condition="'$(CopperOSCommandName)' == 'LoadMonDrvs'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Lock" Condition="'$(CopperOSCommandName)' == 'Lock'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="MakeDir" Condition="'$(CopperOSCommandName)' == 'MakeDir'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="MakeLink" Condition="'$(CopperOSCommandName)' == 'MakeLink'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="ModList" Condition="'$(CopperOSCommandName)' == 'ModList'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Mount" Condition="'$(CopperOSCommandName)' == 'Mount'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="PathPart" Condition="'$(CopperOSCommandName)' == 'PathPart'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="PortList" Condition="'$(CopperOSCommandName)' == 'PortList'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Protect" Condition="'$(CopperOSCommandName)' == 'Protect'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Quote" Condition="'$(CopperOSCommandName)' == 'Quote'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Reboot" Condition="'$(CopperOSCommandName)' == 'Reboot'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Relabel" Condition="'$(CopperOSCommandName)' == 'Relabel'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Rename" Condition="'$(CopperOSCommandName)' == 'Rename'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="RequestChoice" Condition="'$(CopperOSCommandName)' == 'RequestChoice'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="RequestFile" Condition="'$(CopperOSCommandName)' == 'RequestFile'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="ResList" Condition="'$(CopperOSCommandName)' == 'ResList'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Search" Condition="'$(CopperOSCommandName)' == 'Search'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="SetClock" Condition="'$(CopperOSCommandName)' == 'SetClock'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="SetDate" Condition="'$(CopperOSCommandName)' == 'SetDate'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="SetFont" Condition="'$(CopperOSCommandName)' == 'SetFont'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="SetKeyboard" Condition="'$(CopperOSCommandName)' == 'SetKeyboard'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Status" Condition="'$(CopperOSCommandName)' == 'Status'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="TaskList" Condition="'$(CopperOSCommandName)' == 'TaskList'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Touch" Condition="'$(CopperOSCommandName)' == 'Touch'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Type" Condition="'$(CopperOSCommandName)' == 'Type'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Version" Condition="'$(CopperOSCommandName)' == 'Version'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Wait" Condition="'$(CopperOSCommandName)' == 'Wait'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="WaitForLib" Condition="'$(CopperOSCommandName)' == 'WaitForLib'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="WaitForNotification" Condition="'$(CopperOSCommandName)' == 'WaitForNotification'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="WaitForPort" Condition="'$(CopperOSCommandName)' == 'WaitForPort'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+    <_CopperOSCommandVersion Include="Which" Condition="'$(CopperOSCommandName)' == 'Which'">
+      <Version>1.0</Version>
+      <Date>31.10.2026</Date>
+    </_CopperOSCommandVersion>
+  </ItemGroup>
+</Project>

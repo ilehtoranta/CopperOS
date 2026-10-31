@@ -1,5 +1,9 @@
 <Project>
   <Import Project="$(MSBuildThisFileDirectory)CodeSizePolicies.props" />
+  <PropertyGroup>
+    <CopperOSCommandVersionsFile Condition="'$(CopperOSCommandVersionsFile)' == ''">$(MSBuildThisFileDirectory)CommandVersions.props</CopperOSCommandVersionsFile>
+  </PropertyGroup>
+  <Import Project="$(CopperOSCommandVersionsFile)" Condition="Exists('$(CopperOSCommandVersionsFile)')" />
   <!--
     A command project sets CopperOSCommandName (the C: file name) and
     CopperSharpEntry. `dotnet publish` then compiles that one entry to a HUNK
@@ -58,10 +62,20 @@
          the symbols. Set CopperOSSymbols=on to keep them. -->
     <CopperOSSymbols Condition="'$(CopperOSSymbols)' == ''">off</CopperOSSymbols>
     <CopperOSCodeSizeOptimizations Condition="'$(CopperOSCodeSizeOptimizations)' == ''">off</CopperOSCodeSizeOptimizations>
-    <CopperOSBinaryVersion Condition="'$(CopperOSBinaryVersion)' == ''">1.0</CopperOSBinaryVersion>
-    <CopperOSBinaryDate Condition="'$(CopperOSBinaryDate)' == ''">$([System.DateTime]::UtcNow.ToString('d.M.yyyy'))</CopperOSBinaryDate>
     <CopperOSPythonExecutable Condition="'$(CopperOSPythonExecutable)' == ''">python</CopperOSPythonExecutable>
   </PropertyGroup>
+
+  <Target Name="CopperOSValidateCommandVersion"
+          BeforeTargets="PrepareCopperSharpPublishManifest"
+          Condition="'$(CopperOSCommandName)' != ''">
+    <Error Condition="!Exists('$(CopperOSCommandVersionsFile)')" Text="Command version file not found: $(CopperOSCommandVersionsFile)" />
+    <Error Condition="'@(_CopperOSCommandVersion->Count())' != '1'" Text="Expected exactly one version record for $(CopperOSCommandName) in $(CopperOSCommandVersionsFile)." />
+    <PropertyGroup>
+      <CopperOSBinaryVersion Condition="'$(CopperOSBinaryVersion)' == ''">@(_CopperOSCommandVersion->'%(Version)')</CopperOSBinaryVersion>
+      <CopperOSBinaryDate Condition="'$(CopperOSBinaryDate)' == ''">@(_CopperOSCommandVersion->'%(Date)')</CopperOSBinaryDate>
+    </PropertyGroup>
+    <Error Condition="'$(CopperOSBinaryVersion)' == '' or '$(CopperOSBinaryDate)' == ''" Text="Command $(CopperOSCommandName) needs a version and date." />
+  </Target>
 
   <Target Name="CopperOSExtendPublishManifest"
           AfterTargets="PrepareCopperSharpPublishManifest"

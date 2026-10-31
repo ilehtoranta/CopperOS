@@ -20,8 +20,9 @@ param(
     [string]$CompilerAssembly,
     [ValidateSet('on', 'off')][string]$CodeSizeOptimizations,
     [string]$CodeSizePasses,
-    [string]$BinaryVersion = '1.0',
-    [string]$BinaryDate = (Get-Date -Format 'd.M.yyyy'),
+    [string]$BinaryVersion,
+    [string]$BinaryDate,
+    [string]$CommandVersionsFile,
     [string]$PythonExecutable = 'python',
     [switch]$SkipCompiler
 )
@@ -60,7 +61,9 @@ $directory = $stagingDirectory.TrimEnd('\') + '\'
 $failed = [Collections.Generic.List[string]]::new()
 $built = foreach ($project in $projects) {
     $properties = @("-p:CopperSharp68kRoot=$CopperSharpRoot", "-p:CopperOSCDirectory=$directory")
-    $properties += "-p:CopperOSBinaryVersion=$BinaryVersion", "-p:CopperOSBinaryDate=$BinaryDate"
+    if ($BinaryVersion) { $properties += "-p:CopperOSBinaryVersion=$BinaryVersion" }
+    if ($BinaryDate) { $properties += "-p:CopperOSBinaryDate=$BinaryDate" }
+    if ($CommandVersionsFile) { $properties += "-p:CopperOSCommandVersionsFile=$([IO.Path]::GetFullPath($CommandVersionsFile))" }
     $properties += "-p:CopperOSPythonExecutable=$PythonExecutable"
     if ($CompilerAssembly) { $properties += "-p:CopperOSCompilerAssembly=$([IO.Path]::GetFullPath($CompilerAssembly))" }
     if ($CodeSizeOptimizations) { $properties += "-p:CopperOSCodeSizeOptimizations=$CodeSizeOptimizations" }
@@ -68,8 +71,13 @@ $built = foreach ($project in $projects) {
     & dotnet publish $project.Path -c Release -nologo -v q @properties | Out-Host
     if ($LASTEXITCODE -ne 0) { $failed.Add($project.Name); continue }
     $file = Get-Item -LiteralPath (Join-Path $stagingDirectory $project.Name)
+    $content = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($file.FullName))
+    $pattern = '\$VER: ' + [regex]::Escape($project.Name) + ' [0-9]+\.[0-9]+ \([0-9]{1,2}\.[0-9]{1,2}\.[0-9]{4}\) CopperOS\x00'
+    $matches = [regex]::Matches($content, $pattern)
+    if ($matches.Count -ne 1) { throw "Expected exactly one version identifier in $($project.Name)." }
+    $versionId = $matches[0].Value.Substring(0, $matches[0].Length - 1)
     [pscustomobject]@{ Command = $project.Name; Bytes = $file.Length
-        VersionId = ('$VER: {0} {1} ({2}) CopperOS' -f $project.Name, $BinaryVersion, $BinaryDate)
+        VersionId = $versionId
         Sha256 = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
 }
 $built | Format-Table -AutoSize
