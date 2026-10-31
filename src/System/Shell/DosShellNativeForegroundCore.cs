@@ -86,6 +86,7 @@ internal static class DosShellNativeForegroundCore
         dos.WriteUInt8(path, (int)lookup.PathLength, 0);
         var resident = APTR.Null;
         var segment = BPTR.Null;
+        var home = BPTR.Null;
         if (lookup.Kind == ShellScriptLookupKind.Resident)
         {
             var raw = DosShellNativeBridge.LookupResidentNativeRaw(ref dos,
@@ -94,10 +95,27 @@ internal static class DosShellNativeForegroundCore
                 ref dos, state, command.CommandName, command.CommandNameLength, raw));
             if (segment.IsNotNull) resident = APTR.FromPointer(raw);
         }
-        else segment = DosSegmentLoaderCore.Load(ref dos, state, path);
+        else
+        {
+            // PROGDIR names the executable's directory, independently of the
+            // current directory and any command-path search that found it.
+            var file = DosCore.Lock(ref dos, state, path, DOS.LockMode.Shared);
+            if (file.IsNotNull)
+            {
+                home = DosCore.ParentDir(ref dos, state, file);
+                var homeError = DosCore.IoErr(ref dos, state);
+                DosCore.UnLock(ref dos, state, file);
+                DosCore.SetIoErr(ref dos, state, homeError);
+            }
+            if (home.IsNotNull) segment = DosSegmentLoaderCore.Load(ref dos, state, path);
+        }
         var loadError = DosCore.IoErr(ref dos, state);
         dos.FreeGuest(path, lookup.PathLength + 1);
-        if (segment.IsNull) { DosCore.SetIoErr(ref dos, state, loadError); return false; }
+        if (segment.IsNull)
+        {
+            if (home.IsNotNull) DosCore.UnLock(ref dos, state, home);
+            DosCore.SetIoErr(ref dos, state, loadError); return false;
+        }
 
         var arguments = command.Arguments;
         while (arguments.Length != 0 && dos.ReadUInt8(arguments.Data) is (byte)' ' or (byte)'\t')
@@ -113,6 +131,7 @@ internal static class DosShellNativeForegroundCore
             if (text.IsNotNull) dos.FreeGuest(text, capacity);
             if (library.IsNotNull) global::Amiga.Exec.CloseLibrary(library);
             Release(ref dos, state, segment, resident);
+            if (home.IsNotNull) DosCore.UnLock(ref dos, state, home);
             DosCore.SetIoErr(ref dos, state, DOS.Error.NoFreeStore);
             return false;
         }
@@ -138,10 +157,16 @@ internal static class DosShellNativeForegroundCore
         // returning and letting the Shell unload the remaining command chain.
         var savedModule = dos.ReadUInt32(cli, DosLayout.CommandLineInterface.Module);
         dos.WriteUInt32(cli, DosLayout.CommandLineInterface.Module, segment.Raw);
+        var savedHome = home.IsNotNull ? DosProcessCore.SetProgramDir(ref dos, home.Raw) : 0;
         result = NativeForegroundDosVectors.RunCommand(library, segment,
             stack == 0 ? 4096 : unchecked(stack << 2), text, (int)length);
         dos.WriteUInt32(cli, DosLayout.CommandLineInterface.Module, savedModule);
         var ioError = DosCore.IoErr(ref dos, state);
+        if (home.IsNotNull)
+        {
+            var finishedHome = BPTR.FromRaw(DosProcessCore.SetProgramDir(ref dos, savedHome));
+            if (finishedHome.IsNotNull) DosCore.UnLock(ref dos, state, finishedHome);
+        }
         DosCore.SelectInput(ref dos, state, savedInput);
         DosCore.SelectOutput(ref dos, state, savedOutput);
         DosProcessCodec.WriteCurrentError(ref dos, task, savedError);
