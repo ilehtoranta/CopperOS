@@ -20,6 +20,9 @@ param(
     [string]$CompilerAssembly,
     [ValidateSet('on', 'off')][string]$CodeSizeOptimizations,
     [string]$CodeSizePasses,
+    [string]$BinaryVersion = '1.0',
+    [string]$BinaryDate = (Get-Date -Format 'd.M.yyyy'),
+    [string]$PythonExecutable = 'python',
     [switch]$SkipCompiler
 )
 
@@ -57,6 +60,8 @@ $directory = $stagingDirectory.TrimEnd('\') + '\'
 $failed = [Collections.Generic.List[string]]::new()
 $built = foreach ($project in $projects) {
     $properties = @("-p:CopperSharp68kRoot=$CopperSharpRoot", "-p:CopperOSCDirectory=$directory")
+    $properties += "-p:CopperOSBinaryVersion=$BinaryVersion", "-p:CopperOSBinaryDate=$BinaryDate"
+    $properties += "-p:CopperOSPythonExecutable=$PythonExecutable"
     if ($CompilerAssembly) { $properties += "-p:CopperOSCompilerAssembly=$([IO.Path]::GetFullPath($CompilerAssembly))" }
     if ($CodeSizeOptimizations) { $properties += "-p:CopperOSCodeSizeOptimizations=$CodeSizeOptimizations" }
     if ($CodeSizePasses) { $properties += "-p:CopperOSCodeSizePasses=$($CodeSizePasses.Replace(',', '%2C'))" }
@@ -64,6 +69,7 @@ $built = foreach ($project in $projects) {
     if ($LASTEXITCODE -ne 0) { $failed.Add($project.Name); continue }
     $file = Get-Item -LiteralPath (Join-Path $stagingDirectory $project.Name)
     [pscustomobject]@{ Command = $project.Name; Bytes = $file.Length
+        VersionId = ('$VER: {0} {1} ({2}) CopperOS' -f $project.Name, $BinaryVersion, $BinaryDate)
         Sha256 = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
 }
 $built | Format-Table -AutoSize

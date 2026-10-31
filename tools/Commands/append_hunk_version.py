@@ -20,6 +20,7 @@ import struct
 HEADER, CODE, RELOC32, SYMBOL, END = 0x3F3, 0x3E9, 0x3EC, 0x3F0, 0x3F2
 MAX_FILE_BYTES = 32 * 1024 * 1024
 VERSION = re.compile(r"\$VER: [A-Za-z0-9_.-]+ [0-9]+\.[0-9]+ \([0-9]{1,2}\.[0-9]{1,2}\.[0-9]{4}\)(?: [ -~]+)?\Z")
+VERSION_TAG = re.compile(rb"\$VER: [A-Za-z0-9_.-]+ [0-9]+\.[0-9]+ \([0-9]{1,2}\.[0-9]{1,2}\.[0-9]{4}\)(?: [ -~]+)?\x00")
 
 
 class HunkError(ValueError):
@@ -114,7 +115,7 @@ def append_version(data: bytes, version: str) -> tuple[bytes, dict]:
     original = parse_hunk(data)
     if not VERSION.fullmatch(version) or version.count("$VER:") != 1 or len(version) > 255:
         raise HunkError("Expected one printable ASCII command version ID, at most 255 characters")
-    if b"$VER:" in data:
+    if VERSION_TAG.search(data):
         raise HunkError("Refusing an input that already contains a version ID")
     metadata = b"\0" + version.encode("ascii") + b"\0"
     metadata += bytes((-len(metadata)) % 4)

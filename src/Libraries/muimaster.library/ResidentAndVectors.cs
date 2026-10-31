@@ -22,6 +22,7 @@ public static class MuiResidentMetadata
 	public static CString DevelopmentName => CString.FromLiteral(DevelopmentNameText);
 	public const ushort DevelopmentVersion = 0;
 	public const ushort DevelopmentRevision = 1;
+	public const string DevelopmentIdString = "$VER: copperos-muimaster.library 0.1 (31.10.2026) CopperOS";
 	public const int FirstLvo = -30;
 	public const int LastLvo = -756;
 	public const int VectorStride = 6;

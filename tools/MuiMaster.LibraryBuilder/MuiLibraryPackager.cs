@@ -4,7 +4,6 @@
 */
 
 using System.Buffers.Binary;
-using System.Globalization;
 using System.Text;
 using Amiga;
 using CopperSharp.Compiler;
@@ -84,8 +83,7 @@ public static class MuiLibraryPackager
             throw new InvalidDataException("The production negative size does not match the complete vector table.");
 
         var name = Ascii(MuiResidentMetadata.DevelopmentNameText);
-        var id = Ascii(string.Create(CultureInfo.InvariantCulture,
-            $"CopperOS MUI development {MuiResidentMetadata.DevelopmentVersion}.{MuiResidentMetadata.DevelopmentRevision}"));
+        var id = Ascii(MuiResidentMetadata.DevelopmentIdString);
         const int residentOffset = 4; // The only executable entry before metadata is MOVEQ #-1,D0; RTS.
         var autoInitOffset = Align4(checked(residentOffset + (int)Resident.Size));
         var tableOffset = checked(autoInitOffset + (int)ResidentAutoInit.Size);

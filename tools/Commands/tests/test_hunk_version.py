@@ -113,6 +113,13 @@ class HunkVersionTests(unittest.TestCase):
             with self.subTest(version=version), self.assertRaises(HunkError):
                 append_version(fixture(), version)
 
+    def test_version_scanner_literals_do_not_block_appending(self):
+        pattern = b"$VER:\0" + bytes(10)
+        self.assertEqual(len(pattern), 16)
+        image = words(0x3F3, 0, 1, 0, 0, 4, 0x3E9, 4) + pattern + words(0x3F2)
+        output, _ = append_version(image, VERSION)
+        self.assertIn(VERSION.encode(), output)
+
     def test_deterministic_with_repeated_unchanged_input(self):
         self.assertEqual(append_version(fixture(), VERSION), append_version(fixture(), VERSION))
 

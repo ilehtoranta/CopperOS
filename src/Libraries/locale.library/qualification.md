@@ -1,5 +1,10 @@
 # locale.library compatibility qualification
 
+The current resident advertises version 40.4, matching the Commodore
+Workbench 3.1 reference version. This identifies the compatibility baseline;
+it does not claim the CopperOS implementation is limited to the reference
+library's functionality.
+
 ## Current input and catalog-tag follow-up — 2026-10-20
 
 The 1 MiB physical input/paint regression now passes both widths, with three

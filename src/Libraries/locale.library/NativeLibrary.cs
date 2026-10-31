@@ -8,7 +8,7 @@ namespace CopperOS.Locale;
 public static partial class LocaleNativeLibrary
 {
     public const uint PositiveBytes = 324, NegativeBytes = 228;
-    public const ushort Version = 53, Revision = 9;
+    public const ushort Version = 40, Revision = 4;
     internal const uint DosBase = 38, DefaultLocale = 42, Catalogs = 46, LiveLocales = 50, Segment = 54, Gate = 58;
     internal const uint Busy = 104, MemoryInterrupt = 108, MemoryRegistered = 130;
     internal const uint DefaultHistory = 132;
@@ -33,7 +33,7 @@ public static partial class LocaleNativeLibrary
         p.Write8(library + 8, 9); p.Write32(library + 10, CString.ToUInt32(CString.FromLiteral("locale.library")));
         p.Write8(library + 14, 6); p.Write16(library + 20, Version); p.Write16(library + 22, Revision);
         // Keep the header text conventional while making Version FILE work.
-        p.Write32(library + 24, CString.ToUInt32(CString.FromLiteral("$VER: locale.library 53.9 (CopperOS)")) + 6);
+        p.Write32(library + 24, CString.ToUInt32(CString.FromLiteral(LocaleResidentMetadata.DevelopmentIdStringTail)));
         Exec.InitSemaphore(APTR.FromPointer(library + Gate));
         uint configured = LocaleCore.Open(ref p, CString.ToUInt32(CString.FromLiteral("ENV:sys/locale.prefs")), l);
         if (configured != 0) { p.Write32(library + DefaultLocale, configured); LocaleCore.Close(ref p, l); }

@@ -1,5 +1,10 @@
 # Workbench 3.1 integration qualification — 2026-10-20
 
+> Historical qualification receipts below use the earlier locale.library 53.9
+> development version. The current resident version is 40.4; rerun the full
+> integration qualification against that exact rebuilt image before treating
+> these receipts as qualification of the current binary.
+
 <!-- one-mib-display-followup -->
 ## Display and startup follow-up
 

@@ -91,7 +91,7 @@ public sealed class MuiLibraryPackagerTests
         Assert.Equal((byte)NodeType.Library, resident.Type);
         Assert.Equal(MuiResidentMetadata.DevelopmentVersion, resident.Version);
         Assert.Equal(MuiResidentMetadata.DevelopmentNameText, memory.Text(resident.Name.Address));
-        Assert.Equal("CopperOS MUI development 0.1", memory.Text(resident.IdString.Address));
+		Assert.Equal(MuiResidentMetadata.DevelopmentIdString, memory.Text(resident.IdString.Address));
         Assert.Equal(load + (uint)artifact.Layout.AutoInit, resident.Init.Raw);
         var autoInit = ExecResidentAutoInitCodec.Read(ref memory, resident.Init);
         Assert.Equal((uint)MuiNativeLibraryEntrypoints.PositiveBytes, autoInit.DataSize);

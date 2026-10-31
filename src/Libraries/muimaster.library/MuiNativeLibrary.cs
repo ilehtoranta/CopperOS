@@ -188,7 +188,7 @@ public static class MuiNativeLibraryEntrypoints
 		header.Version = MuiResidentMetadata.DevelopmentVersion;
 		header.Revision = MuiResidentMetadata.DevelopmentRevision;
 		header.IdString = APTR.FromPointer(CString.ToUInt32(
-			CString.FromLiteral("CopperOS MUI development 0.1")));
+			CString.FromLiteral("copperos-muimaster.library 0.1 (31.10.2026) CopperOS")));
 		header.OpenCount = 0;
 		var record = default(MuiExecLibraryBaseRecord);
 		record.Header = header;

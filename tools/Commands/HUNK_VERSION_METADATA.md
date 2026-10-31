@@ -1,4 +1,25 @@
-# Development command version metadata
+# Command and library version metadata
+
+Every binary produced for the CopperOS `C:` command directory is tagged during
+`dotnet publish` with `$VER: <command> <version> (<date>) CopperOS`. The
+`tools/Commands/build-c.ps1` full build uses version `1.0` and one build date
+for the complete command set; `-BinaryVersion` and `-BinaryDate` can override
+those defaults. Direct project publishes use the same `1.0` default and the
+UTC build date. The build needs Python 3; `build-c.ps1 -PythonExecutable`
+selects its interpreter when `python` is not available on `PATH`. A successful
+publish writes a sidecar receipt beside the
+compiler output and copies the versioned HUNK into the selected `C:` staging
+directory. The HUNK appender validates and preserves the original code,
+relocations, and symbols; build inventory byte counts and hashes describe the
+versioned files.
+
+The native resident libraries carry IDs in their packaged images as well:
+`locale.library 40.4`, `mathtrans.library 40.1`, and
+`copperos-muimaster.library 0.1`, each with a source version date. The resident
+library API keeps its historical ID-string tail where required, while the
+complete `$VER:` record remains present in the binary for version scanners.
+
+## MakeLink development adapter
 
 `build_workbench_makelink_versioned.py` supplies the next bounded CC08 build
 slice for Workbench MakeLink. It does not stage files or grant shipping/PURE

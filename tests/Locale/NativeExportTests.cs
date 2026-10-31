@@ -81,8 +81,9 @@ public class NativeExportTests
         }
         Call("Init", s => { s.D[0] = NativeBus.Library; s.A[0] = 0x777; s.A[6] = NativeBus.Exec; });
         Assert.Equal(NativeBus.Library, cpu.State.D[0]); Assert.Equal(1, bus.RegisteredMemoryHandlers);
-        Assert.Equal("locale.library 53.9 (CopperOS)", p.String(p.Read32(NativeBus.Library + 24)));
-        Assert.Contains("$VER: locale.library 53.9 (CopperOS)", System.Text.Encoding.Latin1.GetString(snapshot));
+        Assert.Equal(LocaleResidentMetadata.DevelopmentIdStringTail, p.String(p.Read32(NativeBus.Library + 24)));
+        Assert.Contains(LocaleResidentMetadata.DevelopmentIdStringTail, System.Text.Encoding.Latin1.GetString(snapshot));
+        Assert.Contains(LocaleResidentMetadata.DevelopmentIdString, System.Text.Encoding.Latin1.GetString(artifact.Image));
         Call("Open", s => s.D[0] = 38); Assert.Equal(NativeBus.Library, cpu.State.D[0]);
         Call("System.ToLower", s => { s.A[6] = NativeBus.Utility; s.D[0] = 215; }); Assert.Equal(247u, cpu.State.D[0]);
         uint utilityA = p.Text("AbCd"), utilityB = p.Text("abce");

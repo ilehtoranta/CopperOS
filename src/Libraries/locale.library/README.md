@@ -2,8 +2,10 @@
 
 Original C# implementation compiled to a loadable M68k disk library. The
 default artifact targets the 68000, has no FPU or managed runtime dependency,
-and installs as `LIBS:locale.library`. Version 53.9 identifies the register-ABI
-feature level; it does not expose MorphOS System V functions to 68k callers.
+and installs as `LIBS:locale.library`. Version 40.4 matches the Commodore
+Workbench 3.1 locale.library version. CopperOS retains additional locale and
+MorphOS-derived functionality without claiming a newer library version; it
+does not expose MorphOS System V functions to 68k callers.
 The builder disables compiler peephole optimization for management/date code
 after layout-sensitive 68000 failures. The handwritten GetCatalogStr routine
 retains its constant-time dense path and logarithmic sparse path.

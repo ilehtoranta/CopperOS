@@ -58,6 +58,9 @@
          the symbols. Set CopperOSSymbols=on to keep them. -->
     <CopperOSSymbols Condition="'$(CopperOSSymbols)' == ''">off</CopperOSSymbols>
     <CopperOSCodeSizeOptimizations Condition="'$(CopperOSCodeSizeOptimizations)' == ''">off</CopperOSCodeSizeOptimizations>
+    <CopperOSBinaryVersion Condition="'$(CopperOSBinaryVersion)' == ''">1.0</CopperOSBinaryVersion>
+    <CopperOSBinaryDate Condition="'$(CopperOSBinaryDate)' == ''">$([System.DateTime]::UtcNow.ToString('d.M.yyyy'))</CopperOSBinaryDate>
+    <CopperOSPythonExecutable Condition="'$(CopperOSPythonExecutable)' == ''">python</CopperOSPythonExecutable>
   </PropertyGroup>
 
   <Target Name="CopperOSExtendPublishManifest"
@@ -89,5 +92,21 @@
           DestinationFiles="$(CopperOSCDirectory)$(CopperOSCommandName)"
           SkipUnchangedFiles="true" />
     <Message Importance="high" Text="$(CopperOSCommandName) -> $([System.IO.Path]::GetFullPath('$(CopperOSCDirectory)$(CopperOSCommandName)'))" />
+  </Target>
+  <!-- Every published command carries a searchable, NUL-terminated Amiga
+       $VER identifier. The bounded appender preserves CODE, relocations and
+       symbols; the final command copy happens only after it succeeds. -->
+  <Target Name="CopperOSAppendCommandVersion"
+          AfterTargets="CompileCopperSharpPublishedImage"
+          BeforeTargets="CopperOSCopyToCDirectory"
+          Condition="'$(CopperOSCommandName)' != '' and '$(RuntimeIdentifier)' == 'amiga-m68k'">
+    <GetFileHash Files="$(CopperSharpOutputPath)" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="_CopperOSRawHunk" />
+    </GetFileHash>
+    <Delete Files="$(CopperSharpOutputPath).versioned;$(CopperSharpOutputPath).version-receipt.json" />
+    <Exec Command="&quot;$(CopperOSPythonExecutable)&quot; &quot;$(MSBuildThisFileDirectory)..\..\tools\Commands\append_hunk_version.py&quot; --input &quot;$(CopperSharpOutputPath)&quot; --input-sha256 &quot;$([System.String]::Copy('%(_CopperOSRawHunk.FileHash)').ToLowerInvariant())&quot; --output &quot;$(CopperSharpOutputPath).versioned&quot; --receipt &quot;$(CopperSharpOutputPath).version-receipt.json&quot; --version &quot;$VER: $(CopperOSCommandName) $(CopperOSBinaryVersion) ($(CopperOSBinaryDate)) CopperOS&quot;" />
+    <Copy SourceFiles="$(CopperSharpOutputPath).versioned"
+          DestinationFiles="$(CopperSharpOutputPath)"
+          OverwriteReadOnlyFiles="true" />
   </Target>
 </Project>

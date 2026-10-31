@@ -4,7 +4,6 @@
 */
 
 using System.Buffers.Binary;
-using System.Globalization;
 using System.Text;
 using Amiga;
 using CopperSharp.Compiler;
@@ -83,8 +82,7 @@ public static class LocaleLibraryPackager
             throw new InvalidDataException("The production negative size does not match the complete vector table.");
 
         var name = Ascii(LocaleResidentMetadata.DevelopmentNameText);
-        var id = Ascii(string.Create(CultureInfo.InvariantCulture,
-            $"locale.library {LocaleResidentMetadata.DevelopmentVersion}.{LocaleResidentMetadata.DevelopmentRevision} (CopperOS)"));
+        var id = Ascii(LocaleResidentMetadata.DevelopmentIdString);
         const int residentOffset = 4; // The only executable entry before metadata is MOVEQ #-1,D0; RTS.
         var autoInitOffset = Align4(checked(residentOffset + (int)Resident.Size));
         var tableOffset = checked(autoInitOffset + (int)ResidentAutoInit.Size);

@@ -131,7 +131,7 @@ File.WriteAllBytes(Path.Combine(output, "chip.bin"), machine.ChipRam.ToArray());
 File.WriteAllBytes(Path.Combine(output, "fast.bin"), machine.FastRam.ToArray());
 File.WriteAllBytes(Path.Combine(output, "slow.bin"), slowRam);
 Console.WriteLine(JsonSerializer.Serialize(new { output, frame, receipt.workbenchTaskPresent, iprefsSeen, receipt.phase, receipt.commandFailures, libraries, observations }, json));
-uint expectedVersion = uint.Parse(options.GetValueOrDefault("--locale-version", "53"));
+uint expectedVersion = uint.Parse(options.GetValueOrDefault("--locale-version", "40"));
 return !lowPcFailure && !bootFailure && !startupReturnedToInteractive && receipt.workbenchTaskPresent && iprefsSeen &&
     (!replacement || receipt.phase == 3 && nativeDesktopReady) && libraries.Any(l => l.Name == "locale.library" && l.Version == expectedVersion) ? 0 : 2;
 
