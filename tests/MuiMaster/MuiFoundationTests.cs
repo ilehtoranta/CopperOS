@@ -213,9 +213,16 @@ public sealed class MuiFoundationTests
 	}
 
 	[Fact]
-	public void ResidentIdentityDoesNotAdvertiseMorphOsCompatibility()
+	public void ResidentIdentityDescribesSelectedDevelopmentProfile()
 	{
+#if COPPEROS_MUI_CLASSIC_COMPATIBILITY
+		Assert.Equal((ushort)4, MuiResidentMetadata.DevelopmentVersion);
+		Assert.Equal("muimaster.library", MuiResidentMetadata.DevelopmentNameText);
+		Assert.Contains("experimental", MuiResidentMetadata.DevelopmentIdString);
+#else
 		Assert.Equal((ushort)0, MuiResidentMetadata.DevelopmentVersion);
+		Assert.Equal("copperos-muimaster.library", MuiResidentMetadata.DevelopmentNameText);
+#endif
 		Assert.Equal((ushort)1, MuiResidentMetadata.DevelopmentRevision);
 		Assert.Equal(-30, MuiResidentMetadata.FirstLvo);
 		Assert.Equal(-756, MuiResidentMetadata.LastLvo);

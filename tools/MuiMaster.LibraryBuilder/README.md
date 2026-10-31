@@ -17,6 +17,46 @@ ASL entries use the named owner/requester records. Public MorphOS MUI
 compatibility is **not** yet claimed.
 It does not stage or replace anything in `filesystem/SYS/Libs`.
 
+For experiments with unmodified classic MUI 2.0 clients, explicitly opt in to
+`-p:CopperOSMuiClassicCompatibility=true` and select a separate output directory.
+This builds `muimaster.library` with version 4, revision 1 in both its Resident
+and initialized Library header. The ID string marks it CopperOS experimental.
+The normal build retains `copperos-muimaster.library` 0.1. Version 4 admits the
+original MUI Calc 1.25 client's minimum OpenLibrary request; it is an ABI
+selection for continued testing, not a full MUI compatibility certification.
+No third-party binary patching or filesystem installation occurs. Use a
+restore/build when switching profiles so the library assembly matches the
+packager metadata; do not reuse an earlier `--no-build` artifact.
+
+The Open vector takes the library base in A6 and does not interpret incoming
+D0 as a version. Exec performs minimum-version admission before this call;
+native Kickstart 3.1 was observed passing the base in D0. Private semaphore
+admission accepts both the existing CopperStart idle representation and the
+complete native Kickstart representation (NT_SIGNALSEM, queue count -1, empty
+self-linked wait queue, no owner or nesting). Mixed and busy states fail closed.
+
+Known built-in requests lazily register sixteen native BOOPSI classes:
+Notify, Family, Area, Group, Rectangle, Text, List, Listview, Window,
+Application, Menustrip, Menu, Menuitem, String, Image and Cycle (each with `.mui`).
+Their dispatchers use the existing guest-resident state cores and real Exec
+allocations and Intuition classes. Unknown names retain the external custom-class
+loader. Idle classes retire derived-first after leases, objects and callbacks
+have gone; failed native class deletion retains ownership for a later attempt.
+
+The native adapter initializes control, List and Listview state and routes base
+methods plus List insertion and clearing. This is bounded class support, not
+the complete MUI method surface. Native Window presentation is still unavailable:
+the Window Open and Window pointer getters return zero rather than reporting a
+requested attribute as a real open window. Successful construction alone is not
+a working calculator or native MUI GUI.
+
+Public service and dispatcher entry points have native stack gates. With less
+than 32 KiB of task stack remaining they use Exec StackSwap onto a temporary
+128 KiB stack, then restore task bounds, registers and the original stack before
+freeing it. Allocation failure and unsupported execution contexts return zero.
+Native object lookup reads the private BOOPSI header preceding the public object
+pointer; instance data must never be decoded as that header.
+
 From the repository root:
 
 ```powershell

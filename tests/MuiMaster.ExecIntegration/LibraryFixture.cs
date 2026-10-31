@@ -17,7 +17,7 @@ internal static class LibraryFixture
             MatchTag = APTR.FromPointer(Roots.ResidentAddress),
             EndSkip = APTR.FromPointer(Roots.IdAddress + 64),
             Flags = ResidentFlags.AutoInit,
-            Version = 0,
+            Version = (byte)MuiResidentMetadata.DevelopmentVersion,
             Type = (byte)NodeType.Library,
             Name = STRPTR.FromPointer(Roots.NameAddress),
             IdString = STRPTR.FromPointer(Roots.IdAddress),
@@ -63,7 +63,7 @@ internal static class LibraryFixture
             memory.WriteUInt32(autoInit.FunctionTable, index * 4,
                 Export(library, load, vectors[index]).Raw);
         memory.WriteUInt32(autoInit.FunctionTable, vectors.Length * 4, uint.MaxValue);
-        WriteText(ref memory, resident.Name.Address, "copperos-muimaster.library");
+        WriteText(ref memory, resident.Name.Address, MuiResidentMetadata.DevelopmentNameText);
         WriteText(ref memory, resident.IdString.Address,
             "CopperOS MUI development lifecycle fixture 0.1");
     }

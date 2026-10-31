@@ -65,6 +65,7 @@ public static class MuiLibraryPackager
         MuiNativeLibraryEntrypoints.EndRefreshExport,
         MuiNativeLibraryEntrypoints.GetRGBColorExport,
         MuiNativeClassDispatcher.ExportName,
+        MuiNativeBuiltinClasses.DispatchExport,
     });
 
 	public static IReadOnlyList<string> FunctionTableExports { get; } =
@@ -90,7 +91,13 @@ public static class MuiLibraryPackager
         var nameOffset = checked(tableOffset +
             (FunctionTableExports.Count + 1) * sizeof(uint));
         var idOffset = checked(nameOffset + name.Length);
-        var codeOffset = Align4(checked(idOffset + id.Length));
+        var gateNames = ExportNames.Where(name => name != MuiNativeLibraryEntrypoints.InitExport &&
+            name != MuiNativeLibraryEntrypoints.OpenExport && name != MuiNativeLibraryEntrypoints.CloseExport &&
+            name != MuiNativeLibraryEntrypoints.ExpungeExport && name != MuiNativeLibraryEntrypoints.ReservedExport &&
+            name != MuiNativeLibraryEntrypoints.UnsupportedExport).ToArray();
+        var gatesOffset = Align4(checked(idOffset + id.Length));
+        var gateSize = MuiNativeStackGate.Build(0).Code.Length;
+        var codeOffset = Align4(checked(gatesOffset + gateNames.Length * gateSize));
         var endOffset = checked(codeOffset + linkedCode.Length);
         var code = new byte[Align4(checked(endOffset + sizeof(uint)))];
         var layout = new MuiLibraryImageLayout(residentOffset, autoInitOffset,
@@ -114,6 +121,18 @@ public static class MuiLibraryPackager
         }
 
         var outputRelocations = new List<int>();
+        var gatedTargets = new Dictionary<uint, uint>();
+        for (var index = 0; index < gateNames.Length; index++)
+        {
+            var nameKey = gateNames[index];
+            var raw = exports[nameKey];
+            var gateOffset = gatesOffset + index * gateSize;
+            var gate = MuiNativeStackGate.Build(raw);
+            gate.Code.CopyTo(code, gateOffset);
+            outputRelocations.AddRange(gate.Relocations.Select(offset => gateOffset + offset));
+            gatedTargets.Add(raw - (uint)codeOffset, (uint)gateOffset);
+            exports[nameKey] = (uint)gateOffset;
+        }
         var previous = -4;
         foreach (var relocation in relocations.OrderBy(item => item.Offset))
         {
@@ -126,7 +145,7 @@ public static class MuiLibraryPackager
                 throw new InvalidDataException($"Relocation at {offset} targets outside the linked code image.");
             var outputOffset = checked(codeOffset + offset);
             BinaryPrimitives.WriteUInt32BigEndian(code.AsSpan(outputOffset, 4),
-                checked(addend + (uint)codeOffset));
+                gatedTargets.TryGetValue(addend, out var gateTarget) ? gateTarget : checked(addend + (uint)codeOffset));
             outputRelocations.Add(outputOffset);
             previous = offset;
         }

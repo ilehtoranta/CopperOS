@@ -14,6 +14,27 @@ namespace CopperOS.MuiMaster.Tests;
 // lifecycle coverage lives in the independent native Exec fixture.
 public sealed class MuiNativeClassOwnerTests
 {
+	[Theory]
+	[InlineData(-1, true)]
+	[InlineData(0, false)]
+	[InlineData(1, false)]
+	[InlineData(-2, false)]
+	public void ClassicExecInitializedGateRequiresItsCompleteIdleState(short queued, bool idle)
+	{
+		var platform = NewPlatform();
+		Assert.True(MuiNativeClassOwnerCore.TryAttach(ref platform, Library, Root, out var owner));
+		Assert.True(MuiNativeClassOwnerCodec.TryGetGateAddress(ref platform, owner, out var gate));
+		var queue = gate.Raw + Node.Size + sizeof(short);
+		var value = new SignalSemaphore
+		{
+			Link = new Node { Type = (byte)NodeType.SignalSemaphore },
+			QueueCount = queued,
+			WaitQueue = new MinList { Head = APTR.FromPointer(queue + 4), TailPred = APTR.FromPointer(queue) },
+		};
+		Assert.True(MuiSignalSemaphoreCodec.Write(ref platform, gate, value));
+		Assert.Equal(idle, MuiNativeClassOwnerCore.CanDetach(ref platform, Library, Root));
+		Assert.Equal(idle, MuiNativeClassOwnerCore.TryDetach(ref platform, Library, Root));
+	}
 	private static readonly APTR Root = APTR.FromPointer(0x1000);
 	private static readonly APTR OtherRoot = APTR.FromPointer(0x1100);
 	private static readonly APTR Library = APTR.FromPointer(0x1800);

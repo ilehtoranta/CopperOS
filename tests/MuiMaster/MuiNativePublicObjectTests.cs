@@ -10,6 +10,38 @@ namespace CopperOS.MuiMaster.Tests;
 public sealed class MuiNativePublicObjectTests
 {
 	[Fact]
+	public void NativeDisposalRefreshPreservesChildRemovalInsteadOfResurrectingItsBinding()
+	{
+		var memory = CreateReleaseTree(1, 1, out _, out _, out _, out _, out _);
+		var address = APTR.FromPointer(0x1100);
+		Assert.True(MuiNativePublicObjectBindingCodec.TryRead(ref memory, address, out var before));
+		before.ActiveCalls = 1;
+		Assert.True(before.Next.IsNotNull);
+		var afterChildRemoval = before;
+		afterChildRemoval.Next = APTR.Null;
+		Assert.True(MuiNativePublicObjectBindingCodec.Write(ref memory, address, afterChildRemoval));
+
+		Assert.True(MuiNativePublicObjectCore.RefreshAfterNativeDisposal(ref memory,
+			address, ref before, out var sidecar));
+		Assert.True(before.Next.IsNull);
+		Assert.Equal(before.Object, sidecar.Object);
+	}
+
+	[Fact]
+	public void NativeDisposalRefreshRejectsChangedLeaseAuthority()
+	{
+		var memory = CreateReleaseTree(1, 1, out _, out _, out _, out _, out _);
+		var address = APTR.FromPointer(0x1100);
+		Assert.True(MuiNativePublicObjectBindingCodec.TryRead(ref memory, address, out var before));
+		before.ActiveCalls = 1;
+		var changed = before;
+		changed.Lease = APTR.FromPointer(0x4000);
+		Assert.True(MuiNativePublicObjectBindingCodec.Write(ref memory, address, changed));
+		Assert.False(MuiNativePublicObjectCore.RefreshAfterNativeDisposal(ref memory,
+			address, ref before, out _));
+	}
+
+	[Fact]
 	public void IDCMPProjectionPreservesOtherClassesAndRequiredMUIEvents()
 	{
 		var initialMask = IDCMPFlags.ActiveWindow | IDCMPFlags.RawKey;

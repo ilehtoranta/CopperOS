@@ -58,6 +58,7 @@ internal static class Program
             var path = Path.Combine(directory, MuiResidentMetadata.DevelopmentNameText);
             File.WriteAllBytes(path, artifact.Image);
             var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
+            File.WriteAllText(path + ".symbols.json", JsonSerializer.Serialize(result.Symbols, jsonOptions) + "\n");
             File.WriteAllText(path + ".framework.json", JsonSerializer.Serialize(result.FrameworkAnalysis, jsonOptions) + "\n");
             File.WriteAllText(path + ".native.json", JsonSerializer.Serialize(result.NativeCompatibility, jsonOptions) + "\n");
             File.WriteAllText(path + ".json", JsonSerializer.Serialize(new

@@ -650,6 +650,11 @@ internal static class MuiNativePublicObjectCore
 				return false;
 			}
 			platform.DisposeObject(obj);
+			// A native built-in Family can release children through the public
+			// gateway during this callback. Their removal rewrites our Next link;
+			// never restore the pre-callback snapshot (which may point at freed memory).
+			if (!RefreshAfterNativeDisposal(ref memory, bindingAddress, ref binding,
+				out sidecar)) return false;
 			binding.DisposeState = MuiNativePublicObjectBinding.StateNativeDisposed;
 			if (!MuiNativePublicObjectBindingCodec.Write(ref memory, bindingAddress, binding))
 				return false;
@@ -745,6 +750,27 @@ internal static class MuiNativePublicObjectCore
 		if (hasSidecar)
 			platform.Free(binding.Sidecar, MuiNativeMuiObjectRecord.Size);
 		platform.Free(bindingAddress, MuiNativePublicObjectBinding.Size);
+		return true;
+	}
+
+	internal static bool RefreshAfterNativeDisposal<TMemory>(ref TMemory memory,
+		APTR address, ref MuiNativePublicObjectBinding binding,
+		out MuiNativeMuiObjectRecord sidecar)
+		where TMemory : struct, IMuiGuestMemory
+	{
+		sidecar = default;
+		if (!MuiNativePublicObjectBindingCodec.TryRead(ref memory, address, out var current) ||
+			current.Signature != MuiNativePublicObjectBinding.Magic ||
+			current.Object != binding.Object || current.Class != binding.Class ||
+			current.OwnerRoot != binding.OwnerRoot || current.Lease != binding.Lease ||
+			current.CustomClass != binding.CustomClass || current.Sidecar != binding.Sidecar ||
+			current.ActiveCalls != 1 || current.DisposeState != binding.DisposeState)
+			return false;
+		if (current.Sidecar.IsNotNull &&
+			(!MuiNativeMuiObjectCodec.TryRead(ref memory, current.Sidecar, out sidecar) ||
+			 sidecar.Object != current.Object || sidecar.Class != current.Class ||
+			 sidecar.OwnerRoot != current.OwnerRoot || sidecar.ActiveCalls != 0)) return false;
+		binding = current;
 		return true;
 	}
 

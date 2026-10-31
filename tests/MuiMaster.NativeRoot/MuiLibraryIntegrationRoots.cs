@@ -48,7 +48,7 @@ public static class MuiLibraryIntegrationRoots
 			var resident = ExecResidentCodec.Read(ref memory, address);
 			if (resident.MatchTag != address) continue;
 			if (found.IsNotNull || resident.Flags != ResidentFlags.AutoInit ||
-				resident.Type != (byte)NodeType.Library || resident.Version != 0 ||
+				resident.Type != (byte)NodeType.Library || resident.Version != MuiResidentMetadata.DevelopmentVersion ||
 				resident.EndSkip.Raw <= address.Raw ||
 				resident.EndSkip.Raw > image.Raw + imageBytes ||
 				(resident.Init.Raw & 1) != 0 || !memory.IsMapped(resident.Init, ResidentAutoInit.Size) ||
@@ -145,6 +145,12 @@ public static class MuiLibraryIntegrationRoots
 		if (Exec.OpenLibraryRaw(name, 0) != library) return 1051;
 		if (Exec.OpenLibraryRaw(name, 0) != library) return 1052;
 		if (ExecLibraryCodec.ReadOpenCount(ref memory, library) != 2) return 1053;
+		// The library Open vector has no D0 input contract. Native Exec may
+		// leave the library base there after its own version admission.
+		if (InvokeOpen(APTR.FromPointer(library.Raw - 6), library.Raw, library) != library ||
+			ExecLibraryCodec.ReadOpenCount(ref memory, library) != 3) return 1054;
+		Exec.CloseLibrary(library);
+		if (ExecLibraryCodec.ReadOpenCount(ref memory, library) != 2) return 1055;
 		Exec.RemLibrary(library);
 		if (ExecLibraryCodec.ReadOpenCount(ref memory, library) != 2 ||
 			(ExecLibraryCodec.ReadFlags(ref memory, library) & LibraryFlags.DelayedExpunge) == 0)
@@ -366,6 +372,13 @@ public static class MuiLibraryIntegrationRoots
 	[return: M68kRegister(M68kRegister.D0)]
 	private static extern uint InvokeLifecycle(
 		[M68kRegister(M68kRegister.A3)] APTR entry,
+		[M68kRegister(M68kRegister.A6)] APTR library);
+
+	[AmigaIndirectCall(M68kRegister.A3)]
+	[return: M68kRegister(M68kRegister.D0)]
+	private static extern APTR InvokeOpen(
+		[M68kRegister(M68kRegister.A3)] APTR entry,
+		[M68kRegister(M68kRegister.D0)] uint scratch,
 		[M68kRegister(M68kRegister.A6)] APTR library);
 
 	[AmigaIndirectCall(M68kRegister.A3)]

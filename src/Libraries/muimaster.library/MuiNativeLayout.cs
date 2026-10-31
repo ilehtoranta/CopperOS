@@ -24,11 +24,7 @@ internal static class MuiNativeLayoutServiceCore
 				ownerRoot, obj, out var binding)) return false;
 
 		var memory = default(MuiNativeClassMemory);
-		if (!memory.IsMapped(obj, _Object.Size)) return false;
-		var objectValue = BOOPSIGuestCodec.ReadObjectHeader(ref memory, obj);
-		var classPointer = objectValue.o_Class;
-		if (classPointer.IsNull || !memory.IsMapped(classPointer, IClass.Size))
-			return false;
+		if (!MuiNativeBoopsiDispatch.TryGetObjectClass(ref memory, obj, out var classPointer)) return false;
 		var classValue = BOOPSIGuestCodec.ReadClass(ref memory, classPointer);
 		var entry = classValue.cl_Dispatcher.Entry;
 		if (entry.IsNull) return false;

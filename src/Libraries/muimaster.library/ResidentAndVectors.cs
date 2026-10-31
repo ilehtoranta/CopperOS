@@ -18,11 +18,19 @@ public enum MuiVectorId : byte
 
 public static class MuiResidentMetadata
 {
+#if COPPEROS_MUI_CLASSIC_COMPATIBILITY
+	// Explicit experimental classic-client artifact. Keep the default development
+	// identity separate; version 4 admits MUI 2.0 clients, not full conformance.
+	public const string DevelopmentNameText = "muimaster.library";
+	public const ushort DevelopmentVersion = 4;
+	public const string DevelopmentIdString = "$VER: muimaster.library 4.1 (31.10.2026) CopperOS experimental";
+#else
 	public const string DevelopmentNameText = "copperos-muimaster.library";
-	public static CString DevelopmentName => CString.FromLiteral(DevelopmentNameText);
 	public const ushort DevelopmentVersion = 0;
-	public const ushort DevelopmentRevision = 1;
 	public const string DevelopmentIdString = "$VER: copperos-muimaster.library 0.1 (31.10.2026) CopperOS";
+#endif
+	public static CString DevelopmentName => CString.FromLiteral(DevelopmentNameText);
+	public const ushort DevelopmentRevision = 1;
 	public const int FirstLvo = -30;
 	public const int LastLvo = -756;
 	public const int VectorStride = 6;

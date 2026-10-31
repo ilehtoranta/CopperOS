@@ -5,6 +5,26 @@ namespace CopperOS.MuiMaster.Tests;
 
 public sealed class MuiListviewExternalScrollerTests
 {
+	[Fact]
+	public void NativeConstructorCompletionIsIdempotentAndOwnsSuppliedChild()
+	{
+		var platform = NewPlatform();
+		var listClass = Register(ref platform, 0x1100, "List.mui");
+		var viewClass = Register(ref platform, 0x1140, "Listview.mui");
+		var list = MuiListCore.CreateList(ref platform, State, listClass, APTR.Null);
+		var tags = BuildTags(ref platform, 0x1900, new[] { (ListviewList, list.Raw) });
+		var view = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, viewClass, tags);
+		Assert.NotEqual(APTR.Null, view);
+		Assert.True(MuiListviewCore.Construct(ref platform, State, viewClass, view));
+		Assert.True(MuiListviewCore.Construct(ref platform, State, viewClass, view));
+		Assert.Equal(view, MuiHeadlessObjectCore.ParentObject(ref platform, State, list));
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, State, view);
+		Assert.True(MuiHeadlessObjectCodec.TryRead(ref platform, record, out var owner));
+		Assert.True(MuiHeadlessChildCodec.TryRead(ref platform, owner.ChildrenHead, out var child));
+		Assert.True(child.Next.IsNull);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, view));
+		Assert.True(MuiHeadlessObjectCore.FindObject(ref platform, State, list).IsNull);
+	}
 	private static readonly APTR State = APTR.FromPointer(0x1000);
 
 	private const uint ListviewList = 0x8042bcceu;

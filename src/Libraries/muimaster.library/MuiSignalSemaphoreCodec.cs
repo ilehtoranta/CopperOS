@@ -15,15 +15,22 @@ internal static class MuiSignalSemaphoreCodec
 	internal static bool IsIdle(APTR address, SignalSemaphore value)
 	{
 		if (value.Link.Successor.IsNotNull || value.Link.Predecessor.IsNotNull ||
-			value.Link.Name.Raw != 0 || value.Link.Type != 0 || value.Link.Priority != 0 ||
-			value.Owner.IsNotNull || value.NestCount != 0 || value.QueueCount != 0 ||
+			value.Link.Name.Raw != 0 || value.Link.Priority != 0 ||
+			value.Owner.IsNotNull || value.NestCount != 0 ||
 			value.MultipleLink.Waiter.IsNotNull || value.MultipleLink.Link.Successor.IsNotNull ||
 			value.MultipleLink.Link.Predecessor.IsNotNull || value.WaitQueue.Tail.IsNotNull) return false;
 		// Zero storage is valid before native InitSemaphore. Afterwards the
 		// private wait queue must contain precisely its own empty sentinels.
-		if (value.WaitQueue.Head.IsNull && value.WaitQueue.TailPred.IsNull) return true;
+		if (value.WaitQueue.Head.IsNull && value.WaitQueue.TailPred.IsNull)
+			return value.Link.Type == 0 && value.QueueCount == 0;
 		var queue = address.Raw + Node.Size + sizeof(short);
-		return value.WaitQueue.Head.Raw == queue + sizeof(uint) && value.WaitQueue.TailPred.Raw == queue;
+		if (value.WaitQueue.Head.Raw != queue + sizeof(uint) || value.WaitQueue.TailPred.Raw != queue)
+			return false;
+		// Classic Exec InitSemaphore marks NT_SIGNALSEM and uses -1 for an
+		// empty queue. CopperStart's initialized private gate uses zero/zero.
+		// Recognize each complete idle representation, never a mixed state.
+		return value.Link.Type == (byte)NodeType.SignalSemaphore && value.QueueCount == -1 ||
+			value.Link.Type == 0 && value.QueueCount == 0;
 	}
 
 	internal static bool TryRead<T>(ref T memory, APTR address, out SignalSemaphore value)

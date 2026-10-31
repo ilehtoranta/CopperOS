@@ -109,7 +109,8 @@ public sealed class MuiLibraryPackagerTests
             memory.ReadUInt32(APTR.FromPointer(load + (uint)artifact.Layout.CompiledCode), 6));
         Assert.Equal(artifact.Relocations, sites);
         Assert.Equal(input.Relocations.Length +
-            MuiLibraryPackager.FunctionTableExports.Count + 7, sites.Count);
+            MuiLibraryPackager.FunctionTableExports.Count + 7 +
+            2 * artifact.Exports.Values.Count(address => address < artifact.Layout.CompiledCode), sites.Count);
         Assert.DoesNotContain(artifact.Layout.AutoInit + ExecLayout.ResidentAutoInit.DataSize, sites);
         Assert.DoesNotContain(artifact.Layout.AutoInit + ExecLayout.ResidentAutoInit.StructureTable, sites);
         Assert.DoesNotContain(artifact.Layout.FunctionTable +

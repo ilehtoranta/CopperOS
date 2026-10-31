@@ -49,6 +49,7 @@ internal static class MuiNativeOwnedClassServices
 	internal static APTR GetClass(ref MuiNativeServiceLease service, APTR classId)
 	{
 		if (!MuiNativeProviderOwner.TryPrepareServicePlatform(ref service, out var classes, out var currentTask)) return APTR.Null;
+		if (!MuiNativeBuiltinClasses.Ensure(ref classes, classId)) return APTR.Null;
 		return MuiOwnedClassServiceCore.GetClass(ref classes, ref service, currentTask, classId);
 	}
 
@@ -62,6 +63,7 @@ internal static class MuiNativeOwnedClassServices
 		APTR superName, APTR superMcc, int dataSize, APTR dispatcher)
 	{
 		if (!MuiNativeProviderOwner.TryPrepareServicePlatform(ref service, out var classes, out var currentTask)) return APTR.Null;
+		if (superName.IsNotNull && !MuiNativeBuiltinClasses.Ensure(ref classes, superName)) return APTR.Null;
 		return MuiOwnedClassServiceCore.CreateCustomClass(ref classes, ref service, currentTask,
 			dispatcherLibrary, superName, superMcc, dataSize, dispatcher);
 	}
@@ -77,6 +79,7 @@ internal static class MuiNativeOwnedClassServices
 	{
 		if (!MuiNativeProviderOwner.TryPrepareServicePlatform(ref service, out var classes, out _))
 			return APTR.Null;
+		if (!MuiNativeBuiltinClasses.Ensure(ref classes, className)) return APTR.Null;
 		var memory = default(MuiNativeClassMemory);
 		if (!MuiNativeClassOwnerCodec.TryGetPublicObjectStateAddress(ref memory,
 				service.Operation.Owner, out var publicObjects)) return APTR.Null;
@@ -90,6 +93,7 @@ internal static class MuiNativeOwnedClassServices
 	{
 		if (!MuiNativeProviderOwner.TryPrepareServicePlatform(ref service, out var classes, out _))
 			return APTR.Null;
+		if (!MuiNativeBuiltinClasses.Ensure(ref classes, MuiNativeBuiltinClasses.Name(0))) return APTR.Null;
 		var memory = default(MuiNativeClassMemory);
 		if (!MuiNativeClassOwnerCodec.TryGetPublicObjectStateAddress(ref memory,
 			service.Operation.Owner, out var publicObjects)) return APTR.Null;
@@ -105,6 +109,11 @@ internal static class MuiNativeOwnedClassServices
 		var memory = default(MuiNativeClassMemory);
 		if (!MuiNativeClassOwnerCodec.TryGetPublicObjectStateAddress(ref memory,
 			service.Operation.Owner, out var publicObjects)) return false;
+		var builtin = new MuiNativeBuiltinPlatform { Context = classes.Context };
+		if (MuiHeadlessObjectCore.TryFindObject(ref builtin, builtin.Registry, obj, out var record) && record.IsNotNull &&
+			MuiHeadlessObjectCodec.TryRead(ref builtin, record, out var objectState) && objectState.Parent.IsNotNull &&
+			MuiNativePublicObjectCore.TryFindBinding(ref classes, publicObjects, service.Operation.OwnerRoot, obj, out var binding) &&
+			binding.Parent.IsNull) return false;
 		return MuiNativePublicObjectCore.DisposeObject(ref classes,
 			service.Operation.Service, service.Operation.OwnerRoot, publicObjects, obj);
 	}

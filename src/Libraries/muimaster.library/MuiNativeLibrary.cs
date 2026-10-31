@@ -188,7 +188,7 @@ public static class MuiNativeLibraryEntrypoints
 		header.Version = MuiResidentMetadata.DevelopmentVersion;
 		header.Revision = MuiResidentMetadata.DevelopmentRevision;
 		header.IdString = APTR.FromPointer(CString.ToUInt32(
-			CString.FromLiteral("copperos-muimaster.library 0.1 (31.10.2026) CopperOS")));
+			CString.FromLiteral(MuiResidentMetadata.DevelopmentIdString)));
 		header.OpenCount = 0;
 		var record = default(MuiExecLibraryBaseRecord);
 		record.Header = header;
@@ -208,15 +208,17 @@ public static class MuiNativeLibraryEntrypoints
 
 	[M68kExport(OpenExport)]
 	[return: M68kRegister(M68kRegister.D0)]
-	public static APTR Open([M68kRegister(M68kRegister.A6)] APTR library,
-		[M68kRegister(M68kRegister.D0)] uint version)
+	public static APTR Open([M68kRegister(M68kRegister.A6)] APTR library)
 	{
 		Exec.Forbid();
 		var memory = default(MuiExecLibraryMemory);
 		memory.Base = library;
 		var result = APTR.Null;
+		// Exec validates the requested version before invoking this vector. D0 is
+		// scratch here: native Kickstart 3.1 passes the base, not the caller's
+		// minimum version. Interpreting it as a version rejects valid opens.
 		if (TryReadLive(ref memory, library, out var record) &&
-			version <= record.Header.Version && record.Header.OpenCount != ushort.MaxValue)
+			record.Header.OpenCount != ushort.MaxValue)
 		{
 			ExecLibraryCodec.WriteOpenCount(ref memory, library, (ushort)(record.Header.OpenCount + 1));
 			ExecLibraryCodec.WriteFlags(ref memory, library, record.Header.Flags & ~LibraryFlags.DelayedExpunge);

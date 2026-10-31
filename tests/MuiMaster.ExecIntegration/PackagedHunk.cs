@@ -72,12 +72,12 @@ internal sealed record PackagedHunk(byte[] Image, byte[] Code, uint[] Relocation
             var resident = ExecResidentCodec.Read(ref memory, address);
             if (resident.MatchTag != address) continue;
             if (found is not null || resident.Flags != ResidentFlags.AutoInit ||
-                resident.Type != (byte)NodeType.Library || resident.Version != 0 ||
+                resident.Type != (byte)NodeType.Library || resident.Version != MuiResidentMetadata.DevelopmentVersion ||
                 resident.EndSkip.Raw <= address.Raw || resident.EndSkip.Raw > load + Code.Length ||
                 (resident.Init.Raw & 1) != 0 || !memory.IsMapped(resident.Init, ResidentAutoInit.Size) ||
                 !memory.IsMapped(resident.Name.Address, 1) ||
                 !memory.IsMapped(resident.IdString.Address, 1) ||
-                bus.TextAt(resident.Name.Raw) != "copperos-muimaster.library")
+                bus.TextAt(resident.Name.Raw) != MuiResidentMetadata.DevelopmentNameText)
                 throw new InvalidDataException("Invalid or duplicate embedded development Resident.");
             var autoInit = ExecResidentAutoInitCodec.Read(ref memory, resident.Init);
             if (autoInit.DataSize != NativeRoot.MuiLibraryIntegrationRoots.LibraryPositiveBytes ||

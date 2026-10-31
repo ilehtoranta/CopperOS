@@ -13,6 +13,9 @@
   <PropertyGroup Condition="'$(CopperSharpSdkHasMuiLayoutPackets)' == 'true' or ('$(CopperOSUseLocalCopperSharp)' == 'true' and Exists('$(CopperSharp68kRoot)\Sdk.Amiga\CopperSharp.Sdk.Amiga.csproj'))">
     <DefineConstants>$(DefineConstants);COPPEROS_SDK_MUI_LAYOUT</DefineConstants>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSMuiClassicCompatibility)' == 'true'">
+    <DefineConstants>$(DefineConstants);COPPEROS_MUI_CLASSIC_COMPATIBILITY</DefineConstants>
+  </PropertyGroup>
   <ItemGroup Condition="'$(CopperOSUseLocalCopperSharp)' == 'true'">
     <ProjectReference Include="$(CopperSharp68kRoot)\Sdk.Amiga.Support\CopperSharp.Sdk.Amiga.Support.csproj" />
   </ItemGroup>

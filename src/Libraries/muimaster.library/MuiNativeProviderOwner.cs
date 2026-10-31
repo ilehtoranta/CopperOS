@@ -139,6 +139,7 @@ internal static class MuiNativeProviderOwner
 		if (!TryReadLibrary(service.Operation.LibraryBase, out var record) || !IsOrdinaryTask(record.ExecBase)) return false;
 		var platform = default(MuiNativeServiceGatePlatform);
 		platform.ExecBase = record.ExecBase;
+		MuiNativeBuiltinClasses.RetireIdle(ref service);
 		return MuiNativeServiceAccessCore.TryLeave(ref platform, ref service, out operation);
 	}
 

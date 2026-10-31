@@ -1929,6 +1929,19 @@ public static class MuiListviewCore
 		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, state,
 			classRecord, tags);
 		if (obj.IsNull) return APTR.Null;
+		if (Construct(ref platform, state, classRecord, obj)) return obj;
+		MuiCollectionLifecycle.DisposeObject(ref platform, state, obj);
+		return APTR.Null;
+	}
+
+	// Shared completion for native OM_NEW and the portable object factory.
+	// The caller retains partial-object cleanup authority on failure.
+	internal static bool Construct<TPlatform>(ref TPlatform platform, APTR state,
+		APTR classRecord, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (MuiListCore.ClassifyRecord(ref platform, classRecord) != MuiCollectionClass.Listview) return true;
+		if (!TryReadChildStateAdmission(ref platform, state, obj, out _, out var present)) return false;
+		if (present) return true;
 
 		// Resolve the child list: supplied via MUIA_Listview_List or created.
 		var supplied = APTR.FromPointer(Read(ref platform, state, obj, List, 0));
@@ -1939,16 +1952,14 @@ public static class MuiListviewCore
 			child = CreateInternalList(ref platform, state);
 			if (child.IsNull)
 			{
-				MuiCollectionLifecycle.DisposeObject(ref platform, state, obj);
-				return APTR.Null;
+				return false;
 			}
 			internallyCreated = true;
 		}
 		else if (!IsListBacked(ref platform, state, child))
 		{
 			// A non-list object cannot serve as the child; fail atomically.
-			MuiCollectionLifecycle.DisposeObject(ref platform, state, obj);
-			return APTR.Null;
+			return false;
 		}
 
 		// Adopt through the Family seam so the child is owned and disposed with
@@ -1957,8 +1968,7 @@ public static class MuiListviewCore
 		{
 			if (internallyCreated)
 				MuiCollectionLifecycle.DisposeObject(ref platform, state, child);
-			MuiCollectionLifecycle.DisposeObject(ref platform, state, obj);
-			return APTR.Null;
+			return false;
 		}
 
 		// From here the child is adopted; any failure disposes obj (which
@@ -1969,10 +1979,9 @@ public static class MuiListviewCore
 			!EnsureChildState(ref platform, state, obj, child) ||
 			!ApplyDefaults(ref platform, state, obj))
 		{
-			MuiCollectionLifecycle.DisposeObject(ref platform, state, obj);
-			return APTR.Null;
+			return false;
 		}
-		return obj;
+		return true;
 	}
 
 	private static bool ApplyDefaults<TPlatform>(ref TPlatform platform,

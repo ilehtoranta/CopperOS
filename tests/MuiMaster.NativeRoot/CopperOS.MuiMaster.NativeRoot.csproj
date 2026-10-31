@@ -15,9 +15,13 @@
     <DefineConstants>$(DefineConstants);COPPEROS_SDK_MUI_LAYOUT</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Keep linked production metadata identical to the library under test. -->
     <ProjectReference Include="$(CopperSharp68kRoot)\Sdk.Amiga.Support\CopperSharp.Sdk.Amiga.Support.csproj" />
     <Compile Include="..\..\src\Libraries\muimaster.library\*.cs"
              Exclude="..\..\src\Libraries\muimaster.library\obj\**\*;..\..\src\Libraries\muimaster.library\bin\**\*"
              Link="Production\%(Filename)%(Extension)" />
   </ItemGroup>
+  <PropertyGroup Condition="'$(CopperOSMuiClassicCompatibility)' == 'true'">
+    <DefineConstants>$(DefineConstants);COPPEROS_MUI_CLASSIC_COMPATIBILITY</DefineConstants>
+  </PropertyGroup>
 </Project>

@@ -45,12 +45,16 @@ internal static class MuiNativeBoopsiDispatch
 			callbackBase);
 	}
 
-	private static bool TryGetObjectClass<TMemory>(ref TMemory memory,
+	internal static bool TryGetObjectClass<TMemory>(ref TMemory memory,
 		APTR obj, out APTR classPointer) where TMemory : struct, IMuiGuestMemory
 	{
 		classPointer = APTR.Null;
-		if (obj.IsNull || !memory.IsMapped(obj, _Object.Size)) return false;
-		var objectValue = BOOPSIGuestCodec.ReadObjectHeader(ref memory, obj);
+		if (obj.Raw < _Object.Size) return false;
+		// Native BOOPSI APIs publish the instance pointer; the SDK codec takes
+		// the address of the private _Object prefix immediately before it.
+		var header = APTR.FromPointer(obj.Raw - _Object.Size);
+		if (!memory.IsMapped(header, _Object.Size)) return false;
+		var objectValue = BOOPSIGuestCodec.ReadObjectHeader(ref memory, header);
 		classPointer = objectValue.o_Class;
 		return classPointer.IsNotNull && memory.IsMapped(classPointer,
 			IClass.Size);
