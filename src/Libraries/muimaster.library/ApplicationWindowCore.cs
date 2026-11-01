@@ -1840,7 +1840,7 @@ public static class MuiApplicationWindowCore
 		value.IconifiedOpen = iconifiedOpen != 0 ? 1u : 0u;
 	}
 
-	private static bool WriteWindowLifecycle<TPlatform>(ref TPlatform platform,
+	internal static bool WriteWindowLifecycle<TPlatform>(ref TPlatform platform,
 		APTR state, APTR window, MuiWindowLifecycleStateRecord value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
@@ -4382,6 +4382,27 @@ public static class MuiApplicationWindowCore
 			current = objectValue.Next;
 		}
 		return current.IsNull;
+	}
+
+	// Native OM_NEW has no window presenter/event platform yet, but its closed
+	// Window children must already have an owner. Mirror the public tag graph in
+	// the headless lifetime tree without manufacturing native windows or ports.
+	internal static bool AdoptConstructorWindows<TPlatform>(ref TPlatform platform,
+		APTR state, APTR application, APTR tags)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var cursor = new MuiAslTagItemCursor { Base = tags };
+		uint steps = 0;
+		while (MuiClassicApplicationMenu.Next(ref platform, ref cursor, ref steps, out var item))
+		{
+			if (item.Tag == 0) return true;
+			if (item.Tag != ApplicationWindow) continue;
+			var window = APTR.FromPointer(item.Data);
+			if (!MuiApplicationMessageCore.IsWindowObject(ref platform, state, window) ||
+				!MuiFamilyCore.AddTail(ref platform, state, application, window) ||
+				!Set(ref platform, state, window, WindowOwner, application.Raw)) return false;
+		}
+		return false;
 	}
 
 	public static bool AddWindow<TPlatform>(ref TPlatform platform, APTR state,
@@ -7743,23 +7764,55 @@ public static class MuiApplicationWindowCore
 	internal static void CleanupRecords<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var scheduler = ReadApplicationSchedulerState(ref platform, state, obj);
-		var hasInteraction = TryGetWindowInteractionState(ref platform, state, obj,
-			out var interaction);
-		FreeNodes(ref platform, scheduler.ReturnHead);
-		FreeNodes(ref platform, scheduler.InputHandlers);
-		FreeEventHandlerNodes(ref platform, APTR.FromPointer(Read(ref platform,
-			state, obj, EventHandlers)));
-		if (hasInteraction) FreeNodes(ref platform, interaction.CycleChainHead);
-		FreePushNodes(ref platform, scheduler.PushHead);
-		var configState = APTR.FromPointer(Read(ref platform, state, obj,
-			ApplicationSetConfigItemState));
+		// Destruction consumes existing ownership. Public getters may publish
+		// fresh scheduler/interaction stores and classify unrelated controls;
+		// neither belongs on this path. Writers already mirror these owned
+		// pointers in the object's raw attributes.
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, state, obj);
+		var scheduler = new MuiApplicationSchedulerStateRecord
+		{
+			Magic = MuiApplicationSchedulerStateRecord.Cookie,
+			ReturnHead = CleanupPointer(ref platform, record, ReturnHead),
+			ReturnTail = CleanupPointer(ref platform, record, ReturnTail),
+			InputHandlers = CleanupPointer(ref platform, record, InputHandlers),
+			PushHead = CleanupPointer(ref platform, record, PushHead),
+			PushTail = CleanupPointer(ref platform, record, PushTail),
+		};
+		// Validate owned queue structure, without requiring callback targets to
+		// remain live after the owning Family has disposed its children.
+		if (MuiApplicationSchedulerStateAdmission.Validate(ref platform, scheduler))
+		{
+			FreeNodes(ref platform, scheduler.ReturnHead);
+			FreeNodes(ref platform, scheduler.InputHandlers);
+			FreePushNodes(ref platform, scheduler.PushHead);
+		}
+		FreeEventHandlerNodes(ref platform, CleanupPointer(ref platform, record, EventHandlers));
+		var cycleHead = CleanupPointer(ref platform, record, WindowCycleChainHead);
+		MuiHeadlessObjectCore.GetRecordRawAttribute(ref platform, record, WindowCycleChainCount, out var cycleCount);
+		if (AdmitsCleanupCycleChain(ref platform, cycleHead, cycleCount)) FreeNodes(ref platform, cycleHead);
+		var configState = CleanupPointer(ref platform, record, ApplicationSetConfigItemState);
 		if (TryReadSetConfigItemState(ref platform, configState, out _))
 		{
 			platform.Clear(configState, MuiApplicationSetConfigItemStateRecord.Size);
 			platform.Free(configState, MuiApplicationSetConfigItemStateRecord.Size);
 			Set(ref platform, state, obj, ApplicationSetConfigItemState, 0);
 		}
+	}
+	private static APTR CleanupPointer<TPlatform>(ref TPlatform platform, APTR record, uint attribute)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiHeadlessObjectCore.GetRecordRawAttribute(ref platform, record, attribute, out var value) ? APTR.FromPointer(value) : APTR.Null;
+	private static bool AdmitsCleanupCycleChain<TPlatform>(ref TPlatform platform, APTR head, uint count)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (count > MuiHeadlessLayout.MaximumTraversal) return false;
+		var node = head;
+		for (uint i = 0; i < count; i++)
+		{
+			if (node.IsNull || !MuiApplicationWindowNodeCodec.TryRead(ref platform, node, out var value) ||
+				value.Sequence != i + 1 || value.Auxiliary != 0 || value.Packet != 0 || value.Value.IsNull) return false;
+			node = value.Next;
+		}
+		return node.IsNull;
 	}
 
 	private static void FreeNodes<TPlatform>(ref TPlatform platform, APTR current)

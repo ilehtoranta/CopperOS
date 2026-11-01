@@ -5,6 +5,55 @@ namespace CopperOS.MuiMaster.Tests;
 
 public sealed class MuiMenuSpecialistTests
 {
+	[Fact]
+	public void NativeApplicationConstructorOwnsAllSuppliedClosedWindowsWithoutOpeningThem()
+	{
+		var p = NewPlatform();
+		p.WriteCString(ApplicationName, "Application.mui");
+		var windowName = APTR.FromPointer(0x1180); p.WriteCString(windowName, "Window.mui");
+		var appClass = MuiHeadlessObjectCore.RegisterBuiltinClass(ref p, State, ApplicationName, APTR.Null, 0, APTR.FromPointer(12));
+		var windowClass = MuiHeadlessObjectCore.RegisterBuiltinClass(ref p, State, windowName, APTR.Null, 0, APTR.FromPointer(13));
+		var first = MuiHeadlessObjectCore.CreateObjectA(ref p, State, windowClass, APTR.Null);
+		var second = MuiHeadlessObjectCore.CreateObjectA(ref p, State, windowClass, APTR.Null);
+		var app = MuiHeadlessObjectCore.CreateObjectA(ref p, State, appClass, APTR.Null);
+		var tags = APTR.FromPointer(0x1500);
+		p.WriteUInt32(tags, 0, 0x8042BFE0); p.WriteUInt32(tags, 4, first.Raw);
+		p.WriteUInt32(tags, 8, 0x8042BFE0); p.WriteUInt32(tags, 12, second.Raw);
+		p.WriteUInt32(tags, 16, 0);
+		Assert.True(MuiApplicationWindowCore.AdoptConstructorWindows(ref p, State, app, tags));
+		Assert.Equal(app, MuiHeadlessObjectCore.ParentObject(ref p, State, first));
+		Assert.Equal(app, MuiHeadlessObjectCore.ParentObject(ref p, State, second));
+		Assert.Equal(0u, p.WindowOpenCount);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref p, State, app));
+		Assert.True(MuiHeadlessObjectCore.FindObject(ref p, State, first).IsNull);
+		Assert.True(MuiHeadlessObjectCore.FindObject(ref p, State, second).IsNull);
+	}
+
+	[Fact]
+	public void NativeConstructorCompletionPreservesDisabledStateAndGenericDisposalFreesOwnedStrings()
+	{
+		var p = NewPlatform(); p.WriteCString(TitleA, "Project");
+		var cls = MuiHeadlessObjectCore.FindClassByName(ref p, State, MenuName);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref p, State, cls, APTR.Null);
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref p, State, obj, MuiMenuAttributes.Menu_Enabled, 0, false));
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref p, State, obj, MuiMenuAttributes.Menu_CopyStrings, 1, false));
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref p, State, obj, MuiMenuAttributes.Menu_Title, TitleA.Raw, false));
+		Assert.True(MuiMenuSpecialistCore.Construct(ref p, State, obj));
+		var allocations = p.AllocationCount;
+		Assert.True(MuiMenuSpecialistCore.Construct(ref p, State, obj));
+		Assert.Equal(allocations, p.AllocationCount);
+		Assert.True(MuiMenuSpecialistCore.GetAttribute(ref p, State, obj, MuiMenuAttributes.Menu_Enabled, out var enabled));
+		Assert.Equal(0u, enabled);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref p, State, obj, MuiMenuSpecialistLayout.SidecarAttribute, out var sidecar));
+		Assert.True(MuiMenuSpecialistCore.GetAttribute(ref p, State, obj, MuiMenuAttributes.Menu_Title, out var copiedTitle));
+		Assert.NotEqual(TitleA.Raw, copiedTitle);
+		var freed = new List<APTR>(); p.AllocationFreed = (address, _) => freed.Add(address);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref p, State, obj));
+		Assert.Contains(APTR.FromPointer(sidecar), freed);
+		Assert.Contains(APTR.FromPointer(copiedTitle), freed);
+		Assert.False(MuiMenuSpecialistCore.Valid(ref p, State, obj));
+	}
+
 	private static readonly APTR State = APTR.FromPointer(0x1000);
 	private const uint Base = 0x1000;
 	private const int Size = 0x40000;

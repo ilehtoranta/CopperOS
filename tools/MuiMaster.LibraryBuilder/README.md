@@ -43,12 +43,28 @@ allocations and Intuition classes. Unknown names retain the external custom-clas
 loader. Idle classes retire derived-first after leases, objects and callbacks
 have gone; failed native class deletion retains ownership for a later attempt.
 
-The native adapter initializes control, List and Listview state and routes base
-methods plus List insertion and clearing. This is bounded class support, not
-the complete MUI method surface. Native Window presentation is still unavailable:
-the Window Open and Window pointer getters return zero rather than reporting a
-requested attribute as a real open window. Successful construction alone is not
-a working calculator or native MUI GUI.
+The native adapter initializes control, List and Listview state and routes
+collection packets through the shared typed dispatcher, including classic array
+insertion. Native Windows use real Intuition handles, measured layout, guest
+graphics rendering and hardware mouse notifications. Open failure remains closed;
+getters report the actual handle and open state. This is bounded class support,
+not the complete MUI method surface.
+
+In the experimental classic profile, Application_Menu NewMenu input is copied
+and converted through the native MUIO_MenustripNM factory before Application
+construction. The original caller records remain untouched. Menu constructors
+initialize their typed state, preserve explicit disabled flags and release
+their state and owned strings during generic teardown. Built-in child disposal
+uses its existing recursive gateway path; external BOOPSI retained-child
+snapshots remain separate. Native Application construction also adopts supplied
+closed Window objects into its lifetime tree without opening them.
+The original Calc mouse workflow `5 Enter 6 Enter +` visibly produces 11 on
+CopperStart and Kickstart 3.1 in the separate 5 MiB diagnostic profile, followed
+by native close and empty MUI registries. CopperStart additionally needs the
+Layers default-background repair to restore its bare screen after closing.
+Native menu interaction, paging, keyboard and full MUI compatibility remain
+unqualified. Retained evidence is in the CopperScreen repository's
+`docs/UTILITY_MUI_BACKFILL_FIX_2026-11-01.md`; ROMs and media remain local.
 
 Public service and dispatcher entry points have native stack gates. With less
 than 32 KiB of task stack remaining they use Exec StackSwap onto a temporary

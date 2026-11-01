@@ -1368,6 +1368,25 @@ internal static class MuiHeadlessObjectFieldCursorCodec
 
 internal static class MuiHeadlessObjectCodec
 {
+	// Object-list searches only consume the first two links. Admit the entire
+	// allocation, as the full decoder does, without decoding unrelated state
+	// for every nonmatching object during native setup and layout.
+	internal static bool TryReadIdentity<TPlatform>(ref TPlatform platform,
+		APTR address, out APTR next, out APTR boopsi)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		next = APTR.Null;
+		boopsi = APTR.Null;
+		if (!platform.IsMapped(address, MuiHeadlessObjectRecord.Size) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address, 8, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor, out var rawNext) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor, out var rawBoopsi) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		next = APTR.FromPointer(rawNext);
+		boopsi = APTR.FromPointer(rawBoopsi);
+		return true;
+	}
+
 	// Sequential named-struct path used by object-graph consumers. All ten
 	// APTR links precede the six ULONG scalar fields exactly as declared; the
 	// field adapter remains only for compatibility diagnostics.

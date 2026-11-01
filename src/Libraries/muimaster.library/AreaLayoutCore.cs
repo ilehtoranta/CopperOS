@@ -46,7 +46,7 @@ internal static class MuiAreaLayoutCStringByteCursorCodec
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
-internal struct MuiMinMaxValues
+public struct MuiMinMaxValues
 {
 	internal const uint Size = 12;
 	internal const uint FieldSize = 2;
@@ -532,7 +532,7 @@ public static class MuiAreaLayoutCore
 		var clip = platform.PushClip(rastPort, left, top, width, height);
 		if (renderPolicy.FillArea != 0)
 		{
-			platform.SetPen(rastPort, renderPolicy.Background);
+			platform.SetBackgroundPen(rastPort, renderPolicy.Background);
 			platform.FillRectangle(rastPort, left, top, left + width - 1,
 				top + height - 1);
 		}
@@ -648,7 +648,7 @@ public static class MuiAreaLayoutCore
 				request.Flags != flags || request.Kind != kind) return false;
 			return true;
 		}
-		platform.SetPen(rastPort, renderPolicy.Background);
+		platform.SetBackgroundPen(rastPort, renderPolicy.Background);
 		platform.FillRectangle(rastPort, left, top, right, bottom);
 		return true;
 	}
@@ -784,6 +784,7 @@ public static class MuiAreaLayoutCore
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		MuiMinMaxValues result = default;
+		if (platform.TryReadMuiMinMax(obj, out var measured)) return measured;
 		// Layout policy is a named guest record.  A malformed present record must
 		// fail closed before common-control or dimension consumers inspect it.
 		if (!TryReadLayoutPolicyState(ref platform, state, obj,

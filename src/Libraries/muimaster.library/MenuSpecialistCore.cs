@@ -440,6 +440,17 @@ public static class MuiMenuSpecialistCore
 		MuiMenuSpecialistClass.None;
 
 	// ---- Sidecar attach / lookup ---------------------------------------------
+	internal static bool Construct<TPlatform>(ref TPlatform platform, APTR state,
+		APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var kind = ClassifyObject(ref platform, state, obj);
+		return kind == MuiMenuSpecialistClass.None || Valid(ref platform, state, obj) ||
+			Attach(ref platform, state, obj, kind).IsNotNull;
+	}
+
+	internal static void CleanupRecords<TPlatform>(ref TPlatform platform, APTR state,
+		APTR obj) where TPlatform : struct, IMuiHeadlessPlatform =>
+		FreeOwnResources(ref platform, state, obj);
 
 	// Attach a menu sidecar to an already-created headless object of `cls`,
 	// establishing the documented creation defaults (Enabled TRUE). Fails
@@ -473,8 +484,10 @@ public static class MuiMenuSpecialistCore
 			return APTR.Null;
 		}
 		// Documented creation default: the whole family is enabled.
-		MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
-			EnabledAttribute(cls), 1, false);
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			EnabledAttribute(cls), out _))
+			MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+				EnabledAttribute(cls), 1, false);
 		// MUI_MakeObjectA/MUI_NewObjectA apply their initial tags before the
 		// specialist sidecar is attached.  Import the init-only CopyStrings latch
 		// and re-run the string setters so direct factory construction has the same

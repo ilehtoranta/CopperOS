@@ -9511,41 +9511,59 @@ public static class MuiCommonControlCore
 		HandleEventCore(ref platform, state, obj, intuiMessage, muiKey,
 			tick, true);
 
+	// The native registry currently publishes Text, String, Cycle and Image
+	// controls. Keep their input closure on those shared handlers rather than
+	// importing unregistered Numeric/Radio/Scrollbar/Scrollgroup dispatch into
+	// the bounded A500 disk library.
+	internal static uint HandleNativeBuiltinEvent<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, APTR intuiMessage, int muiKey)
+		where TPlatform : struct, IMuiLayoutPlatform
+	{
+		if (!PrepareControlEvent(ref platform, state, obj, intuiMessage, ref muiKey)) return 0;
+		var cls = Classify(ref platform, state, obj);
+		if (cls == MuiControlClass.Image) return HandleImageKey(ref platform, state, obj, muiKey);
+		if (cls == MuiControlClass.Text) return HandleTextKey(ref platform, state, obj, intuiMessage, muiKey);
+		if (cls == MuiControlClass.String) return HandleStringKey(ref platform, state, obj, intuiMessage, muiKey);
+		if (cls == MuiControlClass.Cycle) return HandleChoiceKey(ref platform, state, obj, CycleActive, CycleEntries, muiKey);
+		return 0;
+	}
+	private static bool PrepareControlEvent<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, APTR intuiMessage, ref int muiKey)
+		where TPlatform : struct, IMuiLayoutPlatform
+	{
+		if (!TryReadAreaPresentationState(ref platform, state, obj, out var presentation) || presentation.Disabled != 0) return false;
+		if (muiKey == -1 && MuiIntuiMessageCodec.TryReadRawKeyRecord(ref platform, intuiMessage, out var rawKey) &&
+			MuiIntuiMessageCodec.IsRawKeyRelease(rawKey.Code)) return false;
+		if (TryResolveAreaControlCharKey(ref platform, state, obj, intuiMessage, muiKey, out var key)) muiKey = key;
+		return true;
+	}
+	private static uint HandleImageKey<TPlatform>(ref TPlatform platform, APTR state, APTR obj, int muiKey)
+		where TPlatform : struct, IMuiLayoutPlatform
+	{
+		if ((muiKey != KeyPress && muiKey != KeyToggle) || Read(ref platform, state, obj, InputMode, 0) == 0) return 0;
+		var selected = ReadRaw(ref platform, state, obj, Selected, 0) == 0 ? 1u : 0u;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj, Selected, selected, true) ||
+			!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj, ImageState, selected, true) ||
+			!TryReadImageRenderState(ref platform, state, obj, out var image)) return 0;
+		image.Selected = selected; image.ImageState = selected;
+		if (!PublishImageRenderState(ref platform, state, obj, image)) return 0;
+		return platform.ScheduleRedraw(obj, 2) ? 1u : 0u;
+	}
 	private static uint HandleEventCore<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, APTR intuiMessage, int muiKey, uint tick,
 		bool timerEvents)
 		where TPlatform : struct, IMuiLayoutPlatform
 	{
-		if (!TryReadAreaPresentationState(ref platform, state, obj,
-			out var areaPresentation) || areaPresentation.Disabled != 0) return 0;
+		if (!PrepareControlEvent(ref platform, state, obj, intuiMessage, ref muiKey)) return 0;
 		// Raw key-up messages carry IECODE_UP_PREFIX in the named Code field.
 		// They are not printable input or ControlChar activations; a future
 		// preprocessed MUIKEY_RELEASE remains distinct from MUIKEY_NONE here.
-		if (muiKey == -1 && MuiIntuiMessageCodec.TryReadRawKeyRecord(ref platform,
-			intuiMessage, out var rawKey) &&
-			MuiIntuiMessageCodec.IsRawKeyRelease(rawKey.Code)) return 0;
-		if (TryResolveAreaControlCharKey(ref platform, state, obj, intuiMessage,
-			muiKey, out var controlCharKey)) muiKey = controlCharKey;
 		if (MuiScrollgroupCore.IsObject(ref platform, state, obj))
 			return MuiScrollgroupCore.HandleEvent(ref platform, state, obj,
 				intuiMessage, muiKey);
 		var cls = Classify(ref platform, state, obj);
 		if (cls == MuiControlClass.Image)
-		{
-			if ((muiKey != KeyPress && muiKey != KeyToggle) ||
-				Read(ref platform, state, obj, InputMode, 0) == 0) return 0;
-			var selected = ReadRaw(ref platform, state, obj, Selected, 0) == 0 ? 1u : 0u;
-			if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj, Selected,
-				selected, true) || !MuiHeadlessObjectCore.SetAttribute(ref platform,
-				state, obj, ImageState, selected, true)) return 0;
-			if (!TryReadImageRenderState(ref platform, state, obj,
-				out var imageRender)) return 0;
-			imageRender.Selected = selected;
-			imageRender.ImageState = selected;
-			if (!PublishImageRenderState(ref platform, state, obj, imageRender))
-				return 0;
-			return platform.ScheduleRedraw(obj, 2) ? 1u : 0u;
-		}
+			return HandleImageKey(ref platform, state, obj, muiKey);
 		if (cls == MuiControlClass.Text)
 			return HandleTextKey(ref platform, state, obj, intuiMessage, muiKey);
 		if (cls == MuiControlClass.String)
@@ -9682,8 +9700,8 @@ public static class MuiCommonControlCore
 			selected == 0 ? 1u : 0u, 0);
 	}
 
-	private static uint SetGadgetState<TPlatform>(ref TPlatform platform,
-		APTR state, APTR obj, uint selected, uint pressed)
+	internal static uint SetGadgetState<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, uint selected, uint pressed, bool notify = true)
 		where TPlatform : struct, IMuiLayoutPlatform
 	{
 		var isGadget = Classify(ref platform, state, obj) == MuiControlClass.Gadget;
@@ -9698,14 +9716,14 @@ public static class MuiCommonControlCore
 			out var currentSelected) || currentSelected != selected)
 		{
 			if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj, Selected,
-				selected, true)) return 0;
+				selected, notify)) return 0;
 			changed = true;
 		}
 		if (!MuiHeadlessObjectCore.GetAttribute(ref platform, state, obj, Pressed,
 			out var currentPressed) || currentPressed != pressed)
 		{
 			if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj, Pressed,
-				pressed, true)) return 0;
+				pressed, notify)) return 0;
 			changed = true;
 		}
 		if (isGadget)
@@ -10858,7 +10876,7 @@ public static class MuiCommonControlCore
 				out var objectValue)) return;
 			var candidate = objectValue.Boopsi;
 			if (candidate.Raw != target.Raw &&
-				Classify(ref platform, state, candidate) == MuiControlClass.String &&
+				ClassifyRecord(ref platform, objectValue.Class) == MuiControlClass.String &&
 				TryReadStringAttachedListStateRecord(ref platform, state, candidate,
 					out var attached) && attached.Listview.Raw == target.Raw)
 			{
@@ -15707,7 +15725,6 @@ public static class MuiCommonControlCore
 			geometry.Right = left + width - 1;
 			geometry.Bottom = top + height - 1;
 		}
-		MuiAreaTextColorCore.Apply(ref platform, state, obj, rastPort);
 		// Keep CustomFont rendering explicit instead of making it an accidental
 		// side effect of TextColor application.
 		MuiCustomFontRenderCore.Apply(ref platform, state, obj, rastPort);
@@ -15741,10 +15758,15 @@ public static class MuiCommonControlCore
 		var clip = platform.PushClip(rastPort, left, top, width, height);
 		if (renderPolicy.FillArea != 0)
 		{
-			platform.SetPen(rastPort, renderPolicy.Background);
+			platform.SetBackgroundPen(rastPort, renderPolicy.Background);
 			platform.FillRectangle(rastPort, left, top, left + width - 1,
 					 top + height - 1);
 		}
+		// Background painting changes the raster pen. Select the normal text
+		// foreground before applying an optional resolved RGB override; otherwise
+		// unformatted Text/Cycle labels inherit the background and disappear.
+		platform.SetPen(rastPort, 1);
+		MuiAreaTextColorCore.Apply(ref platform, state, obj, rastPort);
 		DrawContent(ref platform, state, obj, rastPort, contentRect.Left,
 			contentRect.Top, contentRect.Width, contentRect.Height);
 		if (renderPolicy.Frame != 0 && renderPolicy.FrameVisible != 0)

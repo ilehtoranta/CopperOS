@@ -2788,7 +2788,7 @@ public static class MuiListviewCore
 				out var objectValue)) return;
 			var candidate = objectValue.Boopsi;
 			if (candidate.Raw != target.Raw &&
-				MuiListCore.Classify(ref platform, state, candidate) ==
+				MuiListCore.ClassifyRecord(ref platform, objectValue.Class) ==
 				MuiCollectionClass.Listview &&
 				TryGetExternalScrollerConnection(ref platform, state, candidate,
 					out var connection) && connection.Prop.Raw == target.Raw)

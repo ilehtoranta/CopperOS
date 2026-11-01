@@ -16682,7 +16682,7 @@ public static class MuiListCore
 				// MorphOS supplies the skin-specific stripe pen. The freestanding
 				// profile keeps that styling deterministic through the graphics seam;
 				// full palette/skin parity remains outside this compatibility slice.
-				platform.SetPen(rastPort, StripePen);
+				platform.SetBackgroundPen(rastPort, StripePen);
 				platform.FillRectangle(rastPort, left, rowTop,
 					left + width - 1, rowTop + unchecked((int)lineHeight) - 1);
 			}
@@ -16731,6 +16731,10 @@ public static class MuiListCore
 		int baseline)
 		where TPlatform : struct, IMuiLayoutPlatform
 	{
+		// Area and stripe fills change the raster pen. Row text must select
+		// its foreground again before applying an optional resolved color.
+		platform.SetPen(rastPort, 1);
+		MuiAreaTextColorCore.Apply(ref platform, state, obj, rastPort);
 		for (var column = 0u; column < columns; column++)
 		{
 			var sourceColumn = DisplaySourceColumn(ref platform, state, obj,

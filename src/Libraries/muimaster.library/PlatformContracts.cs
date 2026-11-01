@@ -156,6 +156,9 @@ public interface IMuiGraphicsCapability
 	int TextWidth(APTR rastPort, APTR font, APTR text, int length);
 	int TextHeight(APTR rastPort, APTR font);
 	void SetPen(APTR rastPort, uint pen);
+	// Indexed native screens may need different fallbacks for unavailable
+	// background values and foreground/decorative pens.
+	void SetBackgroundPen(APTR rastPort, uint background) => SetPen(rastPort, background);
 	void FillRectangle(APTR rastPort, int left, int top, int right, int bottom);
 	void DrawLine(APTR rastPort, int x1, int y1, int x2, int y2);
 	void DrawText(APTR rastPort, APTR font, int left, int baseline, APTR text,
@@ -790,6 +793,12 @@ public interface IMuiHeadlessPlatform : IMuiClassRegistryPlatform, IMuiExecCapab
 	IMuiDragRoutingCapability,
 	IMuiCustomFontCapability
 {
+	// Optional class-specific bounds for one native layout pass.
+	bool TryReadMuiMinMax(APTR obj, out MuiMinMaxValues values)
+	{
+		values = default;
+		return false;
+	}
 	// Resolve one item from the object's local MUI configuration.  MorphOS
 	// currently publishes only MUICFG_PublicScreen (0x24) through
 	// MUIM_GetConfigItem; the capability returns the native opaque value and

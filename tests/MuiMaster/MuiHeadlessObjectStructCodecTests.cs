@@ -6,6 +6,33 @@ namespace CopperOS.MuiMaster.Tests;
 public sealed class MuiHeadlessObjectStructCodecTests
 {
 	[Fact]
+	public void IdentityProjectionRetainsFullRecordAdmission()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x2800);
+		var value = new MuiHeadlessObjectRecord
+		{
+			Next = APTR.FromPointer(0x3000), Boopsi = APTR.FromPointer(0x3040),
+			Class = APTR.FromPointer(0x3080), Generation = 17,
+		};
+		Assert.True(MuiHeadlessObjectCodec.WriteRecord(ref platform, address, value));
+		Assert.True(MuiHeadlessObjectCodec.TryReadIdentity(ref platform, address,
+			out var next, out var boopsi));
+		Assert.Equal(value.Next, next);
+		Assert.Equal(value.Boopsi, boopsi);
+		// Eight readable bytes cannot admit a truncated 64-byte allocation.
+		var truncated = APTR.FromPointer(0x30FF8);
+		Assert.True(platform.IsMapped(truncated, 8));
+		Assert.False(MuiHeadlessObjectCodec.TryReadIdentity(ref platform, truncated,
+			out next, out boopsi));
+		Assert.Equal(APTR.Null, next);
+		Assert.Equal(APTR.Null, boopsi);
+		Assert.False(MuiHeadlessObjectCodec.TryReadIdentity(ref platform, APTR.Null,
+			out _, out _));
+	}
+
+	[Fact]
 	public void HeadlessObjectStructCodecRoundTripsLinksAndScalars()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,

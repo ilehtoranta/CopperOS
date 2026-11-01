@@ -14,6 +14,9 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 	private readonly byte[] _memory;
 	private uint _next;
 	public APTR State;
+	internal APTR MinMaxPass;
+	public bool TryReadMuiMinMax(APTR obj, out MuiMinMaxValues values) =>
+		MuiNativeBuiltinMinMax.TryRead(ref this, MinMaxPass, State, obj, out values);
 	public uint CurrentTask;
 	public uint AllocationCount;
 	public uint FreeCount;
@@ -59,6 +62,8 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 	public byte MutationMode;
 	public uint RecursiveDispatches;
 	public uint FillCount;
+	public uint LastFillPen;
+	public int NativeBackgroundDepth;
 	public uint LineCount;
 	public uint TextCount;
 	public uint CustomFontOpenCount;
@@ -490,6 +495,8 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		MutationMode = 0;
 		RecursiveDispatches = 0;
 		FillCount = 0;
+		LastFillPen = 0;
+		NativeBackgroundDepth = 0;
 		LineCount = 0;
 		TextCount = 0;
 		ImageCount = 0;
@@ -886,6 +893,7 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 
 	public uint DoMethod(APTR obj, APTR message)
 	{
+		MuiNativeBuiltinMinMax.Invalidate(ref this, MinMaxPass);
 		ObserveCallingFlag();
 		DispatchCount++;
 		LastDispatchObject = obj;
@@ -1026,6 +1034,7 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 
 	public uint InvokeHook(APTR hook, APTR objectAddress, APTR messageAddress)
 	{
+		MuiNativeBuiltinMinMax.Invalidate(ref this, MinMaxPass);
 		if (hook.IsNull) return 0;
 		HookInvokeCount++;
 		LastHookBase = hook;
@@ -1572,6 +1581,8 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 			font.Raw == ActiveCustomFontHandle.Raw;
 	}
 	public void SetPen(APTR rastPort, uint pen) => LastPen = pen;
+	public void SetBackgroundPen(APTR rastPort, uint background) =>
+		SetPen(rastPort, MuiNativeIndexedBackground.Resolve(background, NativeBackgroundDepth));
 	public uint MuiTextColorValue = 0x00FFFFFFu;
 	public bool MuiTextColorAvailable = true;
 	public uint MuiTextColorRequestCount;
@@ -1651,6 +1662,7 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		int bottom)
 	{
 		FillCount++;
+		LastFillPen = LastPen;
 		LastLeft = left;
 		LastTop = top;
 		LastRight = right;

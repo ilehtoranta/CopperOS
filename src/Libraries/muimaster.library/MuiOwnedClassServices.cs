@@ -83,6 +83,18 @@ internal static class MuiNativeOwnedClassServices
 		var memory = default(MuiNativeClassMemory);
 		if (!MuiNativeClassOwnerCodec.TryGetPublicObjectStateAddress(ref memory,
 				service.Operation.Owner, out var publicObjects)) return APTR.Null;
+#if COPPEROS_MUI_CLASSIC_COMPATIBILITY
+		var builtin = new MuiNativeBuiltinPlatform { Context = classes.Context };
+		if (CStringCodec.TryEquals(ref builtin, className, MuiNativeBuiltinClasses.Name(9), 64, out var application) && application)
+		{
+			if (!MuiClassicApplicationMenu.Prepare(ref builtin, tags, out var prepared,
+				out var bytes, out var generated)) return APTR.Null;
+			var result = MuiNativePublicObjectCore.NewObject(ref classes,
+				service.Operation.Service, service.Operation.OwnerRoot, publicObjects, className, prepared);
+			MuiClassicApplicationMenu.Finish(ref builtin, prepared, bytes, generated, result.IsNotNull);
+			return result;
+		}
+#endif
 		return MuiNativePublicObjectCore.NewObject(ref classes,
 			service.Operation.Service, service.Operation.OwnerRoot, publicObjects,
 			className, tags);

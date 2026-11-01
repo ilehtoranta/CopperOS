@@ -20,11 +20,69 @@ internal struct MuiNativeBuiltinInstance
 // Optional OS services that are not implemented fail closed; no fixture arena,
 // host callback, synthetic window or fake filesystem result is used here.
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
-internal struct MuiNativeBuiltinPlatform : IMuiHeadlessPlatform
+internal partial struct MuiNativeBuiltinPlatform : IMuiLayoutPlatform, IMuiClassicMenuPlatform, IMuiBuiltinWindowCapability
 {
-    internal APTR Context;
+    private APTR _context;
+    // Keep the generic ABI at four bytes. During layout the low bit denotes
+    // an owned frame containing the canonical context plus transient state.
+    internal APTR Context
+    {
+        get => (_context.Raw & 1) == 0 ? _context :
+            APTR.FromPointer(APTR.ReadUInt32(APTR.FromPointer(_context.Raw & ~1u), 0));
+        set => _context = value;
+    }
+    private APTR MinMaxPass => (_context.Raw & 1) == 0 ? APTR.Null :
+        APTR.FromPointer((_context.Raw & ~1u) + 4);
+    public bool TryReadMuiMinMax(APTR obj, out MuiMinMaxValues values) =>
+        MuiNativeBuiltinMinMax.TryRead(ref this, MinMaxPass, Registry, obj, out values);
+    internal bool BeginMinMax(APTR root)
+    {
+        var context = Context;
+        var frame = Allocate(4 + MuiNativeBuiltinMinMax.PassSize, MuiHeadlessLayout.AllocationFlags);
+        if (frame.IsNull) return false;
+        WriteUInt32(frame, 0, context.Raw);
+        _context = APTR.FromPointer(frame.Raw | 1u);
+        if (MuiNativeBuiltinMinMax.Begin(ref this, MinMaxPass, Registry, root)) return true;
+        EndMinMax(); return false;
+    }
+    internal void EndMinMax()
+    {
+        if ((_context.Raw & 1) == 0) return;
+        var frame = APTR.FromPointer(_context.Raw & ~1u);
+        MuiNativeBuiltinMinMax.End(ref this, MinMaxPass);
+        var context = APTR.FromPointer(ReadUInt32(frame));
+        _context = context;
+        Free(frame, 4 + MuiNativeBuiltinMinMax.PassSize);
+    }
     internal MuiNativeClassPlatform Native => new MuiNativeClassPlatform { Context = Context };
     internal APTR Registry => MuiNativeClassOwnerCodec.TryGetRegistryAddress(ref this, Context, out var value) ? value : APTR.Null;
+    public bool IsMenustripObject(APTR value) =>
+        MuiMenuSpecialistCore.Classify(ref this, Registry, value) == MuiMenuSpecialistClass.Menustrip;
+    public APTR CreateClassicMenustrip(APTR newMenu)
+    {
+        var native = Native;
+        if (!MuiNativeClassOwnerCodec.TryRead(ref this, Context, out var owner) ||
+            !MuiNativeClassOwnerCodec.TryGetServiceAddress(ref this, Context, out var service) ||
+            !MuiNativeClassOwnerCodec.TryGetPublicObjectStateAddress(ref this, Context, out var objects)) return APTR.Null;
+        var parameters = Allocate(8, MuiHeadlessLayout.AllocationFlags);
+        if (parameters.IsNull) return APTR.Null;
+        WriteUInt32(parameters, 0, newMenu.Raw);
+        var strip = MuiMakeObjectServiceCore.MakeNativeObjectA(ref native, service,
+            owner.Context.OwnerRoot, objects, MuiMakeObjectServiceCore.MUIO_MenustripNM, parameters);
+        Free(parameters, 8);
+        return strip;
+    }
+    public void DisposeClassicMenustrip(APTR strip)
+    {
+        var native = Native;
+        // Construction may already have adopted and destroyed the generated
+        // strip. Never dispose a stale pointer or steal a partial owner's child.
+        if (MuiNativeClassOwnerCodec.TryGetPublicObjectStateAddress(ref this, Context, out var objects) &&
+            MuiNativePublicObjectCore.TryFindBinding(ref native, objects, native.OwnerRoot, strip, out _) &&
+            MuiHeadlessObjectCore.TryFindObject(ref this, Registry, strip, out var record) &&
+            (record.IsNull || MuiHeadlessObjectCodec.TryRead(ref this, record, out var value) && value.Parent.IsNull))
+            DisposeObject(strip);
+    }
     public bool IsMapped(APTR a, uint n) => default(MuiNativeClassMemory).IsMapped(a, n);
     public byte ReadUInt8(APTR a, int o = 0) => APTR.ReadUInt8(a, o);
     public ushort ReadUInt16(APTR a, int o = 0) => APTR.ReadUInt16(a, o);
@@ -63,6 +121,7 @@ internal struct MuiNativeBuiltinPlatform : IMuiHeadlessPlatform
             MuiNativeClassOwnerCodec.TryGetPublicObjectStateAddress(ref this, Context, out var objects) &&
             MuiNativePublicObjectCore.TryFindBinding(ref native, objects, native.OwnerRoot, obj, out var binding))
         {
+            ReleaseBuiltinWindow(obj);
             // Family cleanup has already retired the headless child link. Drop
             // its parallel native relationship before the public disposal seam.
             if (binding.Parent.IsNotNull &&
@@ -72,7 +131,11 @@ internal struct MuiNativeBuiltinPlatform : IMuiHeadlessPlatform
         }
         else native.DisposeObject(obj);
     }
-    public uint DoMethod(APTR obj, APTR message) => Native.DoMethod(obj, message);
+    public uint DoMethod(APTR obj, APTR message)
+    {
+        MuiNativeBuiltinMinMax.Invalidate(ref this, MinMaxPass);
+        return Native.DoMethod(obj, message);
+    }
     public uint CoerceMethod(APTR cls, APTR obj, APTR message) => Native.CoerceMethod(cls, obj, message);
     public uint DoSuperMethod(APTR cls, APTR obj, APTR message)
     {
@@ -109,9 +172,12 @@ internal struct MuiNativeBuiltinPlatform : IMuiHeadlessPlatform
         WriteUInt32(storage, MuiNativeBuiltinInstance.PinsOffset, count - 1);
         return count == 1;
     }
-    public uint InvokeHook(APTR hook, APTR obj, APTR message) =>
-        MuiNativeClassOwnerCodec.TryRead(ref this, Context, out var owner) && owner.UtilityBase.IsNotNull
+    public uint InvokeHook(APTR hook, APTR obj, APTR message)
+    {
+        MuiNativeBuiltinMinMax.Invalidate(ref this, MinMaxPass);
+        return MuiNativeClassOwnerCodec.TryRead(ref this, Context, out var owner) && owner.UtilityBase.IsNotNull
             ? MuiNativeUtilityCalls.CallHookPkt(owner.UtilityBase, hook, obj, message) : 0;
+    }
     public uint CurrentTaskToken() => Exec.FindTask(CString.FromPointer(0)).Raw;
     private uint Dos(short lvo, uint d1, uint d2, uint d3)
     {

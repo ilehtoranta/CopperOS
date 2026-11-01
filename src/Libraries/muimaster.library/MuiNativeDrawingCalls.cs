@@ -437,6 +437,8 @@ internal struct MuiNativeScreenRecord
 {
 	internal const uint Size = 346;
 	internal APTR ViewPortAddress;
+	internal short Width;
+	internal short Height;
 }
 
 internal static class MuiNativeScreenStructCodec
@@ -450,7 +452,13 @@ internal static class MuiNativeScreenStructCodec
 			!MuiGuestStructCursor.TryTake(ref memory, ref cursor, 4, out _) ||
 			!MuiGuestStructCursor.TryTake(ref memory, ref cursor, 4, out _))
 			return false;
-		for (var index = 0; index < 7; index++)
+		if (!MuiGuestStructCursor.TryTake(ref memory, ref cursor, 2, out _) ||
+			!MuiGuestStructCursor.TryTake(ref memory, ref cursor, 2, out _) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref memory, ref cursor, out var width) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref memory, ref cursor, out var height)) return false;
+		value.Width = unchecked((short)width);
+		value.Height = unchecked((short)height);
+		for (var index = 0; index < 3; index++)
 			if (!MuiGuestStructCursor.TryTake(ref memory, ref cursor, 2, out _))
 				return false;
 		if (!MuiGuestStructCursor.TryTake(ref memory, ref cursor, 4, out _) ||

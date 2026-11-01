@@ -7468,11 +7468,60 @@ public sealed class MuiListCoreTests
 		Assert.True(MuiListCore.Draw(ref platform, State, list, 0));
 		Assert.Equal(2u, platform.FillCount); // background plus the odd row
 		Assert.Equal(2u, platform.TextCount);
-		Assert.Equal(2u, platform.LastPen);
+		Assert.Equal(1u, platform.LastPen); // text restores foreground after the stripe fill
+		platform.NativeBackgroundDepth = 1;
+		platform.FillCount = 0; platform.TextCount = 0;
+		Assert.True(MuiListCore.Draw(ref platform, State, list, 0));
+		Assert.Equal(2u, platform.TextCount);
+		Assert.Equal(0u, platform.LastFillPen);
+		Assert.Equal(1u, platform.LastPen);
 
 		Assert.True(MuiListCore.SetAttribute(ref platform, State, list,
 			StripesAttr, 0));
 		Assert.Equal(0u, Get(ref platform, list, StripesAttr));
+	}
+
+	[Fact]
+	public void NativeListMutationRefreshHonoursQuietAndPaintsVisibleRows()
+	{
+		var platform = CreatePlatform(out var listClass, out _, 0x40000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass, APTR.Null);
+		var text = APTR.FromPointer(0x3600); platform.WriteCString(text, "11");
+		var info = APTR.FromPointer(0x36C0); platform.WriteUInt32(info, 20, 0x3700);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, list, info));
+		Assert.True(MuiAreaLayoutCore.Show(ref platform, State, list));
+		Assert.True(MuiListCore.Layout(ref platform, State, list, 0, 0, 80, 16));
+		var before = MuiListCore.RedrawRequests(ref platform, State, list);
+		var array = APTR.FromPointer(0x3800); platform.WriteUInt32(array, 0, text.Raw);
+		var packet = APTR.FromPointer(0x3840);
+		platform.WriteUInt32(packet, 0, 0x80426C87); // Classic MUIM_List_Insert.
+		platform.WriteUInt32(packet, 4, array.Raw);
+		platform.WriteUInt32(packet, 8, 1);
+		platform.WriteUInt32(packet, 12, unchecked((uint)InsertBottom));
+		Assert.Equal(list, MuiNativeBuiltinCollection.RedrawTarget(ref platform, State, list));
+		Assert.True(MuiNativeBuiltinCollection.TryDispatch(ref platform, State, list, packet, out var inserted));
+		Assert.Equal(1u, inserted);
+		Assert.True(MuiNativeBuiltinPresentation.RedrawChangedList(ref platform, State, list, before));
+		Assert.Equal(1u, platform.TextCount);
+		Assert.Equal(1u, platform.LastPen);
+		Assert.Equal(2, platform.LastTextLength);
+		Assert.True(MuiListCore.SetAttribute(ref platform, State, list, QuietAttr, 1));
+		before = MuiListCore.RedrawRequests(ref platform, State, list);
+		platform.TextCount = 0;
+		Assert.True(MuiNativeBuiltinPresentation.RedrawAfterSet(ref platform, State, list));
+		Assert.Equal(0u, platform.TextCount);
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list, text, InsertBottom));
+		Assert.True(MuiNativeBuiltinPresentation.RedrawChangedList(ref platform, State, list, before));
+		Assert.Equal(0u, platform.TextCount);
+		Assert.True(MuiListCore.SetAttribute(ref platform, State, list, QuietAttr, 0));
+		Assert.True(MuiNativeBuiltinPresentation.RedrawChangedList(ref platform, State, list, before));
+		Assert.Equal(2u, platform.TextCount);
+		before = MuiListCore.RedrawRequests(ref platform, State, list);
+		Assert.True(MuiListCore.Clear(ref platform, State, list));
+		platform.TextCount = 0; platform.FillCount = 0;
+		Assert.True(MuiNativeBuiltinPresentation.RedrawChangedList(ref platform, State, list, before));
+		Assert.Equal(0u, platform.TextCount);
+		Assert.True(platform.FillCount > 0);
 	}
 
 	[Fact]

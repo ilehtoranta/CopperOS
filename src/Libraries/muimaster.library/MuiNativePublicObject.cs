@@ -554,6 +554,15 @@ internal static class MuiNativePublicObjectCore
 			 binding.DisposeState != MuiNativePublicObjectBinding.StateNativeDisposed &&
 			 binding.DisposeState != MuiNativePublicObjectBinding.StateLeaseReleased)) return false;
 		var hasSidecar = binding.Sidecar.IsNotNull;
+		var builtin = new MuiNativeBuiltinPlatform { Context = platform.Context };
+		var nativeClass = BOOPSIGuestCodec.ReadClass(ref memory, binding.Class);
+		// Built-ins recursively release owned children through this same public
+		// gateway. External BOOPSI classes instead require retained-child snapshots.
+		// Nesting those snapshots on a built-in child overwrites its outer parent's
+		// pending disposal scope and strands already-destroyed child bindings.
+		var ownsChildDisposal = nativeClass.cl_Dispatcher.Entry == APTR.ExportAddress(MuiNativeBuiltinClasses.DispatchExport) &&
+			nativeClass.cl_Dispatcher.Data == platform.Context &&
+			MuiNativeBuiltinClasses.Find(ref builtin, binding.Class).IsNotNull;
 		var sidecar = default(MuiNativeMuiObjectRecord);
 		if (hasSidecar && (!MuiNativeMuiObjectCodec.TryRead(ref memory,
 			binding.Sidecar, out sidecar) || sidecar.Object != obj ||
@@ -642,7 +651,7 @@ internal static class MuiNativePublicObjectCore
 					binding.Sidecar, obj);
 				return true;
 			}
-			if (!CapturePendingReleaseSnapshots(ref memory, ref platform,
+			if (!ownsChildDisposal && !CapturePendingReleaseSnapshots(ref memory, ref platform,
 				ownerRoot, publicObjects, obj))
 			{
 				RestoreDisposalAdmission(ref memory, bindingAddress,
@@ -667,7 +676,7 @@ internal static class MuiNativePublicObjectCore
 					sidecar)) return false;
 			}
 		}
-		if (!ReconcilePendingReleaseSnapshots(ref memory, ownerRoot,
+		if (!ownsChildDisposal && !ReconcilePendingReleaseSnapshots(ref memory, ownerRoot,
 			publicObjects, obj))
 		{
 			binding.ActiveCalls = 0;

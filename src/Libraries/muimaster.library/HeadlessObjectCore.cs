@@ -603,6 +603,7 @@ public static class MuiHeadlessObjectCore
                 return false;
             }
             MuiFamilyCore.DetachFromParent(ref platform, state, record);
+            MuiMenuSpecialistCore.CleanupRecords(ref platform, state, obj);
             MuiApplicationWindowCore.CleanupRecords(ref platform, state, obj);
             MuiGroupChangeCore.CleanupRecords(ref platform, state, obj);
             MuiGroupPageCore.Cleanup(ref platform, state, obj);
@@ -677,15 +678,15 @@ public static class MuiHeadlessObjectCore
         uint visited = 0;
         while (current.IsNotNull && visited++ < MuiHeadlessLayout.MaximumTraversal)
         {
-            if (!MuiHeadlessObjectCodec.TryRead(ref platform, current,
-                out var objectValue))
+            if (!MuiHeadlessObjectCodec.TryReadIdentity(ref platform, current,
+                out var next, out var boopsi))
                 return false;
-            if (objectValue.Boopsi.Raw == obj.Raw)
+            if (boopsi.Raw == obj.Raw)
             {
                 record = current;
                 return true;
             }
-            current = objectValue.Next;
+            current = next;
         }
         return current.IsNull;
     }
@@ -1072,6 +1073,15 @@ public static class MuiHeadlessObjectCore
     {
         value = 0;
         var record = FindObject(ref platform, state, obj);
+        if (record.IsNull) return false;
+        return GetRecordRawAttribute(ref platform, record, attribute, out value);
+    }
+
+    internal static bool GetRecordRawAttribute<TPlatform>(ref TPlatform platform,
+        APTR record, uint attribute, out uint value)
+        where TPlatform : struct, IMuiHeadlessPlatform
+    {
+        value = 0;
         if (record.IsNull) return false;
         if (attribute == ObjectIdAttribute || attribute == UserDataAttribute)
         {

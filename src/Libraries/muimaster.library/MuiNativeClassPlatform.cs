@@ -826,7 +826,7 @@ public static class MuiNativeClassDispatcher
 		return result;
 	}
 
-	private static bool TryDispatchNativeState(ref MuiNativeClassMemory memory,
+	internal static bool TryDispatchNativeState(ref MuiNativeClassMemory memory,
 		APTR ownerRoot, APTR obj, APTR message, uint method, out uint result)
 	{
 		result = 0;
@@ -873,7 +873,7 @@ public static class MuiNativeClassDispatcher
 			publicObjects, ownerRoot, obj, message, method, out result);
 	}
 
-	private static bool TryProjectNativeMethod(ref MuiNativeClassMemory memory,
+	internal static bool TryProjectNativeMethod(ref MuiNativeClassMemory memory,
 		APTR ownerRoot, APTR obj, APTR message, uint method,
 		uint receivedSignals, ref uint result)
 	{

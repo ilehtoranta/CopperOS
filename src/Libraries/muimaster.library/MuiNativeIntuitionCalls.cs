@@ -14,6 +14,10 @@ namespace CopperOS.MuiMaster;
 // Public structure access belongs in the SDK codecs, not in this call bridge.
 internal static class MuiNativeIntuitionCalls
 {
+	internal static APTR OpenWindow(APTR library, APTR description) =>
+		APTR.FromPointer(PointerResultCall(Entry(library, IntuitionLvo.OpenWindow), library, description));
+	internal static void CloseWindow(APTR library, APTR window) =>
+		PointerVoidCall(Entry(library, IntuitionLvo.CloseWindow), library, window);
 	// MorphOS 3.20 mui/mccheader.c: the fifth library vector is MCC_Query.
 	// Selector zero returns MUI_CustomClass*, whose Class field is the IClass.
 	private const short CustomClassQueryLvo = -30;
