@@ -9519,8 +9519,9 @@ public static class MuiCommonControlCore
 		APTR state, APTR obj, APTR intuiMessage, int muiKey)
 		where TPlatform : struct, IMuiLayoutPlatform
 	{
-		if (!PrepareControlEvent(ref platform, state, obj, intuiMessage, ref muiKey)) return 0;
 		var cls = Classify(ref platform, state, obj);
+		if (!PrepareControlEvent(ref platform, state, obj, intuiMessage, ref muiKey,
+			cls != MuiControlClass.String)) return 0;
 		if (cls == MuiControlClass.Image) return HandleImageKey(ref platform, state, obj, muiKey);
 		if (cls == MuiControlClass.Text) return HandleTextKey(ref platform, state, obj, intuiMessage, muiKey);
 		if (cls == MuiControlClass.String) return HandleStringKey(ref platform, state, obj, intuiMessage, muiKey);
@@ -9528,13 +9529,13 @@ public static class MuiCommonControlCore
 		return 0;
 	}
 	private static bool PrepareControlEvent<TPlatform>(ref TPlatform platform,
-		APTR state, APTR obj, APTR intuiMessage, ref int muiKey)
+		APTR state, APTR obj, APTR intuiMessage, ref int muiKey, bool promoteControlChar = true)
 		where TPlatform : struct, IMuiLayoutPlatform
 	{
 		if (!TryReadAreaPresentationState(ref platform, state, obj, out var presentation) || presentation.Disabled != 0) return false;
 		if (muiKey == -1 && MuiIntuiMessageCodec.TryReadRawKeyRecord(ref platform, intuiMessage, out var rawKey) &&
 			MuiIntuiMessageCodec.IsRawKeyRelease(rawKey.Code)) return false;
-		if (TryResolveAreaControlCharKey(ref platform, state, obj, intuiMessage, muiKey, out var key)) muiKey = key;
+		if (promoteControlChar && TryResolveAreaControlCharKey(ref platform, state, obj, intuiMessage, muiKey, out var key)) muiKey = key;
 		return true;
 	}
 	private static uint HandleImageKey<TPlatform>(ref TPlatform platform, APTR state, APTR obj, int muiKey)
@@ -9812,7 +9813,19 @@ public static class MuiCommonControlCore
 		if (!TryReadStringContentsState(ref platform, state, obj,
 			out var contentsState)) return 0;
 		var contents = contentsState.Contents;
-		if (contents.IsNull) return 0;
+		if (contents.IsNull)
+		{
+			// A NULL initial Contents tag represents an empty editable field.
+			// Materialize its owned NUL before the edit/hook path; do not require
+			// the original client to supply a non-NULL empty-string literal.
+			if (!MuiStoreCore.DataspaceAdd(ref platform, state, obj, StringCopyKey,
+				state, 1)) return 0;
+			contents = MuiStoreCore.DataspaceFind(ref platform, state, obj, StringCopyKey);
+			if (contents.IsNull) return 0;
+			platform.WriteUInt8(contents, 0, 0);
+			contentsState.Contents = contents;
+			if (!PublishStringContentsState(ref platform, state, obj, contentsState, false)) return 0;
+		}
 		var unicode = StringIsUnicode(ref platform, state, obj);
 		var byteLength = StringLength(ref platform, contents);
 		var length = StringCursorLength(ref platform, state, obj, contents);

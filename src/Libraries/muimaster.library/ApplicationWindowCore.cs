@@ -4393,14 +4393,15 @@ public static class MuiApplicationWindowCore
 	{
 		var cursor = new MuiAslTagItemCursor { Base = tags };
 		uint steps = 0;
+		var accepted = true;
 		while (MuiClassicApplicationMenu.Next(ref platform, ref cursor, ref steps, out var item))
 		{
-			if (item.Tag == 0) return true;
+			if (item.Tag == 0) return accepted;
 			if (item.Tag != ApplicationWindow) continue;
 			var window = APTR.FromPointer(item.Data);
 			if (!MuiApplicationMessageCore.IsWindowObject(ref platform, state, window) ||
 				!MuiFamilyCore.AddTail(ref platform, state, application, window) ||
-				!Set(ref platform, state, window, WindowOwner, application.Raw)) return false;
+				!Set(ref platform, state, window, WindowOwner, application.Raw)) accepted = false;
 		}
 		return false;
 	}

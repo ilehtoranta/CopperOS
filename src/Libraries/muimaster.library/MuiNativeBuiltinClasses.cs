@@ -6,19 +6,21 @@ namespace CopperOS.MuiMaster;
 
 public static class MuiNativeBuiltinClasses
 {
-    internal const int Count = 16;
+    internal const int Count = 19;
     public const string DispatchExport = "copperos.mui.builtin.dispatch";
+    public const string PopaslWorkerExport = "copperos.mui.popasl.worker";
     internal static APTR Name(int index) => APTR.FromPointer(CString.ToUInt32(CString.FromLiteral(index switch
     {
         0 => "Notify.mui", 1 => "Family.mui", 2 => "Area.mui", 3 => "Group.mui",
         4 => "Rectangle.mui", 5 => "Text.mui", 6 => "List.mui", 7 => "Listview.mui",
         8 => "Window.mui", 9 => "Application.mui", 10 => "Menustrip.mui",
-        11 => "Menu.mui", 12 => "Menuitem.mui", 13 => "String.mui", 14 => "Image.mui", _ => "Cycle.mui",
+        11 => "Menu.mui", 12 => "Menuitem.mui", 13 => "String.mui", 14 => "Image.mui", 15 => "Cycle.mui",
+        16 => "Radio.mui", 17 => "Popstring.mui", _ => "Popasl.mui",
     })));
     internal static int Parent(int index) => index switch
     {
         0 => -1, 1 or 2 or 8 or 12 => 0, 3 or 4 or 5 or 6 or 13 or 14 => 2,
-        7 or 15 => 3, _ => 1,
+        7 or 15 or 16 or 17 => 3, 18 => 17, _ => 1,
     };
     internal static bool Ensure(ref MuiNativeClassPlatform native, APTR requested)
     {
@@ -118,9 +120,15 @@ public static class MuiNativeBuiltinClasses
             MuiApplicationInputMessageCodec.TryRead(ref memory, message, out var inputMessage) &&
             MuiApplicationWindowSignalStorageCodec.TryRead(ref memory, inputMessage.SignalStorage, out var signalStorage))
             receivedSignals = signalStorage.Signals;
+        var applicationInput = method == MuiApplicationDispatcher.ApplicationInputMethod || method == MuiApplicationDispatcher.ApplicationNewInputMethod;
+        if (applicationInput) MuiNativeBuiltinPopasl.Pump(ref p, obj);
         var handled = MuiNativeClassDispatcher.TryDispatchNativeState(ref memory,
             owner.Context.OwnerRoot, obj, message, method, out var answer);
         if (!handled) answer = DispatchCore(ref p, cls, obj, message, method);
+        if (MuiNativeBuiltinGroupNotifications.TryForward(ref p, p.Registry, obj, message, method, out var forwarded))
+            answer = method == MuiNotifyCore.NotifyMethod ?
+                (answer != 0 && forwarded != 0 ? 1u : 0u) : answer + forwarded;
+
         var project = method != BOOPSI.OM_NEW && method != BOOPSI.OM_DISPOSE;
         // The built-in headless dispatcher already executes these operations.
         // Reusing the external-class fallback here would invoke hooks or write
@@ -128,10 +136,20 @@ public static class MuiNativeBuiltinClasses
         if (method == MuiCallHookCore.Method || method == MuiNotifyWriteCore.WriteLongMethod ||
             method == MuiNotifyWriteCore.WriteStringMethod || method == MuiNotifyCore.MultiSetMethod) project = false;
         if (method == BOOPSI.OM_GET && MuiExternalBoopsiOpGetMessageStructCodec.TryRead(ref p, message, out var get) &&
-            get.Attribute == MuiWindowPublicCore.Open) project = false; // The class reports an actual native handle, not the requested tag.
+            MuiNativeBuiltinControlGetter.PreserveClassResult(get.Attribute, answer)) project = false;
         if (project)
             MuiNativeClassDispatcher.TryProjectNativeMethod(ref memory,
                 owner.Context.OwnerRoot, obj, message, method, receivedSignals, ref answer);
+        // A window event may have opened a popup during this input iteration.
+        // Include its reply signal before the client waits. Do not dequeue a
+        // completion after the Application's ReturnID dequeue has already run.
+        var popSignals = applicationInput ? MuiNativeBuiltinPopasl.Pump(ref p, obj, false) : 0u;
+        if (popSignals != 0 && MuiApplicationInputMessageCodec.TryRead(ref p, message, out var pendingInput) &&
+            MuiApplicationWindowSignalStorageCodec.TryRead(ref p, pendingInput.SignalStorage, out var pendingSignals))
+        {
+            pendingSignals.Signals |= popSignals;
+            MuiApplicationWindowSignalStorageCodec.Write(ref p, pendingInput.SignalStorage, pendingSignals);
+        }
         if (method == BOOPSI.OM_SET || method == BOOPSI.OM_UPDATE ||
             method == MuiNotifyCore.SetMethod || method == MuiNotifyCore.NoNotifySetMethod)
             MuiNativeBuiltinPresentation.RedrawAfterSet(ref p, p.Registry, obj);
@@ -179,7 +197,9 @@ public static class MuiNativeBuiltinClasses
                 (!MuiCommonControlCore.Construct(ref p, p.Registry, owning, result) ||
                  !MuiListCore.Construct(ref p, p.Registry, owning, result) ||
                  !MuiListviewCore.Construct(ref p, p.Registry, owning, result) ||
-                 !MuiMenuSpecialistCore.Construct(ref p, p.Registry, result)))
+                 !MuiMenuSpecialistCore.Construct(ref p, p.Registry, result) ||
+                 !MuiNativeBuiltinPopstring.Construct(ref p, p.Registry, result) ||
+                 !MuiNativeBuiltinWindow.ValidateConstructorRoot(ref p, p.Registry, result)))
                 initialized = APTR.Null;
             if (initialized.IsNotNull && owning == MuiHeadlessObjectCore.FindClassByName(ref p, p.Registry, Name(9)) &&
                 !MuiApplicationWindowCore.AdoptConstructorWindows(ref p, p.Registry, result, packet.Attributes))
@@ -195,6 +215,9 @@ public static class MuiNativeBuiltinClasses
         if (method == BOOPSI.OM_DISPOSE)
         {
             if (record != notify) return p.DoSuperMethod(cls, obj, message);
+            var initialReferences = p.References(obj);
+            if (initialReferences.IsNull || p.ReadUInt32(initialReferences) <= 1)
+                MuiNativeBuiltinPopasl.Dispose(ref p, obj);
             // Family teardown may have retired the child's sidecar before
             // releasing its native object. Do not strand that root allocation.
             if (MuiHeadlessObjectCore.TryFindObject(ref p, p.Registry, obj, out var existing) && existing.IsNull)
@@ -212,6 +235,8 @@ public static class MuiNativeBuiltinClasses
             p.ReleaseBuiltinWindow(obj);
             return MuiBoopsiBaseDisposalCore.TryDispose(ref p, p.Registry, record, obj, message, out var result) ? result : 0;
         }
+        if (method == MuiPopAttributes.Popstring_Open)
+            return MuiNativeBuiltinPopasl.Open(ref p, obj);
         if (method == MuiNativeBoopsiMethodId.RetainCount)
         {
             var references = p.References(obj);
@@ -227,14 +252,15 @@ public static class MuiNativeBuiltinClasses
                 var projected = get.Attribute == MuiWindowPublicCore.Window ? handle : handle != 0 ? 1u : 0u;
                 return MuiGuestUlongStorageCodec.WriteValue(ref p, get.Storage, projected) ? 1u : 0u;
             }
-            if (!MuiHeadlessObjectCore.GetAttribute(ref p, p.Registry, obj, get.Attribute, out var value)) return 0;
+            if (!MuiNativeBuiltinPopstring.TryGetString(ref p, p.Registry, obj, get.Attribute, out var value) &&
+                !MuiHeadlessObjectCore.GetAttribute(ref p, p.Registry, obj, get.Attribute, out value)) return 0;
             return MuiGuestUlongStorageCodec.WriteValue(ref p, get.Storage, value) ? 1u : 0u;
         }
         if (method == MuiCommonControlPacketCore.HandleEvent &&
             MuiCommonControlPacketCore.TryReadHandleEvent(ref p, message, out var input))
         {
             if (record == MuiHeadlessObjectCore.FindClassByName(ref p, p.Registry, Name(8)))
-                return MuiNativeBuiltinInput.HandleWindow(ref p, obj, APTR.FromPointer(input.InputMessage));
+                return MuiNativeBuiltinInput.HandleWindow(ref p, obj, APTR.FromPointer(input.InputMessage), input.MuiKey);
             var result = MuiCommonControlCore.HandleNativeBuiltinEvent(ref p, p.Registry, obj,
                 APTR.FromPointer(input.InputMessage), input.MuiKey);
             MuiNativeBuiltinPresentation.PublishInputChanges(ref p, obj);
@@ -245,6 +271,11 @@ public static class MuiNativeBuiltinClasses
             return MuiNativeBuiltinPresentation.DrawObject(ref p, obj, 0) ? 1u : 0u;
         if (MuiNativeBuiltinCollection.TryDispatch(ref p, p.Registry, obj, message, out var collectionAnswer))
             return collectionAnswer;
+        if ((method == BOOPSI.OM_SET || method == BOOPSI.OM_UPDATE ||
+             method == MuiNotifyCore.SetMethod || method == MuiNotifyCore.NoNotifySetMethod) &&
+            MuiCommonControlCore.IsAreaControlClass(MuiCommonControlCore.Classify(ref p, p.Registry, obj)))
+            return MuiNativeBuiltinControlSetter.Dispatch(ref p, p.Registry,
+                obj, message, method);
         var answer = MuiHeadlessDispatcher.Dispatch(ref p, p.Registry, obj, message);
         if ((method == BOOPSI.OM_SET || method == BOOPSI.OM_UPDATE ||
              method == MuiNotifyCore.SetMethod || method == MuiNotifyCore.NoNotifySetMethod) &&

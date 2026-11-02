@@ -344,6 +344,10 @@ internal struct MuiNativeClassPlatform : IMuiClassServicePlatform,
 	}
 	public bool LockLayer(APTR layer) =>
 		MuiNativeDrawingPlatformCore.LockLayer(ref this, layer);
+	internal bool LockPaintLayer(APTR layer) =>
+		MuiNativeDrawingPlatformCore.LockPaintLayer(ref this, layer);
+	internal void UnlockPaintLayer(APTR layer) =>
+		MuiNativeDrawingPlatformCore.UnlockPaintLayer(ref this, layer);
 	public void UnlockLayer(APTR layer) =>
 		MuiNativeDrawingPlatformCore.UnlockLayer(ref this, layer);
 	public bool BeginUpdate(APTR layer) =>

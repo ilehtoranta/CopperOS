@@ -1395,6 +1395,18 @@ public static class MuiFamilyMutationCore
 		return DispatchRecord(ref platform, state, family, message);
 	}
 
+	public static uint DispatchClassic<TPlatform>(ref TPlatform platform, APTR state,
+		APTR family, APTR message) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!MuiFamilyMutationMessageStructCodec.TryReadChild(ref platform, message,
+			out var packet) || !MuiFamilyCore.IsFamilyObject(ref platform, state, family)) return 0;
+		if (packet.MethodId == BOOPSI.OM_ADDMEMBER)
+			return MuiFamilyCore.AddTail(ref platform, state, family, packet.Object) ? 1u : 0u;
+		if (packet.MethodId == BOOPSI.OM_REMMEMBER)
+			return MuiFamilyCore.Remove(ref platform, state, family, packet.Object) ? 1u : 0u;
+		return 0;
+	}
+
 	public static uint DispatchInsert<TPlatform>(ref TPlatform platform,
 		APTR state, APTR family, APTR message)
 		where TPlatform : struct, IMuiHeadlessPlatform

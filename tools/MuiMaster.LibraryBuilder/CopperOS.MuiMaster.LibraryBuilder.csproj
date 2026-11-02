@@ -9,6 +9,7 @@
     <CopperSharp68kRoot Condition="'$(CopperSharp68kRoot)' == ''">$(MSBuildThisFileDirectory)..\..\..\CopperSharp68k</CopperSharp68kRoot>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="CopperOS.MuiMaster.LibraryBuilder.Tests" />
     <Compile Remove="tests\**\*.cs" />
     <ProjectReference Include="..\..\src\Libraries\muimaster.library\CopperOS.MuiMaster.csproj" AdditionalProperties="CopperOSUseLocalCopperSharp=true" />
     <ProjectReference Include="$(CopperSharp68kRoot)\Targets.Amiga\CopperSharp.Targets.Amiga.csproj" />

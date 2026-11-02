@@ -26,9 +26,14 @@ internal static class MuiNativeStackGate
         W(0x7000, 0x7200, 0x4eae, unchecked((ushort)ExecLvo.SetSR));
         W(0x0240, 0x2700); Branch(0x6600, "fail"); // Ordinary user/IPL0 calls only.
         W(0x206e, (ushort)ExecLayout.ExecBase.ThisTask, 0x2008); Branch(0x6700, "fail");
-        W(0x200f, 0xb0a8, (ushort)ExecLayout.Task.StackLower); Branch(0x6500, "fail");
+        W(0x200f, 0xb0a8, (ushort)ExecLayout.Task.StackLower); Branch(0x6500, "swap");
+        // Manual application stacks need not update tc_SPLower/tc_SPUpper.
+        // A large distance above the recorded lower bound proves no headroom
+        // when SP is already outside that recorded stack (MUImem does this).
+        W(0xb0a8, (ushort)ExecLayout.Task.StackUpper); Branch(0x6200, "swap");
         W(0x90a8, (ushort)ExecLayout.Task.StackLower, 0x0c80); L(RequiredHeadroom);
         Branch(0x6400, "fast");
+        labels.Add("swap", bytes.Count);
         W(0x203c); L(StackBytes); W(0x7201, 0x4eae, unchecked((ushort)ExecLvo.AllocMem));
         W(0x2f40, 12, 0x4a80); Branch(0x6700, "fail");
         W(0x2a4f, 0x2a80, 0x0680); L(StackBytes); // A5=old frame; lower/upper/new SP.

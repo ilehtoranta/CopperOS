@@ -45,8 +45,8 @@ internal enum MuiNativeHandleEventKey : int
 }
 
 // Native Application Input/NewInput drains only this application's open
-// window ports. IntuiMessages remain owned by Intuition until ReplyMsg, so the
-// complete HandleEvent call is synchronous and uses the original message.
+// window ports. Ordinary IDCMP input is copied and replied before callbacks:
+// a callback can close its window and thereby deallocate the original message.
 internal static class MuiNativeApplicationWindowEvents
 {
 	private const uint MaximumMessagesPerWindow =
@@ -231,15 +231,27 @@ internal static class MuiNativeApplicationWindowEvents
 						if (!IsStillOpen(ref memory, current, ownerRoot,
 							application, task, binding.Object,
 							sidecar.NativeWindow, userPort, signalBit)) break;
-						var intuiMessage = Exec.GetMsg(userPort);
-						if (intuiMessage.IsNull) break;
+						var receivedMessage = Exec.GetMsg(userPort);
+						if (receivedMessage.IsNull) break;
+						if (!MuiNativeIntuiMessageDeliveryCore.TryPrepare(ref platform,
+							receivedMessage, out var delivery))
+						{
+							FinishDelivery(ref platform, ref delivery);
+							continue;
+						}
+						if (delivery.Allocation.IsNotNull)
+						{
+							Exec.ReplyMsg(delivery.Original);
+							delivery.ReplyPending = 0;
+						}
+						var intuiMessage = delivery.Message;
 						var hasHandleEvent = TryPrepareHandleEvent(ref memory,
 							intuiMessage, packet, out var eventClass);
 						if (hasHandleEvent && eventClass == RefreshWindowClass)
 						{
 							if (TryDispatchApplicationCheckRefresh(ref platform,
 								application, packet)) dispatched++;
-							Exec.ReplyMsg(intuiMessage);
+							FinishDelivery(ref platform, ref delivery);
 							continue;
 						}
 						var hasSleepState =
@@ -255,7 +267,7 @@ internal static class MuiNativeApplicationWindowEvents
 									TryHandleSleepingWindowMessage(ref platform,
 										binding.Sidecar, sidecar.NativeWindow,
 										intuiMessage);
-							Exec.ReplyMsg(intuiMessage);
+							FinishDelivery(ref platform, ref delivery);
 							if (!hasSleepState || sleepDepth == 0 ||
 								!geometryRestored) break;
 							continue;
@@ -324,9 +336,7 @@ internal static class MuiNativeApplicationWindowEvents
 								RetireInputEvent(ref platform, binding.Sidecar,
 									inputEventStorage, previousInputEvent);
 						}
-						// Even an unrecognized or malformed event must be returned to
-						// Intuition after GetMsg transfers ownership to this task.
-						Exec.ReplyMsg(intuiMessage);
+						FinishDelivery(ref platform, ref delivery);
 					}
 				}
 			}
@@ -651,6 +661,14 @@ internal static class MuiNativeApplicationWindowEvents
 		}
 		signalBit = port.SignalBit;
 		return true;
+	}
+
+	private static void FinishDelivery(ref MuiNativeClassPlatform platform,
+		ref MuiNativeIntuiMessageDelivery delivery)
+	{
+		if (delivery.ReplyPending != 0 && delivery.Original.IsNotNull)
+			Exec.ReplyMsg(delivery.Original);
+		MuiNativeIntuiMessageDeliveryCore.Release(ref platform, ref delivery);
 	}
 
 	private static bool IsStillOpen(ref MuiNativeClassMemory memory,

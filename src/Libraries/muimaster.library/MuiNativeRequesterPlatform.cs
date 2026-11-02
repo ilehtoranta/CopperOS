@@ -35,6 +35,20 @@ internal static class MuiNativeRequesterRouteCore
 	}
 }
 
+internal static class MuiNativeRequesterClassServiceCore
+{
+	internal static APTR Resolve<T>(ref T memory, APTR owner)
+		where T : struct, IMuiGuestMemory
+	{
+		// Requester formatting state and class/object leases are different
+		// embedded records. Constructors and disposal require the class service.
+		return MuiNativeClassOwnerCodec.TryGetServiceAddress(ref memory, owner,
+			out var address) && MuiClassServiceStateCodec.TryRead(ref memory,
+			address, out var state) && state.Magic == MuiClassServiceLayout.Magic
+			? address : APTR.Null;
+	}
+}
+
 // Native requester calls keep MorphOS ExtEasyStruct/TagItem records in guest
 // storage for the duration of a synchronous call. MUI_RequestA uses its
 // application-backed object tree and input pump; the null-application route
@@ -63,14 +77,13 @@ internal struct MuiNativeRequesterPlatform : IMuiRequesterCapability,
 				? address : APTR.Null;
 		}
 	}
-	internal APTR ServiceState
+	internal APTR ClassServiceState
 	{
 		get
 		{
 			var memory = default(MuiNativeClassMemory);
-			return MuiNativeClassOwnerCodec.TryGetRequesterStateAddress(
-				ref memory, Classes.Context, out var address)
-				? address : APTR.Null;
+			return MuiNativeRequesterClassServiceCore.Resolve(ref memory,
+				Classes.Context);
 		}
 	}
 
@@ -114,7 +127,7 @@ internal struct MuiNativeRequesterPlatform : IMuiRequesterCapability,
 					ref platform, request, PublicObjects, OwnerRoot,
 					out var admission)) return 0;
 			return MuiNativeRequesterApplicationPresenter.Request(ref platform,
-				ServiceState, request, admission);
+				ClassServiceState, request, admission);
 		}
 		if (route != MuiNativeRequesterRoute.IntuitionSystemFallback ||
 			IntuitionBase.IsNull) return 0;
@@ -205,10 +218,10 @@ internal struct MuiNativeRequesterPlatform : IMuiRequesterCapability,
 			!MuiNativeRequesterApplicationAdmissionCore.TryValidate(ref platform,
 				request, PublicObjects, OwnerRoot, out var admission)) return 0;
 		return MuiNativeRequesterApplicationPresenter.RequestObject(ref platform,
-			ServiceState, request, admission, out consumeReference);
+			ClassServiceState, request, admission, out consumeReference);
 	}
 
 	public bool ReleaseObject(APTR obj) =>
-		MuiNativePublicObjectCore.DisposeObject(ref Classes, ServiceState,
+		MuiNativePublicObjectCore.DisposeObject(ref Classes, ClassServiceState,
 			OwnerRoot, PublicObjects, obj);
 }

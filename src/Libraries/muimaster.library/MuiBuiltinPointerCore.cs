@@ -22,6 +22,12 @@ internal static class MuiBuiltinPointerCore
             MuiHeadlessObjectCore.GetRawAttribute(ref p, state, window, MuiWindowPublicCore.RootObject, out var root);
             var target = Hit(ref p, state, APTR.FromPointer(root), x, y, 0);
             if (target.IsNull) return false;
+            if (MuiCommonControlCore.Classify(ref p, state, target) == MuiControlClass.String)
+            {
+                if (!Set(ref p, state, window, MuiWindowPublicCore.ActiveObject, target.Raw)) return false;
+                changed = target;
+                return true;
+            }
             var record = MuiHeadlessObjectCore.FindObject(ref p, state, target);
             if (!MuiHeadlessObjectCodec.TryRead(ref p, record, out var value)) return false;
             MuiHeadlessObjectCore.GetAttribute(ref p, state, target, MuiCommonControlCore.Selected, out var selected);
@@ -89,6 +95,7 @@ internal static class MuiBuiltinPointerCore
         }
         if (hit.IsNotNull) return hit;
         var cls = MuiCommonControlCore.Classify(ref p, state, obj);
+        if (cls == MuiControlClass.String) return obj;
         if (cls != MuiControlClass.Text && cls != MuiControlClass.Image) return APTR.Null;
         MuiHeadlessObjectCore.GetAttribute(ref p, state, obj, MuiCommonControlCore.InputMode, out var mode);
         return mode >= 1 && mode <= 3 ? obj : APTR.Null;

@@ -17,6 +17,9 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 	internal APTR MinMaxPass;
 	public bool TryReadMuiMinMax(APTR obj, out MuiMinMaxValues values) =>
 		MuiNativeBuiltinMinMax.TryRead(ref this, MinMaxPass, State, obj, out values);
+	public APTR BorrowMuiLayoutPolicy(APTR obj) =>
+		MuiNativeBuiltinMinMax.BorrowLayoutPolicy(ref this, MinMaxPass, State, obj);
+	public void InvalidateMuiLayoutPolicy() => MuiNativeBuiltinMinMax.Invalidate(ref this, MinMaxPass);
 	public uint CurrentTask;
 	public uint AllocationCount;
 	public uint FreeCount;

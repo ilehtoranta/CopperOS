@@ -66,6 +66,7 @@ public static class MuiLibraryPackager
         MuiNativeLibraryEntrypoints.GetRGBColorExport,
         MuiNativeClassDispatcher.ExportName,
         MuiNativeBuiltinClasses.DispatchExport,
+        MuiNativeBuiltinClasses.PopaslWorkerExport,
     });
 
 	public static IReadOnlyList<string> FunctionTableExports { get; } =

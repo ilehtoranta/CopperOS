@@ -90,6 +90,12 @@ internal static class MuiNativeDrawingCalls
 		return true;
 	}
 
+	internal static void LockLayerInfo(APTR layers, APTR info) =>
+		UnlockLayerCall(Entry(layers, LayersLvo.LockLayerInfo), layers, info);
+
+	internal static void UnlockLayerInfo(APTR layers, APTR info) =>
+		UnlockLayerCall(Entry(layers, LayersLvo.UnlockLayerInfo), layers, info);
+
 	internal static void UnlockLayer(APTR layers, APTR layer)
 	{
 		if (layers.IsNull || layer.IsNull) return;

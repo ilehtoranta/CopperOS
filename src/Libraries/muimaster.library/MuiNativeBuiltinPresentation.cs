@@ -155,7 +155,16 @@ internal static class MuiNativeBuiltinPresentation
         where T : struct, IMuiLayoutPlatform =>
         MuiListCore.RedrawRequests(ref p, state, obj) == previousRequests ||
         RedrawAfterSet(ref p, state, obj);
-    internal static void PublishInputChanges(ref MuiNativeBuiltinPlatform p, APTR obj, bool notify = true)
+    internal static void PublishStringAcknowledge(ref MuiNativeBuiltinPlatform p, APTR obj)
+    {
+        var native = p.Native;
+        if (MuiNativeClassOwnerCodec.TryGetPublicObjectStateAddress(ref p, p.Context, out var objects) &&
+            MuiHeadlessObjectCore.GetAttribute(ref p, p.Registry, obj, MuiCommonControlCore.StringAcknowledge, out var value))
+            MuiNativePublicObjectCore.SetAttribute(ref native, objects, native.OwnerRoot,
+                obj, MuiCommonControlCore.StringAcknowledge, value, true);
+    }
+    internal static void PublishInputChanges(ref MuiNativeBuiltinPlatform p, APTR obj,
+        bool notify = true, bool stringContentsChanged = false)
     {
         var native = p.Native;
         if (!MuiNativeClassOwnerCodec.TryGetPublicObjectStateAddress(ref p, p.Context, out var objects)) return;
@@ -171,7 +180,8 @@ internal static class MuiNativeBuiltinPresentation
                 i == 4 ? MuiCommonControlCore.NumericValue : MuiCommonControlCore.ImageState;
             if (!MuiHeadlessObjectCore.GetAttribute(ref p, p.Registry, obj, attribute, out var value)) continue;
             var hadPrevious = MuiNativePublicObjectCore.GetAttribute(ref native, objects, native.OwnerRoot, obj, attribute, out var previous);
-            if ((!hadPrevious && value == 0) || (hadPrevious && previous == value)) continue;
+            if (!(attribute == MuiCommonControlCore.StringContents && stringContentsChanged) &&
+                ((!hadPrevious && value == 0) || (hadPrevious && previous == value))) continue;
             if (!MuiNativePublicObjectCore.SetAttribute(ref native, objects, native.OwnerRoot, obj, attribute, value, notify)) return;
         }
     }

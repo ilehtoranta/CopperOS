@@ -35,6 +35,9 @@ internal partial struct MuiNativeBuiltinPlatform : IMuiLayoutPlatform, IMuiClass
         APTR.FromPointer((_context.Raw & ~1u) + 4);
     public bool TryReadMuiMinMax(APTR obj, out MuiMinMaxValues values) =>
         MuiNativeBuiltinMinMax.TryRead(ref this, MinMaxPass, Registry, obj, out values);
+    public APTR BorrowMuiLayoutPolicy(APTR obj) =>
+        MuiNativeBuiltinMinMax.BorrowLayoutPolicy(ref this, MinMaxPass, Registry, obj);
+    public void InvalidateMuiLayoutPolicy() => MuiNativeBuiltinMinMax.Invalidate(ref this, MinMaxPass);
     internal bool BeginMinMax(APTR root)
     {
         var context = Context;

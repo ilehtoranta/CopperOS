@@ -799,6 +799,11 @@ public interface IMuiHeadlessPlatform : IMuiClassRegistryPlatform, IMuiExecCapab
 		values = default;
 		return false;
 	}
+	// Read-only named Area policy for the current native layout transaction.
+	// A null result requests the ordinary live projection. Never retain this
+	// address across a callback or beyond the layout operation.
+	APTR BorrowMuiLayoutPolicy(APTR obj) => APTR.Null;
+	void InvalidateMuiLayoutPolicy() { }
 	// Resolve one item from the object's local MUI configuration.  MorphOS
 	// currently publishes only MUICFG_PublicScreen (0x24) through
 	// MUIM_GetConfigItem; the capability returns the native opaque value and

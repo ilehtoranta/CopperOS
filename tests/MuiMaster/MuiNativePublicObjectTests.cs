@@ -9,6 +9,48 @@ namespace CopperOS.MuiMaster.Tests;
 
 public sealed class MuiNativePublicObjectTests
 {
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public void FinalDisposalUnlinkUsesCurrentPredecessorAfterNativeChildMutation(bool predecessorSurvives)
+	{
+		var memory = CreateReleaseTree(1, 1, out var registry, out var ownerRoot,
+			out _, out _, out _);
+		var address = APTR.FromPointer(0x1100);
+		var childAddress = APTR.FromPointer(0x1140);
+		Assert.True(MuiNativePublicObjectBindingCodec.TryRead(ref memory, address, out var root));
+		root.ActiveCalls = 1;
+		root.DisposeState = MuiNativePublicObjectBinding.StateLeaseReleased;
+		root.Next = APTR.Null;
+		Assert.True(MuiNativePublicObjectBindingCodec.Write(ref memory, address, root));
+		Assert.True(MuiNativePublicObjectRegistryCodec.TryRead(ref memory, registry, out var state));
+		if (predecessorSurvives)
+		{
+			Assert.True(MuiNativePublicObjectBindingCodec.TryRead(ref memory, childAddress, out var predecessor));
+			predecessor.Next = address;
+			Assert.True(MuiNativePublicObjectBindingCodec.Write(ref memory, childAddress, predecessor));
+			state.Head = childAddress;
+		}
+		else
+		{
+			// The child's old predecessor allocation has already been retired.
+			memory.Clear(childAddress, MuiNativePublicObjectBinding.Size);
+			state.Head = address;
+		}
+		Assert.True(MuiNativePublicObjectRegistryCodec.Write(ref memory, registry, state));
+		Assert.True(MuiNativePublicObjectCore.RemoveDisposedBinding(ref memory,
+			registry, ownerRoot, address, root));
+		Assert.False(MuiNativePublicObjectCore.TryFindBinding(ref memory,
+			registry, ownerRoot, root.Object, out _));
+		Assert.True(MuiNativePublicObjectRegistryCodec.TryRead(ref memory, registry, out state));
+		Assert.Equal(predecessorSurvives ? childAddress : APTR.Null, state.Head);
+		if (predecessorSurvives)
+		{
+			Assert.True(MuiNativePublicObjectBindingCodec.TryRead(ref memory, childAddress, out var predecessor));
+			Assert.True(predecessor.Next.IsNull);
+		}
+	}
+
 	[Fact]
 	public void NativeDisposalRefreshPreservesChildRemovalInsteadOfResurrectingItsBinding()
 	{

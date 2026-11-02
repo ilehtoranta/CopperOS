@@ -14,6 +14,35 @@ namespace CopperOS.MuiMaster.Tests;
 // lifecycle coverage lives in the independent native Exec fixture.
 public sealed class MuiNativeClassOwnerTests
 {
+	[Fact]
+	public void RequesterConstructorsResolveClassLeasesRatherThanFormattingState()
+	{
+		var platform = NewPlatform();
+		Assert.True(MuiNativeClassOwnerCore.TryAttach(ref platform, Library, Root, out var owner));
+		Assert.True(MuiNativeClassOwnerCodec.TryGetServiceAddress(ref platform, owner, out var classes));
+		Assert.True(MuiNativeClassOwnerCodec.TryGetRequesterStateAddress(ref platform, owner, out var requester));
+		Assert.NotEqual(classes, requester);
+		Assert.True(MuiRequesterServiceStateStructCodec.TryRead(ref platform, requester, out var formatting));
+		Assert.Equal(MuiRequesterServiceLayout.Magic, formatting.Magic);
+		Assert.Equal(classes, MuiNativeRequesterClassServiceCore.Resolve(ref platform, owner));
+		Assert.True(MuiClassServiceStateCodec.TryRead(ref platform, classes, out var leases));
+		Assert.Equal(MuiClassServiceLayout.Magic, leases.Magic);
+		Assert.NotEqual(formatting.Magic, leases.Magic);
+	}
+
+	[Fact]
+	public void RequesterClassServiceRejectsWrongRecordMagicAndMissingOwner()
+	{
+		var platform = NewPlatform();
+		Assert.Equal(APTR.Null, MuiNativeRequesterClassServiceCore.Resolve(ref platform, APTR.Null));
+		Assert.True(MuiNativeClassOwnerCore.TryAttach(ref platform, Library, Root, out var owner));
+		Assert.True(MuiNativeClassOwnerCodec.TryGetServiceAddress(ref platform, owner, out var classes));
+		Assert.True(MuiClassServiceStateCodec.TryRead(ref platform, classes, out var leases));
+		leases.Magic = MuiRequesterServiceLayout.Magic;
+		Assert.True(MuiClassServiceStateCodec.Write(ref platform, classes, leases));
+		Assert.Equal(APTR.Null, MuiNativeRequesterClassServiceCore.Resolve(ref platform, owner));
+	}
+
 	[Theory]
 	[InlineData(-1, true)]
 	[InlineData(0, false)]

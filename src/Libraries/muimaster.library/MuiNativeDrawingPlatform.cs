@@ -20,6 +20,37 @@ internal static class MuiNativeDrawingPlatformCore
 	private const uint LayersFlags = (uint)(Exec.MemoryFlags.Public |
 		Exec.MemoryFlags.Clear);
 
+	// Per-object painting installs/restores clipping while the layer is locked.
+	// Hold LayerInfo first, matching Intuition refresh and topology operations;
+	// taking it inside PopClip after LockLayer can deadlock against refresh.
+	internal static bool LockPaintLayer(ref MuiNativeClassPlatform platform,
+		APTR layer)
+	{
+		if (layer.IsNull || !platform.IsMapped(layer, Layer.Size)) return false;
+		var info = LayersLayerCodec.ReadLayerInfo(ref platform, layer);
+		if (info.IsNull || !platform.IsMapped(info, LayerInfo.Size)) return false;
+		var layers = OpenLayers();
+		if (layers.IsNull) return false;
+		MuiNativeDrawingCalls.LockLayerInfo(layers, info);
+		var locked = MuiNativeDrawingCalls.LockLayer(layers, layer);
+		if (!locked) MuiNativeDrawingCalls.UnlockLayerInfo(layers, info);
+		CloseLayers(layers);
+		return locked;
+	}
+
+	internal static void UnlockPaintLayer(ref MuiNativeClassPlatform platform,
+		APTR layer)
+	{
+		if (layer.IsNull || !platform.IsMapped(layer, Layer.Size)) return;
+		var info = LayersLayerCodec.ReadLayerInfo(ref platform, layer);
+		if (info.IsNull || !platform.IsMapped(info, LayerInfo.Size)) return;
+		var layers = OpenLayers();
+		if (layers.IsNull) return;
+		MuiNativeDrawingCalls.UnlockLayer(layers, layer);
+		MuiNativeDrawingCalls.UnlockLayerInfo(layers, info);
+		CloseLayers(layers);
+	}
+
 	internal static bool LockLayer(ref MuiNativeClassPlatform platform,
 		APTR layer)
 	{

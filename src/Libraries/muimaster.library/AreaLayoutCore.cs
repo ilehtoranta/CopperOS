@@ -972,6 +972,11 @@ public static class MuiAreaLayoutCore
 		out MuiAreaLayoutPolicyStateRecord value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		var cached = platform.BorrowMuiLayoutPolicy(obj);
+		if (cached.IsNotNull)
+			return MuiAreaLayoutPolicyStateRecordCodec.TryReadStructural(ref platform,
+				cached, out value) && MuiAreaLayoutPolicyStateAdmission.ValidateLive(
+				ref platform, state, obj, value);
 		value = default;
 		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
 			obj).IsNull) return false;
@@ -1024,6 +1029,10 @@ public static class MuiAreaLayoutCore
 		platform.Free(scratch, MuiAreaLayoutPolicyStateRecord.Size);
 		return added;
 	}
+
+	internal static bool IsLayoutPolicyAttribute(uint attribute) => attribute is
+		ShowMe or FixWidth or FixHeight or MaxWidth or MaxHeight or InnerLeft or
+		InnerRight or InnerTop or InnerBottom or HorizWeight or VertWeight or Weight;
 
 	private static void FillLayoutPolicy<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, ref MuiAreaLayoutPolicyStateRecord value)
@@ -1721,6 +1730,9 @@ public static class MuiGroupLayoutCore
 	internal static MuiMinMaxValues ComputeMinMax<TPlatform>(ref TPlatform platform,
 		APTR state, APTR group) where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		// Composite callers enter here directly, not through Area.ComputeMinMax.
+		// Reuse the same call-local measurement and callback invalidation contract.
+		if (platform.TryReadMuiMinMax(group, out var measured)) return measured;
 		if (!TryReadLayoutPolicyState(ref platform, state, group,
 			out var policy)) return default;
 		if (!MuiGroupLayoutHookCore.TryReadEffectiveState(ref platform, state,

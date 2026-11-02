@@ -168,6 +168,37 @@ public sealed class MuiGroupLayoutPolicyTests
 		Assert.Equal(10, selection.DefaultExtent);
 	}
 
+	[Theory]
+	[InlineData(true)]
+	[InlineData(false)]
+	public void SameSizeDoesNotCollapseDifferentFixedChildExtents(bool horizontal)
+	{
+		var platform = CreatePlatform(out var cl);
+		var group = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var first = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		var second = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl, APTR.Null);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, group, first));
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, group, second));
+		Set(ref platform, group, Horizontal, horizontal ? 1u : 0u);
+		Set(ref platform, group, SameSize, 1);
+		Set(ref platform, group, Spacing, 0);
+		Set(ref platform, group, VerticalSpacing, 0);
+		Set(ref platform, first, FixWidth, 8);
+		Set(ref platform, second, FixWidth, 56);
+		Set(ref platform, first, FixHeight, 10);
+		Set(ref platform, second, FixHeight, 10);
+		var storage = APTR.FromPointer(0x1800);
+		Assert.True(MuiGroupLayoutCore.AskMinMax(ref platform, State, group, storage));
+		var width = horizontal ? 112 : 56;
+		Assert.Equal((ushort)width, platform.ReadUInt16(storage, 0));
+		Assert.Equal((ushort)width, platform.ReadUInt16(storage, 4));
+		Assert.True(MuiGroupLayoutCore.Layout(ref platform, State, group, 0, 0, width, 20));
+		Assert.Equal(56u, Get(ref platform, second, 0x8042B59C));
+		if (horizontal)
+			Assert.True(Get(ref platform, second, LeftEdge) >=
+				Get(ref platform, first, LeftEdge) + Get(ref platform, first, 0x8042B59C));
+	}
+
 	[Fact]
 	public void GroupLayoutPublishesEffectivePolicyRecord()
 	{

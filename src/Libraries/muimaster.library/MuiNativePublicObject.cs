@@ -750,7 +750,7 @@ internal static class MuiNativePublicObjectCore
 			return false;
 		}
 
-		if (!Remove(ref memory, publicObjects, ownerRoot, previous, bindingAddress, binding))
+		if (!RemoveDisposedBinding(ref memory, publicObjects, ownerRoot, bindingAddress, binding))
 		{
 			binding.ActiveCalls = 0;
 			MuiNativePublicObjectBindingCodec.Write(ref memory, bindingAddress, binding);
@@ -760,6 +760,22 @@ internal static class MuiNativePublicObjectCore
 			platform.Free(binding.Sidecar, MuiNativeMuiObjectRecord.Size);
 		platform.Free(bindingAddress, MuiNativePublicObjectBinding.Size);
 		return true;
+	}
+
+	// Native Family disposal can remove a dynamically added child which was
+	// this object's list predecessor at admission. Re-find both links after all
+	// child callbacks; neither the old predecessor nor its allocation is ours now.
+	internal static bool RemoveDisposedBinding<T>(ref T memory, APTR publicObjects,
+		APTR ownerRoot, APTR address, MuiNativePublicObjectBinding expected)
+		where T : struct, IMuiGuestMemory
+	{
+		if (!Find(ref memory, publicObjects, ownerRoot, expected.Object,
+			out var previous, out var found, out var current) || found != address ||
+			current.Class != expected.Class || current.Lease != expected.Lease ||
+			current.CustomClass != expected.CustomClass || current.Sidecar != expected.Sidecar ||
+			current.ActiveCalls != 1 || current.DisposeState != MuiNativePublicObjectBinding.StateLeaseReleased)
+			return false;
+		return Remove(ref memory, publicObjects, ownerRoot, previous, address, current);
 	}
 
 	internal static bool RefreshAfterNativeDisposal<TMemory>(ref TMemory memory,

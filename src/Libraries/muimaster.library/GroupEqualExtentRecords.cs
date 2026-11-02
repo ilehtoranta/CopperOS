@@ -29,11 +29,15 @@ internal static class MuiGroupEqualExtentCore
 {
 	// Keep the preferred equal extent inside the same valid finite bounds as
 	// the minimum and maximum.  MorphOS dimensions normally satisfy Min <= Max;
-	// if malformed child data reverses that relationship, preserve the minimum
-	// rather than manufacturing a second contradictory bound.
+	// Equal sizing can combine individually valid children whose fixed extents
+	// differ (for example an empty table heading and a longer row label). The
+	// largest minimum must win over the smallest maximum of that intersection.
 	internal static void NormalizeDefault(
 		ref MuiGroupEqualExtentSelection selection)
 	{
+		if (selection.HasFiniteMaximum != 0 &&
+			selection.MaximumExtent < selection.MinimumExtent)
+			selection.MaximumExtent = selection.MinimumExtent;
 		if (selection.HasFiniteMaximum != 0 &&
 			selection.MaximumExtent >= selection.MinimumExtent &&
 			selection.DefaultExtent > selection.MaximumExtent)

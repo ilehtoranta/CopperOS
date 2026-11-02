@@ -16,6 +16,18 @@ internal interface IMuiBuiltinWindowCapability
 internal static class MuiNativeBuiltinWindow
 {
     internal const uint NativeWindow = 0x7FFE0011;
+    internal static bool ValidateConstructorRoot<T>(ref T p, APTR state, APTR obj)
+        where T : struct, IMuiHeadlessPlatform
+    {
+        if (!MuiApplicationMessageCore.IsWindowObject(ref p, state, obj)) return true;
+        // Window.mui requires a root at creation; accepting a failed nested
+        // Group would leave the original client holding disposed child objects.
+        // https://github.com/amiga-mui/muidev/wiki/MUI_Window#muia_window_rootobject
+        return MuiHeadlessObjectCore.GetRawAttribute(ref p, state, obj,
+            MuiWindowPublicCore.RootObject, out var root) && root != 0 &&
+            MuiHeadlessObjectCore.ParentObject(ref p, state, APTR.FromPointer(root)) == obj;
+    }
+
     internal static bool Synchronize<T, TNative>(ref T p, ref TNative native,
         APTR state, APTR obj) where T : struct, IMuiHeadlessPlatform
         where TNative : struct, IMuiBuiltinWindowCapability

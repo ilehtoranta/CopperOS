@@ -216,7 +216,7 @@ public sealed class MuiFoundationTests
 	public void ResidentIdentityDescribesSelectedDevelopmentProfile()
 	{
 #if COPPEROS_MUI_CLASSIC_COMPATIBILITY
-		Assert.Equal((ushort)4, MuiResidentMetadata.DevelopmentVersion);
+		Assert.Equal((ushort)12, MuiResidentMetadata.DevelopmentVersion);
 		Assert.Equal("muimaster.library", MuiResidentMetadata.DevelopmentNameText);
 		Assert.Contains("experimental", MuiResidentMetadata.DevelopmentIdString);
 #else

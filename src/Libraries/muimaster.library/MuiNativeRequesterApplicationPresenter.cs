@@ -125,6 +125,40 @@ internal static class MuiNativeRequesterSignalPolicyCore
 		(receivedSignals & MuiNativeApplicationLoopCore.SignalBreakCtrlC) != 0;
 }
 
+internal static class MuiRequesterApplicationWindowTagCore
+{
+	internal static bool TryCreate<T>(ref T platform,
+		MuiNativeRequesterApplicationAdmissionRecord admission, APTR root,
+		APTR title, APTR activeButton,
+		out MuiRequesterApplicationTagPlanRecord tags)
+		where T : struct, IMuiAllocationPlatform
+	{
+		tags = default;
+		if (root.IsNull) return false;
+		var count = 4u; // RootObject, Open, Title and TAG_DONE.
+		if (admission.HasReferenceWindow != 0) count++;
+		if (activeButton.IsNotNull) count++;
+		if (!MuiRequesterApplicationTagPlanCore.TryCreate(ref platform, count,
+			out tags)) return false;
+		var complete = MuiRequesterApplicationTagPlanCore.TryAdd(ref platform,
+			ref tags, MuiWindowPublicCore.RootObject, root.Raw) &&
+			MuiRequesterApplicationTagPlanCore.TryAdd(ref platform, ref tags,
+				MuiWindowPublicCore.Open, 0) &&
+			MuiRequesterApplicationTagPlanCore.TryAdd(ref platform, ref tags,
+				MuiWindowPublicCore.Title, title.Raw);
+		if (complete && admission.HasReferenceWindow != 0)
+			complete = MuiRequesterApplicationTagPlanCore.TryAdd(ref platform,
+				ref tags, MuiWindowPublicCore.RefWindow, admission.Window.Raw);
+		if (complete && activeButton.IsNotNull)
+			complete = MuiRequesterApplicationTagPlanCore.TryAdd(ref platform,
+				ref tags, MuiWindowPublicCore.DefaultObject, activeButton.Raw);
+		if (complete && MuiRequesterApplicationTagPlanCore.TryFinish(ref platform,
+			ref tags)) return true;
+		MuiRequesterApplicationTagPlanCore.Release(ref platform, ref tags);
+		return false;
+	}
+}
+
 // Synchronous MUI_RequestA and MUI_RequestObjectA presenter. Its transient
 // window is linked to the application's private native event graph, not to
 // the public initializer-only MUIA_Application_Window relation. Input is
@@ -365,39 +399,23 @@ internal static class MuiNativeRequesterApplicationPresenter
 		MuiNativeRequesterApplicationAdmissionRecord admission,
 		ref MuiNativeRequesterApplicationPresenterRecord state)
 	{
-		var count = 3u; // Open, Title and TAG_DONE.
-		if (admission.HasReferenceWindow != 0) count++;
-		if (state.ActiveButton.IsNotNull) count++;
 		var tags = default(MuiRequesterApplicationTagPlanRecord);
-		if (!MuiRequesterApplicationTagPlanCore.TryCreate(ref platform, count,
+		if (!MuiRequesterApplicationWindowTagCore.TryCreate(ref platform,
+			admission, state.RootGroup, state.TitleCopy, state.ActiveButton,
 			out tags)) return false;
-		var complete = MuiRequesterApplicationTagPlanCore.TryAdd(ref platform,
-			ref tags, MuiWindowPublicCore.Open, ClosedRequester) &&
-			MuiRequesterApplicationTagPlanCore.TryAdd(ref platform, ref tags,
-				MuiWindowPublicCore.Title, state.TitleCopy.Raw);
-		if (complete && admission.HasReferenceWindow != 0)
-			complete = MuiRequesterApplicationTagPlanCore.TryAdd(ref platform,
-				ref tags, MuiWindowPublicCore.RefWindow, admission.Window.Raw);
-		if (complete && state.ActiveButton.IsNotNull)
-			complete = MuiRequesterApplicationTagPlanCore.TryAdd(ref platform,
-				ref tags, MuiWindowPublicCore.DefaultObject,
-				state.ActiveButton.Raw);
-		complete = complete && MuiRequesterApplicationTagPlanCore.TryFinish(
-			ref platform, ref tags);
-		if (complete)
-			state.Window = NewObject(ref platform, serviceState,
-				APTR.FromPointer(CString.ToUInt32(
-					CString.FromLiteral("Window.mui"))), tags.Items);
+		state.Window = NewObject(ref platform, serviceState,
+			APTR.FromPointer(CString.ToUInt32(
+				CString.FromLiteral("Window.mui"))), tags.Items);
 		MuiRequesterApplicationTagPlanCore.Release(ref platform, ref tags);
-		return complete && state.Window.IsNotNull;
+		return state.Window.IsNotNull;
 	}
 
 	private static bool AttachRootObject(ref MuiNativeRequesterPlatform platform,
 		APTR window, APTR root)
 	{
-		if (!TrySetObjectAttribute(ref platform, window,
-			MuiWindowPublicCore.RootObject, root.Raw) ||
-			!MuiNativePublicObjectCore.GetAttribute(ref platform.Classes,
+		// RootObject is supplied to OM_NEW. Confirm and publish its native
+		// ownership relation; do not try to replace an initializer-only root.
+		if (!MuiNativePublicObjectCore.GetAttribute(ref platform.Classes,
 				platform.PublicObjects, platform.OwnerRoot, window,
 				MuiWindowPublicCore.RootObject, out var observedRoot) ||
 			observedRoot != root.Raw) return false;

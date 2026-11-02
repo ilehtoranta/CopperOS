@@ -77,8 +77,8 @@ internal partial struct MuiNativeBuiltinPlatform
     }
     public bool ScheduleRedraw(APTR obj, uint flags) => MuiNativeBuiltinPresentation.DrawObject(ref this, obj, flags);
     private APTR RasterLayer(APTR rp) => rp.IsNull ? APTR.Null : LayersRastPortCodec.ReadLayer(ref this, rp);
-    public bool LockLayer(APTR rp) => Native.LockLayer(RasterLayer(rp));
-    public void UnlockLayer(APTR rp) => Native.UnlockLayer(RasterLayer(rp));
+    public bool LockLayer(APTR rp) => Native.LockPaintLayer(RasterLayer(rp));
+    public void UnlockLayer(APTR rp) => Native.UnlockPaintLayer(RasterLayer(rp));
     // These per-object paint scopes must retain the visible ClipRects. A
     // Layers BeginUpdate/EndUpdate pair would restrict each object to damage
     // and let the first Group clear damage needed by its later children.
@@ -108,7 +108,17 @@ internal partial struct MuiNativeBuiltinPlatform
     public bool ApplyMuiTextMethod(ref MuiTextMethodRenderRequest request) => false;
     public bool ApplyMuiTextDimensions(ref MuiTextDimensionRequest request) => false;
     public bool ReadMuiKeyadjustTextInput(ref MuiKeyadjustTextInputSample input) => false;
-    public int TranslateTextInput(APTR message) => -1;
+    public int TranslateTextInput(APTR message)
+    {
+        if (!MuiNativeApplicationWindowEvents.TryTranslateInputEvent(ref this, message, out var input)) return -1;
+        var storage = Allocate(MuiWindowInputEventRecord.Size, MuiHeadlessLayout.AllocationFlags);
+        if (storage.IsNull) return -1;
+        var native = Native;
+        var translated = MuiWindowInputEventCodec.WriteRecord(ref this, storage, input) &&
+            native.TryMapRawKey(storage, out var character) ? (int)character : -1;
+        Free(storage, MuiWindowInputEventRecord.Size);
+        return translated;
+    }
     public bool DisplayMuiBeep(ref MuiStringEditBeepRequest request) => false;
     public bool ReuseMuiInput(ref MuiStringEditReuseRequest request) => false;
     public uint ReadTicks()

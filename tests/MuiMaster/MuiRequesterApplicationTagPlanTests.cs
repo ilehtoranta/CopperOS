@@ -13,6 +13,35 @@ public sealed class MuiRequesterApplicationTagPlanTests
 	private static readonly APTR State = APTR.FromPointer(0x1000);
 
 	[Fact]
+	public void RequesterTagsSatisfyNativeWindowConstructorAndTransferRootOwnership()
+	{
+		var p = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x5000, State);
+		Assert.True(MuiHeadlessObjectCore.Initialize(ref p, State));
+		p.WriteCString(APTR.FromPointer(0x1100), "Group.mui");
+		p.WriteCString(APTR.FromPointer(0x1140), "Window.mui");
+		p.WriteCString(APTR.FromPointer(0x1180), "Result");
+		var groupClass = MuiHeadlessObjectCore.RegisterBuiltinClass(ref p, State,
+			APTR.FromPointer(0x1100), APTR.Null, 0, APTR.FromPointer(42));
+		var windowClass = MuiHeadlessObjectCore.RegisterBuiltinClass(ref p, State,
+			APTR.FromPointer(0x1140), APTR.Null, 0, APTR.FromPointer(43));
+		var missing = MuiHeadlessObjectCore.CreateObjectA(ref p, State,
+			windowClass, APTR.Null);
+		Assert.False(MuiNativeBuiltinWindow.ValidateConstructorRoot(ref p, State, missing));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref p, State, missing));
+		var root = MuiHeadlessObjectCore.CreateObjectA(ref p, State, groupClass, APTR.Null);
+		Assert.True(MuiRequesterApplicationWindowTagCore.TryCreate(ref p,
+			default, root, APTR.FromPointer(0x1180), APTR.Null, out var tags));
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref p, State,
+			windowClass, tags.Items);
+		MuiRequesterApplicationTagPlanCore.Release(ref p, ref tags);
+		Assert.NotEqual(APTR.Null, window);
+		Assert.True(MuiNativeBuiltinWindow.ValidateConstructorRoot(ref p, State, window));
+		Assert.Equal(window, MuiHeadlessObjectCore.ParentObject(ref p, State, root));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref p, State, window));
+		Assert.Equal(APTR.Null, MuiHeadlessObjectCore.FindObject(ref p, State, root));
+	}
+
+	[Fact]
 	public void TypedTagPlanWritesNamedItemsAndOneTerminator()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,

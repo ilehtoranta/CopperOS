@@ -72,6 +72,11 @@ public static class MuiHeadlessDispatcher
 		if (!MuiHeadlessMessageCodec.TryReadMethodId(ref platform, message,
 			out var methodHeader)) return 0;
 		var method = methodHeader.MethodId;
+		// Classic Group clients use BOOPSI's {MethodID,Object} membership
+		// messages. Preserve the same ownership/topology as MUI Family methods.
+		if (method == BOOPSI.OM_ADDMEMBER || method == BOOPSI.OM_REMMEMBER)
+			return MuiFamilyMutationCore.DispatchClassic(ref platform, state, obj, message);
+
 		if (!MuiStorePolicyCore.IsMethodClassCompatible(ref platform, state, obj,
 			MuiStorePolicyCore.ClassifyMethod(method))) return 0;
 		var policy = IsDatamapMethod(method) ? MuiStorePolicyKind.Datamap :

@@ -7,10 +7,12 @@ namespace CopperOS.MuiMaster;
 // must remain a four-byte carrier; this state is never embedded in that value.
 internal static class MuiNativeBuiltinMinMax
 {
-    internal const uint PassSize = 20;
+    internal const uint PassSize = 28;
     private const int Head = 0, Current = 4, Active = 8, Reliable = 12, Depth = 16;
+    private const int PolicyHead = 20, ReadingPolicy = 24;
     private const uint NodeSize = 24;
     private const int Next = 0, Object = 4, Generation = 8, Bounds = 12;
+    private const uint PolicyNodeSize = 12 + MuiAreaLayoutPolicyStateRecord.Size;
 
     internal static bool Begin<T>(ref T p, APTR pass, APTR state, APTR root)
         where T : struct, IMuiLayoutPlatform
@@ -33,12 +35,51 @@ internal static class MuiNativeBuiltinMinMax
     {
         if (pass.IsNull || !p.IsMapped(pass, PassSize)) return;
         var node = APTR.FromPointer(p.ReadUInt32(pass, Head));
+        var policy = APTR.FromPointer(p.ReadUInt32(pass, PolicyHead));
         p.Clear(pass, PassSize);
         for (uint count = 0; node.IsNotNull && count < MuiHeadlessLayout.MaximumTraversal; count++)
         {
             var next = APTR.FromPointer(p.ReadUInt32(node, Next));
             p.Free(node, NodeSize); node = next;
         }
+        for (uint count = 0; policy.IsNotNull && count < MuiHeadlessLayout.MaximumTraversal; count++)
+        {
+            var next = APTR.FromPointer(p.ReadUInt32(policy, Next));
+            p.Free(policy, PolicyNodeSize); policy = next;
+        }
+    }
+
+    internal static APTR BorrowLayoutPolicy<T>(ref T p, APTR pass, APTR state, APTR obj)
+        where T : struct, IMuiHeadlessPlatform
+    {
+        if (pass.IsNull || obj.IsNull || !p.IsMapped(pass, PassSize) ||
+            p.ReadUInt32(pass, Active) == 0 || p.ReadUInt32(pass, Reliable) == 0 ||
+            p.ReadUInt32(pass, ReadingPolicy) != 0) return APTR.Null;
+        var record = MuiHeadlessObjectCore.FindObject(ref p, state, obj);
+        if (record.IsNull || !MuiHeadlessObjectCodec.TryRead(ref p, record, out var live)) return APTR.Null;
+        var node = APTR.FromPointer(p.ReadUInt32(pass, PolicyHead));
+        for (uint count = 0; node.IsNotNull && count < MuiHeadlessLayout.MaximumTraversal; count++)
+        {
+            if (p.ReadUInt32(node, Object) == obj.Raw)
+                return p.ReadUInt32(node, Generation) == live.Generation ?
+                    APTR.FromPointer(node.Raw + Bounds) : APTR.Null;
+            node = APTR.FromPointer(p.ReadUInt32(node, Next));
+        }
+        // Re-enter the normal projection exactly once. Its raw attribute reads
+        // cannot use this cache until the complete named record is published.
+        p.WriteUInt32(pass, ReadingPolicy, obj.Raw);
+        var success = MuiAreaLayoutCore.TryReadLayoutPolicyState(ref p, state, obj, out var policy);
+        p.WriteUInt32(pass, ReadingPolicy, 0);
+        if (!success || p.ReadUInt32(pass, Reliable) == 0) return APTR.Null;
+        node = p.Allocate(PolicyNodeSize, MuiHeadlessLayout.AllocationFlags);
+        if (node.IsNull) return APTR.Null; // Allocation pressure retains the live path.
+        var storage = APTR.FromPointer(node.Raw + Bounds);
+        if (!MuiAreaLayoutPolicyStateRecordCodec.Write(ref p, storage, policy))
+        { p.Free(node, PolicyNodeSize); return APTR.Null; }
+        p.WriteUInt32(node, Next, p.ReadUInt32(pass, PolicyHead));
+        p.WriteUInt32(node, Object, obj.Raw); p.WriteUInt32(node, Generation, live.Generation);
+        p.WriteUInt32(pass, PolicyHead, node.Raw);
+        return storage;
     }
 
     internal static bool TryRead<T>(ref T p, APTR pass, APTR state, APTR obj,

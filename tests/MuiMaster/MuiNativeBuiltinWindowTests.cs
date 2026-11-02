@@ -21,8 +21,10 @@ public sealed class MuiNativeBuiltinWindowTests
     {
         Assert.Equal(4, System.Runtime.InteropServices.Marshal.SizeOf<MuiNativeBuiltinPlatform>());
     }
-    [Fact]
-    public void MeasurementCallbackInvalidatesParentBoundsAndPassStorageIsReleased()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MeasurementCallbackInvalidatesParentBoundsAndPassStorageIsReleased(bool groupEntry)
     {
         var p = Platform(out var state, out _);
         var groupName = APTR.FromPointer(0x1200); p.WriteCString(groupName, "Group.mui");
@@ -37,16 +39,48 @@ public sealed class MuiNativeBuiltinWindowTests
         Assert.True(MuiFamilyCore.AddTail(ref p, state, root, text));
         p.MinMaxPass = p.Allocate(MuiNativeBuiltinMinMax.PassSize, 0x10001);
         Assert.True(MuiNativeBuiltinMinMax.Begin(ref p, p.MinMaxPass, state, root));
-        Assert.True(MuiAreaLayoutCore.ComputeMinMax(ref p, state, root).DefWidth > 0);
+        var beforeBounds = groupEntry ? MuiGroupLayoutCore.ComputeMinMax(ref p, state, root) :
+            MuiAreaLayoutCore.ComputeMinMax(ref p, state, root);
+        Assert.True(beforeBounds.DefWidth > 0);
+        var cachedPolicy = p.BorrowMuiLayoutPolicy(text);
+        Assert.True(cachedPolicy.IsNotNull);
+        var allocations = p.AllocationCount;
+        Assert.Equal(cachedPolicy, p.BorrowMuiLayoutPolicy(text));
+        Assert.Equal(allocations, p.AllocationCount);
         var message = APTR.FromPointer(0x1600); p.WriteUInt32(message, 0, 0);
         p.InvokeHook(APTR.FromPointer(0x1500), root, message);
+        Assert.True(p.BorrowMuiLayoutPolicy(text).IsNull);
+        Assert.True(MuiHeadlessObjectCore.SetAttribute(ref p, state, text,
+            0x80426DB9, 700, false));
+        Assert.True(MuiAreaLayoutCore.TryReadLayoutPolicyState(ref p, state, text, out var livePolicy));
+        Assert.Equal(700u, livePolicy.HorizontalWeight);
         Assert.True(MuiHeadlessObjectCore.DisposeObject(ref p, state, text));
-        Assert.Equal(0, MuiAreaLayoutCore.ComputeMinMax(ref p, state, root).DefWidth);
+        var afterBounds = groupEntry ? MuiGroupLayoutCore.ComputeMinMax(ref p, state, root) :
+            MuiAreaLayoutCore.ComputeMinMax(ref p, state, root);
+        Assert.Equal(0, afterBounds.DefWidth);
         var before = p.FreeCount;
         MuiNativeBuiltinMinMax.End(ref p, p.MinMaxPass);
-        Assert.Equal(before + 2, p.FreeCount);
+        Assert.Equal(before + 3, p.FreeCount); // Two measured objects and one Area policy.
         Assert.Equal(0u, p.ReadUInt32(p.MinMaxPass, 0));
         p.Free(p.MinMaxPass, MuiNativeBuiltinMinMax.PassSize); p.MinMaxPass = APTR.Null;
+    }
+    [Fact]
+    public void DirectLayoutPolicyMutationInvalidatesThePassBeforeTheNextRead()
+    {
+        var p = Platform(out var state, out _);
+        var name = APTR.FromPointer(0x1200); p.WriteCString(name, "Group.mui");
+        var cls = MuiHeadlessObjectCore.RegisterBuiltinClass(ref p, state, name, APTR.Null, 0, APTR.FromPointer(42));
+        var group = MuiHeadlessObjectCore.CreateObjectA(ref p, state, cls, APTR.Null);
+        p.MinMaxPass = p.Allocate(MuiNativeBuiltinMinMax.PassSize, 0x10001);
+        Assert.True(MuiNativeBuiltinMinMax.Begin(ref p, p.MinMaxPass, state, group));
+        Assert.True(p.BorrowMuiLayoutPolicy(group).IsNotNull);
+        Assert.True(MuiHeadlessObjectCore.SetAttribute(ref p, state, group,
+            MuiCommonControlCore.ShowMe, 0, false));
+        Assert.True(p.BorrowMuiLayoutPolicy(group).IsNull);
+        Assert.True(MuiAreaLayoutCore.TryReadLayoutPolicyState(ref p, state, group, out var current));
+        Assert.Equal(0u, current.ShowMe);
+        MuiNativeBuiltinMinMax.End(ref p, p.MinMaxPass);
+        p.Free(p.MinMaxPass, MuiNativeBuiltinMinMax.PassSize);
     }
     [Theory]
     [InlineData(0, 180, 100, 220, 13, 240, 233)]

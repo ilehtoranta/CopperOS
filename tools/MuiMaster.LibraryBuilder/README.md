@@ -17,12 +17,12 @@ ASL entries use the named owner/requester records. Public MorphOS MUI
 compatibility is **not** yet claimed.
 It does not stage or replace anything in `filesystem/SYS/Libs`.
 
-For experiments with unmodified classic MUI 2.0 clients, explicitly opt in to
+For experiments with unmodified classic MUI clients, explicitly opt in to
 `-p:CopperOSMuiClassicCompatibility=true` and select a separate output directory.
-This builds `muimaster.library` with version 4, revision 1 in both its Resident
+This builds `muimaster.library` with version 12, revision 1 in both its Resident
 and initialized Library header. The ID string marks it CopperOS experimental.
-The normal build retains `copperos-muimaster.library` 0.1. Version 4 admits the
-original MUI Calc 1.25 client's minimum OpenLibrary request; it is an ABI
+The normal build retains `copperos-muimaster.library` 0.1. The classic target admits
+the original Calc, MUImem and MUIJoin minimum OpenLibrary requests; it is an ABI
 selection for continued testing, not a full MUI compatibility certification.
 No third-party binary patching or filesystem installation occurs. Use a
 restore/build when switching profiles so the library assembly matches the
@@ -35,9 +35,18 @@ admission accepts both the existing CopperStart idle representation and the
 complete native Kickstart representation (NT_SIGNALSEM, queue count -1, empty
 self-linked wait queue, no owner or nesting). Mixed and busy states fail closed.
 
-Known built-in requests lazily register sixteen native BOOPSI classes:
+Known built-in requests lazily register nineteen native BOOPSI classes:
 Notify, Family, Area, Group, Rectangle, Text, List, Listview, Window,
-Application, Menustrip, Menu, Menuitem, String, Image and Cycle (each with `.mui`).
+Application, Menustrip, Menu, Menuitem, String, Image, Cycle, Radio, Popstring and
+Popasl (each with `.mui`). Popstring and Popasl compose and own their String and
+Button children. A native asynchronous file-Popasl candidate now runs ASL in a
+guest DOS worker with a private requester input port and an owned reply message.
+Application input collects completion, runs hooks and updates String/Active;
+disposal waits for an active worker. ASL calls borrow an explicit library base,
+so the worker does not share the SDK's mutable ASL base slot. This candidate is
+under native replay and is not yet qualified. Font/screen defaults and complete
+Popstring behavior remain open;
+class registration and main-window construction do not qualify file selection.
 Their dispatchers use the existing guest-resident state cores and real Exec
 allocations and Intuition classes. Unknown names retain the external custom-class
 loader. Idle classes retire derived-first after leases, objects and callbacks
@@ -67,7 +76,8 @@ unqualified. Retained evidence is in the CopperScreen repository's
 `docs/UTILITY_MUI_BACKFILL_FIX_2026-11-01.md`; ROMs and media remain local.
 
 Public service and dispatcher entry points have native stack gates. With less
-than 32 KiB of task stack remaining they use Exec StackSwap onto a temporary
+than 32 KiB of proven task stack remaining, or SP outside the recorded Task bounds,
+they use Exec StackSwap onto a temporary
 128 KiB stack, then restore task bounds, registers and the original stack before
 freeing it. Allocation failure and unsupported execution contexts return zero.
 Native object lookup reads the private BOOPSI header preceding the public object
@@ -127,3 +137,18 @@ diagnostic only and are not loader inputs.
 Host tests independently parse and relocate the serialized HUNK at two load bases,
 then read its descriptors through the SDK and verify every management pointer.
 Real native execution belongs to `tests/MuiMaster.ExecIntegration`.
+
+## Small classic utilities — 2026-11-02
+
+MUImem 1.1, MUIJoin 1.0, MUIMenu 1.00 and MUI Icon Update 1.2 pass their
+exercised workflows against CopperStart and Kickstart 3.1. Coverage includes
+actual split/rejoin bytes, command execution, icon-file updates and complete
+native cleanup. The first three retain their v48 library results; Icon Update
+uses the v49 requester correction. Exact hashes, historical failures and scope
+limits are in CopperScreen's
+[A/B report](https://github.com/ilehtoranta/CopperScreen/blob/main/docs/UTILITY_MUI_SMALL_TOOLS_FIX_2026-11-01.md).
+
+Clean source integration passes all 3,973 MUI host tests in each default/classic
+profile and all 26 library-builder tests, with no skips. These host checks are
+separate from native replays. The library remains experimental; no package is
+published and no full MUI conformance or performance qualification is claimed.

@@ -726,6 +726,52 @@ public static class MuiHeadlessObjectCore
     internal static bool SetAttributes<TPlatform>(ref TPlatform platform,
         APTR state, APTR obj, APTR tags)
         where TPlatform : struct, IMuiHeadlessPlatform
+        => SetAttributesCore<TPlatform, RawTagSetter<TPlatform>>(
+            ref platform, state, obj, tags);
+
+    internal static bool SetControlAttributes<TPlatform>(ref TPlatform platform,
+        APTR state, APTR obj, APTR tags)
+        where TPlatform : struct, IMuiLayoutPlatform
+        => SetAttributesCore<TPlatform, ControlTagSetter<TPlatform>>(
+            ref platform, state, obj, tags);
+
+    private interface ITagSetter<TPlatform>
+        where TPlatform : struct, IMuiHeadlessPlatform
+    {
+        bool Set(ref TPlatform platform, APTR state, APTR record,
+            uint attribute, uint value, bool notify, bool runtime);
+    }
+
+    private struct RawTagSetter<TPlatform> : ITagSetter<TPlatform>
+        where TPlatform : struct, IMuiHeadlessPlatform
+    {
+        public bool Set(ref TPlatform platform, APTR state, APTR record,
+            uint attribute, uint value, bool notify, bool runtime) =>
+            SetRecordAttribute(ref platform, state, record, attribute, value,
+                notify, runtime);
+    }
+
+    private struct ControlTagSetter<TPlatform> : ITagSetter<TPlatform>
+        where TPlatform : struct, IMuiLayoutPlatform
+    {
+        public bool Set(ref TPlatform platform, APTR state, APTR record,
+            uint attribute, uint value, bool notify, bool runtime)
+        {
+            if (runtime && IsObjectInitialized(ref platform, record) &&
+                MuiHeadlessObjectCodec.TryRead(ref platform, record, out var obj) &&
+                MuiCommonControlCore.IsAreaControlClass(
+                    MuiCommonControlCore.Classify(ref platform, state, obj.Boopsi)))
+                return MuiCommonControlCore.SetControlAttribute(ref platform,
+                    state, obj.Boopsi, attribute, value, notify);
+            return SetRecordAttribute(ref platform, state, record, attribute,
+                value, notify, runtime);
+        }
+    }
+
+    private static bool SetAttributesCore<TPlatform, TSetter>(ref TPlatform platform,
+        APTR state, APTR obj, APTR tags)
+        where TPlatform : struct, IMuiHeadlessPlatform
+        where TSetter : struct, ITagSetter<TPlatform>
     {
         var record = FindObject(ref platform, state, obj);
         if (record.IsNull) return false;
@@ -744,7 +790,7 @@ public static class MuiHeadlessObjectCore
             if (!MuiHeadlessStateCodec.Write(ref platform, state, stateValue))
                 return false;
         }
-        var applied = ApplyTagList(ref platform, state, record, tags,
+        var applied = ApplyTagList<TPlatform, TSetter>(ref platform, state, record, tags,
             !noNotify, true);
         if (!MuiHeadlessStateCodec.TryRead(ref platform, state,
             out stateValue)) return false;
@@ -1000,6 +1046,8 @@ public static class MuiHeadlessObjectCore
         APTR state, APTR record, uint attribute, uint value, bool notify)
         where TPlatform : struct, IMuiHeadlessPlatform
     {
+        if (MuiAreaLayoutCore.IsLayoutPolicyAttribute(attribute))
+            platform.InvalidateMuiLayoutPolicy();
         if (attribute == ObjectIdAttribute || attribute == UserDataAttribute)
         {
             if (!MuiHeadlessObjectCodec.TryRead(ref platform, record,
@@ -1135,7 +1183,8 @@ public static class MuiHeadlessObjectCore
         // setting-only control tag must not become a raw persistent attribute.
         if (!TryReadNotificationSettings(ref platform, tags, out _, out _))
             return false;
-        return ApplyTagList(ref platform, state, record, tags, false, false);
+        return ApplyTagList<TPlatform, RawTagSetter<TPlatform>>(
+            ref platform, state, record, tags, false, false);
     }
 
     private static bool TryReadNotificationSettings<TPlatform>(
@@ -1185,11 +1234,19 @@ public static class MuiHeadlessObjectCore
         return cursor.Base.IsNull;
     }
 
-    private static bool ApplyTagList<TPlatform>(ref TPlatform platform,
+    private static bool ApplyTagList<TPlatform, TSetter>(ref TPlatform platform,
         APTR state, APTR record, APTR tags, bool notify,
         bool routeCollectionRuntime)
         where TPlatform : struct, IMuiHeadlessPlatform
+        where TSetter : struct, ITagSetter<TPlatform>
     {
+        // Constructor arguments already contain every evaluated child. A NULL
+        // child makes construction fail, but later valid children must still
+        // be adopted so the owner's failure unwind disposes the whole tree.
+        // https://github.com/amiga-mui/muidev/wiki/MUI_Group#muia_group_child
+        var constructing = !IsObjectInitialized(ref platform, record);
+        var accepted = true;
+        var setter = default(TSetter);
         var cursor = default(MuiAslTagItemCursor);
         cursor.Base = tags;
         uint visited = 0;
@@ -1200,7 +1257,7 @@ public static class MuiHeadlessObjectCore
                 out var item)) return false;
             var tag = item.Tag;
             var data = item.Data;
-            if (tag == MuiAslTagListCore.TagDone) return true;
+            if (tag == MuiAslTagListCore.TagDone) return accepted;
             if (tag == MuiAslTagListCore.TagIgnore)
             {
                 if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1))
@@ -1209,7 +1266,7 @@ public static class MuiHeadlessObjectCore
             }
             if (tag == MuiAslTagListCore.TagMore)
             {
-                if (data == 0) return true;
+                if (data == 0) return accepted;
                 cursor.Base = APTR.FromPointer(data);
                 cursor.Index = 0;
                 continue;
@@ -1227,13 +1284,16 @@ public static class MuiHeadlessObjectCore
                     return false;
                 continue;
             }
-            if (!SetRecordAttribute(ref platform, state, record, tag, data, notify,
+            if (!setter.Set(ref platform, state, record, tag, data, notify,
                 routeCollectionRuntime))
-                return false;
+            {
+                if (!constructing) return false;
+                accepted = false;
+            }
             if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1))
                 return false;
         }
-        return cursor.Base.IsNull;
+        return cursor.Base.IsNull && accepted;
     }
 
     private static APTR FindAttribute<TPlatform>(ref TPlatform platform,

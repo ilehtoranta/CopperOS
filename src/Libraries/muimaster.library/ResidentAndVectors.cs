@@ -20,10 +20,11 @@ public static class MuiResidentMetadata
 {
 #if COPPEROS_MUI_CLASSIC_COMPATIBILITY
 	// Explicit experimental classic-client artifact. Keep the default development
-	// identity separate; version 4 admits MUI 2.0 clients, not full conformance.
+	// identity separate. The classic ABI target admits clients requesting v12;
+	// it remains experimental and is not a claim of complete MUI conformance.
 	public const string DevelopmentNameText = "muimaster.library";
-	public const ushort DevelopmentVersion = 4;
-	public const string DevelopmentIdString = "$VER: muimaster.library 4.1 (31.10.2026) CopperOS experimental";
+	public const ushort DevelopmentVersion = 12;
+	public const string DevelopmentIdString = "$VER: muimaster.library 12.1 (1.11.2026) CopperOS experimental";
 #else
 	public const string DevelopmentNameText = "copperos-muimaster.library";
 	public const ushort DevelopmentVersion = 0;
