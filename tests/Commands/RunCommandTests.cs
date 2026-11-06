@@ -5,8 +5,36 @@ namespace CopperOS.Commands.Tests;
 
 public sealed class RunCommandTests
 {
+    [Theory]
+    [InlineData(false, false, ShellRunOutputDestination.Nil)]
+    [InlineData(false, true, ShellRunOutputDestination.ExplicitNil)]
+    [InlineData(true, false, ShellRunOutputDestination.Console)]
+    [InlineData(true, true, ShellRunOutputDestination.ExplicitNil)]
+    public void WorkerOutputUsesTheConsoleOrNilUnlessNilWasExplicit(bool hasConsole, bool nilOutput, ShellRunOutputDestination expected)
+        => Assert.Equal(expected, ShellRunOutputPolicy.Destination(hasConsole, nilOutput));
+
+    [Theory]
+    [InlineData(2u, false, false, true, 0u, true)]
+    [InlineData(2u, true, false, false, 2u, false)]
+    [InlineData(2u, false, true, true, 4u, false)]
+    [InlineData(0u, false, false, true, 0u, false)]
+    [InlineData(3u, false, false, true, 1u, true)]
+    public void Run_output_policy_preserves_child_and_launcher_ownership(
+        uint owned, bool nil, bool sharedError, bool useStandard,
+        uint expectedOwned, bool closeLauncher)
+    {
+        var launcher = BPTR.FromRaw(11);
+        var standard = BPTR.FromRaw(12);
+        var error = BPTR.FromRaw(sharedError ? 11u : 13u);
+        ShellRunOutputPolicy.Select(launcher, error, standard, owned, nil,
+            out var child, out var transferred, out var close);
+        Assert.Equal(useStandard ? standard : launcher, child);
+        Assert.Equal(expectedOwned, transferred);
+        Assert.Equal(closeLauncher, close);
+    }
+
     [Fact]
-    public void Run_reads_options_and_copies_the_full_command_before_starting()
+    public void Run_passes_the_full_command_line_without_interpreting_option_words()
     {
         EchoCommandTests.TestShellPlatform platform = new();
         string commandLine = "DETACH QUIET STACK 8192 PRI -3 Echo hello world";
@@ -17,24 +45,51 @@ public sealed class RunCommandTests
             new APTR(80), 128, new APTR(480), 256);
 
         Assert.Equal((int)ShellCommandResult.Ok, result);
-        Assert.Equal("Echo hello world", platform.Store.RunCommand);
-        Assert.Equal((uint)1, platform.Store.RunDetach);
-        Assert.Equal((uint)1, platform.Store.RunQuiet);
-        Assert.Equal((uint)8192, platform.Store.RunStack);
-        Assert.Equal((uint)1, platform.Store.RunStackPresent);
-        Assert.Equal(-3, platform.Store.RunPriority);
-        Assert.Equal((uint)1, platform.Store.RunPriorityPresent);
+        Assert.Equal(commandLine, platform.Store.RunCommand);
+        Assert.Equal(0u, platform.Store.RunDetach);
+        Assert.Equal(0u, platform.Store.RunQuiet);
+        Assert.Equal(0u, platform.Store.RunStackPresent);
+        Assert.Equal(0u, platform.Store.RunPriorityPresent);
         Assert.Equal(1, platform.Store.RunCount);
-        Assert.Equal(1, platform.Store.ReadArgsCount);
-        Assert.Equal(1, platform.Store.FreeArgsCount);
+        Assert.Equal(0, platform.Store.ReadArgsCount);
+    }
+
+    [Fact]
+    public void Run_preserves_quoted_and_escaped_child_text()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        const string line = "DETACH STACK 8192 Echo \"hello there\" *>errors";
+        APTR source = platform.Store.PutAt(16, line);
+        CommandInvocation invocation = CreateInvocation(source, line.Length);
+
+        Assert.Equal((int)ShellCommandResult.Ok, RunCommand.Execute(ref platform,
+            in invocation, new APTR(80), 128, new APTR(480), 256));
+        Assert.Equal(line, platform.Store.RunCommand);
+    }
+
+    [Theory]
+    [InlineData("COMMAND Echo \"FIRST\" >out")]
+    [InlineData("COMMAND=Echo \"FIRST\" >out")]
+    [InlineData("DETACH Echo child >out")]
+    [InlineData("QUIET Echo child >out")]
+    [InlineData("STACK 4096 Echo child >out")]
+    [InlineData("PRI 2 Echo child >out")]
+    public void Run_treats_command_as_part_of_the_child_line(string line)
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        APTR source = platform.Store.PutAt(16, line);
+        CommandInvocation invocation = CreateInvocation(source, line.Length);
+
+        Assert.Equal((int)ShellCommandResult.Ok, RunCommand.Execute(ref platform,
+            in invocation, new APTR(80), 128, new APTR(480), 256));
+        Assert.Equal(line, platform.Store.RunCommand);
     }
 
     [Theory]
     [InlineData("")]
-    [InlineData("STACK 4096")]
-    [InlineData("PRI 2")]
-    [InlineData("DETACH")]
-    public void Run_requires_a_command_after_options(string commandLine)
+    [InlineData("   ")]
+    [InlineData("; comment")]
+    public void Run_launches_an_empty_child_when_no_command_is_supplied(string commandLine)
     {
         EchoCommandTests.TestShellPlatform platform = new();
         APTR source = platform.Store.PutAt(16, commandLine);
@@ -43,8 +98,20 @@ public sealed class RunCommandTests
         int result = RunCommand.Execute(ref platform, in invocation,
             new APTR(80), 128, new APTR(480), 256);
 
-        Assert.Equal((int)ShellCommandResult.Error, result);
-        Assert.Equal(0, platform.Store.RunCount);
+        Assert.Equal((int)ShellCommandResult.Ok, result);
+        Assert.Equal(1, platform.Store.RunCount);
+        Assert.Equal(string.Empty, platform.Store.RunCommand);
+    }
+
+    [Fact]
+    public void Run_accepts_the_null_argument_pointer_used_by_the_command_stepper()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        CommandInvocation invocation = CreateInvocation(APTR.Null, 0);
+        Assert.Equal((int)ShellCommandResult.Ok, RunCommand.Execute(ref platform,
+            in invocation, new APTR(80), 128, new APTR(480), 256));
+        Assert.Equal(1, platform.Store.RunCount);
+        Assert.Equal(string.Empty, platform.Store.RunCommand);
     }
 
     [Fact]
@@ -60,8 +127,7 @@ public sealed class RunCommandTests
             new APTR(80), 128, new APTR(480), 256);
 
         Assert.Equal((int)ShellCommandResult.Fail, result);
-        Assert.Equal(1, platform.Store.ReadArgsCount);
-        Assert.Equal(1, platform.Store.FreeArgsCount);
+        Assert.Equal(0, platform.Store.ReadArgsCount);
         Assert.Equal(0, platform.Store.RunCount);
     }
 

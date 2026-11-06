@@ -7,7 +7,7 @@ namespace CopperOS.Shell.Dos;
 /// Entry-side logic for a native NewCLI/NewShell child.  The launch boundary
 /// creates the Process/CLI; this value-type routine consumes the CLI's FROM
 /// BSTR, converts it to a bounded C string, and drives the existing persistent
-/// DOS-owned script runner until it completes.  A child without FROM reads its
+/// Shell-owned script runner until it completes. A child without FROM reads its
 /// inherited CLI input through the same persistent runner.
 /// </summary>
 internal static class DosShellNativeChildCore
@@ -18,28 +18,66 @@ internal static class DosShellNativeChildCore
 	public static uint RunFromCurrentTask()
 	{
 		// Exec creates the task with cleared saved registers, including A6.
-		// Recover ExecBase through its canonical pointer before binding DOS.
+		// FindTask uses the public Exec base and the runner owns its state.
 		var dos = new CopperSharpNativeDosPlatform();
-		if (!DosShellNativeBootstrapCodec.TryReadExecBase(ref dos,
-			out var execBase))
-			return unchecked((uint)ShellCommandResult.Error);
-		var task = dos.GetCurrentTask(execBase);
+		var task = global::Amiga.Exec.FindTask(CString.FromPointer(0));
 		if (!DosProcessCodec.IsMapped(ref dos, task))
 			return unchecked((uint)ShellCommandResult.Error);
 		var cli = DosProcessCodec.ReadCommandLineInterface(ref dos, task).Address;
-		if (!DosShellNativeChildContextCore.TryGetCliState(ref dos, cli,
-			out var state))
+		if (!DosCommandLineInterfaceCodec.IsMapped(ref dos, cli))
 			return Complete(ref dos, task, unchecked((uint)
 				ShellCommandResult.Error));
-		dos = new CopperSharpNativeDosPlatform(state.Raw);
-		if (!DosShellNativeContextCore.WriteExecBase(ref dos, state, execBase))
-			return Complete(ref dos, task, unchecked((uint)
-				ShellCommandResult.Error));
+		return RunInstalled(ref dos, task, cli, false, false);
+	}
 
-		var shell = new DosShellNativePlatform(state);
-		var arguments = DosProcessCodec.ReadArguments(ref dos, task);
-		var commandFile = DosCommandLineInterfaceCodec.Read(ref dos, cli)
-			.CommandFile.Address;
+	/// <summary>
+	/// Runs the shared Shell against an already initialized public CLI input.
+	/// Packet startup and stream ownership remain the caller's responsibility.
+	/// </summary>
+	public static uint RunFromInitializedCli(bool resumeStandardInput = false)
+	{
+		var dos = new CopperSharpNativeDosPlatform();
+		var task = global::Amiga.Exec.FindTask(CString.FromPointer(0));
+		if (!DosProcessCodec.IsMapped(ref dos, task))
+			return unchecked((uint)ShellCommandResult.Error);
+		var cli = DosProcessCodec.ReadCommandLineInterface(ref dos, task).Address;
+		if (!DosCommandLineInterfaceCodec.IsMapped(ref dos, cli))
+			return unchecked((uint)ShellCommandResult.Error);
+		return RunInstalled(ref dos, task, cli, true, resumeStandardInput);
+	}
+
+	private static uint RunInstalled(ref CopperSharpNativeDosPlatform dos,
+		APTR task, APTR cli, bool initializedInput, bool resumeStandardInput)
+	{
+		var shell = new DosShellNativePlatform(APTR.Null);
+		if (!ShellProcessState.TryInstall(ref shell, cli, out var processState, out var failure))
+		{
+			_ = shell.SetShellError(failure == ShellProcessStateFailure.NoMemory
+				? DOS.Error.NoFreeStore : DOS.Error.ObjectWrongType);
+			return Complete(ref dos, task, unchecked((uint)ShellCommandResult.Error));
+		}
+		var result = RunWithProcessState(ref dos, ref shell, task, cli,
+			initializedInput, resumeStandardInput);
+		if (!PublicShellContinuationCore.DetachAll(ref shell, cli) ||
+			!ShellProcessState.TryRemove(ref shell, cli, processState))
+			return Complete(ref dos, task, unchecked((uint)ShellCommandResult.Error));
+		return result;
+	}
+
+	private static uint RunWithProcessState(ref CopperSharpNativeDosPlatform dos,
+		ref DosShellNativePlatform shell, APTR task, APTR cli,
+		bool initializedInput, bool resumeStandardInput)
+	{
+		var arguments = initializedInput ? APTR.Null : DosProcessCodec.ReadArguments(ref dos, task);
+		var startupCli = DosCommandLineInterfaceCodec.Read(ref dos, cli);
+		var resumeReader = initializedInput && resumeStandardInput &&
+			startupCli.StandardInput.IsNotNull &&
+			startupCli.CurrentInput != startupCli.StandardInput;
+		var interactiveStartup = arguments.IsNull && startupCli.Interactive != 0 &&
+			startupCli.CurrentInput == startupCli.StandardInput && startupCli.StandardInput.IsNotNull;
+		if (resumeReader) interactiveStartup = true;
+		var commandFile = initializedInput ? APTR.Null :
+			DosCommandLineInterfaceCodec.Read(ref dos, cli).CommandFile.Address;
 		var path = APTR.Null;
 		var pathLength = 0u;
 		ShellScriptExecutionStatus status;
@@ -54,7 +92,14 @@ internal static class DosShellNativeChildCore
 			// This entry consumes pr_Arguments directly. Drain only its startup
 			// input prefix before running the text, so System continue-input
 			// resumes the inherited stream without executing the command twice.
-			if (!DosCore.ConsumeProcessArgumentInput(ref dos, state))
+			var library = global::Amiga.Exec.OpenLibraryRaw("dos.library", 37);
+			if (library.IsNull)
+				return Complete(ref dos, task, unchecked((uint)
+					ShellCommandResult.Error));
+			var consumed = PublicShellArgumentServices.ConsumeInputPrefix(library,
+				PublicShellFileServices.Input(library), arguments, argumentLength);
+			global::Amiga.Exec.CloseLibrary(library);
+			if (!consumed)
 				return Complete(ref dos, task, unchecked((uint)
 					ShellCommandResult.Error));
 			if (argumentLength == 0)
@@ -109,6 +154,7 @@ internal static class DosShellNativeChildCore
 				!shell.TryParkScriptWait(cli, uint.MaxValue) ||
 				!shell.TryPollScriptExecution(cli, out status, out result))
 			{
+				_ = shell.AbortScriptExecution(cli);
 				result = (int)ShellCommandResult.Error;
 				status = ShellScriptExecutionStatus.Failed;
 				break;
@@ -116,9 +162,53 @@ internal static class DosShellNativeChildCore
 		}
 		if (status == ShellScriptExecutionStatus.Pending)
 			result = (int)ShellCommandResult.Error;
-		if (arguments.IsNotNull && DosSystemCore.ContinuesWithInput(
-			DosProcessCodec.ReadShellPrivate(ref dos, task)) &&
-			status == ShellScriptExecutionStatus.Completed)
+		if (resumeReader && status == ShellScriptExecutionStatus.Completed)
+		{
+			if (!ShellProcessState.TryEndRequested(ref shell, cli, out var endRequested))
+			{
+				result = (int)ShellCommandResult.Error;
+				status = ShellScriptExecutionStatus.Failed;
+			}
+			else if (!endRequested)
+			{
+				var library = global::Amiga.Exec.OpenLibraryRaw("dos.library", 37);
+				if (library.IsNull)
+				{
+					result = (int)ShellCommandResult.Error;
+					status = ShellScriptExecutionStatus.Failed;
+				}
+				else
+				{
+					var current = DosCommandLineInterfaceCodec.Read(ref dos, cli).CurrentInput;
+					_ = NativeForegroundDosVectors.SelectInput(library, startupCli.StandardInput);
+					DosCommandLineInterfaceCodec.WriteCurrentInput(ref dos, cli, startupCli.StandardInput);
+					// Execute may already have closed the startup input and installed
+					// its own reader. Close it only while the CLI still identifies it.
+					if (current == startupCli.CurrentInput && current.IsNotNull &&
+						current != startupCli.StandardOutput)
+						_ = PublicShellFileServices.Close(library, current);
+					global::Amiga.Exec.CloseLibrary(library);
+					status = shell.TryStartInteractiveScript(cli, out result);
+					while (status == ShellScriptExecutionStatus.Pending)
+					{
+						if (!shell.TryPrepareScriptWait(cli) ||
+							!shell.TryParkScriptWait(cli, uint.MaxValue) ||
+							!shell.TryPollScriptExecution(cli, out status, out result))
+						{
+							_ = shell.AbortScriptExecution(cli);
+							result = (int)ShellCommandResult.Error;
+							status = ShellScriptExecutionStatus.Failed;
+							break;
+						}
+					}
+				}
+			}
+		}
+		// Execute can replace the reader of an interactive Shell with a work
+		// file. Once that reader reaches EOF, resume the original console.
+		// EndCLI and a console EOF clear cli_Interactive during teardown.
+		while (interactiveStartup && status == ShellScriptExecutionStatus.Completed &&
+			DosCommandLineInterfaceCodec.Read(ref dos, cli).Interactive != 0)
 		{
 			status = shell.TryStartInteractiveScript(cli, out result);
 			while (status == ShellScriptExecutionStatus.Pending)
@@ -127,13 +217,12 @@ internal static class DosShellNativeChildCore
 					!shell.TryParkScriptWait(cli, uint.MaxValue) ||
 					!shell.TryPollScriptExecution(cli, out status, out result))
 				{
+					_ = shell.AbortScriptExecution(cli);
 					result = (int)ShellCommandResult.Error;
 					status = ShellScriptExecutionStatus.Failed;
 					break;
 				}
 			}
-			if (status == ShellScriptExecutionStatus.Pending)
-				result = (int)ShellCommandResult.Error;
 		}
 		if (path.IsNotNull) dos.FreeGuest(path, pathLength + 1);
 		return Complete(ref dos, task, unchecked((uint)result));

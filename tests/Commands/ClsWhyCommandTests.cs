@@ -5,10 +5,44 @@ namespace CopperOS.Commands.Tests;
 
 public sealed class ClsWhyCommandTests
 {
-    [Fact]
-    public void Cls_clears_the_console_and_accepts_reset()
+    [Theory]
+    [InlineData(0u, "\f")]
+    [InlineData(1u, "\u001bc")]
+    public void Console_output_distinguishes_window_clear_from_reset(uint reset, string expected)
     {
         EchoCommandTests.TestShellPlatform platform = new();
+        Assert.True(ShellConsoleOutput.Clear(ref platform, new BPTR(1), reset));
+        Assert.Equal(expected, platform.Store.OutputText);
+    }
+
+    [Fact]
+    public void Console_output_rejects_invalid_streams_and_reset_values()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        Assert.False(ShellConsoleOutput.Clear(ref platform, BPTR.Null, 0));
+        Assert.False(ShellConsoleOutput.Clear(ref platform, new BPTR(1), 2));
+        Assert.Empty(platform.Store.OutputText);
+    }
+
+    [Theory]
+    [InlineData(0, "")]
+    [InlineData(1, "\u001b")]
+    public void Console_reset_reports_a_failed_write_without_sending_later_bytes(int failedByte, string written)
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.FailByteWriteAt = failedByte;
+        Assert.False(ShellConsoleOutput.Clear(ref platform, new BPTR(1), 1));
+        Assert.Equal(written, platform.Store.OutputText);
+        Assert.Equal(failedByte + 1, platform.Store.ByteWriteAttempts);
+    }
+
+    [Theory]
+    [InlineData(1u)]
+    [InlineData(uint.MaxValue)]
+    public void Cls_clears_the_console_and_normalizes_the_dos_reset_switch(uint trueValue)
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.ResetSwitchValue = trueValue;
         string commandLine = "RESET";
         APTR source = platform.Store.PutAt(16, commandLine);
         CommandInvocation invocation = CreateInvocation(source, commandLine.Length,
@@ -70,7 +104,7 @@ public sealed class ClsWhyCommandTests
             new APTR(80),
             32);
 
-        Assert.Equal((int)ShellCommandResult.Ok, result);
+        Assert.Equal((int)ShellCommandResult.Warn, result);
         Assert.Equal("Object not found\n", platform.Store.OutputText);
         Assert.Equal(1, platform.Store.WhyCount);
         Assert.Equal(1, platform.Store.ReadArgsCount);

@@ -3,8 +3,8 @@ using Amiga;
 namespace CopperOS.Shell;
 
 /// <summary>
-/// Shell-owned MorphOS <c>Unsetenv NAME [SAVE]</c> command.  With no name it
-/// delegates the canonical global-variable listing to the DOS owner.
+/// Shell-owned <c>Unsetenv NAME [SAVE]</c> command. With no name it delegates
+/// the classic global-variable listing, preserving its result and streams.
 /// </summary>
 public static class UnsetenvCommand
 {
@@ -42,7 +42,7 @@ public static class UnsetenvCommand
             return (int)ShellCommandResult.Error;
         }
         var name = parsed.Name;
-        var save = parsed.Save;
+        var save = parsed.Save == 0 ? 0u : 1u;
         if (name.IsNull)
         {
             if (save != 0)
@@ -52,10 +52,10 @@ public static class UnsetenvCommand
             }
 
             platform.FreeArgs(rdArgs);
-            return invocation.Output.IsNull ||
-                !platform.TryWriteGlobalVariables(invocation.Output)
-                ? (int)ShellCommandResult.Fail
-                : (int)ShellCommandResult.Ok;
+            if (invocation.Output.IsNull || !platform.TryWriteGlobalVariables(
+                invocation.Input, invocation.Output, invocation.DiagnosticOutput, out var listResult))
+                return (int)ShellCommandResult.Fail;
+            return listResult;
         }
 
         if (!CStringCodec.TryReadLength(ref platform, name, 65536,

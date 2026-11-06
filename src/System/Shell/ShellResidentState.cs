@@ -66,6 +66,8 @@ public struct ShellResidentManagementRequest
     public uint Force;
     public uint System;
     public uint Defer;
+    // Distinguishes an explicit REPLACE from the default add-or-replace.
+    public uint RequireExisting;
 }
 
 /// <summary>

@@ -83,11 +83,27 @@ public static class ResidentCommand
         var defer = NormalizeSwitchResult(parsed.Defer);
         var operationCount = remove + add + replace;
         var aliasOperation = parsed.Alias.IsNotNull;
-        // Classic startup files give only a full filename, e.g.
-        // Resident C:Assign PURE. ReadArgs places that in NAME; preserve the
-        // backing path and derive the public resident name from its FilePart.
+        var internalCommand = nameLength == 0
+            ? ShellInternalCommand.Unknown
+            : ShellInternalCommandResolver.Resolve(ref platform, nameBuffer,
+                nameLength);
+        if (!aliasOperation && parsed.File.IsNull && internalCommand !=
+                ShellInternalCommand.Unknown && operationCount == 1 &&
+            (remove != 0 || replace != 0))
+        {
+            if (!platform.TryGetInternalCommandEnabled(invocation.Cli,
+                    (uint)internalCommand, out var enabled))
+                return (int)ShellCommandResult.Fail;
+            if (remove != 0 || (replace != 0 && enabled == 0))
+                return platform.TrySetInternalCommandEnabled(invocation.Cli,
+                        (uint)internalCommand, remove != 0 ? 0u : 1u)
+                    ? (int)ShellCommandResult.Ok
+                    : (int)ShellCommandResult.Fail;
+        }
+        // A lone NAME is a filename, even without a directory component.
+        // Remove instead identifies an existing resident entry by name.
         if (!aliasOperation && remove == 0 && parsed.File.IsNull &&
-            FilePartOffset(ref platform, nameBuffer, nameLength) != 0)
+            parsed.Name.IsNotNull)
         {
             if (!ReadArgsCommandSupport.CopyCString(ref platform, nameBuffer,
                     fileBuffer, fileCapacity, out fileLength))
@@ -118,21 +134,10 @@ public static class ResidentCommand
         var aliasArgument = aliasBuffer;
         if (parsed.Alias.IsNull) aliasArgument = APTR.FromPointer(0);
 
-        var internalCommand = nameLength == 0
-            ? ShellInternalCommand.Unknown
-            : ShellInternalCommandResolver.Resolve(ref platform, nameBuffer,
-                nameLength);
-        if (!aliasOperation && parsed.File.IsNull && internalCommand !=
-                ShellInternalCommand.Unknown && (remove != 0 || replace != 0))
-        {
-            var enabled = remove != 0 ? 0u : 1u;
-            return platform.TrySetInternalCommandEnabled(invocation.Cli,
-                    (uint)internalCommand, enabled)
-                ? (int)ShellCommandResult.Ok
-                : (int)ShellCommandResult.Fail;
-        }
-
-        var listing = parsed.File.IsNull && !aliasOperation && remove == 0;
+        var listing = parsed.Name.IsNull && parsed.File.IsNull && !aliasOperation && remove == 0;
+        if (listing)
+            return platform.TryListResidents(invocation.Cli, invocation.Output, system)
+                ? (int)ShellCommandResult.Ok : (int)ShellCommandResult.Warn;
         if (!listing && remove == 0 && add == 0 && replace == 0)
         {
             if (aliasOperation) add = 1;
@@ -140,7 +145,7 @@ public static class ResidentCommand
         }
         var request = new ShellResidentManagementRequest
         {
-            Output = invocation.Output,
+            Output = invocation.DiagnosticOutput,
             Name = nameArgument,
             NameLength = nameLength,
             File = fileArgument,
@@ -153,13 +158,13 @@ public static class ResidentCommand
             Force = listing ? 0u : force,
             System = system,
             Defer = listing ? 0u : defer,
+            RequireExisting = parsed.Replace != 0 ? 1u : 0u,
         };
         var success = platform.TryManageResident(invocation.Cli,
             in request);
-        if (!success) return (int)ShellCommandResult.Fail;
-        if (listing && !ShellInternalCommandResolver.WriteResidentNames(
-            ref platform, invocation.Cli, invocation.Output, system))
-            return (int)ShellCommandResult.Fail;
+        // V40 reports DOS resident-list failures as WARN and keeps IoErr as
+        // the CLI secondary result; parser failures have their own result.
+        if (!success) return (int)ShellCommandResult.Warn;
         return (int)ShellCommandResult.Ok;
     }
 

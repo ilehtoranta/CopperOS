@@ -151,6 +151,9 @@ public interface IShellScriptPlatform
 	/// <summary>Obtains the runner-owned buffer used by backtick expansion.</summary>
 	bool TryEnsureScriptPromptTemplate(APTR cli, out APTR buffer, out uint capacity);
 
+    /// <summary>Selects an available capture directory without showing a requester.</summary>
+    bool TrySelectScriptPromptDirectory(APTR cli, APTR path, uint capacity, ref uint length);
+
 	/// <summary>Tracks prompt-capture path and reader ownership in the runner.</summary>
 	bool TrySetScriptPromptCapture(APTR cli, APTR path, uint pathLength,
 		BPTR input);

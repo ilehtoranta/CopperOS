@@ -21,19 +21,10 @@ public static class DosShellNativeParkEntrypoint
 		[M68kRegister(M68kRegister.A0)] uint dosState,
 		[M68kRegister(M68kRegister.A6)] uint execBase)
 	{
-		var state = APTR.FromPointer(dosState);
-		var platform = new CopperSharpNativeDosPlatform(dosState);
-		var parent = APTR.FromPointer(cli);
-		if (parent.IsNull || !DosShellNativeContextCore.WriteExecBase(
-			ref platform, state, APTR.FromPointer(execBase))) return 0;
-		var runner = DosShellNativeBridge.FindScriptRunner(ref platform, state,
-			parent);
-		if (runner.IsNull || !DosShellNativeBridge.ReadScriptRunner(ref platform,
-			state, runner, out var stored)) return 0;
-		var wait = DosShellNativeBridge.FindForegroundWaitByFrame(ref platform,
-			state, stored.Frame);
-		return wait.IsNotNull && DosShellNativeBridge.ParkForegroundWait(
-			ref platform, state, wait, timeoutTicks) ? 1u : 0u;
+		_ = dosState;
+		_ = execBase;
+		var shell = new DosShellNativePlatform(APTR.Null);
+		return shell.TryParkScriptWait(APTR.FromPointer(cli), timeoutTicks) ? 1u : 0u;
 	}
 
 	public static APTR AddressOfExecutePark() =>

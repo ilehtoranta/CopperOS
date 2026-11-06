@@ -45,7 +45,7 @@ public struct ShellAskResponse
 }
 
 /// <summary>
-/// Shell-owned MorphOS <c>Ask</c> command.
+/// Shell-owned <c>Ask</c> command with the Kickstart 3.1 result convention.
 /// </summary>
 public static class AskCommand
 {
@@ -101,8 +101,8 @@ public static class AskCommand
 
         return response.Answer switch
         {
-            ShellAskAnswer.Yes => (int)ShellCommandResult.Ok,
-            ShellAskAnswer.No => (int)ShellCommandResult.Warn,
+            ShellAskAnswer.Yes => (int)ShellCommandResult.Warn,
+            ShellAskAnswer.No => (int)ShellCommandResult.Ok,
             _ => (int)ShellCommandResult.Error,
         };
     }

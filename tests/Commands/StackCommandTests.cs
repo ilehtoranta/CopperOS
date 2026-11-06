@@ -40,7 +40,8 @@ public sealed class StackCommandTests
             32);
 
         Assert.Equal((int)ShellCommandResult.Ok, result);
-        Assert.Equal(expected, platform.Store.OutputText);
+        Assert.Equal("Current stack size is " + expected.TrimEnd('\n') + " bytes\n",
+            platform.Store.OutputText);
         Assert.Equal(0, platform.Store.WriteStackCount);
         Assert.Equal(1, platform.Store.ReadArgsCount);
         Assert.Equal(1, platform.Store.FreeArgsCount);

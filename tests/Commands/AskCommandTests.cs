@@ -6,7 +6,7 @@ namespace CopperOS.Commands.Tests;
 public sealed class AskCommandTests
 {
     [Fact]
-    public void Ask_decodes_the_prompt_and_returns_success_for_yes()
+    public void Ask_decodes_the_prompt_and_returns_warn_for_yes()
     {
         EchoCommandTests.TestShellPlatform platform = new();
         string commandLine = "Do you own a Pegasos? *n";
@@ -30,7 +30,7 @@ public sealed class AskCommandTests
             new APTR(80),
             96);
 
-        Assert.Equal((int)ShellCommandResult.Ok, result);
+        Assert.Equal((int)ShellCommandResult.Warn, result);
         Assert.Equal("Do you own a Pegasos? \n", platform.Store.AskPrompt);
         Assert.Equal(1, platform.Store.AskCount);
         Assert.Equal(1, platform.Store.ReadArgsCount);
@@ -38,7 +38,7 @@ public sealed class AskCommandTests
     }
 
     [Fact]
-    public void Ask_maps_a_negative_answer_to_warn()
+    public void Ask_maps_a_negative_answer_to_success()
     {
         EchoCommandTests.TestShellPlatform platform = new();
         platform.Store.AskAnswer = ShellAskAnswer.No;
@@ -63,7 +63,7 @@ public sealed class AskCommandTests
             new APTR(80),
             96);
 
-        Assert.Equal((int)ShellCommandResult.Warn, result);
+        Assert.Equal((int)ShellCommandResult.Ok, result);
         Assert.Equal(1, platform.Store.FreeArgsCount);
     }
 

@@ -45,7 +45,7 @@ public static class SkipCommand
         }
 
         var label = parsed.Label;
-        var back = parsed.Back;
+        var back = parsed.Back == 0 ? 0u : 1u;
         if (label.IsNull)
         {
             platform.FreeArgs(rdArgs);
@@ -73,7 +73,7 @@ public static class SkipCommand
         uint labelLength,
         uint back)
         where TPlatform : struct, IShellPlatform =>
-        platform.TrySkipToLabel(cli, label, labelLength, back)
-            ? (int)ShellCommandResult.Ok
+        platform.TrySkipToLabel(cli, label, labelLength, back, out var result)
+            ? result
             : (int)ShellCommandResult.Fail;
 }

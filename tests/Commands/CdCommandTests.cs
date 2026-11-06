@@ -93,7 +93,7 @@ public sealed class CdCommandTests
             new APTR(160),
             64);
 
-        Assert.Equal((int)ShellCommandResult.Error, result);
+        Assert.Equal((int)ShellCommandResult.Fail, result);
         Assert.Equal("SYS:", platform.Store.CurrentDirectory);
         Assert.Equal(0, platform.Store.ChangeDirectoryCount);
     }
@@ -128,7 +128,7 @@ public sealed class CdCommandTests
             new APTR(160),
             64);
 
-        Assert.Equal((int)ShellCommandResult.Error, result);
+        Assert.Equal((int)ShellCommandResult.Fail, result);
         Assert.Equal(0, platform.Store.ChangeDirectoryCount);
     }
 

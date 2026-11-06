@@ -159,8 +159,7 @@ internal static class PathReadArgsVectorCursorCodec
 	{
 		value = APTR.Null;
 		hasValue = false;
-		if (cursor.Base.IsNull || cursor.Index > PathCommand.MaximumPathEntries ||
-			cursor.Index >= uint.MaxValue / sizeof(uint)) return false;
+		if (cursor.Base.IsNull || cursor.Index >= uint.MaxValue / sizeof(uint)) return false;
 		var offset = cursor.Index * sizeof(uint);
 		var byteLength = offset + sizeof(uint);
 		if (cursor.Base.Raw > uint.MaxValue - byteLength ||
@@ -173,7 +172,7 @@ internal static class PathReadArgsVectorCursorCodec
 
 	internal static bool TryAdvance(ref PathReadArgsVectorCursor cursor)
 	{
-		if (cursor.Index >= PathCommand.MaximumPathEntries) return false;
+		if (cursor.Index >= uint.MaxValue / sizeof(uint) - 1) return false;
 		cursor.Index++;
 		return true;
 	}

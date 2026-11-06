@@ -34,7 +34,7 @@ public static class ClsCommand
             platform.FreeArgs(rdArgs);
             return (int)ShellCommandResult.Error;
         }
-        var reset = parsed.Value;
+        var reset = parsed.Value == 0 ? 0u : 1u;
         platform.FreeArgs(rdArgs);
 
         return platform.ClearConsole(invocation.Output, reset)

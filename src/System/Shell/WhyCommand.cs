@@ -32,7 +32,7 @@ public static class WhyCommand
         platform.FreeArgs(rdArgs);
 
         return platform.TryWriteWhy(invocation.Output, invocation.Cli)
-            ? (int)ShellCommandResult.Ok
+            ? (int)ShellCommandResult.Warn
             : (int)ShellCommandResult.Fail;
     }
 }

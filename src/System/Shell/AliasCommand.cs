@@ -67,6 +67,21 @@ public static class AliasCommand
             platform.FreeArgs(rdArgs);
             return (int)ShellCommandResult.Fail;
         }
+        if (value.IsNull)
+        {
+            platform.FreeArgs(rdArgs);
+            if (invocation.Output.IsNull) return (int)ShellCommandResult.Error;
+            if (!platform.TryGetAlias(invocation.Cli, nameBuffer, nameLength,
+                valueBuffer, valueCapacity, out valueLength, out var missing))
+                return missing != 0 ? (int)ShellCommandResult.Warn : (int)ShellCommandResult.Error;
+            if (valueLength > valueCapacity ||
+                (valueLength != 0 && !platform.IsMapped(valueBuffer, valueLength)))
+                return (int)ShellCommandResult.Fail;
+            if (valueLength != 0 && platform.Write(invocation.Output, valueBuffer, valueLength) != (int)valueLength)
+                return (int)ShellCommandResult.Error;
+            return platform.WriteByte(invocation.Output, (byte)'\n') < 0
+                ? (int)ShellCommandResult.Error : (int)ShellCommandResult.Ok;
+        }
         valueLength = value.IsNull ? 0 : valueLength;
         platform.FreeArgs(rdArgs);
 

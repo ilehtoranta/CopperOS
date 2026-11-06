@@ -15,9 +15,10 @@ public sealed class ReadArgsCommandSupportTests
     {
         foreach (ShellInternalCommand command in Enum.GetValues<ShellInternalCommand>())
         {
-            // Echo supplies its own template/result buffers; every other
-            // internal command uses the shared Prepare boundary.
-            if (command is ShellInternalCommand.Unknown or ShellInternalCommand.Echo)
+            // Echo supplies its own template/result buffers; RUN forwards
+            // the original text and does not invoke ReadArgs. LAB is a
+            // source marker and does not parse arguments at execution time.
+            if (command is ShellInternalCommand.Unknown or ShellInternalCommand.Echo or ShellInternalCommand.Run or ShellInternalCommand.Lab)
                 continue;
 
             EchoCommandTests.TestShellPlatform platform = new();

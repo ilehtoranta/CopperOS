@@ -8,12 +8,14 @@ namespace CopperOS.Shell.Dos;
 /// <summary>Runs a foreground disk command in its calling Shell Process.</summary>
 internal static class DosShellNativeForegroundCore
 {
-    public static bool ExecuteScript(CopperSharpNativeDosPlatform dos, APTR state,
+    public static bool ExecuteScript(CopperSharpNativeDosPlatform dos,
         APTR cli, in ShellScriptCommandInvocation command,
         in ShellScriptLookupResult lookup, BPTR input, BPTR output, BPTR error,
         out int result)
     {
         result = (int)ShellCommandResult.Error;
+        var library = global::Amiga.Exec.OpenLibraryRaw("dos.library", 37);
+        if (library.IsNull) return false;
         var capacity = 12 + lookup.PathLength * 2 + command.Arguments.Length;
         var line = dos.AllocateGuest(capacity);
         var name = dos.AllocateGuest(8);
@@ -23,7 +25,8 @@ internal static class DosShellNativeForegroundCore
             if (line.IsNotNull) dos.FreeGuest(line, capacity);
             if (name.IsNotNull) dos.FreeGuest(name, 8);
             if (path.IsNotNull) dos.FreeGuest(path, 512);
-            DosCore.SetIoErr(ref dos, state, DOS.Error.NoFreeStore);
+            PublicShellFileServices.SetError(library, DOS.Error.NoFreeStore);
+            global::Amiga.Exec.CloseLibrary(library);
             return false;
         }
         dos.WriteUInt32(name, 0, 0x45786563);
@@ -46,11 +49,12 @@ internal static class DosShellNativeForegroundCore
             position += command.Arguments.Length;
         }
         dos.WriteUInt8(line, (int)position, 0);
-        var found = DosShellNativeBridge.LookupCommand(ref dos, state, cli,
-            name, 7, path, 512, out var resolved);
+        var workspace = new ShellScriptLookupWorkspace(path, 512);
+        var found = PublicShellCommandLookup.Find(ref dos, library, cli,
+            name, 7, in workspace, out var resolved);
         var executed = false;
-        if (found && resolved.Kind is not (DosShellNativeBridge.LookupKind.NotFound or
-            DosShellNativeBridge.LookupKind.Malformed or DosShellNativeBridge.LookupKind.Script))
+        if (found && resolved.Kind is not (ShellScriptLookupKind.NotFound or
+            ShellScriptLookupKind.Malformed or ShellScriptLookupKind.Script))
         {
             var invocation = default(ShellScriptCommandInvocation);
             invocation.Line = line;
@@ -61,27 +65,34 @@ internal static class DosShellNativeForegroundCore
             var executable = default(ShellScriptLookupResult);
             executable.ResolvedPath = path;
             executable.PathLength = resolved.PathLength;
-            executable.Kind = resolved.Kind == DosShellNativeBridge.LookupKind.Resident
-                ? ShellScriptLookupKind.Resident : ShellScriptLookupKind.ExplicitFile;
-            executed = Execute(dos, state, cli, in invocation, in executable,
+            executable.Kind = resolved.Kind;
+            executed = Execute(dos, cli, in invocation, in executable,
                 input, output, error, out result);
         }
-        var ioError = DosCore.IoErr(ref dos, state);
+        var ioError = PublicShellFileServices.GetError(library);
         dos.FreeGuest(line, capacity);
         dos.FreeGuest(name, 8);
         dos.FreeGuest(path, 512);
-        DosCore.SetIoErr(ref dos, state, ioError);
+        PublicShellFileServices.SetError(library, (DOS.Error)ioError);
+        global::Amiga.Exec.CloseLibrary(library);
         return executed;
     }
 
-    public static bool Execute(CopperSharpNativeDosPlatform dos, APTR state,
+    public static bool Execute(CopperSharpNativeDosPlatform dos,
         APTR cli, in ShellScriptCommandInvocation command,
         in ShellScriptLookupResult lookup, BPTR input, BPTR output, BPTR error,
         out int result)
     {
         result = (int)ShellCommandResult.Error;
+        var library = global::Amiga.Exec.OpenLibraryRaw("dos.library", 37);
+        if (library.IsNull) return false;
         var path = dos.AllocateGuest(lookup.PathLength + 1);
-        if (path.IsNull) { DosCore.SetIoErr(ref dos, state, DOS.Error.NoFreeStore); return false; }
+        if (path.IsNull)
+        {
+            PublicShellFileServices.SetError(library, DOS.Error.NoFreeStore);
+            global::Amiga.Exec.CloseLibrary(library);
+            return false;
+        }
         dos.Copy(lookup.ResolvedPath, path, lookup.PathLength);
         dos.WriteUInt8(path, (int)lookup.PathLength, 0);
         var resident = APTR.Null;
@@ -89,32 +100,30 @@ internal static class DosShellNativeForegroundCore
         var home = BPTR.Null;
         if (lookup.Kind == ShellScriptLookupKind.Resident)
         {
-            var raw = DosShellNativeBridge.LookupResidentNativeRaw(ref dos,
-                state, command.CommandName, command.CommandNameLength);
-            segment = BPTR.FromRaw(DosShellNativeBridge.AcquireResidentNativeRaw(
-                ref dos, state, command.CommandName, command.CommandNameLength, raw));
-            if (segment.IsNotNull) resident = APTR.FromPointer(raw);
+            segment = PublicShellResidentServices.Acquire(ref dos, library, path, out resident);
         }
         else
         {
             // PROGDIR names the executable's directory, independently of the
             // current directory and any command-path search that found it.
-            var file = DosCore.Lock(ref dos, state, path, DOS.LockMode.Shared);
+            var file = PublicShellFileServices.Lock(library, path);
             if (file.IsNotNull)
             {
-                home = DosCore.ParentDir(ref dos, state, file);
-                var homeError = DosCore.IoErr(ref dos, state);
-                DosCore.UnLock(ref dos, state, file);
-                DosCore.SetIoErr(ref dos, state, homeError);
+                home = NativeForegroundDosVectors.ParentDir(library, file);
+                var homeError = PublicShellFileServices.GetError(library);
+                PublicShellFileServices.UnLock(library, file);
+                PublicShellFileServices.SetError(library, (DOS.Error)homeError);
             }
-            if (home.IsNotNull) segment = DosSegmentLoaderCore.Load(ref dos, state, path);
+            if (home.IsNotNull) segment = NativeForegroundDosVectors.LoadSeg(library, path);
         }
-        var loadError = DosCore.IoErr(ref dos, state);
+        var loadError = PublicShellFileServices.GetError(library);
         dos.FreeGuest(path, lookup.PathLength + 1);
         if (segment.IsNull)
         {
-            if (home.IsNotNull) DosCore.UnLock(ref dos, state, home);
-            DosCore.SetIoErr(ref dos, state, loadError); return false;
+            if (home.IsNotNull) PublicShellFileServices.UnLock(library, home);
+            PublicShellFileServices.SetError(library, (DOS.Error)loadError);
+            global::Amiga.Exec.CloseLibrary(library);
+            return false;
         }
 
         var arguments = command.Arguments;
@@ -123,32 +132,48 @@ internal static class DosShellNativeForegroundCore
         var length = arguments.Length;
         var append = length == 0 || dos.ReadUInt8(arguments.Data, (int)length - 1) != (byte)'\n';
         var argumentCapacity = length + 2;
-        var capacity = argumentCapacity + 256;
+        var capacity = argumentCapacity + 512;
         var text = dos.AllocateGuest(capacity);
-        var library = global::Amiga.Exec.OpenLibraryRaw("dos.library", 0);
-        if (text.IsNull || library.IsNull)
+        if (text.IsNull)
         {
-            if (text.IsNotNull) dos.FreeGuest(text, capacity);
-            if (library.IsNotNull) global::Amiga.Exec.CloseLibrary(library);
-            Release(ref dos, state, segment, resident);
-            if (home.IsNotNull) DosCore.UnLock(ref dos, state, home);
-            DosCore.SetIoErr(ref dos, state, DOS.Error.NoFreeStore);
+            Release(ref dos, library, segment, resident);
+            if (home.IsNotNull) PublicShellFileServices.UnLock(library, home);
+            PublicShellFileServices.SetError(library, DOS.Error.NoFreeStore);
+            global::Amiga.Exec.CloseLibrary(library);
             return false;
         }
         if (length != 0) dos.Copy(arguments.Data, text, length);
         if (append) dos.WriteUInt8(text, (int)length++, (byte)'\n');
         dos.WriteUInt8(text, (int)length, 0);
         var savedName = APTR.FromPointer(text.Raw + argumentCapacity);
-        var previousName = DosCommandLineInterfaceCodec.Read(ref dos, cli).CommandName.Address;
-        var previousLength = previousName.IsNull ? 0u : dos.ReadUInt8(previousName);
-        for (var i = 0u; i < previousLength; i++)
-            dos.WriteUInt8(savedName, (int)i, dos.ReadUInt8(previousName, (int)i + 1));
-        dos.WriteUInt8(savedName, (int)previousLength, 0);
-        DosObjectCore.SetCliString(ref dos, state, cli, (uint)DosObjectTag.CliCommandName,
-            command.CommandName, command.CommandNameLength);
+        var newName = APTR.FromPointer(savedName.Raw + 256);
+        if (command.CommandNameLength > 255 || command.CommandName.IsNull ||
+            NativeForegroundDosVectors.GetProgramName(library, savedName, 256) == 0)
+        {
+            var nameError = command.CommandNameLength > 255
+                ? (int)DOS.Error.LineTooLong : PublicShellFileServices.GetError(library);
+            dos.FreeGuest(text, capacity);
+            Release(ref dos, library, segment, resident);
+            if (home.IsNotNull) PublicShellFileServices.UnLock(library, home);
+            PublicShellFileServices.SetError(library, (DOS.Error)nameError);
+            global::Amiga.Exec.CloseLibrary(library);
+            return false;
+        }
+        dos.Copy(command.CommandName, newName, command.CommandNameLength);
+        dos.WriteUInt8(newName, (int)command.CommandNameLength, 0);
+        if (NativeForegroundDosVectors.SetProgramName(library, newName) == 0)
+        {
+            var nameError = PublicShellFileServices.GetError(library);
+            dos.FreeGuest(text, capacity);
+            Release(ref dos, library, segment, resident);
+            if (home.IsNotNull) PublicShellFileServices.UnLock(library, home);
+            PublicShellFileServices.SetError(library, (DOS.Error)nameError);
+            global::Amiga.Exec.CloseLibrary(library);
+            return false;
+        }
         var task = dos.CurrentDosTask;
-        var savedInput = DosCore.SelectInput(ref dos, state, input);
-        var savedOutput = DosCore.SelectOutput(ref dos, state, output);
+        var savedInput = NativeForegroundDosVectors.SelectInput(library, input);
+        var savedOutput = NativeForegroundDosVectors.SelectOutput(library, output);
         var savedError = DosProcessCodec.ReadCurrentError(ref dos, task);
         DosProcessCodec.WriteCurrentError(ref dos, task, error);
         var stack = DosCommandLineInterfaceCodec.Read(ref dos, cli).DefaultStack;
@@ -157,39 +182,64 @@ internal static class DosShellNativeForegroundCore
         // returning and letting the Shell unload the remaining command chain.
         var savedModule = dos.ReadUInt32(cli, DosLayout.CommandLineInterface.Module);
         dos.WriteUInt32(cli, DosLayout.CommandLineInterface.Module, segment.Raw);
-        var savedHome = home.IsNotNull ? DosProcessCore.SetProgramDir(ref dos, home.Raw) : 0;
+        var savedHome = home.IsNotNull ? NativeForegroundDosVectors.SetProgramDir(library, home) : BPTR.Null;
         result = NativeForegroundDosVectors.RunCommand(library, segment,
             stack == 0 ? 4096 : unchecked(stack << 2), text, (int)length);
         dos.WriteUInt32(cli, DosLayout.CommandLineInterface.Module, savedModule);
-        var ioError = DosCore.IoErr(ref dos, state);
+        var ioError = PublicShellFileServices.GetError(library);
         if (home.IsNotNull)
         {
-            var finishedHome = BPTR.FromRaw(DosProcessCore.SetProgramDir(ref dos, savedHome));
-            if (finishedHome.IsNotNull) DosCore.UnLock(ref dos, state, finishedHome);
+            var finishedHome = NativeForegroundDosVectors.SetProgramDir(library, savedHome);
+            if (finishedHome.IsNotNull) PublicShellFileServices.UnLock(library, finishedHome);
         }
-        DosCore.SelectInput(ref dos, state, savedInput);
-        DosCore.SelectOutput(ref dos, state, savedOutput);
+        NativeForegroundDosVectors.SelectInput(library, savedInput);
+        NativeForegroundDosVectors.SelectOutput(library, savedOutput);
         DosProcessCodec.WriteCurrentError(ref dos, task, savedError);
-        DosObjectCore.SetCliString(ref dos, state, cli, (uint)DosObjectTag.CliCommandName,
-            savedName, previousLength);
-        global::Amiga.Exec.CloseLibrary(library);
+        NativeForegroundDosVectors.SetProgramName(library, savedName);
         dos.FreeGuest(text, capacity);
-        Release(ref dos, state, segment, resident);
-        DosCore.SetIoErr(ref dos, state, ioError);
+        Release(ref dos, library, segment, resident);
+        PublicShellFileServices.SetError(library, (DOS.Error)ioError);
+        global::Amiga.Exec.CloseLibrary(library);
         return true;
     }
 
-    private static void Release(ref CopperSharpNativeDosPlatform dos, APTR state,
-        BPTR segment, APTR resident)
+    private static void Release(ref CopperSharpNativeDosPlatform dos,
+        APTR library, BPTR segment, APTR resident)
     {
-        if (resident.IsNotNull) DosShellNativeBridge.ReleaseResidentNativeRaw(ref dos, state, resident.Raw);
-        else DosSegmentLoaderCore.Unload(ref dos, state, segment);
+        if (resident.IsNotNull) PublicShellResidentServices.Release(ref dos, resident);
+        else NativeForegroundDosVectors.UnLoadSeg(library, segment);
     }
 }
 
 [AmigaLibrary("dos.library::shell-foreground", AmigaLibraryBasePolicy.CallerProvided)]
 internal static class NativeForegroundDosVectors
 {
+    [AmigaLvo(DosLvo.LoadSeg)] [return: M68kRegister(M68kRegister.D0)]
+    internal static extern BPTR LoadSeg([M68kRegister(M68kRegister.A6)] APTR library,
+        [M68kRegister(M68kRegister.D1)] APTR name);
+    [AmigaLvo(DosLvo.UnLoadSeg)]
+    internal static extern void UnLoadSeg([M68kRegister(M68kRegister.A6)] APTR library,
+        [M68kRegister(M68kRegister.D1)] BPTR segment);
+    [AmigaLvo(DosLvo.ParentDir)] [return: M68kRegister(M68kRegister.D0)]
+    internal static extern BPTR ParentDir([M68kRegister(M68kRegister.A6)] APTR library,
+        [M68kRegister(M68kRegister.D1)] BPTR file);
+    [AmigaLvo(DosLvo.SelectInput)] [return: M68kRegister(M68kRegister.D0)]
+    internal static extern BPTR SelectInput([M68kRegister(M68kRegister.A6)] APTR library,
+        [M68kRegister(M68kRegister.D1)] BPTR file);
+    [AmigaLvo(DosLvo.SelectOutput)] [return: M68kRegister(M68kRegister.D0)]
+    internal static extern BPTR SelectOutput([M68kRegister(M68kRegister.A6)] APTR library,
+        [M68kRegister(M68kRegister.D1)] BPTR file);
+    [AmigaLvo(DosLvo.SetProgramDir)] [return: M68kRegister(M68kRegister.D0)]
+    internal static extern BPTR SetProgramDir([M68kRegister(M68kRegister.A6)] APTR library,
+        [M68kRegister(M68kRegister.D1)] BPTR directory);
+    [AmigaLvo(DosLvo.SetProgramName)] [return: M68kRegister(M68kRegister.D0)]
+    internal static extern int SetProgramName([M68kRegister(M68kRegister.A6)] APTR library,
+        [M68kRegister(M68kRegister.D1)] APTR name);
+    [AmigaLvo(DosLvo.GetProgramName)] [return: M68kRegister(M68kRegister.D0)]
+    internal static extern int GetProgramName([M68kRegister(M68kRegister.A6)] APTR library,
+        [M68kRegister(M68kRegister.D1)] APTR buffer, [M68kRegister(M68kRegister.D2)] int size);
+    [AmigaLvo(DosLvo.GetProgramDir)] [return: M68kRegister(M68kRegister.D0)]
+    internal static extern BPTR GetProgramDir([M68kRegister(M68kRegister.A6)] APTR library);
     [AmigaLvo(DosLvo.RunCommand)]
     [return: M68kRegister(M68kRegister.D0)]
     internal static extern int RunCommand([M68kRegister(M68kRegister.A6)] APTR library,

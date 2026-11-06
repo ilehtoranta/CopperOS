@@ -9,8 +9,13 @@ namespace CopperOS.Shell;
 /// boundary explicitly.  The production contract has no managed stream,
 /// allocator, callback, or exception dependency.
 /// </summary>
-public interface IShellPlatform : IAmigaGuestMemory
+public interface IShellPlatform : IShellResidentListWriter
 {
+    /// <summary>Formats a public DOS fault into caller storage without changing IoErr.</summary>
+    bool TryFormatShellError(int error, APTR buffer, uint capacity, out uint length);
+    /// <summary>Commits buffered output before mixing it with direct DOS writes.</summary>
+    bool TryFlushShellOutput(BPTR output);
+
     /// <summary>
     /// Reads the current CLI's default stack for future child commands.  This
     /// capability deliberately does not expose the already-running task stack.
@@ -50,6 +55,10 @@ public interface IShellPlatform : IAmigaGuestMemory
         APTR replacement,
         uint replacementLength);
 
+    /// <summary>Reads an alias; missing is one only when the name is absent.</summary>
+    bool TryGetAlias(APTR cli, APTR name, uint nameLength, APTR value,
+        uint capacity, out uint valueLength, out uint missing);
+
     /// <summary>Removes one CLI-owned command alias.</summary>
     bool TryRemoveAlias(APTR cli, APTR name, uint nameLength);
 
@@ -58,8 +67,8 @@ public interface IShellPlatform : IAmigaGuestMemory
 
     /// <summary>
     /// Applies a fully parsed command-path operation. Entries are packed in
-    /// caller-owned guest memory as NUL-terminated strings; DOS owns path
-    /// ordering, assigns, locks, and requester policy.
+    /// caller-owned guest memory as NUL-terminated strings. The Shell updates
+    /// the CLI-owned lock list using DOS directory and requester services.
     /// </summary>
     bool TryUpdateCommandPath(
         APTR cli,
@@ -69,7 +78,7 @@ public interface IShellPlatform : IAmigaGuestMemory
         uint operation,
         uint quiet);
 
-    /// <summary>Writes the DOS-owned command-path listing.</summary>
+    /// <summary>Writes the current CLI command-path listing.</summary>
     bool TryWriteCommandPath(BPTR output, APTR cli, uint quiet);
 
     /// <summary>
@@ -104,6 +113,10 @@ public interface IShellPlatform : IAmigaGuestMemory
         APTR label,
         uint labelLength,
         uint back);
+
+    /// <summary>Returns WARN when a forward search terminates at ENDSKIP.</summary>
+    bool TrySkipToLabel(APTR cli, APTR label, uint labelLength, uint back,
+        out int result);
 
     /// <summary>
     /// Displays a prompt and returns the user's bounded Y/N/empty response.
@@ -146,9 +159,9 @@ public interface IShellPlatform : IAmigaGuestMemory
         out int result);
 
     /// <summary>
-    /// Resumes one DOS-owned script runner without waiting or spinning. A
+    /// Resumes one Shell-owned script runner without waiting or spinning. A
     /// pending child leaves the runner and its frame resident for a later
-    /// poll; a terminal result releases them through the DOS owner.
+    /// poll; a terminal result releases the runner and its resources.
     /// </summary>
     bool TryPollScriptExecution(APTR cli,
         out ShellScriptExecutionStatus status, out int result);
@@ -162,16 +175,22 @@ public interface IShellPlatform : IAmigaGuestMemory
     /// </summary>
     bool TryParkScriptWait(APTR cli, uint timeoutTicks);
 
+    /// <summary>Whether the background launcher starts a Shell that parses its own redirections.</summary>
+    bool RunChildParsesRedirections();
+
     /// <summary>
     /// Starts a background command through the DOS/Shell process owner. The
     /// command text is caller-owned and is consumed before this call returns;
-    /// no Shell state retains the invocation pointer.
+    /// no Shell state retains the invocation pointer. For a launcher whose
+    /// child parses redirections, successful creation transfers ownership of
+    /// streams indicated by bits 1, 2 and 4 (input, output and error).
     /// </summary>
     bool TryRunCommand(
         APTR cli,
         BPTR input,
         BPTR output,
         BPTR error,
+        uint ownedStreams,
         BPTR currentDirectory,
         APTR continuation,
         APTR command,
@@ -192,14 +211,8 @@ public interface IShellPlatform : IAmigaGuestMemory
         APTR cli,
         in ShellResidentManagementRequest request);
 
-    /// <summary>
-    /// Reads the enabled state for a Shell internal-command identity. A
-    /// command which has no explicit DOS-owned state is enabled by default.
-    /// </summary>
-    bool TryGetInternalCommandEnabled(
-        APTR cli,
-        uint commandIdentity,
-        out uint enabled);
+    /// <summary>Writes the live resident-command list and Shell internals.</summary>
+    bool TryListResidents(APTR cli, BPTR output, uint includeSystem);
 
     /// <summary>Changes the enabled state of one CLI-owned internal command.</summary>
     bool TrySetInternalCommandEnabled(
@@ -325,7 +338,7 @@ public interface IShellPlatform : IAmigaGuestMemory
         uint save);
 
     /// <summary>Writes the DOS-owned global environment listing.</summary>
-    bool TryWriteGlobalVariables(BPTR output);
+    bool TryWriteGlobalVariables(BPTR input, BPTR output, BPTR error, out int result);
 
     /// <summary>Removes a local CLI variable.</summary>
     bool TryRemoveLocalVariable(APTR cli, APTR name, uint nameLength);
@@ -366,12 +379,6 @@ public interface IShellPlatform : IAmigaGuestMemory
     /// for command output because it would silently truncate the result.
     /// </summary>
     int Write(BPTR handle, APTR source, uint length);
-
-    /// <summary>
-    /// Writes one byte to a DOS file handle.  The result is one on success and
-    /// negative on failure.
-    /// </summary>
-    int WriteByte(BPTR handle, byte value);
 
     /// <summary>
     /// Opens a command-owned output file.  A null handle reports failure.

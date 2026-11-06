@@ -102,11 +102,29 @@ public static class ShellRedirectionParser
         in ShellRedirectionWorkspace workspace,
         out ShellRedirectionSpec spec,
         out uint commandLength)
+        where TPlatform : struct, IAmigaGuestMemory =>
+        ParseCore(ref platform, source, sourceLength, in workspace, 0, false,
+            out spec, out commandLength);
+
+    /// <summary>Parses only redirections preceding a Run child command.</summary>
+    public static bool ParseRunLeading<TPlatform>(
+        ref TPlatform platform, APTR source, uint sourceLength,
+        uint argumentOffset, in ShellRedirectionWorkspace workspace,
+        out ShellRedirectionSpec spec, out uint commandLength)
+        where TPlatform : struct, IAmigaGuestMemory =>
+        ParseCore(ref platform, source, sourceLength, in workspace, argumentOffset,
+            true, out spec, out commandLength);
+
+    private static bool ParseCore<TPlatform>(
+        ref TPlatform platform, APTR source, uint sourceLength,
+        in ShellRedirectionWorkspace workspace, uint argumentOffset,
+        bool leadingOnly, out ShellRedirectionSpec spec, out uint commandLength)
         where TPlatform : struct, IAmigaGuestMemory
     {
         spec = default;
         commandLength = 0;
-        if (!ValidSource(ref platform, source, sourceLength) ||
+        if ((leadingOnly && argumentOffset > sourceLength) ||
+            !ValidSource(ref platform, source, sourceLength) ||
             !ValidWorkspace(ref platform, in workspace) ||
             (sourceLength != 0 &&
              (RangesOverlap(source, sourceLength, workspace.Command,
@@ -137,6 +155,22 @@ public static class ShellRedirectionParser
             var value = platform.ReadUInt8(source, (int)position);
             if (value == 0)
                 return false;
+            if (leadingOnly && position >= argumentOffset && !IsWhitespace(value))
+            {
+                var redirection = value == '<' || value == '>' ||
+                    (value == '*' && position + 1 < sourceLength &&
+                     (platform.ReadUInt8(source, (int)position + 1) == '>' ||
+                      (position + 2 < sourceLength &&
+                       platform.ReadUInt8(source, (int)position + 1) == '<' &&
+                       platform.ReadUInt8(source, (int)position + 2) == '>')));
+                if (!redirection)
+                {
+                    if (!CopyRaw(ref platform, source, sourceLength, ref position,
+                            workspace.Command, workspace.CommandCapacity, ref written))
+                        return false;
+                    break;
+                }
+            }
             if (value == ';' && !quote)
             {
                 if (!CopyRaw(ref platform, source, sourceLength,

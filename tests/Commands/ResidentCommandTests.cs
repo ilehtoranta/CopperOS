@@ -6,8 +6,23 @@ namespace CopperOS.Commands.Tests;
 public sealed class ResidentCommandTests
 {
     [Theory]
+    [InlineData(0, "Test                -1\n")]
+    [InlineData(1, "Test                 0\n")]
+    [InlineData(12, "Test                11\n")]
+    [InlineData(-1, "Test              SYSTEM\n")]
+    [InlineData(-2, "Test              INTERNAL\n")]
+    public void Resident_listing_formats_the_raw_use_count(int count, string expected)
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        var name = platform.Store.PutAt(16, "Test");
+        Assert.True(ShellResidentListFormatter.WriteEntry(ref platform, new BPTR(1), name, 4, count));
+        Assert.Equal(expected, platform.Store.OutputText);
+    }
+
+    [Theory]
     [InlineData("C:Assign PURE", "Assign", "C:Assign", 1u)]
     [InlineData("SYS:C/Execute", "Execute", "SYS:C/Execute", 0u)]
+    [InlineData("Demo", "Demo", "Demo", 0u)]
     public void Resident_filename_only_uses_its_file_part_as_the_resident_name(
         string commandLine, string name, string file, uint force)
     {
@@ -91,6 +106,22 @@ public sealed class ResidentCommandTests
         Assert.Equal((int)ShellCommandResult.Ok, result);
         Assert.Equal(0u, platform.Store.ResidentAdd);
         Assert.Equal(1u, platform.Store.ResidentReplace);
+        Assert.Equal(0u, platform.Store.ResidentRequireExisting);
+    }
+
+    [Fact]
+    public void Resident_explicit_replace_requires_an_existing_entry()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        const string commandLine = "MyCmd SYS:C/MyCmd REPLACE";
+        APTR source = platform.Store.PutAt(16, commandLine);
+        var invocation = CreateInvocation(source, commandLine.Length);
+        var result = ResidentCommand.Execute(ref platform, in invocation,
+            new APTR(80), 128, new APTR(480), 64, new APTR(560), 128,
+            new APTR(704), 64);
+        Assert.Equal((int)ShellCommandResult.Ok, result);
+        Assert.Equal(1u, platform.Store.ResidentReplace);
+        Assert.Equal(1u, platform.Store.ResidentRequireExisting);
     }
 
     [Fact]
@@ -154,7 +185,7 @@ public sealed class ResidentCommandTests
     }
 
     [Fact]
-    public void Resident_rejects_add_without_file_instead_of_listing()
+    public void Resident_uses_a_single_name_as_file_for_add()
     {
         EchoCommandTests.TestShellPlatform platform = new();
         const string commandLine = "MyCmd ADD";
@@ -166,8 +197,11 @@ public sealed class ResidentCommandTests
             new APTR(80), 128, new APTR(480), 64, new APTR(560), 128,
             new APTR(704), 64);
 
-        Assert.Equal((int)ShellCommandResult.Error, result);
-        Assert.Equal(0, platform.Store.ResidentCount);
+        Assert.Equal((int)ShellCommandResult.Ok, result);
+        Assert.Equal(1, platform.Store.ResidentCount);
+        Assert.Equal("MyCmd", platform.Store.ResidentName);
+        Assert.Equal("MyCmd", platform.Store.ResidentFile);
+        Assert.Equal(1u, platform.Store.ResidentAdd);
         Assert.Equal(1, platform.Store.ReadArgsCount);
         Assert.Equal(1, platform.Store.FreeArgsCount);
     }
@@ -197,7 +231,7 @@ public sealed class ResidentCommandTests
     {
         EchoCommandTests.TestShellPlatform platform = new();
         platform.Store.ResidentSwitchValue = uint.MaxValue;
-        const string commandLine = "MyCmd SYSTEM";
+        const string commandLine = "SYSTEM";
         APTR source = platform.Store.PutAt(16, commandLine);
         CommandInvocation invocation = CreateInvocation(source,
             commandLine.Length);
@@ -207,12 +241,12 @@ public sealed class ResidentCommandTests
             new APTR(704), 64);
 
         Assert.Equal((int)ShellCommandResult.Ok, result);
-        Assert.Equal(string.Empty, platform.Store.OutputText);
+        Assert.StartsWith("NAME              USE COUNT\n\n", platform.Store.OutputText);
         Assert.Equal(1, platform.Store.ResidentCount);
     }
 
     [Fact]
-    public void Resident_maps_registry_failure_to_fail()
+    public void Resident_maps_registry_failure_to_warn()
     {
         EchoCommandTests.TestShellPlatform platform = new();
         platform.Store.ResidentFailure = true;
@@ -226,7 +260,7 @@ public sealed class ResidentCommandTests
             new APTR(560), 128,
             new APTR(704), 64);
 
-        Assert.Equal((int)ShellCommandResult.Fail, result);
+        Assert.Equal((int)ShellCommandResult.Warn, result);
         Assert.Equal(1, platform.Store.ReadArgsCount);
         Assert.Equal(1, platform.Store.FreeArgsCount);
         Assert.Equal(0, platform.Store.ResidentCount);
@@ -279,7 +313,23 @@ public sealed class ResidentCommandTests
     }
 
     [Fact]
-    public void Resident_listing_includes_active_internal_names_but_not_system_only()
+    public void Resident_replace_of_an_active_internal_loads_the_named_file()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        const string line = "Echo REPLACE";
+        var source = platform.Store.PutAt(16, line);
+        var invocation = CreateInvocation(source, line.Length);
+        Assert.Equal((int)ShellCommandResult.Ok, ResidentCommand.Execute(
+            ref platform, in invocation, new APTR(80), 128, new APTR(480), 64,
+            new APTR(560), 128, new APTR(704), 64));
+        Assert.Equal("Echo", platform.Store.ResidentName);
+        Assert.Equal("Echo", platform.Store.ResidentFile);
+        Assert.Equal(1u, platform.Store.ResidentRequireExisting);
+        Assert.Equal(0, platform.Store.InternalCommandStateChangeCount);
+    }
+
+    [Fact]
+    public void Resident_listing_includes_active_internal_names_with_or_without_system()
     {
         EchoCommandTests.TestShellPlatform platform = new();
         CommandInvocation invocation = CreateInvocation(APTR.Null, 0);
@@ -287,7 +337,9 @@ public sealed class ResidentCommandTests
         Assert.Equal((int)ShellCommandResult.Ok, ResidentCommand.Execute(
             ref platform, in invocation, new APTR(80), 128, new APTR(480), 64,
             new APTR(560), 128, new APTR(704), 64));
-        Assert.Contains("Echo\n", platform.Store.OutputText);
+        Assert.StartsWith("NAME              USE COUNT\n\n", platform.Store.OutputText);
+        Assert.Contains("Echo              INTERNAL\n", platform.Store.OutputText);
+        Assert.Contains("Unsetenv          INTERNAL\n", platform.Store.OutputText);
 
         platform.Store.Output.Clear();
         const string systemLine = "SYSTEM";
@@ -296,7 +348,7 @@ public sealed class ResidentCommandTests
         Assert.Equal((int)ShellCommandResult.Ok, ResidentCommand.Execute(
             ref platform, in invocation, new APTR(80), 128, new APTR(480), 64,
             new APTR(560), 128, new APTR(704), 64));
-        Assert.Equal(string.Empty, platform.Store.OutputText);
+        Assert.Contains("Echo              INTERNAL\n", platform.Store.OutputText);
     }
 
     private static CommandInvocation CreateInvocation(APTR source, int length) =>

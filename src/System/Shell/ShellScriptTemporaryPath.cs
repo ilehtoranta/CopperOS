@@ -68,4 +68,38 @@ public static class ShellScriptTemporaryPath
 		length = PromptPathLength;
 		return true;
 	}
+
+    /// <summary>Uses the volume's T directory when T: is not assigned.</summary>
+    public static bool TrySelectPromptDirectory<TPlatform>(ref TPlatform platform,
+        APTR path, uint capacity, ref uint length)
+        where TPlatform : struct, IShellPackedCommandPathPlatform
+    {
+        if (path.IsNull || length != PromptPathLength || capacity <= length + 1 ||
+            path.Raw > uint.MaxValue - capacity || !platform.IsMapped(path, capacity) ||
+            platform.ReadUInt8(path, 0) != (byte)'T' || platform.ReadUInt8(path, 1) != (byte)':')
+            return false;
+        if (!platform.TryEnterPathRequesters(1, out var process, out var window)) return false;
+        var saved = platform.ReadUInt8(path, 2);
+        platform.WriteUInt8(path, 2, 0);
+        var directory = platform.LockPathDirectory(path);
+        var error = platform.GetPathError();
+        platform.WriteUInt8(path, 2, saved);
+        if (directory.IsNotNull) platform.ReleasePathLock(directory);
+        platform.ExitPathRequesters(process, window);
+        if (directory.IsNull && error != (int)DOS.Error.ObjectNotFound &&
+            error != (int)DOS.Error.DeviceNotMounted)
+        { platform.SetPathError(error); return false; }
+        if (directory.IsNull)
+        {
+            // Include the terminator when moving the original filename.
+            for (var i = length + 1; i > 2; i--)
+                platform.WriteUInt8(path, (int)i, platform.ReadUInt8(path, (int)i - 1));
+            platform.WriteUInt8(path, 0, (byte)':');
+            platform.WriteUInt8(path, 1, (byte)'T');
+            platform.WriteUInt8(path, 2, (byte)'/');
+            length++;
+        }
+        platform.SetPathError(0);
+        return true;
+    }
 }

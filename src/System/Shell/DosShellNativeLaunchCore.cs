@@ -371,9 +371,11 @@ internal static class DosShellNativeLaunchCore
 		// Saved child identities and handles are historical snapshots. DOS
 		// retirement owns their lifetime; acknowledgement only drops the result.
 		if ((current.Flags & (uint)DosChildContinuationFlags.RecordOwned) != 0)
-			return DosShellNativeBridge.TryGetScriptFrame(ref dos, state, cli,
-				out var frame) && DosChildCompletionCore.TryAcknowledgeScriptRecord(
+		{
+			var shell = new DosShellNativePlatform(state);
+			return shell.TryFindFrame(cli, out var frame) && DosChildCompletionCore.TryAcknowledgeScriptRecord(
 					ref dos, state, cli, continuation, frame);
+		}
 		// Caller-owned Run/NewShell records remain caller-owned.
 		return DosChildCompletionCore.TryAcknowledge(ref dos, state, cli,
 			continuation);

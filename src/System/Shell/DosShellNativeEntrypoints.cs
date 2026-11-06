@@ -7,9 +7,9 @@ namespace CopperOS.Shell.Dos;
 
 /// <summary>
 /// Small native ABI for the DOS-backed Shell runner.  The Shell segment owns
-/// command dispatch; these entries only bridge the persistent Execute state
-/// to DOS's prepared wait primitives and return fixed-width status/result
-/// pairs.  No entry spins or invokes a child recursively.
+/// command dispatch; these entries resume its owned Execute state and return
+/// fixed-width status/result pairs. Legacy context register arguments are ignored;
+/// state belongs to the current Shell process. No entry invokes a child recursively.
 /// </summary>
 public static class DosShellNativeEntrypoints
 {
@@ -46,6 +46,13 @@ public static class DosShellNativeEntrypoints
 	public static uint ShellTaskEntry() =>
 		DosShellNativeChildCore.RunFromCurrentTask();
 
+	/// <summary>Starts a Shell launched by a standard DOS startup packet.</summary>
+	public static uint PacketShellTaskEntry()
+	{
+		var task = global::Amiga.Exec.FindTask(CString.FromPointer(0));
+		return task.IsNull ? 20u : DosShellPacketStartup.Run(task);
+	}
+
 	[MethodImpl(MethodImplOptions.NoInlining)]
 	[M68kExport("copperos.shell.child")]
 	[return: M68kRegister(M68kRegister.D0)]
@@ -62,6 +69,12 @@ public static class DosShellNativeEntrypoints
 		APTR.ExportAddress("copperos.shell.entry");
 	public static APTR AddressOfShellChild() =>
 		APTR.ExportAddress("copperos.shell.child");
+
+	// The legacy native image declares export labels in its primary assembly;
+	// its small forwarding entries call these shared worker implementations.
+	public static uint BackgroundWorker() => PublicShellBackgroundCore.Worker();
+	public static uint NewProcessWorker() => PublicShellNewProcessCore.Worker();
+
 	[MethodImpl(MethodImplOptions.NoInlining)]
 	[M68kExport("copperos.shell.queue-handler-task")]
 	[return: M68kRegister(M68kRegister.D0)]
@@ -76,11 +89,9 @@ public static class DosShellNativeEntrypoints
 	private static ulong Begin(APTR cli, APTR file, uint fileLength,
 		APTR dosState, APTR execBase)
 	{
-		var dos = new CopperSharpNativeDosPlatform(dosState.Raw);
-		if (!DosShellNativeContextCore.WriteExecBase(ref dos, dosState,
-			execBase)) return ReturnPair((uint)ShellScriptExecutionStatus.Failed,
-			unchecked((uint)ShellCommandResult.Error));
-		var platform = new DosShellNativePlatform(dosState);
+		_ = dosState;
+		_ = execBase;
+		var platform = new DosShellNativePlatform(APTR.Null);
 		var status = platform.TryExecuteScript(cli, file, fileLength,
 			APTR.Null, 0, out var result);
 		return ReturnPair((uint)status, unchecked((uint)result));
@@ -88,11 +99,9 @@ public static class DosShellNativeEntrypoints
 
 	private static ulong Poll(APTR cli, APTR dosState, APTR execBase)
 	{
-		var dos = new CopperSharpNativeDosPlatform(dosState.Raw);
-		if (!DosShellNativeContextCore.WriteExecBase(ref dos, dosState,
-			execBase)) return ReturnPair((uint)ShellScriptExecutionStatus.Failed,
-			unchecked((uint)ShellCommandResult.Error));
-		var platform = new DosShellNativePlatform(dosState);
+		_ = dosState;
+		_ = execBase;
+		var platform = new DosShellNativePlatform(APTR.Null);
 		if (!platform.TryPollScriptExecution(cli, out var status,
 			out var result))
 			return ReturnPair((uint)ShellScriptExecutionStatus.Failed,

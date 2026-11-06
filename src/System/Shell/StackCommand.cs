@@ -63,7 +63,7 @@ public static class StackCommand
                     invocation.Cli,
                     out var currentStack) || currentStack < 0)
                 return (int)ShellCommandResult.Fail;
-            return ShellUnsignedOutput.WriteLine(ref platform,
+            return ShellUnsignedOutput.WriteStackLine(ref platform,
                 invocation.Output, (uint)currentStack);
         }
 

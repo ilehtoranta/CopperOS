@@ -56,6 +56,23 @@ public sealed class PathCommandTests
     }
 
     [Fact]
+    public void Path_accepts_more_than_64_arguments_when_the_workspace_fits()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.Memory = new byte[32768];
+        var names = Enumerable.Range(0, 65).Select(index => $"P{index}").ToArray();
+        var commandLine = string.Join(' ', names);
+        var source = platform.Store.PutAt(24000, commandLine);
+        var invocation = CreateInvocation(source, commandLine.Length);
+
+        var result = PathCommand.Execute(ref platform, in invocation,
+            new APTR(80), 80, new APTR(12000), 512);
+
+        Assert.Equal((int)ShellCommandResult.Ok, result);
+        Assert.Equal(names, platform.Store.CommandPathEntries);
+    }
+
+    [Fact]
     public void Path_supports_add_remove_reset_and_quiet_switches()
     {
         EchoCommandTests.TestShellPlatform platform = new();

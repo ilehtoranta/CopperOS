@@ -53,6 +53,26 @@ public readonly struct CommandInvocation
         int returnLevel,
         int ioError,
         APTR continuation)
+        : this(argumentText, argumentLength, dosBase, execBase, input, output,
+            error, currentDirectory, cli, returnLevel, ioError, continuation, 0)
+    {
+    }
+
+    public CommandInvocation(
+        APTR argumentText, uint argumentLength, APTR dosBase, APTR execBase,
+        BPTR input, BPTR output, BPTR error, BPTR currentDirectory, APTR cli,
+        int returnLevel, int ioError, APTR continuation, uint ownedStreams)
+        : this(argumentText, argumentLength, dosBase, execBase, input, output,
+            error, currentDirectory, cli, returnLevel, ioError, continuation,
+            ownedStreams, output)
+    {
+    }
+
+    public CommandInvocation(
+        APTR argumentText, uint argumentLength, APTR dosBase, APTR execBase,
+        BPTR input, BPTR output, BPTR error, BPTR currentDirectory, APTR cli,
+        int returnLevel, int ioError, APTR continuation, uint ownedStreams,
+        BPTR diagnosticOutput)
     {
         ArgumentText = argumentText;
         ArgumentLength = argumentLength;
@@ -66,6 +86,8 @@ public readonly struct CommandInvocation
         ReturnLevel = returnLevel;
         IoError = ioError;
         Continuation = continuation;
+        OwnedStreams = ownedStreams;
+        DiagnosticOutput = diagnosticOutput;
     }
 
     public APTR ArgumentText { get; }
@@ -75,11 +97,15 @@ public readonly struct CommandInvocation
     public BPTR Input { get; }
     public BPTR Output { get; }
     public BPTR Error { get; }
+    /// <summary>Built-in diagnostics use Output unless error redirection is explicit.</summary>
+    public BPTR DiagnosticOutput { get; }
     public BPTR CurrentDirectory { get; }
     public APTR Cli { get; }
     public int ReturnLevel { get; }
     public int IoError { get; }
     public APTR Continuation { get; }
+    /// <summary>Command-scoped streams eligible for transfer to a child.</summary>
+    public uint OwnedStreams { get; }
 
     /// <summary>
     /// Creates the smallest useful invocation for a command semantic test.

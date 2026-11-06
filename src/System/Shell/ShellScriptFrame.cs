@@ -136,7 +136,7 @@ public static class ShellScriptFrameCodec
         ref TPlatform platform,
         APTR frame,
         in ShellScriptFrameState initial)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (frame.IsNull || !platform.IsMapped(frame, Size))
             return false;
@@ -151,7 +151,7 @@ public static class ShellScriptFrameCodec
         ref TPlatform platform,
         APTR frame,
         out ShellScriptFrameState state)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         state = default;
         if (frame.IsNull || !platform.IsMapped(frame, Size) ||
@@ -208,7 +208,7 @@ public static class ShellScriptFrameCodec
         ref TPlatform platform,
         APTR frame,
         out uint controlTopRaw)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         controlTopRaw = 0;
         if (frame.IsNull || !platform.IsMapped(frame, Size) ||
@@ -223,7 +223,7 @@ public static class ShellScriptFrameCodec
         ref TPlatform platform,
         APTR frame,
         int result)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (!TryRead(ref platform, frame, out var state))
             return false;
@@ -236,7 +236,7 @@ public static class ShellScriptFrameCodec
         APTR frame,
         uint condition,
         uint conditionFalse)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (conditionFalse > 1 || !TryRead(ref platform, frame, out var state))
             return false;
@@ -250,12 +250,21 @@ public static class ShellScriptFrameCodec
         return WriteState(ref platform, frame, in state);
     }
 
+    /// <summary>Refreshes the current process's borrowed directory lock.</summary>
+    public static bool TrySetCurrentDirectory<TPlatform>(ref TPlatform platform,
+        APTR frame, BPTR directory) where TPlatform : struct, IAmigaGuestMemory
+    {
+        if (!TryRead(ref platform, frame, out _)) return false;
+        platform.WriteUInt32(frame, 28, directory.Raw);
+        return true;
+    }
+
     /// <summary>Updates the condition value without changing branch flags.</summary>
     public static bool TrySetCondition<TPlatform>(
         ref TPlatform platform,
         APTR frame,
         uint condition)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (condition == 0 || !TryRead(ref platform, frame, out var state))
             return false;
@@ -268,7 +277,7 @@ public static class ShellScriptFrameCodec
         APTR frame,
         ShellControlAction action,
         int returnCode)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (action is < ShellControlAction.Else or > ShellControlAction.Quit ||
             !TryRead(ref platform, frame, out var state))
@@ -290,7 +299,7 @@ public static class ShellScriptFrameCodec
         ref TPlatform platform,
         APTR frame,
         uint failureLimit)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (failureLimit == 0 || !TryRead(ref platform, frame, out var state))
             return false;
@@ -304,7 +313,7 @@ public static class ShellScriptFrameCodec
         APTR frame,
         uint line,
         uint offset)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (!TryRead(ref platform, frame, out var state))
             return false;
@@ -321,7 +330,7 @@ public static class ShellScriptFrameCodec
         ref TPlatform platform,
         APTR frame,
         BPTR input)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (input.IsNull || !TryRead(ref platform, frame, out var state) ||
             state.InputState.IsNotNull)
@@ -333,7 +342,7 @@ public static class ShellScriptFrameCodec
     }
 
     public static bool TrySetInteractiveMode<TPlatform>(ref TPlatform platform,
-        APTR frame, bool interactive) where TPlatform : struct, IShellPlatform
+        APTR frame, bool interactive) where TPlatform : struct, IAmigaGuestMemory
     {
         if (!TryRead(ref platform, frame, out var state)) return false;
         if (interactive) state.Flags |= ShellScriptFrameFlags.Interactive;
@@ -345,7 +354,7 @@ public static class ShellScriptFrameCodec
         ref TPlatform platform,
         APTR frame,
         APTR controlTop)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (!TryRead(ref platform, frame, out var state))
             return false;
@@ -358,7 +367,7 @@ public static class ShellScriptFrameCodec
         ref TPlatform platform,
         APTR frame,
         uint controlTopRaw)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (frame.IsNull || !platform.IsMapped(frame, Size) ||
             platform.ReadUInt32(frame, 0) != Magic ||
@@ -372,7 +381,7 @@ public static class ShellScriptFrameCodec
         ref TPlatform platform,
         APTR frame,
         APTR inputState)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (!TryRead(ref platform, frame, out var state))
             return false;
@@ -386,7 +395,7 @@ public static class ShellScriptFrameCodec
         APTR frame,
         APTR template,
         uint templateLength)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (!TryRead(ref platform, frame, out var state) ||
             template.IsNull || templateLength == 0 ||
@@ -404,7 +413,7 @@ public static class ShellScriptFrameCodec
 		ref TPlatform platform,
 		APTR frame,
 		in ShellScriptPromptExpansionState expansion)
-		where TPlatform : struct, IShellPlatform
+		where TPlatform : struct, IAmigaGuestMemory
 	{
 		if (!ValidPromptExpansion(in expansion) ||
 			!TryRead(ref platform, frame, out var state))
@@ -417,7 +426,7 @@ public static class ShellScriptFrameCodec
         ref TPlatform platform,
         APTR frame,
         APTR labelTop)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (!TryRead(ref platform, frame, out var state))
             return false;
@@ -429,7 +438,7 @@ public static class ShellScriptFrameCodec
         ref TPlatform platform,
         APTR frame,
         APTR signalState)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (!TryRead(ref platform, frame, out var state))
             return false;
@@ -444,7 +453,7 @@ public static class ShellScriptFrameCodec
         APTR continuation,
         uint nextLine,
         uint nextOffset)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (continuation.IsNotNull && nextLine == 0)
             return false;
@@ -461,7 +470,7 @@ public static class ShellScriptFrameCodec
 		ref TPlatform platform,
 		APTR frame,
 		in ShellScriptDeferredCommandState deferred)
-		where TPlatform : struct, IShellPlatform
+		where TPlatform : struct, IAmigaGuestMemory
 	{
 		if (!ValidDeferredCommand(ref platform, in deferred) ||
 			!TryRead(ref platform, frame, out var state))
@@ -475,7 +484,7 @@ public static class ShellScriptFrameCodec
         APTR frame,
         ShellScriptSignalFlags signal,
         int result)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (!ValidSignal(signal) ||
             !TryRead(ref platform, frame, out var state))
@@ -505,7 +514,7 @@ public static class ShellScriptFrameCodec
         uint conditionFalse,
         uint skipping,
         uint elseSeen)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (conditionFalse > 1 || skipping > 1 || elseSeen > 1 ||
             !TryRead(ref platform, frame, out var state))
@@ -529,7 +538,7 @@ public static class ShellScriptFrameCodec
         uint conditionFalse,
         uint skipping,
         uint elseSeen)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (conditionFalse > 1 || skipping > 1 || elseSeen > 1 ||
             frame.IsNull || !platform.IsMapped(frame, Size) ||
@@ -550,7 +559,7 @@ public static class ShellScriptFrameCodec
     public static bool TryIncrementLabelCount<TPlatform>(
         ref TPlatform platform,
         APTR frame)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (!TryRead(ref platform, frame, out var state) ||
             state.LabelCount == uint.MaxValue)
@@ -563,7 +572,7 @@ public static class ShellScriptFrameCodec
         ref TPlatform platform,
         APTR frame,
         in ShellScriptFrameState state)
-        where TPlatform : struct, IShellPlatform
+        where TPlatform : struct, IAmigaGuestMemory
     {
         if (frame.IsNull || !platform.IsMapped(frame, Size))
             return false;
@@ -618,7 +627,7 @@ public static class ShellScriptFrameCodec
 	private static bool ValidDeferredCommand<TPlatform>(
 		ref TPlatform platform,
 		in ShellScriptDeferredCommandState deferred)
-		where TPlatform : struct, IShellPlatform
+		where TPlatform : struct, IAmigaGuestMemory
 	{
 		if (deferred.Kind == ShellScriptDeferredCommandKind.None)
 			return deferred.Text.Data.IsNull && deferred.Text.Length == 0 &&
@@ -668,6 +677,6 @@ public static class ShellScriptFrameCodec
         APTR address,
         int offset,
         uint value)
-        where TPlatform : struct, IShellPlatform =>
+        where TPlatform : struct, IAmigaGuestMemory =>
         platform.WriteUInt32(address, offset, value);
 }

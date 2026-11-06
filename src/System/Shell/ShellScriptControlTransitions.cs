@@ -9,6 +9,19 @@ namespace CopperOS.Shell;
 /// </summary>
 public static class ShellScriptControlTransitions
 {
+    /// <summary>ENDSKIP is a no-op when no Skip control record is active.</summary>
+    public static bool TryEndSkip<TPlatform>(ref TPlatform platform, APTR frame,
+        out APTR closedRecord) where TPlatform : struct, IShellPlatform
+    {
+        closedRecord = APTR.Null;
+        if (!ShellScriptFrameCodec.TryReadControlTop(ref platform, frame, out var top)) return false;
+        if (top == 0) return true;
+        if (!ShellScriptControlCodec.TryReadLinkRaw(ref platform, top,
+                out _, out var kind, out _)) return false;
+        if (kind != ShellScriptBlockKind.Skip) return true;
+        return TryClose(ref platform, frame, ShellScriptBlockKind.Skip, out closedRecord);
+    }
+
     public static bool TryOpen<TPlatform>(
         ref TPlatform platform,
         APTR frame,

@@ -134,7 +134,7 @@ public sealed class FailatFaultCommandTests
             32);
 
         Assert.Equal((int)ShellCommandResult.Ok, result);
-        Assert.Equal("5\n", platform.Store.OutputText);
+        Assert.Equal("Fail limit: 5\n", platform.Store.OutputText);
         Assert.Equal(0, platform.Store.WriteFailureLimitCount);
         Assert.Equal(1, platform.Store.ReadArgsCount);
         Assert.Equal(1, platform.Store.FreeArgsCount);

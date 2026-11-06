@@ -3,10 +3,10 @@ using Amiga;
 namespace CopperOS.Shell;
 
 /// <summary>
-/// Shell-owned MorphOS <c>Setenv NAME [SAVE] STRING/F</c> command slice.
+/// Shell-owned <c>Setenv NAME [SAVE] STRING/F</c> command slice.
 ///
-/// The no-argument form asks the DOS owner for its canonical global-variable
-/// listing; the Shell does not retain or format an environment map.
+/// The no-argument form delegates the classic global-variable listing while
+/// preserving its result and command streams.
 /// </summary>
 public static class SetenvCommand
 {
@@ -50,7 +50,7 @@ public static class SetenvCommand
 
         var name = parsed.Name;
         var value = parsed.Value;
-        var save = parsed.Save;
+        var save = parsed.Save == 0 ? 0u : 1u;
         if (name.IsNull)
         {
             if (value.IsNotNull || save != 0)
@@ -60,10 +60,10 @@ public static class SetenvCommand
             }
 
             platform.FreeArgs(rdArgs);
-            return invocation.Output.IsNull ||
-                !platform.TryWriteGlobalVariables(invocation.Output)
-                ? (int)ShellCommandResult.Fail
-                : (int)ShellCommandResult.Ok;
+            if (invocation.Output.IsNull || !platform.TryWriteGlobalVariables(
+                invocation.Input, invocation.Output, invocation.DiagnosticOutput, out var listResult))
+                return (int)ShellCommandResult.Fail;
+            return listResult;
         }
 
         uint nameLength;

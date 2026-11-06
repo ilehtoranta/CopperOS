@@ -341,6 +341,33 @@ public sealed class EchoCommandTests
 
         public GuestStore Store;
 
+        public bool TryFormatShellError(int error, APTR buffer, uint capacity, out uint length)
+        {
+            var text = error == 115 ? "bad number" : error == 118 ? "wrong number of arguments" :
+                error == 205 ? "object not found" : "fault " + error;
+            length = (uint)text.Length;
+            if (Store.FaultFailure || buffer.IsNull || capacity <= length || !IsMapped(buffer, capacity)) return false;
+            for (var index = 0; index < text.Length; index++) WriteUInt8(buffer, index, (byte)text[index]);
+            WriteUInt8(buffer, text.Length, 0);
+            return true;
+        }
+
+        public bool TryFlushShellOutput(BPTR output)
+        {
+            if (output.IsNull) return false;
+            Store.CommandIoError = 0;
+            if (Store.BufferedBytes.TryGetValue(output.Raw, out var bytes))
+            {
+                foreach (var value in bytes)
+                {
+                    Store.Output.Add(value);
+                    Store.RecordStreamByte(output.Raw, value);
+                }
+                bytes.Clear();
+            }
+            return true;
+        }
+
         public bool TryBeginCommandDiagnostics(APTR cli)
         {
             if (cli.IsNull) return false;
@@ -473,6 +500,8 @@ public sealed class EchoCommandTests
 				return checked((int)length);
 			}
             Store.Append(source, length);
+            for (var index = 0u; index < length; index++)
+                Store.RecordStreamByte(handle.Raw, ReadUInt8(source, (int)index));
             return checked((int)length);
         }
 
@@ -495,6 +524,15 @@ public sealed class EchoCommandTests
         {
             if (handle.IsNull)
                 return -1;
+            if (Store.ByteWriteAttempts++ == Store.FailByteWriteAt)
+                return -1;
+			if (Store.BufferByteWrites)
+			{
+				if (!Store.BufferedBytes.TryGetValue(handle.Raw, out var bytes))
+					Store.BufferedBytes.Add(handle.Raw, bytes = new List<byte>());
+				bytes.Add(value);
+				return 1;
+			}
 			if (handle.Raw == 21 && Store.RedirectionOutputPath.StartsWith(
 				"T:Prompt.", StringComparison.Ordinal))
 			{
@@ -502,6 +540,7 @@ public sealed class EchoCommandTests
 				return 1;
 			}
             Store.Output.Add(value);
+            Store.RecordStreamByte(handle.Raw, value);
             return 1;
         }
 
@@ -635,6 +674,22 @@ public sealed class EchoCommandTests
             return true;
         }
 
+        public bool TryGetAlias(APTR cli, APTR name, uint nameLength, APTR value,
+            uint capacity, out uint valueLength, out uint missing)
+        {
+            valueLength = 0; missing = 0;
+            if (cli.IsNull || name.IsNull || nameLength == 0 || !IsMapped(name, nameLength) ||
+                value.IsNull || capacity == 0 || !IsMapped(value, capacity)) return false;
+            if (!string.Equals(Store.ReadText(name, nameLength), Store.AliasName, StringComparison.OrdinalIgnoreCase))
+            { missing = 1; return false; }
+            var bytes = System.Text.Encoding.ASCII.GetBytes(Store.AliasValue);
+            valueLength = (uint)bytes.Length;
+            if (valueLength >= capacity) return false;
+            bytes.CopyTo(Store.Memory, checked((int)value.Raw));
+            WriteUInt8(value, bytes.Length, 0);
+            return true;
+        }
+
         public bool TryWriteAliases(BPTR output, APTR cli)
         {
             if (output.IsNull || cli.IsNull || Store.AliasListFailure)
@@ -740,7 +795,12 @@ public sealed class EchoCommandTests
             APTR label,
             uint labelLength,
             uint back)
+            => TrySkipToLabel(cli, label, labelLength, back, out _);
+
+        public bool TrySkipToLabel(APTR cli, APTR label, uint labelLength,
+            uint back, out int result)
         {
+            result = Store.SkipResult;
             if (cli.IsNull || Store.SkipFailure ||
                 (labelLength != 0 &&
                  (label.IsNull || !IsMapped(label, labelLength))))
@@ -750,6 +810,12 @@ public sealed class EchoCommandTests
                 : Store.ReadText(label, labelLength);
             Store.SkipBack = back;
             Store.SkipCount++;
+            if (Store.ScanSkipSource)
+                return back != 0
+                    ? ShellScriptLabelTransitions.TryScanFromBeginning(ref this, Store.BoundFrame,
+                        label, labelLength, new APTR(6000), 512, new APTR(6600), 256, out result)
+                    : ShellScriptLabelTransitions.TryScanForward(ref this, Store.BoundFrame,
+                        label, labelLength, new APTR(6000), 512, new APTR(6600), 256, out result);
             return true;
         }
 
@@ -900,6 +966,8 @@ public sealed class EchoCommandTests
             Store.LastScriptLookupName = Store.ReadText(name, nameLength);
             Store.ScriptLookupCount++;
             lookup.Kind = Store.ScriptLookupKind;
+            if (lookup.Kind == ShellScriptLookupKind.NotFound)
+                Store.CommandIoError = (int)DOS.Error.ObjectNotFound;
             lookup.Origin = Store.ScriptLookupKind switch
             {
                 ShellScriptLookupKind.Resident =>
@@ -1112,6 +1180,7 @@ public sealed class EchoCommandTests
                 return false;
             Store.RedirectionInputPath = Store.ReadText(path, pathLength);
             Store.RedirectionOpenCount++;
+            if (Store.ClobberIoErrorOnRedirectionOpen) Store.CommandIoError = 0;
             if (Store.RedirectionInputPath.StartsWith("T:Prompt.",
 				StringComparison.Ordinal))
 				Store.PromptCaptureReadOffset = 0;
@@ -1134,13 +1203,14 @@ public sealed class EchoCommandTests
             Store.RedirectionOutputPath = Store.ReadText(path, pathLength);
             Store.RedirectionOutputAppend = append;
             Store.RedirectionOpenCount++;
+            if (Store.ClobberIoErrorOnRedirectionOpen) Store.CommandIoError = 0;
             if (Store.RedirectionOutputPath.StartsWith("T:Prompt.",
 				StringComparison.Ordinal))
 			{
 				Store.PromptCapture.Clear();
 				Store.PromptCaptureReadOffset = 0;
 			}
-            handle = new BPTR(21);
+            handle = new BPTR(Store.DistinctRedirectionHandles ? (uint)(20 + Store.RedirectionOpenCount) : 21u);
             return true;
         }
 
@@ -1176,6 +1246,9 @@ public sealed class EchoCommandTests
             return IsMapped(buffer, capacity);
         }
 
+        public bool TrySelectScriptPromptDirectory(APTR cli, APTR path, uint capacity, ref uint length) =>
+            cli.IsNotNull && path.IsNotNull && length < capacity && IsMapped(path, capacity);
+
         public bool TrySetScriptPromptCapture(APTR cli, APTR path,
 			uint pathLength, BPTR input) => cli.IsNotNull && path.IsNotNull &&
 			pathLength != 0 && pathLength < 512 &&
@@ -1195,11 +1268,14 @@ public sealed class EchoCommandTests
             return !failed;
         }
 
+        public bool RunChildParsesRedirections() => !Store.LegacyRunRedirection;
+
         public bool TryRunCommand(
             APTR cli,
             BPTR input,
             BPTR output,
             BPTR error,
+            uint ownedStreams,
             BPTR currentDirectory,
             APTR continuation,
             APTR command,
@@ -1218,6 +1294,7 @@ public sealed class EchoCommandTests
             Store.RunInput = input;
             Store.RunOutput = output;
             Store.RunError = error;
+            Store.RunOwnedStreams = ownedStreams;
             Store.RunCurrentDirectory = currentDirectory;
             Store.RunContinuation = continuation;
             Store.RunDetach = detach;
@@ -1234,6 +1311,7 @@ public sealed class EchoCommandTests
             APTR cli,
             in ShellResidentManagementRequest request)
         {
+            Store.ResidentOutput = request.Output;
             if (cli.IsNull || request.Output.IsNull || Store.ResidentFailure ||
                 (request.NameLength != 0 && (request.Name.IsNull ||
                     !IsMapped(request.Name, request.NameLength))) ||
@@ -1254,8 +1332,17 @@ public sealed class EchoCommandTests
             Store.ResidentForce = request.Force;
             Store.ResidentSystem = request.System;
             Store.ResidentDefer = request.Defer;
+            Store.ResidentRequireExisting = request.RequireExisting;
             Store.ResidentCount++;
             return true;
+        }
+
+        public bool TryListResidents(APTR cli, BPTR output, uint includeSystem)
+        {
+            var request = new ShellResidentManagementRequest { Output = output, System = includeSystem };
+            return TryManageResident(cli, in request) &&
+                ShellResidentListFormatter.WriteHeader(ref this, output) &&
+                ShellResidentListFormatter.WriteInternals(ref this, cli, output);
         }
 
         public bool TryGetInternalCommandEnabled(APTR cli,
@@ -1447,9 +1534,9 @@ public sealed class EchoCommandTests
                     StringComparison.OrdinalIgnoreCase))
                 return TryReadPromptArgs(argumentText, argumentLength,
                     resultArray, out rdArgs);
-            if (string.Equals(templateText, "LABEL/A",
+            if (string.Equals(templateText, "LABEL",
                     StringComparison.OrdinalIgnoreCase))
-                return TryReadLabArgs(argumentText, argumentLength,
+                return TryReadOptionalNameArgs(argumentText, argumentLength,
                     resultArray, out rdArgs);
             if (string.Equals(templateText, "DIR",
                     StringComparison.OrdinalIgnoreCase))
@@ -1805,7 +1892,10 @@ public sealed class EchoCommandTests
                     continue;
                 }
                 if (positional >= 2)
+                {
+                    Store.CommandIoError = (int)DOS.Error.TooManyArguments;
                     return false;
+                }
                 var address = new APTR((uint)valueAddress);
                 Store.PutAt(valueAddress, value);
                 WriteUInt8(address, value.Length, 0);
@@ -1908,7 +1998,7 @@ public sealed class EchoCommandTests
                 token, 96, out _, out _);
             if (tokenResult != (int)ShellTextTokenResult.End)
                 return false;
-            WriteUInt32(resultArray, 0, 1);
+            WriteUInt32(resultArray, 0, Store.ResetSwitchValue);
             rdArgs = new APTR(240);
             Store.ReadArgsCount++;
             return true;
@@ -2000,7 +2090,7 @@ public sealed class EchoCommandTests
                 WriteUInt8(nameAddress, name.Length, 0);
                 WriteUInt32(resultArray, 0, nameAddress.Raw);
             }
-            WriteUInt32(resultArray, 4, save != 0 ? 1u : 0u);
+            WriteUInt32(resultArray, 4, save != 0 ? Store.SaveSwitchValue : 0u);
             rdArgs = new APTR(240);
             Store.ReadArgsCount++;
             return true;
@@ -2121,7 +2211,7 @@ public sealed class EchoCommandTests
             if (!nameSet)
                 return false;
             WriteNamedFinalResult(resultArray, name, value);
-            WriteUInt32(resultArray, 4, save != 0 ? 1u : 0u);
+            WriteUInt32(resultArray, 4, save != 0 ? Store.SaveSwitchValue : 0u);
             WriteUInt32(resultArray, 8, new APTR(220).Raw);
             rdArgs = new APTR(240);
             Store.ReadArgsCount++;
@@ -2161,9 +2251,13 @@ public sealed class EchoCommandTests
             if (valueResult != (int)ShellTextTokenResult.Token &&
                 valueResult != (int)ShellTextTokenResult.End)
                 return false;
-            var value = valueResult == (int)ShellTextTokenResult.End
-                ? string.Empty : Store.ReadText(token, valueLength);
-            WriteNamedFinalResult(resultArray, name, value);
+            if (valueResult == (int)ShellTextTokenResult.End)
+            {
+                var nameAddress = Store.PutAt(192, name);
+                WriteUInt8(nameAddress, name.Length, 0);
+                WriteUInt32(resultArray, 0, nameAddress.Raw);
+            }
+            else WriteNamedFinalResult(resultArray, name, Store.ReadText(token, valueLength));
             rdArgs = new APTR(240);
             Store.ReadArgsCount++;
             return true;
@@ -2323,7 +2417,7 @@ public sealed class EchoCommandTests
                     token, 96, out _, out _);
                 if (tokenResult != (int)ShellTextTokenResult.End)
                     return false;
-                WriteUInt32(resultArray, 4, 1);
+                WriteUInt32(resultArray, 4, Store.SkipSwitchValue);
                 rdArgs = new APTR(240);
                 Store.ReadArgsCount++;
                 return true;
@@ -2340,7 +2434,7 @@ public sealed class EchoCommandTests
                     !string.Equals(Store.ReadText(token, optionLength),
                         "BACK", StringComparison.OrdinalIgnoreCase))
                     return false;
-                WriteUInt32(resultArray, 4, 1);
+                WriteUInt32(resultArray, 4, Store.SkipSwitchValue);
                 tokenResult = ShellTextParser.NextToken(ref this, ref cursor,
                     token, 96, out _, out _);
             }
@@ -2361,10 +2455,12 @@ public sealed class EchoCommandTests
             Clear(resultArray, 24);
             var cursor = new ShellTextCursor(argumentText, argumentLength);
             var token = new APTR(64);
-            var listAddress = new APTR(768);
+            var extended = Store.Memory.Length > 8192;
+            var listAddress = new APTR(extended ? 16000u : 768u);
+            var listEntries = extended ? 1024 : 65;
             var pathCount = 0;
             var optionsStarted = false;
-            Clear(listAddress, 260);
+            Clear(listAddress, (uint)(listEntries * 4));
 
             while (true)
             {
@@ -2394,7 +2490,7 @@ public sealed class EchoCommandTests
                     optionsStarted = true;
                     continue;
                 }
-                if (optionsStarted || pathCount >= 64)
+                if (optionsStarted || pathCount >= (extended ? 96 : 64))
                     return false;
 
                 var valueAddress = new APTR((uint)(1024 + pathCount * 128));
@@ -2411,7 +2507,7 @@ public sealed class EchoCommandTests
                 if (Store.PathArgsMissingTerminator)
                 {
                     var firstPath = ReadUInt32(listAddress, 0);
-                    for (var index = pathCount; index <= 64; index++)
+                    for (var index = pathCount; index < listEntries; index++)
                         WriteUInt32(listAddress, index * 4, firstPath);
                 }
                 else
@@ -2888,10 +2984,13 @@ public sealed class EchoCommandTests
             return true;
         }
 
-        public bool TryWriteGlobalVariables(BPTR output)
+        public bool TryWriteGlobalVariables(BPTR input, BPTR output, BPTR error, out int result)
         {
+            result = Store.GlobalListResult;
             if (output.IsNull || Store.GlobalListFailure)
                 return false;
+            Store.GlobalListInput = input;
+            Store.GlobalListError = error;
             Store.GlobalListCount++;
             Store.Output.AddRange(System.Text.Encoding.ASCII.GetBytes(
                 Store.GlobalVariableListing));
@@ -2985,12 +3084,24 @@ public sealed class EchoCommandTests
 
     public sealed class GuestStore
     {
-        public readonly byte[] Memory = new byte[8192];
+        public byte[] Memory = new byte[8192];
         public bool LazyPromptFailure, LazyPromptAllocated;
         public int LazyPromptAllocations;
         public bool ClobberFaultReadArgs;
         public uint FaultReadArgsCount;
         public readonly List<byte> Output = new();
+        public readonly Dictionary<uint, List<byte>> OutputStreams = new();
+        public readonly Dictionary<uint, List<byte>> BufferedBytes = new();
+        public bool BufferByteWrites;
+        public bool DistinctRedirectionHandles, ClobberIoErrorOnRedirectionOpen;
+        public void RecordStreamByte(uint handle, byte value)
+        {
+            if (!OutputStreams.TryGetValue(handle, out var bytes))
+                OutputStreams.Add(handle, bytes = new List<byte>());
+            bytes.Add(value);
+        }
+        public string StreamText(uint handle) => OutputStreams.TryGetValue(handle, out var bytes)
+            ? System.Text.Encoding.ASCII.GetString(bytes.ToArray()) : string.Empty;
 		public readonly List<byte> PromptCapture = new();
 		public int PromptCaptureReadOffset;
         public bool ShortWrite;
@@ -3117,6 +3228,7 @@ public sealed class EchoCommandTests
 		public int ScriptDeleteCount;
 		public string LastDeletedScriptPath = string.Empty;
         public bool RunFailure;
+        public bool LegacyRunRedirection;
         public string RunCommand = string.Empty;
         public uint RunDetach;
         public uint RunQuiet;
@@ -3126,6 +3238,7 @@ public sealed class EchoCommandTests
         public uint RunPriorityPresent;
         public BPTR RunInput;
         public BPTR RunOutput;
+        public uint RunOwnedStreams;
         public BPTR RunError;
         public BPTR RunCurrentDirectory;
         public APTR RunContinuation;
@@ -3140,8 +3253,10 @@ public sealed class EchoCommandTests
         public uint ResidentForce;
         public uint ResidentSystem;
         public uint ResidentDefer;
+        public uint ResidentRequireExisting;
         public uint ResidentSwitchValue = 1;
         public int ResidentCount;
+        public BPTR ResidentOutput;
         public APTR InternalCommandCli;
         public uint DisabledInternalCommandMask;
         public int InternalCommandStateChangeCount;
@@ -3186,12 +3301,22 @@ public sealed class EchoCommandTests
         public int LocalSetCount;
         public bool GlobalLookupFailure;
         public bool GlobalListFailure;
+        public int GlobalListResult;
+        public BPTR GlobalListInput;
+        public BPTR GlobalListError;
         public string GlobalVariableListing = string.Empty;
         public int GlobalListCount;
         public bool GlobalSetFailure;
         public string GlobalVariableName = string.Empty;
         public string GlobalVariableValue = string.Empty;
+        public int SkipResult;
+        public bool ScanSkipSource;
+        public uint SkipSwitchValue = 1;
         public uint GlobalSaveFlag;
+        public uint SaveSwitchValue = 1;
+        public uint ResetSwitchValue = 1;
+        public int FailByteWriteAt = -1;
+        public int ByteWriteAttempts;
         public int GlobalSetCount;
         public bool LocalRemoveFailure;
         public bool GlobalRemoveFailure;

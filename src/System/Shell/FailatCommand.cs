@@ -5,9 +5,8 @@ namespace CopperOS.Shell;
 /// <summary>
 /// Shell-owned MorphOS <c>FailAt</c> command.
 ///
-/// The command changes the active command-sequence failure threshold. The
-/// sequence owner is responsible for restoring its default when the sequence
-/// ends; this command does not retain a second Shell-side copy of that state.
+/// The command changes the CLI failure threshold. It remains in effect after
+/// a command source or nested script ends, until a later FailAt changes it.
 /// </summary>
 public static class FailatCommand
 {
@@ -48,6 +47,20 @@ public static class FailatCommand
                 !platform.TryReadCliFailureLimit(invocation.Cli,
                     out var currentFailureLimit))
                 return (int)ShellCommandResult.Fail;
+            // V40 displays a label before the numeric threshold.
+            if (platform.WriteByte(invocation.Output, (byte)'F') < 0 ||
+                platform.WriteByte(invocation.Output, (byte)'a') < 0 ||
+                platform.WriteByte(invocation.Output, (byte)'i') < 0 ||
+                platform.WriteByte(invocation.Output, (byte)'l') < 0 ||
+                platform.WriteByte(invocation.Output, (byte)' ') < 0 ||
+                platform.WriteByte(invocation.Output, (byte)'l') < 0 ||
+                platform.WriteByte(invocation.Output, (byte)'i') < 0 ||
+                platform.WriteByte(invocation.Output, (byte)'m') < 0 ||
+                platform.WriteByte(invocation.Output, (byte)'i') < 0 ||
+                platform.WriteByte(invocation.Output, (byte)'t') < 0 ||
+                platform.WriteByte(invocation.Output, (byte)':') < 0 ||
+                platform.WriteByte(invocation.Output, (byte)' ') < 0)
+                return (int)ShellCommandResult.Error;
             return ShellUnsignedOutput.WriteLine(ref platform,
                 invocation.Output, currentFailureLimit);
         }

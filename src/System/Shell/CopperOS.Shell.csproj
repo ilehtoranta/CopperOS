@@ -9,8 +9,8 @@
     <NoWarn>1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="DosShellNativeForegroundCore.cs;DosShellNativePlatform.Foreground.cs" />
-    <Compile Remove="DosShellPlatform.cs;DosShellNativeEntrypoints.cs;DosShellNativeParkEntrypoint.cs;DosShellNativePlatform.cs;DosShellNativeLaunchCore.cs;DosShellNativeChildCore.cs;DosShellPreparedChildCore.cs;DosQueueHandlerTaskNativeCore.cs" />
+    <Compile Remove="DosShellNativeForegroundCore.cs;DosShellNativePlatform.Foreground.cs;DosShellPacketStartup.cs;DosShellPublicGlobalListing.cs;PublicShellResidentMutation.cs;PublicShellResidentListing.cs;PublicShellBackgroundCore.cs;PublicShellNewProcessCore.cs;PublicShellImageLease.cs;PublicShellWorkerStartup.cs;PublicShellStreamLeaseCore.cs;PublicShellContinuationCore.cs" />
+    <Compile Remove="DosShellPlatform.cs;DosShellNativeEntrypoints.cs;DosShellNativeParkEntrypoint.cs;DosShellNativePlatform.cs;DosShellNativeLaunchCore.cs;DosShellNativeChildCore.cs;DosShellPreparedChildCore.cs;DosQueueHandlerTaskNativeCore.cs;DosShellPathServices.cs" />
   </ItemGroup>
   <ItemGroup Condition="'$(CopperOSUseLocalCopperSharp)' == 'true' and Exists('$(CopperSharp68kRoot)\Sdk.Amiga\CopperSharp.Sdk.Amiga.csproj')">
     <ProjectReference Include="$(CopperSharp68kRoot)\Sdk.Amiga.Support\CopperSharp.Sdk.Amiga.Support.csproj" />

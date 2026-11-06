@@ -74,6 +74,33 @@ public sealed class AliasCommandTests
     }
 
     [Fact]
+    public void Alias_with_only_a_name_displays_the_value_without_modifying_it()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.AliasName = "hi";
+        platform.Store.AliasValue = "echo Hello";
+        APTR source = platform.Store.PutAt(16, "hi");
+        CommandInvocation invocation = CreateInvocation(source, 2, new BPTR(1));
+        var result = AliasCommand.Execute(ref platform, in invocation, new APTR(80), 32, new APTR(128), 96);
+        Assert.Equal((int)ShellCommandResult.Ok, result);
+        Assert.Equal("echo Hello\n", platform.Store.OutputText);
+        Assert.Equal("echo Hello", platform.Store.AliasValue);
+        Assert.Equal(0, platform.Store.AliasSetCount);
+    }
+
+    [Fact]
+    public void Alias_with_an_unknown_name_returns_warn_without_creating_it()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        APTR source = platform.Store.PutAt(16, "missing");
+        CommandInvocation invocation = CreateInvocation(source, 7, new BPTR(1));
+        var result = AliasCommand.Execute(ref platform, in invocation, new APTR(80), 32, new APTR(128), 96);
+        Assert.Equal((int)ShellCommandResult.Warn, result);
+        Assert.Equal(0, platform.Store.AliasSetCount);
+        Assert.Empty(platform.Store.Output);
+    }
+
+    [Fact]
     public void Alias_rejects_malformed_replacement_without_mutation()
     {
         EchoCommandTests.TestShellPlatform platform = new();

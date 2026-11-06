@@ -38,7 +38,7 @@ public static class CdCommand
                 invocation.ArgumentLength, tokenBuffer, templateLength,
                 resultArray, ReadArgsPointerResultRecord.Size,
                 out var rdArgs) || rdArgs.IsNull)
-            return (int)ShellCommandResult.Error;
+            return (int)ShellCommandResult.Fail;
 
         if (!ReadArgsPointerResultRecordCodec.TryRead(ref platform,
                 resultArray, out var parsed))
@@ -61,7 +61,7 @@ public static class CdCommand
             return platform.TryChangeCurrentDirectory(
                     invocation.Cli, pathBuffer, pathLength)
                 ? (int)ShellCommandResult.Ok
-                : (int)ShellCommandResult.Error;
+                : (int)ShellCommandResult.Fail;
         }
 
         platform.FreeArgs(rdArgs);

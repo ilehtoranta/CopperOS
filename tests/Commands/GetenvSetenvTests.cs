@@ -5,6 +5,27 @@ namespace CopperOS.Commands.Tests;
 
 public sealed class GetenvSetenvTests
 {
+    [Theory]
+    [InlineData(1u)]
+    [InlineData(uint.MaxValue)]
+    public void Save_switch_normalizes_ReadArgs_true_before_global_services(uint trueValue)
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.SaveSwitchValue = trueValue;
+        var text = "BIVar SAVE second";
+        var source = platform.Store.PutAt(16, text);
+        var invocation = CreateInvocation(source, text.Length, BPTR.Null);
+        Assert.Equal(0, SetenvCommand.Execute(ref platform, in invocation,
+            new APTR(80), 40, new APTR(120), 32, new APTR(160), 80));
+        Assert.Equal(1u, platform.Store.GlobalSaveFlag);
+        text = "BIVar SAVE";
+        source = platform.Store.PutAt(16, text);
+        invocation = CreateInvocation(source, text.Length, BPTR.Null);
+        Assert.Equal(0, UnsetenvCommand.Execute(ref platform, in invocation,
+            new APTR(80), 40, new APTR(128), 32));
+        Assert.Equal(1u, platform.Store.GlobalRemoveSaveFlag);
+    }
+
     [Fact]
     public void Getenv_reads_a_global_value_and_appends_a_line()
     {
@@ -127,6 +148,7 @@ public sealed class GetenvSetenvTests
     {
         EchoCommandTests.TestShellPlatform platform = new();
         platform.Store.GlobalVariableListing = "MOS=MorphOS\n";
+        platform.Store.GlobalListResult = (int)ShellCommandResult.Warn;
         CommandInvocation invocation = CreateInvocation(APTR.Null, 0,
             new BPTR(1));
 
@@ -140,7 +162,7 @@ public sealed class GetenvSetenvTests
             new APTR(160),
             80);
 
-        Assert.Equal((int)ShellCommandResult.Ok, result);
+        Assert.Equal((int)ShellCommandResult.Warn, result);
         Assert.Equal(0, platform.Store.GlobalSetCount);
         Assert.Equal("MOS=MorphOS\n", platform.Store.OutputText);
         Assert.Equal(1, platform.Store.GlobalListCount);
@@ -169,6 +191,25 @@ public sealed class GetenvSetenvTests
         Assert.Equal(1, platform.Store.FreeArgsCount);
         Assert.Equal(0, platform.Store.GlobalListCount);
         Assert.Equal(string.Empty, platform.Store.OutputText);
+    }
+
+    [Fact]
+    public void Setenv_preserves_listing_warning_and_command_streams()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.GlobalListResult = (int)ShellCommandResult.Warn;
+        var input = BPTR.FromRaw(2);
+        var error = BPTR.FromRaw(3);
+        var invocation = new CommandInvocation(APTR.Null, 0, APTR.Null, APTR.Null,
+            input, BPTR.FromRaw(1), error, BPTR.Null, APTR.Null, 0, 0,
+            APTR.Null, 0, error);
+
+        var result = SetenvCommand.Execute(ref platform, in invocation,
+            new APTR(80), 40, new APTR(120), 32, new APTR(160), 80);
+
+        Assert.Equal((int)ShellCommandResult.Warn, result);
+        Assert.Equal(input, platform.Store.GlobalListInput);
+        Assert.Equal(error, platform.Store.GlobalListError);
     }
 
     private static CommandInvocation CreateInvocation(

@@ -140,7 +140,7 @@ public static class ShellInternalCommandResolver
 			ShellInternalCommand.Stack => new(0x53746163u, 0x6B000000u, 5),
 			ShellInternalCommand.Unalias => new(0x556E616Cu, 0x69617300u, 7),
 			ShellInternalCommand.Unset => new(0x556E7365u, 0x74000000u, 5),
-			ShellInternalCommand.Unsetenv => new(0x556E7365u, 0x74656E76u, 7),
+			ShellInternalCommand.Unsetenv => new(0x556E7365u, 0x74656E76u, 8),
 			ShellInternalCommand.Why => new(0x57687900u, 0, 3),
 			_ => default,
 		};

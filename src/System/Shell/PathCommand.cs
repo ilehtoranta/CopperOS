@@ -11,7 +11,6 @@ namespace CopperOS.Shell;
 /// </summary>
 public static class PathCommand
 {
-    public const uint MaximumPathEntries = 64;
     public const uint MaximumPathBytes = 65_535;
 
     public const uint OperationReset = 0;
@@ -86,8 +85,7 @@ public static class PathCommand
                     terminated = true;
                     break;
                 }
-                if (pathCount >= MaximumPathEntries ||
-                    pathBytes >= pathCapacity)
+                if (pathBytes >= pathCapacity)
                 {
                     platform.FreeArgs(rdArgs);
                     return (int)ShellCommandResult.Error;

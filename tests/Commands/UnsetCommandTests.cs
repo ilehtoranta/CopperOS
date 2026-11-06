@@ -116,6 +116,7 @@ public sealed class UnsetCommandTests
 
         platform = new EchoCommandTests.TestShellPlatform();
         platform.Store.GlobalVariableListing = "MOS=value\n";
+        platform.Store.GlobalListResult = (int)ShellCommandResult.Warn;
         invocation = CreateInvocation(APTR.Null, 0, APTR.Null,
             new BPTR(1));
         result = UnsetenvCommand.Execute(
@@ -125,7 +126,7 @@ public sealed class UnsetCommandTests
             40,
             new APTR(128),
             32);
-        Assert.Equal((int)ShellCommandResult.Ok, result);
+        Assert.Equal((int)ShellCommandResult.Warn, result);
         Assert.Equal("MOS=value\n", platform.Store.OutputText);
         Assert.Equal(1, platform.Store.GlobalListCount);
     }

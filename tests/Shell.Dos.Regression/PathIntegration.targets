@@ -1,0 +1,6 @@
+<Project>
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'CopperStart.Exec.Tests'">
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\..\src\System\Shell\CopperOS.Shell.Dos.csproj" />
+    <Compile Include="$(MSBuildThisFileDirectory)PathOwnershipTests.cs" />
+  </ItemGroup>
+</Project>

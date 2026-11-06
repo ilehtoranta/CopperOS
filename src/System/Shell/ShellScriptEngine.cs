@@ -18,6 +18,7 @@ public enum ShellScriptStepStatus : int
 	Waiting = 16,
 	FailureLimitExceeded = 17,
 	UnsupportedOperator = 18,
+	CommandSyntaxError = 19,
 }
 
 /// <summary>
@@ -328,10 +329,6 @@ public static partial class ShellScriptEngine
 		if (result.Status != ShellScriptStepStatus.Waiting)
 		{
 			platform.TryUnbindScriptFrame(initial.Cli, frame);
-			if (!platform.TryWriteCliFailureLimit(initial.Cli,
-				ShellScriptFrameCodec.DefaultFailureLimit))
-				return MakeRun(ShellScriptStepStatus.PlatformFailure,
-					(int)ShellCommandResult.Error, result.Steps);
 		}
 		return result;
 	}
@@ -946,7 +943,7 @@ public static partial class ShellScriptEngine
 				nextOffset, (int)ShellCommandResult.Error);
 			step = MakeStep(compoundStatus ==
 					(int)ShellScriptCompoundParseStatus.Malformed
-					? ShellScriptStepStatus.Malformed
+					? ShellScriptStepStatus.CommandSyntaxError
 					: ShellScriptStepStatus.PlatformFailure,
 				ShellInternalCommand.Unknown,
 				(int)ShellCommandResult.Error, nextLine, nextOffset,
@@ -1067,22 +1064,31 @@ public static partial class ShellScriptEngine
             RecordFailureAndAdvance(ref platform, frame, nextLine, nextOffset, (int)ShellCommandResult.Error);
             return FailAfterRead(ref platform, frame, state, lineLength, out step);
         }
+        // Redirections immediately after RUN apply to the launcher; later
+        // redirections remain part of the background command text.
+        var rawCursor = new ShellTextCursor(commandSource, commandLength);
+        var rawToken = ShellTextParser.NextToken(ref platform, ref rawCursor,
+            workspace.CommandName, workspace.CommandNameCapacity, out var rawNameLength, out _);
+        var deferRunRedirection = platform.RunChildParsesRedirections() &&
+            rawToken == (int)ShellTextTokenResult.Token &&
+            rawNameLength != 0 && ShellInternalCommandResolver.ResolveAvailable(
+                ref platform, state.Cli, workspace.CommandName, rawNameLength) == ShellInternalCommand.Run;
         var redirection = default(ShellRedirectionSpec);
         if (workspace.Redirection.IsEnabled)
         {
             var redirectionWorkspace = workspace.Redirection;
-            if (!ShellRedirectionParser.Parse(
-                    ref platform,
-                    commandSource,
-                    commandLength,
-                    in redirectionWorkspace,
-                    out redirection,
-                    out commandLength))
+            var parsedRedirection = deferRunRedirection
+                ? ShellRedirectionParser.ParseRunLeading(ref platform, commandSource,
+                    commandLength, rawCursor.Position, in redirectionWorkspace,
+                    out redirection, out commandLength)
+                : ShellRedirectionParser.Parse(ref platform, commandSource,
+                    commandLength, in redirectionWorkspace, out redirection, out commandLength);
+            if (!parsedRedirection)
             {
                 RecordFailureAndAdvance(ref platform, frame, nextLine,
                     nextOffset, (int)ShellCommandResult.Error);
         step = MakeStep(
-                    ShellScriptStepStatus.Malformed,
+                    ShellScriptStepStatus.CommandSyntaxError,
                     ShellInternalCommand.Unknown,
                     (int)ShellCommandResult.Error,
                     nextLine,
@@ -1122,7 +1128,7 @@ public static partial class ShellScriptEngine
             RecordFailureAndAdvance(ref platform, frame, nextLine,
                 nextOffset, (int)ShellCommandResult.Error);
         step = MakeStep(
-                ShellScriptStepStatus.Malformed,
+                ShellScriptStepStatus.CommandSyntaxError,
                 ShellInternalCommand.Unknown,
                 (int)ShellCommandResult.Error,
                 nextLine,
@@ -1187,9 +1193,28 @@ public static partial class ShellScriptEngine
             return step.Status;
         }
 
+        var missingCommand = command == ShellInternalCommand.Unknown &&
+            lookup.Kind == ShellScriptLookupKind.NotFound;
+        var lookupDiagnostics = default(ShellCommandDiagnostics);
+        var lookupDiagnosticsCaptured = missingCommand &&
+            platform.TryCaptureCommandDiagnostics(state.Cli, (int)ShellCommandResult.Error,
+                out lookupDiagnostics);
+        var redirectionToOpen = redirection;
+        if (missingCommand)
+        {
+            // V40 lookup failure does not create a stdout target. Our explicit
+            // error stream still applies; *<> needs its selected stdout target.
+            redirectionToOpen.InputPath = APTR.Null;
+            redirectionToOpen.InputLength = 0;
+            if (redirectionToOpen.ErrorToOutput == 0)
+            {
+                redirectionToOpen.OutputPath = APTR.Null;
+                redirectionToOpen.OutputLength = 0;
+            }
+        }
         var redirectionHandles = default(ShellRedirectionHandles);
         if (!ShellRedirectionTransaction.TryOpen(
-                ref platform, in state, in redirection,
+                ref platform, in state, in redirectionToOpen,
                 out redirectionHandles))
         {
             RecordFailureAndAdvance(ref platform, frame, nextLine,
@@ -1204,10 +1229,12 @@ public static partial class ShellScriptEngine
             return step.Status;
         }
 
+        var builtinErrorOutput = redirectionHandles.Output;
+        if (redirection.HasError) builtinErrorOutput = redirectionHandles.Error;
         int commandResult;
         var platformSuccess = true;
         var pendingContinuation = APTR.Null;
-        if (command == ShellInternalCommand.Unknown && lookup.Kind == ShellScriptLookupKind.NotFound)
+        if (missingCommand)
         {
             // A completed lookup that found no command is an ordinary command
             // error. No executable path exists to pass to the launch boundary.
@@ -1261,24 +1288,62 @@ public static partial class ShellScriptEngine
                 state.CurrentDirectory,
                 state.Cli,
                 0,
-                0);
+                0,
+                APTR.Null,
+                deferRunRedirection ? redirectionHandles.Owned : 0,
+                builtinErrorOutput);
             var commandWorkspace = workspace.CommandWorkspace;
             commandResult = ShellCommandDispatcher.Dispatch(
                 ref platform,
                 in invocation,
                 command,
                 in commandWorkspace);
+            if (deferRunRedirection && command == ShellInternalCommand.Run &&
+                commandResult == (int)ShellCommandResult.Ok)
+                redirectionHandles.Owned = 0;
         }
 
         // ReadArgs, output, and command completion use the current process's
         // IoErr. Snapshot it before closing redirections can overwrite it.
         // Pending children own a separate outcome; the parent's IoErr is not
         // evidence of the child's result and is never published for them.
-        var diagnostics = default(ShellCommandDiagnostics);
-        var diagnosticsCaptured = pendingContinuation.IsNull &&
-            platform.TryCaptureCommandDiagnostics(state.Cli,
+        var diagnostics = lookupDiagnostics;
+        var diagnosticsCaptured = lookupDiagnosticsCaptured;
+        if (!missingCommand)
+            diagnosticsCaptured = pendingContinuation.IsNull && platform.TryCaptureCommandDiagnostics(state.Cli,
                 platformSuccess ? commandResult : (int)ShellCommandResult.Error,
                 out diagnostics);
+        // V40 WHY publishes WARN, retaining the preceding secondary error.
+        // Read it from the CLI so formatting and stream operations cannot
+        // substitute their own process IoErr for the reported command's error.
+        if (diagnosticsCaptured && command == ShellInternalCommand.Why &&
+            commandResult == (int)ShellCommandResult.Warn)
+        {
+            if (!platform.TryReadPublishedCommandDiagnostics(state.Cli, out var previousWhy))
+                diagnosticsCaptured = false;
+            else diagnostics.IoError = previousWhy.IoError;
+        }
+        if (diagnosticsCaptured && missingCommand)
+            _ = ShellScriptDiagnostics.WriteMissingCommand(ref platform, redirectionHandles.Error,
+                workspace.CommandName, commandNameLength);
+        if (diagnosticsCaptured && command != ShellInternalCommand.Unknown &&
+            diagnostics.ReturnCode >= (int)ShellCommandResult.Error && diagnostics.IoError != 0)
+        {
+            // The Shell owns builtin parser diagnostics, including Resident's
+            // ReadArgs errors. Resident's own admission/removal failures use
+            // WARN (5), below this threshold, and already print their message.
+            // External programs own their output.
+            // Preserve the captured outcome even if reporting it fails.
+            _ = ShellScriptDiagnostics.WriteDosError(ref platform, builtinErrorOutput,
+                diagnostics.IoError, workspace.CommandWorkspace.First,
+                workspace.CommandWorkspace.FirstCapacity);
+        }
+        if (diagnosticsCaptured && command != ShellInternalCommand.Quit &&
+            (state.Flags & ShellScriptFrameFlags.Interactive) == 0 &&
+            MeetsFailureLimit(commandResult, state.FailureLimit) &&
+            !(hasDeferredCommand && compoundSplit.Operator == ShellScriptCompoundOperator.OutputConcatenation))
+            _ = ShellScriptDiagnostics.WriteReturnCode(ref platform, redirectionHandles.Error,
+                workspace.CommandName, commandNameLength, commandResult);
         if (!ShellRedirectionTransaction.Close(
                 ref platform, in state, ref redirectionHandles,
                 out var closeFailure, out var closeFailureCaptured))
@@ -1355,7 +1420,7 @@ public static partial class ShellScriptEngine
 
         if (!diagnosticsCaptured ||
             !platform.TryPublishCommandDiagnostics(state.Cli, in diagnostics) ||
-            !ShellScriptFrameCodec.TryRecordResult(
+             !ShellScriptFrameCodec.TryRecordResult(
                 ref platform, frame, commandResult))
         {
         step = MakeStep(
@@ -1704,6 +1769,9 @@ public static partial class ShellScriptEngine
 			!ShellScriptTemporaryPath.TryBuildPrompt(ref platform, frame,
 				workspace.PromptCapturePath,
 				workspace.PromptCapturePathCapacity, out var capturePathLength) ||
+			!platform.TrySelectScriptPromptDirectory(state.Cli,
+				workspace.PromptCapturePath, workspace.PromptCapturePathCapacity,
+				ref capturePathLength) ||
 			!platform.TrySetScriptPromptCapture(state.Cli,
 				workspace.PromptCapturePath, capturePathLength, BPTR.Null) ||
 			!platform.TryOpenScriptOutput(state.Cli, workspace.PromptCapturePath,
@@ -1852,6 +1920,23 @@ public static partial class ShellScriptEngine
 			if (status is ShellScriptStepStatus.Executed or
 				ShellScriptStepStatus.Skipped or ShellScriptStepStatus.Empty)
 				continue;
+			// V40 consumes a malformed line and continues, including in scripts.
+			// Require the published next cursor so an unadvanced/EOF failure
+			// cannot be retried indefinitely by a native single-step runner.
+			if (status is ShellScriptStepStatus.CommandSyntaxError or ShellScriptStepStatus.Malformed or ShellScriptStepStatus.UnsupportedOperator &&
+				step.LineLength != 0 && ShellScriptFrameCodec.TryRead(ref platform, frame, out var failed) &&
+				(failed.Flags & ShellScriptFrameFlags.Active) != 0 &&
+				(status == ShellScriptStepStatus.CommandSyntaxError || (failed.Flags & ShellScriptFrameFlags.Interactive) != 0) &&
+				failed.CurrentLine == step.Line && failed.CurrentOffset == step.Offset &&
+				platform.TryReadPublishedCommandDiagnostics(failed.Cli, out var diagnostics))
+			{
+				var output = failed.Error;
+				if (output.IsNull) output = failed.Output;
+				_ = ShellScriptDiagnostics.WriteSyntaxError(ref platform, output);
+				if (!platform.TryPublishCommandDiagnostics(failed.Cli, in diagnostics))
+					return MakeRun(ShellScriptStepStatus.PlatformFailure, (int)ShellCommandResult.Error, steps + 1);
+				continue;
+			}
 			return MakeRun(status, step.CommandResult, steps + 1);
 		}
 		var result = (int)ShellCommandResult.Error;
@@ -1860,6 +1945,12 @@ public static partial class ShellScriptEngine
 		return MakeRun(ShellScriptStepStatus.StepLimit,
 			result, maximumSteps);
 	}
+
+    /// <summary>A stopped command sequence has an ordinary DOS result, even when it failed.</summary>
+    public static bool IsCompletedRunStatus(ShellScriptStepStatus status) => status is
+        ShellScriptStepStatus.EndOfFile or ShellScriptStepStatus.FailureLimitExceeded or
+        ShellScriptStepStatus.Malformed or ShellScriptStepStatus.CommandSyntaxError or ShellScriptStepStatus.UnsupportedOperator or
+        ShellScriptStepStatus.Interrupted or ShellScriptStepStatus.Terminated;
 
     private static bool ValidWorkspace<TPlatform>(
         ref TPlatform platform,
@@ -1926,8 +2017,7 @@ public static partial class ShellScriptEngine
 
     private static bool AllowedWhileSkipping(ShellInternalCommand command) =>
         command is ShellInternalCommand.If or ShellInternalCommand.Else or
-        ShellInternalCommand.EndIf or ShellInternalCommand.EndSkip or
-        ShellInternalCommand.Lab or ShellInternalCommand.Skip;
+        ShellInternalCommand.EndIf;
 
     private static bool Advance<TPlatform>(
         ref TPlatform platform,

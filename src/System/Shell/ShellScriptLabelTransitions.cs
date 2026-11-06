@@ -4,7 +4,7 @@ namespace CopperOS.Shell;
 
 /// <summary>
 /// Bounded label registration and target lookup for one script frame. Label
-/// record/name storage is supplied and owned by the DOS/Shell caller.
+/// record/name storage is supplied and owned by the Shell frame.
 /// </summary>
 public static class ShellScriptLabelTransitions
 {
@@ -152,6 +152,103 @@ public static class ShellScriptLabelTransitions
         return ShellScriptFrameCodec.TryAdvance(
             ref platform, frame, line, offset);
     }
+
+    /// <summary>Searches the unread script for a LAB target or ENDSKIP boundary.</summary>
+    public static bool TryScanForward<TPlatform>(ref TPlatform platform,
+        APTR frame, APTR name, uint nameLength, APTR lineBuffer,
+        uint lineCapacity, APTR tokenBuffer, uint tokenCapacity)
+        where TPlatform : struct, IShellPlatform, IShellScriptPlatform
+        => TryScanForward(ref platform, frame, name, nameLength, lineBuffer,
+            lineCapacity, tokenBuffer, tokenCapacity, out _);
+
+    public static bool TryScanForward<TPlatform>(ref TPlatform platform,
+        APTR frame, APTR name, uint nameLength, APTR lineBuffer,
+        uint lineCapacity, APTR tokenBuffer, uint tokenCapacity, out int result)
+        where TPlatform : struct, IShellPlatform, IShellScriptPlatform
+        => TryScan(ref platform, frame, name, nameLength, lineBuffer,
+            lineCapacity, tokenBuffer, tokenCapacity, false, out result);
+
+    public static bool TryScanFromBeginning<TPlatform>(ref TPlatform platform,
+        APTR frame, APTR name, uint nameLength, APTR lineBuffer,
+        uint lineCapacity, APTR tokenBuffer, uint tokenCapacity, out int result)
+        where TPlatform : struct, IShellPlatform, IShellScriptPlatform
+        => TryScan(ref platform, frame, name, nameLength, lineBuffer,
+            lineCapacity, tokenBuffer, tokenCapacity, true, out result);
+
+    private static bool TryScan<TPlatform>(ref TPlatform platform,
+        APTR frame, APTR name, uint nameLength, APTR lineBuffer,
+        uint lineCapacity, APTR tokenBuffer, uint tokenCapacity, bool fromBeginning,
+        out int result) where TPlatform : struct, IShellPlatform, IShellScriptPlatform
+    {
+        result = (int)ShellCommandResult.Fail;
+        if (!ShellScriptFrameCodec.TryRead(ref platform, frame, out var state) ||
+            (nameLength != 0 && !ValidName(ref platform, name, nameLength)) ||
+            lineBuffer.IsNull || lineCapacity < 2 || tokenBuffer.IsNull || tokenCapacity < 4 ||
+            !platform.IsMapped(lineBuffer, lineCapacity) || !platform.IsMapped(tokenBuffer, tokenCapacity))
+            return false;
+
+        var line = state.CurrentLine;
+        var offset = state.CurrentOffset;
+        var first = true;
+        if (fromBeginning) { line = 1; offset = 0; first = false; }
+        while (true)
+        {
+            if (!platform.TryReadScriptLine(state.Cli, state.Input, line, offset,
+                    lineBuffer, lineCapacity, out var length, out var nextLine,
+                    out var nextOffset, out var eof) || eof > 1 || length >= lineCapacity)
+                return false;
+            if (!first && length != 0)
+            {
+                var cursor = new ShellTextCursor(lineBuffer, length);
+                var token = ShellTextParser.NextToken(ref platform, ref cursor, tokenBuffer,
+                    tokenCapacity, out var commandLength, out _);
+                if (token == (int)ShellTextTokenResult.Token &&
+                    ShellTextParser.EqualsPacked(ref platform, tokenBuffer, commandLength,
+                        0x456e6453, 0x6b697000))
+                {
+                    if (!ShellScriptFrameCodec.TryAdvance(ref platform, frame, nextLine, nextOffset))
+                        return false;
+                    result = (int)ShellCommandResult.Warn;
+                    return true;
+                }
+                if (token == (int)ShellTextTokenResult.Token &&
+                    commandLength == 3 && Lower(platform.ReadUInt8(tokenBuffer, 0)) == (byte)'l' &&
+                    Lower(platform.ReadUInt8(tokenBuffer, 1)) == (byte)'a' &&
+                    Lower(platform.ReadUInt8(tokenBuffer, 2)) == (byte)'b')
+                {
+                    var labelToken = ShellTextParser.NextToken(ref platform, ref cursor,
+                        tokenBuffer, tokenCapacity, out var foundLength, out _);
+                    // V40's omitted target matches an unnamed LAB, rather
+                    // than the next named label. ENDSKIP is handled above.
+                    var matches = labelToken == (int)ShellTextTokenResult.End
+                        ? nameLength == 0
+                        : labelToken == (int)ShellTextTokenResult.Token && foundLength == nameLength &&
+                          (nameLength == 0 || ShellScriptLabelCodec.NamesEqualNoCase(ref platform,
+                              tokenBuffer, foundLength, name, nameLength));
+                    if (matches)
+                    {
+                        if (!ShellScriptFrameCodec.TryAdvance(ref platform, frame, nextLine, nextOffset)) return false;
+                        result = (int)ShellCommandResult.Ok;
+                        return true;
+                    }
+                }
+            }
+            if (eof != 0)
+            {
+                if (!ShellScriptFrameCodec.TryAdvance(ref platform, frame, nextLine, nextOffset))
+                    return false;
+                result = (int)ShellCommandResult.Error;
+                return true;
+            }
+            if (nextOffset <= offset || nextLine <= line) return false;
+            first = false;
+            line = nextLine;
+            offset = nextOffset;
+        }
+    }
+
+    private static byte Lower(byte value) => value is >= (byte)'A' and <= (byte)'Z'
+        ? (byte)(value + 32) : value;
 
     private static bool ValidName<TPlatform>(
         ref TPlatform platform,

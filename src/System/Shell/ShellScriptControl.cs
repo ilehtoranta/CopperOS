@@ -23,7 +23,7 @@ public enum ShellScriptBlockFlags : uint
 
 /// <summary>
 /// Fixed-width state for one nested If/Skip block.  Parent is a guest pointer
-/// to the previous record, so nested depth is bounded by DOS-owned storage
+/// to the previous record, so nested depth is bounded by Shell-owned storage
 /// rather than a managed stack.
 /// </summary>
 public struct ShellScriptBlockState

@@ -178,7 +178,7 @@ internal static class ReadArgsCommandSupport
             case ReadArgsCommandTemplate.Alias: return 13;
             case ReadArgsCommandTemplate.Ask: return 10;
             case ReadArgsCommandTemplate.Prompt: return 8;
-            case ReadArgsCommandTemplate.Lab: return 7;
+            case ReadArgsCommandTemplate.Lab: return 5;
             case ReadArgsCommandTemplate.Dir: return 3;
             case ReadArgsCommandTemplate.Unalias: return 4;
             case ReadArgsCommandTemplate.Skip: return 12;
@@ -426,8 +426,6 @@ internal static class ReadArgsCommandSupport
                 AppendByte(ref platform, ref writer, (byte)'B');
                 AppendByte(ref platform, ref writer, (byte)'E');
                 AppendByte(ref platform, ref writer, (byte)'L');
-                AppendByte(ref platform, ref writer, (byte)'/');
-                AppendByte(ref platform, ref writer, (byte)'A');
                 AppendByte(ref platform, ref writer, 0);
                 return;
             case ReadArgsCommandTemplate.Dir:
