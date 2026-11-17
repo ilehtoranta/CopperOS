@@ -10,9 +10,38 @@
     <CopperOSUseLocalCopperSharp>true</CopperOSUseLocalCopperSharp>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSProbeSys)' == 'true'">
+    <DefineConstants>$(DefineConstants);COPPEROS_PROBE_SYS</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSContinuationNoOomControl)' == 'true'">
+    <DefineConstants>$(DefineConstants);COPPEROS_CONTINUATION_NO_OOM_CONTROL</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSDelayHeapPressureProbe)' == 'true'">
+    <DefineConstants>$(DefineConstants);COPPEROS_DELAY_HEAP_PRESSURE</DefineConstants>
+  </PropertyGroup>
   <ItemGroup>
     <Compile Include="DosShellNativeRoots.cs" />
     <Compile Include="DosQueueBufferNativeRoots.cs" />
+    <Compile Include="PublicFileNativeProbe.cs" />
+    <Compile Include="PublicGlobalVariableNativeProbe.cs" />
+    <Compile Include="PublicGlobalListingNativeProbe.cs" />
+    <Compile Include="PublicPromptNativeProbe.cs" />
+    <Compile Include="PublicFaultNativeProbe.cs" />
+    <Compile Include="PublicProcessStateNativeProbe.cs" />
+    <Compile Include="PublicRunnerNativeProbe.cs" />
+    <Compile Include="PublicExportedRunnerNativeProbe.cs" />
+    <Compile Include="PublicExitLifecycleNativeProbe.cs" />
+    <Compile Include="PublicContinuationOwnerNativeProbe.cs" />
+    <Compile Include="PublicDelayPriorityNativeProbe.cs" />
+    <Compile Include="PublicContinuationLaunchNativeProbe.cs" />
+    <Compile Include="PublicContinuationDelayedCommand.cs" />
+    <Compile Include="PublicCreateProcessLockNativeProbe.cs" />
+    <Compile Include="PublicRunnerDirectoryCommand.cs" />
+    <Compile Include="PublicRunnerDirectoryNativeProbe.cs" />
+    <Compile Include="PublicResidentMutationNativeProbe.cs" />
+    <Compile Include="CliResultCaptureNativeProbe.cs" />
+    <Compile Include="PublicChildLaunchNativeProbe.cs" />
+    <Compile Include="RedirectionNativeProbe.cs" />
     <Compile Include="..\..\src\System\Shell\DosShellNativeEntrypoints.cs"
              Link="Production\DosShellNativeEntrypoints.cs" />
     <Compile Include="..\..\src\System\Shell\DosShellNativeParkEntrypoint.cs"

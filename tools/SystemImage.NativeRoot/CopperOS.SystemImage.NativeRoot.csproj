@@ -7,7 +7,6 @@
   <Import Project="../../CopperOS.Portable.props" />
   <ItemGroup>
     <Compile Include="SystemBootstrap.cs" />
-    <Compile Include="KickstartShell.cs" />
     <Compile Include="StorageProbe.cs" />
     <Compile Include="SingleHunkStreamLoader.cs" />
     <Compile Include="NativeFfsFile.cs" />

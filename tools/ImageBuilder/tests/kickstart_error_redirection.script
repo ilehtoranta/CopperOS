@@ -1,0 +1,20 @@
+; Helper volume DH0: supplies e from make_error_probe.py and root from
+; make_null_current_dir_probe.py.
+DH0:e *>DH0:err.txt >DH0:out.txt
+DH0:e *>>DH0:err.txt >DH0:out2.txt
+DH0:e >DH0:merged.txt *<>
+DH0:e
+cd DH0:
+cd >DH0:current.txt
+cd DH0:e *>DH0:cd-file-error.txt
+cd >DH0:after-file.txt
+cd DH0: DH0: *>DH0:cd-extra-error.txt
+cd >DH0:after-extra.txt
+missingcommand *>DH0:diagnostic.txt >DH0:silent.txt
+missingcommand *>>DH0:diagnostic.txt
+missingcommand >DH0:merged-diagnostic.txt *<>
+cd DH0:no-such-directory *>DH0:cd-error.txt >DH0:cd-out.txt
+execute DH0:no-such-script *>DH0:script-error.txt
+DH0:root
+cd >DH0:root-cd.txt
+echo completed >DH0:done.txt

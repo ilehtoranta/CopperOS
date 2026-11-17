@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\..\CopperOS.Portable.props" />
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <CopperScreenRoot Condition="'$(CopperScreenRoot)' == ''">$(MSBuildThisFileDirectory)..\..\..\..\CopperScreen</CopperScreenRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(CopperScreenRoot)\CopperMod.Amiga.Lightweight\CopperMod.Amiga.Lightweight.csproj" />
+  </ItemGroup>
+</Project>

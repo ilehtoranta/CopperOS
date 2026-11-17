@@ -17,7 +17,8 @@ internal sealed record ListEntryCase(bool Quick = false, bool Keys = false,
     int SinceDay = 0, int UptoDay = 0, bool DateParseFailure = false,
     bool MatchFailure = false, bool AllocationFailure = false,
     bool CtrlC = false, bool DateFailure = false, int ParserError = 0,
-    bool All = false,
+    bool All = false, string Name = "SRC:dir", bool LiteralFile = false,
+    bool Wildcard = false, bool EmptyDirectory = false,
     ListEntryData[]? Entries = null);
 
 internal sealed class ListNativeLayout(uint control, uint names, uint pattern,
@@ -58,6 +59,10 @@ internal sealed partial class ProbeFixture
         [
             ListCase("default", new(), "SRC:dir"),
             ListCase("quick", new(Quick: true), "SRC:dir QUICK"),
+            ListCase("literal-file", new(Quick: true, Name: "SRC:file", LiteralFile: true), "SRC:file QUICK"),
+            ListCase("wildcard", new(Quick: true, Name: "SRC:#?", Wildcard: true), "SRC:#? QUICK"),
+            new("empty-directory", "SRC:empty QUICK NOHEAD", DOS.RETURN_WARN, 0, "")
+            { List = new(Quick: true, NoHead: true, Name: "SRC:empty", EmptyDirectory: true) },
             ListCase("dates-quick", new(Quick: true, Dates: true),
                 "SRC:dir DATES QUICK"),
             ListCase("files", new(Quick: true, Files: true),
@@ -266,7 +271,7 @@ internal sealed partial class ProbeFixture
         var uptoName = control + 640;
         invocation.ListLayout = new(control, names, pattern, firstName,
             secondName, outputName, subName, sinceName, uptoName);
-        PutCString(firstName, "SRC:dir");
+        PutCString(firstName, definition.Name);
         PutCString(secondName, "SRC:missing");
         PutCString(outputName, definition.To ?? "RAM:out");
         PutCString(subName, definition.Sub ?? "");
@@ -291,6 +296,29 @@ internal sealed partial class ProbeFixture
 
     private void RegisterListEntryDos(uint baseAddress)
     {
+        Register(baseAddress, DosLvo.Lock, "Lock", (state, invocation) =>
+        {
+            var definition = invocation.Definition.List!;
+            var expected = definition.MatchFailure ? "SRC:missing" : definition.Name;
+            Require(Bus.CString(state.D[1]) == expected &&
+                state.D[2] == unchecked((uint)DOS.LockMode.Shared),
+                "List directory lock arguments differ.");
+            return definition.MatchFailure || definition.Wildcard ? 0u : 0x131u + (uint)invocation.Slot;
+        });
+        Register(baseAddress, DosLvo.Examine, "Examine", (state, invocation) =>
+        {
+            Require(state.D[1] == 0x131u + (uint)invocation.Slot && state.D[2] != 0,
+                "List Examine lock or buffer differs.");
+            Bus.Long(state.D[2] + (uint)FileInfoBlock.DirEntryTypeOffset,
+                invocation.Definition.List!.LiteralFile ? unchecked((uint)-3) : 2u);
+            return 1;
+        });
+        Register(baseAddress, DosLvo.UnLock, "UnLock", (state, invocation) =>
+        {
+            Require(state.D[1] == 0x131u + (uint)invocation.Slot,
+                "List released a different directory lock.");
+            return 0;
+        });
         Register(baseAddress, DosLvo.ReadArgs, "ReadArgs", (state,
             invocation) =>
         {
@@ -443,10 +471,18 @@ internal sealed partial class ProbeFixture
             var layout = invocation.ListLayout!;
             Require(state.D[2] != 0 && state.D[1] != 0,
                 "List MatchFirst arguments differ.");
+            var definition = invocation.Definition.List!;
+            var expected = definition.MatchFailure ? "SRC:missing" : definition.Name;
+            if (!definition.MatchFailure && !definition.LiteralFile && !definition.Wildcard)
+                expected += expected.EndsWith(':') || expected.EndsWith('/') ? "#?" : "/#?";
+            Require(Bus.CString(state.D[1]) == expected,
+                "List MatchFirst directory expansion differs.");
             invocation.ListMatchFirstCalls++;
             layout.Workspace = state.D[2];
             layout.EntryIndex = 0;
             layout.MatchLive = true;
+            if (definition.EmptyDirectory)
+                return (uint)DOS.Error.ObjectNotFound;
             if (invocation.Definition.List!.MatchFailure)
                 return (uint)DOS.Error.NoMoreEntries;
             PutListFib(invocation, layout, 0);
@@ -783,7 +819,7 @@ internal sealed partial class ProbeFixture
             (definition.Upto is null ? 0 : 1);
         Require(invocation.ListStrToDateCalls == expectedParseCalls,
             "List StrToDate cadence differs.");
-        if (!definition.MatchFailure)
+        if (!definition.MatchFailure && !definition.EmptyDirectory)
             Require(invocation.ListMatchNextCalls ==
                 (definition.CtrlC || definition.DateFailure ? 0 :
                     (definition.Entries ?? DefaultListEntries).Length),

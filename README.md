@@ -22,6 +22,21 @@ This builds and tests the command model on the host; it does not build a bootabl
 
 Native artifact builds use a sibling `CopperSharp68k` checkout by default. For example, the MUI builder supports `CopperSharp68kRoot` to select a different checkout and `CopperOSUseLocalCopperSharp=true` to use its local SDK. See the [MUI builder guide](tools/MuiMaster.LibraryBuilder/README.md) for prerequisites and commands.
 
+Build and stage the portable 68000 system, including the shared Shell, with:
+
+```powershell
+& tools/build_system.ps1 -Python '<python executable>'
+```
+
+This stages the generated system files in `filesystem/SYS` and writes the normal
+boot image to `artifacts/system/68000/System.adf`. The image uses the same shared
+Shell on CopperStart and Kickstart 3.1. Native compilation, public-interface
+auditing and image verification run before staging; ROMs are supplied separately
+for boot tests. This native build requires sibling `CopperStart`, `CopperFS`
+and `CopperSharp68k` source checkouts. `-OutputDirectory`, `-SystemRoot` and `-CopperSharpRoot` select
+alternate outputs, staging trees and toolchains. See the
+[system build guide](tools/ImageBuilder/README.md).
+
 ## Repository layout
 
 - [`src/`](src/) — source for commands, libraries, system components, devices and handlers.

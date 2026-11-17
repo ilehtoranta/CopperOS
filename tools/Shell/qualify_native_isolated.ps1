@@ -142,14 +142,14 @@ if ($IncludeFullExecute) {
     $mode = 'execute'
     $entryPoint = 'CopperOS.Shell.Dos.NativeRoot.DosShellNativeRoots::CapabilityRoot'
     $exports = @('copperos.shell.execute-begin', 'copperos.shell.execute-poll',
-        'copperos.shell.entry', 'copperos.shell.child',
+        'copperos.shell.entry', 'copperos.shell.child', 'copperos.shell.background', 'copperos.shell.new-process',
         'copperos.shell.execute-park',
         'copperstart.dos.process-return')
 } elseif ($UseShellTaskEntry) {
     $mode = 'shell-task'
     $entryPoint = 'CopperOS.Shell.Dos.DosShellNativeEntrypoints::ShellTaskEntry'
     $exports = @('copperos.shell.execute-begin', 'copperos.shell.execute-poll',
-        'copperos.shell.entry', 'copperos.shell.child',
+        'copperos.shell.entry', 'copperos.shell.child', 'copperos.shell.background', 'copperos.shell.new-process',
         'copperos.shell.execute-park',
         'copperstart.dos.process-return')
 }

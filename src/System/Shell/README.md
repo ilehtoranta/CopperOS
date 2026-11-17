@@ -4,6 +4,13 @@ This project owns the Shell segment and its internal commands. Internal
 commands such as `Echo`, `Stack`, and `Resident` are not copied into
 `filesystem/SYS/C` as separate files.
 
+The shared public Exec/DOS refactor is accepted on CopperStart and Kickstart
+3.1 for the v22 proof image. Current artifact hashes, all eight requirements,
+the 31-command coverage map, original-V40 comparisons and the final independent
+runtime audit are in [Shared Shell acceptance](../../../docs/SharedShellAcceptance.md).
+The implementation notes below also describe extensions beyond stock V40;
+acceptance does not imply exhaustive MorphOS language conformance.
+
 The initial implementation slice defines the fixed-width
 `CommandInvocation` and the explicit `IShellPlatform` guest boundary. The
 MorphOS `Echo`, `Stack`, `Failat`, `Quit`, `Fault`, `Get`, `Getenv`, `Unset`,
@@ -15,15 +22,16 @@ then copy only the typed result slots they need into caller-owned buffers
 before calling `FreeArgs`. The broader
 Shell lexer remains responsible for command separators, aliases, variables,
 redirection syntax, and script state; it is not the option-parser authority.
+`Ask` follows the Kickstart 3.1 convention: a yes answer returns WARN (5),
+while no or Return returns OK (0).
 
 The Shell also contains the first `Stack` state slice. It reads and updates
 only a DOS-owned CLI default-stack field; the platform boundary exposes no
 operation that could mutate the stack of the already-running command.
 
-`ShellInternalCommandResolver` recognizes all 32 names in the frozen MorphOS
-internal-command inventory before any resident or filesystem lookup. Commands
-without an implementation yet remain explicitly identified as internal, so
-they cannot accidentally become duplicate `SYS:C` binaries.
+`ShellInternalCommandResolver` recognizes the 31 names in the frozen MorphOS
+internal-command inventory before any resident or filesystem lookup. The
+dispatcher has an implementation for each recognized name.
 
 `GetCommand` is the first local-variable consumer. It asks the current CLI/DOS
 boundary for a bounded value, writes it to the inherited output, and keeps
@@ -100,8 +108,8 @@ form through the DOS `ReadArgs` contract before emitting or formatting
 anything. The frame, not the command, owns block matching, teardown, and quit
 result propagation.
 
-`LabCommand` and `SkipCommand` similarly delegate label registration and
-bounded forward/from-start searches to the active script frame. `Skip` accepts
+`LabCommand` accepts source markers without runtime registration, as on V40.
+`SkipCommand` delegates forward/from-start source searches to the active script frame. `Skip` accepts
 the optional `BACK` switch and validates the complete line before requesting a
 jump; its `LABEL,BACK/S` result now comes from DOS `ReadArgs`.
 
@@ -120,10 +128,10 @@ owner. `EXISTS` probes with a shared DOS lock so files and directories both
 match; a missing object is treated as a false condition and its expected
 lookup `IoErr` is cleared.
 
-`RunCommand` consumes `DETACH/S,QUIET/S,STACK/K/N,PRI/K/N,COMMAND/F` through
-the same boundary. It copies the full command text and optional numeric
-values before releasing `RDArgs`, then delegates process creation, inherited
-streams, detachment, stack selection, and priority policy to DOS/Shell.
+`RunCommand` copies the full, undecoded remainder for a background Shell.
+On V40, words such as `DETACH`, `QUIET`, `STACK`, and `PRI` are part of that
+command, not `Run` options. The native background launcher creates a
+Shell-owned worker through public DOS and Exec interfaces.
 
 `ResidentCommand` consumes
 `NAME,FILE,ALIAS/K,REMOVE/S,ADD/S,REPLACE/S,PURE=FORCE/S,SYSTEM/S,DEFER/S`.
@@ -189,7 +197,9 @@ codec.
 encodes each 36-byte `If`/`Skip` record, including parent, branch flags, block
 position, and skip target. `ShellScriptInputCodec` records only the current
 bounded buffer span/cursor, while `ShellScriptLabelCodec` and its transitions
-maintain a bounded parent-linked label index. These codecs perform bounded
+retain the bounded parent-linked label index for callers that supply records.
+The public runner scans source text and does not populate that index when LAB executes.
+These codecs perform bounded
 transitions without owning block scheduling or process behavior.
 
 `ShellScriptEngine.Step` consumes one command step from a bounded line in the
@@ -223,7 +233,11 @@ streams.
 `*<>` aliases the error handle to the selected output handle without creating
 a second ownership claim. Operators must begin at a whitespace-delimited
 boundary; the former `2>` and `2>>` spellings are not MorphOS redirection
-operators.
+operators. The explicit error-stream operators are later AmigaDOS extensions:
+the [DOS reference, section 15.1.1](https://developer.amigaos3.net/sites/default/files/downloads/2024-10/Amiga_ROM_Kernel_Reference_Manual_DOS.pdf)
+dates them to version 45, after Kickstart 3.1's V40 DOS. They are provided by
+this Shell on V40 as extensions and should not be assumed to work in the
+original V40 Shell.
 `ShellRedirectionTransaction` opens only the requested streams, rolls back
 already-opened handles on a later failure, passes the temporary handles to the
 internal or external command, and closes them in reverse order. The inherited
@@ -264,12 +278,10 @@ fixed-width initial frame state, reusable workspace, and step bound, so a DOS
 adapter can pass its cursor/handles into Shell without a managed startup
 object or retained script text.
 
-Remaining command work is now focused on the unimplemented internal-command
-behaviors and the Shell/DOS script-frame integration. Variable listings stay
-DOS-owned: the Shell receives only an output boundary and never retains a
-managed variable map. Any future option-bearing command must add an exact DOS
-template/result-buffer boundary rather than a second command-local option
-parser.
+Behavioral coverage and the shared public-interface implementation are described
+below. Variable listings use the DOS/Shell boundary; the Shell retains no
+managed variable map. Option-bearing commands use DOS templates and result
+buffers rather than a second command-local option parser.
 
 The external `CopperOS.Commands` project now contains `ExecuteCommand`. It
 parses only the required `FILE/A` path and calls the active Shell engine; it
@@ -311,35 +323,279 @@ stepper. A fixed-width `DosChildCliStartup` handoff copies bounded
 overflow or invalid guest memory. Command wrappers retain no host text or
 loader object.
 
-`DosShellNativeBridge` is the first concrete adapter slice. It connects the
-startup cursor, explicit-span `ReadArgs`/`FreeArgs`, resident registry
-lookup/use-count/management, and command-owned output handles to DOS without
-crossing managed state into Shell. The remaining adapter work is the broader
-`IShellPlatform` capability set: external script-image launch and requester
-extensions. Child Process completion, prepared scheduler wake, and Shell
-control-signal delivery now cross the DOS/Exec boundary.
+The native Shell owns its process command state, command-file BSTR, runner
+records, workspace, frame resources, command sources, and the CLI command-path
+lock list. Its public DOS/Exec operations
+include command lookup and synchronous foreground execution, file and argument
+services, prompt setting, template reading and rendering, local variables and aliases,
+global variable read/write/delete, and `Why`/`Fault` diagnostics.
+The V40 command search also checks the current directory and the implicit
+`C:` location around the CLI lock list. `Path` displays these two implicit
+entries even when `Path RESET` clears the explicit list. `Path` arguments use
+the runner's bounded workspace; traversal of the live CLI list has no fixed
+entry limit and rejects cycles before changing the list.
+The generic host platform remains useful for host regression tests.
+Before each native runner step, the frame refreshes its borrowed current-directory
+lock from the public Process record. `CD` or a foreground command can replace
+and release the previous lock; retaining the initial snapshot across steps would
+otherwise leave later command invocations with a stale lock.
 
-`CopperOS.Shell.Dos` now supplies the concrete value-type adapter for the
-implemented portion of that boundary. `DosShellPlatform<TDosPlatform>` uses
-DOS-owned fixed-width records for CLI state, aliases, variables, paths,
-resident entries, handles, startup cursors, and active CLI-to-frame bindings.
-The project is compiled as a
-standalone local-SDK unit to keep its CopperStart ABI coherent; the host
-`CopperOS.Shell` project remains separate. Unsupported requester and
-external-image operations return explicit failure until their owning DOS/Exec
-mechanisms are available. File-backed `Run` uses the existing Exec task creator when the DOS
-adapter has a live `ExecBase`, and terminal teardown releases the corresponding
-DOS/Exec resources; resident commands bind and release their use counts through
-the child Process, while external script-image launch remains an explicit
-boundary. `Execute` runs bounded internal script lines through the
-same guest frame engine. Foreground external lines publish a DOS-owned
-continuation and yield a `Waiting` step; the final DOS scheduler park/wake
-entrypoint parks the native task between polls. Direct
-quit/end controls, nested control records, labels, and bounded `If` evaluation
-are forwarded through DOS-owned frame bindings. The `copperos.shell.execute-park`
-ABI bridges the prepared DOS wait record; Begin/Poll use a four-byte DOS-state
-context, and the full Execute export set is freestanding-qualified for
-MC68000/020/040 with no managed allocation sites. Child task death completes
-the matching continuation before DOS release and signals the prepared parent
-wait; `SIGBREAKF_CTRL_C`/`SIGBREAKF_CTRL_D` map to Shell events while
-unrelated Exec signals remain pending.
+Ordinary and SYSTEM resident command add, replace and remove operations use
+public DOS segment and file vectors. SYSTEM admission creates a permanent
+segment with use count -1. A system entry cannot be removed; explicit REPLACE
+can add another entry with the same name while preserving the system entry.
+An original Kickstart 3.1 Shell comparison checks these cases, their DOS
+errors, and the order of interleaved normal and system entries. The proof's
+extra `Cls` internal and registered `Shell` module remain visible in its
+listing. Operations check the PURE bit unless forced, preserve an
+old segment if publication of a replacement fails, and protect the segment
+use count under Exec `Forbid`. Duplicate names are permitted for `ADD`, as on
+the V40 Shell; an explicit `REPLACE` requires an existing name. The command
+reports ordinary resident-operation failures at warning level 5 and preserves
+the DOS error as the CLI secondary result. If DOS refuses to remove an old
+normal entry after a replacement SYSTEM entry is published, the old entry is
+retained and the permanent new entry also remains; public `RemSegment` cannot
+roll back a SYSTEM entry. The command
+source leaves the CLI's `FailAt` limit in effect when it completes, including
+when a nested script changes the limit.
+The native `Resident` listing copies segment names and counts under Exec
+`Forbid` and writes the snapshot afterward. DOS V50 and newer use
+`FindSegmentTagList` to locate the first entries, then walk the public Segment
+links to retain their order. V40 has no public name-independent iterator, so
+its isolated compatibility path reads the SDK RootNode/DosInfo resident-list head.
+That V40 path depends on the 3.1 layout and is tested against the original ROM.
+Backtick capture suppresses disk requesters while looking for `T:` and falls
+back to the current volume's `:T/` directory if the assign is unavailable. The
+Shell owns the capture file and removes it after reading.
+
+For a launcher that starts a background Shell, the command stepper leaves
+`Run` redirections in the child command text. The existing private direct
+executable launcher instead retains its parent-opened redirection handles;
+this temporary distinction avoids breaking it before conversion. Like the
+original 3.1 Shell, `Run` passes quotation and star escapes through and treats
+`DETACH`, `QUIET`, `STACK`, and `PRI` as command text. An empty `Run` starts
+an empty child, as on V40. A worker can use a permanently registered system
+`Shell` segment directly. For the fingerprinted proof-image Shell package,
+when the caller is not permanent the launcher loads a matching `L:Shell-Seg`
+and transfers its ownership to DOS for the new process. The package header
+contains a build fingerprint; the installed file must have the same fingerprint
+as the running package. This is a build identity check, not file authentication.
+Each such worker needs a separate Shell image in memory. Other package formats
+or an absent or mismatched `L:Shell-Seg` cannot use this fallback. It can borrow
+its parent's input and error handles, so their owner must keep them alive
+while the worker uses them. A worker that executes a command flushes output
+before it exits; an empty worker does not touch its borrowed output.
+With the earlier, larger Shell on the 2 MiB Kickstart 3.1 proof configuration,
+a burst of concurrent nonresident workers exhausted public memory: the diagnostic in
+`artifacts/shell-public-nonresident-run-results-ks-v4` recorded return code 20
+and `ERROR_NO_FREE_STORE` for one launch. That broad replay did not pass.
+After removing private DOS roots, the 186772-byte shared Shell passes the
+nonresident broad workload on both systems in
+`artifacts/shell-public-only-nonresident-ks-v5` and
+`artifacts/shell-public-only-nonresident-copper-v3`, including worker retirement
+and Shell exit. Separate worker images still consume memory; these results
+establish the tested workload rather than an arbitrary concurrency limit.
+When borrowed input is interactive, the launcher temporarily selects its
+handler as the process's console task, opens `*` through DOS, restores the
+previous console task, and leases the separate handle to the worker. This
+prevents `RunCommand` from replacing the interactive Shell's input buffer while
+the parent is reading. The clone is closed after its last Shell worker releases
+it. A borrowed `NIL:` input is also reopened and leased to the worker, so its
+parent may close its own handle. Other non-interactive shared input handles are
+not isolated by this path.
+Redirections immediately following `Run` apply to the launcher, while later
+ones apply to the child. Kickstart 3.1 comparisons show that a leading output
+file receives the `[CLI n]` notice, while an unredirected child of the tested
+interactive launcher uses an interactive output. A worker opens its own console
+handle when the launcher has a console task, or `NIL:` when it has none; the
+caller retains its output handle. An explicit leading `NIL:` is
+passed to the worker. A launcher-opened ordinary output is closed after the
+notice unless it is also the child's error handle. These comparisons cover
+ordinary files and `NIL:`; special devices and all input/error redirection
+combinations have not been compared with the original.
+Shell-owned stream leases are retained by nested background workers and closed
+after the last holder exits. Streams borrowed from an external owner remain
+that owner's responsibility. A delayed nested-worker probe checks the worker's
+own standard output and redirected output after its launcher can retire.
+
+`NewCLI` and `NewShell` launched by the shared command runner use public DOS
+process creation. They open independent console handles, copy the parent's
+prompt and current-directory name, inherit its DOS-owned path and local
+variables, and run the requested startup file before reading the console.
+When a continuation requests a particular directory, the launcher temporarily
+selects its own duplicate and lets `CreateNewProc` inherit a separate lock. It
+then restores the parent directory and releases its temporary lock, including
+when process creation fails. This avoids depending on ownership of an explicit
+`NP_CurrentDir` on failure.
+This launcher uses the same permanent-segment or fingerprinted-copy lifetime
+rules as the background worker. Kickstart 3.1 tests exercise both `Run` and
+`NewShell` from a nonresident proof-image Shell. With no `WINDOW`, it opens
+`CON:0/0/640/200/CopperOS Shell/CLOSE`; the original's default window geometry
+has not been compared. Kickstart 3.1 guest tests cover both
+command names, startup execution, inherited aliases, variables, path,
+directory and stack, and process exit. Separate Kickstart 3.1 tests cover the
+default startup file, an explicit console window, and an inherited prompt.
+CopperStart tests cover both command names and the same inherited state,
+including the prompt, and exit behavior. A missing `FROM` file leaves the new
+Shell interactive, as in a separate Kickstart ROM Shell control.
+
+The shared native platform uses public Exec/DOS services and Shell-owned
+records for runner discovery, command state, script cleanup, child launch,
+continuation ownership and waiting. It never retains a supplied CopperStart
+DOS-state pointer. Its constructor keeps an ignored argument for existing
+callers and a reserved four-byte native transport slot. The generic
+`DosShellPlatform<TPlatform>` adapter remains for legacy host fixtures; it is
+not the native interpreter's service owner. A standard V40 `Run`, `NewShell`
+or `NewCLI` uses public DOS process creation. Caller-provided continuation
+observations remain owned until their tasks have actually exited.
+Native platform callers can also request a command stack (64 bytes through
+16 MiB) and a signed task priority (-128 through 127) on the public Run path.
+The worker keeps at least its own 64 KiB stack, while the requested command
+stack is stored in the child CLI. Invalid sizes, priorities and presence flags
+fail before stream ownership transfers. The V40 Run command still passes its
+unparsed remainder to the child; these platform options add no command syntax.
+Caller-owned continuation records can be polled and released. Public observers
+also accept frame-owned records allocated by ShellFrameResources; acknowledgement
+or detachment releases them, while a detached worker retains its own observation.
+Native frame teardown detaches its public observations and leaves allocations
+belonging to a supplied legacy context with their caller. The legacy generic
+adapter retains its own cleanup protocol. The mixed-owner regression verifies
+both ownership boundaries before its fixture releases the legacy records.
+The public wait path polls completion through DOS Delay, increasing its interval
+from one tick to at most 25 ticks while a worker remains pending. Each delay is
+clipped to a finite caller's remaining tick budget, and IoErr is restored. A
+one-tick timer can expire during call overhead before the caller blocks;
+repeating that interval can starve a ready lower-priority worker. The same public
+implementation runs on both systems, without a scheduler adapter. The full
+heap-pressure/priority regression passes on CopperStart with all `0x3fff` stages.
+
+Earlier CopperStart fixes installed timer.device at reset using ROM-resident
+dispatch and corrected CheckIO for requests already consumed by DoIO or WaitIO.
+Those historical missing-device failures are separate from the later observed
+one-tick nonblocking delay on a working timer. Current artifacts, original-ROM
+comparisons and completed acceptance checks are recorded in
+[Shared Shell acceptance](../../../docs/SharedShellAcceptance.md).
+Wait preparation and parking accept Shell-owned continuations. Ordinary
+V40 Run remains asynchronous and does not allocate a parent wait record.
+Callers requesting observation can provide a continuation; frame-owned
+records are allocated and reclaimed through ShellFrameResources. Extended
+native DETACH/QUIET options return ERROR_NOT_IMPLEMENTED before transferring
+stream ownership; they are not V40 Run command syntax.
+Deferred `ADD` uses the public V50 `AddSegmentTagList` API when the installed DOS
+exports it. The Shell checks both the DOS version and vector extent first; on a
+V40 DOS, deferred and resident-alias extensions return `ERROR_NOT_IMPLEMENTED`
+instead of calling a CopperStart-private registry. The V50 deferred path retains
+the forced-resident warning and leaves loading and segment ownership with DOS.
+The native foreground runner, environment listing and resident management
+use public services. The exported `execute-begin`, `execute-poll` and
+`execute-park` entries preserve their register signatures but ignore the old
+context and ExecBase arguments. Begin requires an initialized CLI with
+Shell-owned process state. No error or pending-command path initializes a
+private DOS context. Child entry also leaves an opaque previous
+`pr_ShellPrivate` value uninterpreted: packet startup's public CliInit result
+explicitly controls whether to resume standard input.
+The synchronous script path has a native register-ABI probe; the caller-owned
+Run/NewShell continuations and public wait path have focused native probes.
+Probes on the original Kickstart 3.1 ROM and CopperStart held a
+`CreateNewProc` child inside its exit callback and observed that it was still
+visible as both an Exec task and a CLI.
+An exit callback can therefore notify an owner, but it is not evidence that
+the child and its DOS resources have already retired. `FindCliProc` numbers
+can also be reused, so a replacement wait protocol must retain a separate
+identity and synchronize ownership when the parent exits. See the native-root
+test README for the probe and its limits.
+The public Exec task-identity reservation provides distinct names while either
+the polling owner or its child remains alive, and is used by the public `Run`
+continuation path. Its guest probe passes on both systems.
+The proof's directly created Shell process and DOS packet startup both enter
+the shared initialized-CLI runner on CopperStart and an original ROM. The
+bootstrap identifies its directly created child through the public task user
+data field; it does not inspect CopperStart's private DOS context. Published
+CLI path nodes use Exec vectors so both DOS implementations can release the
+live path when the process exits. Focused native probes do not verify the
+complete shared Shell.
+For script files the Shell opens itself, the public DOS `SetVBuf` call requests
+a full buffer on noninteractive handles; if DOS cannot allocate one, reading
+continues without requiring that request to succeed. The DOS error from opening is
+preserved. Borrowed command input and interactive handles are not rebuffered.
+This avoids the slow per-character disk reads observed in a legacy CopperStart
+boot: the 65-argument Path startup script then completed within its native test
+bound. Script control flow and seeking were also replayed on Kickstart 3.1.
+For packet-started `System` calls, the initialized CLI can supply a command
+stream distinct from the standard input inherited by commands. The shared
+runner reads the command stream while passing the standard input to the
+command. A proof-image test on both CopperStart and Kickstart 3.1 checks that a
+synchronous command receives the supplied input and leaves its caller's
+handle usable; it also covers synchronous and asynchronous completion. The
+earlier proof image returned from `System` on Kickstart but supplied an empty
+input to the command. See `tests/Shell.Dos.NativeRoot/README.md` for the guest
+tests and their limits. The legacy CopperStart boot registers the same
+packet-started runner for DOS-launched Shells; its independently created
+workers continue to use the direct worker entry.
+The proof build no longer roots the legacy queue-handler task or DOS process-
+return exports in the portable Shell image. See `tests/Shell.Dos.NativeRoot/README.md`
+for the scope and limitations of the standalone native probes and boot replays.
+The v22 packaged image passes the recorded host, native, original-ROM and
+CopperStart acceptance matrix; the linked acceptance document defines its scope.
+
+The shared runner owns failure diagnostics as well as status publication.
+It obtains catalogue text through public DOS Fault, uses the command's selected
+streams, and flushes diagnostic boundaries so direct Write and buffered FPutC
+fragments retain their order. Missing-command lookup does not create an ordinary
+stdout target, as on V40; explicit error redirection and *<> remain available.
+CD directory and ReadArgs failures return 20, matching original V40 captures.
+Consumed command syntax errors recover in both scripts and the console, while
+malformed script directives remain terminal. A FailAt stop completes the command
+sequence with its DOS result and can return to the console. The new console
+frame retains the CLI return code for IF ERROR. Current native evidence is
+summarized in `docs/SharedShellAcceptance.md`; the native-root README retains
+the probe contracts and investigation history.
+
+On the original V40 Shell, a no-argument `SetEnv` invoked the external `LIST`
+command with `env: QUICK NOHEAD FILES`. With `LIST` available it printed file
+names in `ENV:` (not their contents or subdirectory names); without it, the
+Shell reported the missing command. Fresh original-ROM CLI captures publish
+return code zero and secondary error zero for both no-argument commands,
+including a missing LIST and deterministic LIST fixtures returning 0 and 10. This
+supersedes the earlier warning-level-5 assumption.
+The native Shell now uses public command lookup and foreground execution for
+that listing; native verification is described in `tests/Shell.Dos.NativeRoot`.
+
+Built-in service diagnostics have a separate selected destination in
+`CommandInvocation`. It defaults to the command's standard output, as observed
+on V40, and changes to the error stream only for explicit error redirection.
+Resident mutation messages and global-listing failure messages use that
+destination; Resident listings and LIST's ordinary output retain standard
+output. Error-stream inheritance for child processes is independent of this
+built-in reporting policy. The `*>`, `*>>`, and `*<>` forms are extensions to
+the V40 syntax, and are tested separately from the original-Shell controls.
+Resident ReadArgs failures also use the Shell's catalogue diagnostic path:
+an extra positional argument reports `wrong number of arguments` with result
+10/118, matching the original V40 Shell. Resident admission/removal failures
+retain their service-owned message and WARN result, so they are not reported
+twice by that parser-error path.
+
+Additional original-ROM controls establish that WHY publishes WARN (5), even
+after a successful command, and retains the preceding CLI secondary error.
+The runner preserves that error across diagnostic formatting and cleanup.
+Forward SKIP scans source text rather than using a cached future label:
+ENDSKIP stops the scan with WARN, while a missing target consumes the rest of
+the command sequence and returns ERROR with object-not-found. Standalone
+ENDSKIP succeeds without closing an unrelated IF record. BACK searches from
+the beginning of the current source. Accepted native comparison evidence is
+tracked in `docs/SharedShellAcceptance.md`.
+An omitted SKIP target matches an unnamed LAB on the tested V40 ROM; it does
+not match an arbitrary named LAB. Successful scans consume the matched LAB
+line, so a backward jump resumes at its following command. An unnamed LAB
+is also a successful command in ordinary execution.
+ReadArgs switches passed to boolean-valued services are normalized from DOS
+TRUE as well as 1, including SAVE, BACK and CLS RESET. Stack displays the full
+`Current stack size is ... bytes` line observed on V40.
+
+CLS writes a form feed to clear the selected console output. CLS RESET uses
+the console device's Reset to Initial State sequence, ESC followed by lower
+case c, so character modes and display defaults are reset as well. The shared
+formatter is used by both platforms and reports a failed byte write. This
+uses the documented public console output protocol through DOS; it does not
+require a private console service. See the
+[console device reference](https://wiki.amigaos.net/wiki/Console_Device).

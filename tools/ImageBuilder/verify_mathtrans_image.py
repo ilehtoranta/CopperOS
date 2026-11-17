@@ -14,7 +14,7 @@ image = args.image.read_bytes()
 receipt = json.loads(args.receipt.read_text(encoding='utf-8-sig'))
 staged = args.staged_library.read_bytes()
 digest = lambda value: hashlib.sha256(value).hexdigest()
-if receipt.get('kind') != 'original-system-boot-proof' or receipt.get('imageFormat') != 'adf' or receipt.get('shipping') is not False:
+if receipt.get('kind') not in ('original-system-boot-proof', 'copperos-system-image') or receipt.get('imageFormat') != 'adf' or receipt.get('shipping') is not False:
     raise ValueError('Expected a nonshipping ADF boot-proof receipt')
 if receipt.get('sha256') != digest(image) or receipt.get('bytes') != len(image):
     raise ValueError('Boot-proof image differs from its receipt')

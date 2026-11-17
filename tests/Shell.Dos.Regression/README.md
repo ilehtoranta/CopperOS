@@ -9,12 +9,34 @@ dotnet test ../CopperStart/tests/CopperStart.Exec.Tests/CopperStart.Exec.Tests.c
 dotnet test tests/Commands/CopperOS.Commands.Tests.csproj -c Release
 ```
 
+The shared Shell path and runner ownership regressions use the same process
+fixture with the production Shell project:
+
+```powershell
+$targets = (Resolve-Path tests/Shell.Dos.Regression/PathIntegration.targets).Path
+dotnet test ../CopperStart/tests/CopperStart.Exec.Tests/CopperStart.Exec.Tests.csproj -c Release --filter 'FullyQualifiedName~PathOwnershipTests' "-p:CustomAfterMicrosoftCommonTargets=$targets"
+```
+
+These tests cover public CLI path ownership, runner publication through the
+current Process's Shell-private field, nested Shell-owned script frames,
+control and label cleanup, child completion under the correct frame, normal
+script completion, and rollback when runner publication cannot allocate. The focused 68000 probe is documented
+in `tests/Shell.Runner.NativeRoot/README.md`; neither suite by itself qualifies
+the complete Shell on a real Kickstart image.
+
 The targets file enables the ROM branch only in the host test assembly and adds
 the regression to CopperStart's existing process fixture. That assembly already
 links this checkout's production `DosShellPreparedChildCore.cs`. The regression
 fails against the old private-loader rollback: the platform release callback is
 never invoked. It also checks the command error, task retirement and absence of
 publication. These are host semantic tests, without guest CPU execution.
+
+On a writable CopperOS proof image, `Run C:Demo >SYS:T/runresult` exercises the
+native public Shell worker and its child-opened redirection. After allowing the
+child to finish, the file should contain the two lines printed by `C:Demo`.
+The Kickstart probe in `tools/ImageBuilder/qualify_shared_shell31.py --run`
+also checks this path. The generic host platform still has a separate legacy
+direct-executable launcher, and these checks do not qualify every launch path.
 
 The production `CopperOS.Shell.Dos` project enables ROM DOS vector loading. The
 separate `Shell.Dos.NativeRoot` project continues to qualify the standalone

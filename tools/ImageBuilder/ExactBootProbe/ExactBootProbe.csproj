@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\..\CopperOS.Portable.props" />
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <CopperScreenRoot Condition="'$(CopperScreenRoot)' == ''">$(MSBuildThisFileDirectory)..\..\..\..\CopperScreen</CopperScreenRoot>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(CopperOSProbeEmulatorDirectory)' == ''">
+    <ProjectReference Include="$(CopperScreenRoot)\CopperMod.Amiga.Lightweight\CopperMod.Amiga.Lightweight.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(CopperOSProbeEmulatorDirectory)' != ''">
+    <Reference Include="CopperMod.Amiga.Lightweight"><HintPath>$(CopperOSProbeEmulatorDirectory)/CopperMod.Amiga.Lightweight.dll</HintPath></Reference>
+    <Reference Include="Copper68k"><HintPath>$(CopperOSProbeEmulatorDirectory)/Copper68k.dll</HintPath></Reference>
+    <Reference Include="CopperDisk"><HintPath>$(CopperOSProbeEmulatorDirectory)/CopperDisk.dll</HintPath></Reference>
+    <Reference Include="CopperFloat"><HintPath>$(CopperOSProbeEmulatorDirectory)/CopperFloat.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

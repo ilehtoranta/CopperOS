@@ -1,0 +1,9 @@
+; DH0:install inserts a real lock node in this CLI's command path. p exists
+; only on DH0: and reports whether it can load SYS:Libs/mathtrans.library.
+cd SYS:
+cd >DH0:before.txt
+p *>DH0:before-install.txt
+DH0:install
+p
+cd >DH0:after.txt
+echo completed >DH0:done.txt

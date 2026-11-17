@@ -27,9 +27,9 @@ public static class NativeMorphOSListCommand
     private const uint TimeTextOffset = DateTextOffset + DateTextBytes;
     private const uint ProtectionTextOffset = TimeTextOffset + DateTextBytes;
     private const uint CommentTextOffset = ProtectionTextOffset + ProtectionBytes;
-    public const uint WorkspaceAllocationBytes = (uint)DosLayout.AnchorPath.Size +
-        PathBytes + PatternBytes * 3u + (uint)FileInfoBlock.SizeInBytes +
-        DosDateTime.Size + DateTextBytes * 3u + ProtectionBytes + CommentBytes;
+    private const uint DirectoryPatternOffset = CommentTextOffset + CommentBytes;
+    private const uint DirectoryFibOffset = (DirectoryPatternOffset + PathBytes + 3u) & ~3u;
+    public const uint WorkspaceAllocationBytes = DirectoryFibOffset + (uint)FileInfoBlock.SizeInBytes;
     private const uint CtrlCMask = 1u << 12;
     private const byte DoDirectory = (byte)AnchorPathFlags.DoDirectory;
     private const byte DidDirectory = (byte)AnchorPathFlags.DidDirectory;
@@ -166,6 +166,8 @@ public static class NativeMorphOSListCommand
             var subPatternBuffer = APTR.FromPointer(subInputBuffer.Raw +
                 PatternBytes);
             var fib = APTR.FromPointer(subPatternBuffer.Raw + PatternBytes);
+            var directoryPattern = APTR.FromPointer(workspace.Raw + DirectoryPatternOffset);
+            var directoryFib = APTR.FromPointer(workspace.Raw + DirectoryFibOffset);
             InitializeAnchor(anchor);
 
             if (pat.IsNotNull && DOS.ParsePatternNoCase(
@@ -214,6 +216,24 @@ public static class NativeMorphOSListCommand
                 var nameRaw = APTR.ReadUInt32(slot, 0);
                 if (nameRaw == 0) break;
                 var name = CString.FromPointer(nameRaw);
+                var directoryExpanded = false;
+                var directoryLock = DOS.LockRaw(name, DOS.LockMode.Shared);
+                if (directoryLock.IsNotNull)
+                {
+                    var examined = DOS.Examine(directoryLock, directoryFib) != 0;
+                    var isDirectory = examined && FileInfoBlock.GetDirEntryType(directoryFib.Raw) > 0;
+                    DOS.UnLock(directoryLock);
+                    if (isDirectory)
+                    {
+                        if (!BuildDirectoryPattern(APTR.FromPointer(nameRaw), directoryPattern))
+                        {
+                            error = (int)DOS.Error.LineTooLong;
+                            break;
+                        }
+                        name = CString.FromPointer(directoryPattern.Raw);
+                        directoryExpanded = true;
+                    }
+                }
                 var match = DOS.MatchFirst(name, anchor);
                 while (match == 0)
                 {
@@ -339,7 +359,8 @@ public static class NativeMorphOSListCommand
                 }
                 DOS.MatchEnd(anchor);
                 if (error != 0) break;
-                if (match != (int)DOS.Error.NoMoreEntries && match != 0)
+                if (match != (int)DOS.Error.NoMoreEntries && match != 0 &&
+                    !(directoryExpanded && match == (int)DOS.Error.ObjectNotFound))
                 {
                     error = match;
                     break;
@@ -380,6 +401,28 @@ public static class NativeMorphOSListCommand
         APTR.WriteUInt8(anchor, DosLayout.AnchorPath.Reserved, 0);
         APTR.WriteUInt16(anchor, DosLayout.AnchorPath.StringLength,
             unchecked((ushort)PathBytes));
+    }
+
+    private static bool BuildDirectoryPattern(APTR source, APTR destination)
+    {
+        var length = 0u;
+        while (length < PathBytes && APTR.ReadUInt8(source, (int)length) != 0)
+        {
+            APTR.WriteUInt8(destination, (int)length, APTR.ReadUInt8(source, (int)length));
+            length++;
+        }
+        if (length == 0 || length >= PathBytes) return false;
+        var last = APTR.ReadUInt8(destination, (int)length - 1);
+        if (last != (byte)':' && last != (byte)'/')
+        {
+            if (length + 1 >= PathBytes) return false;
+            APTR.WriteUInt8(destination, (int)length++, (byte)'/');
+        }
+        if (length + 3 > PathBytes) return false;
+        APTR.WriteUInt8(destination, (int)length++, (byte)'#');
+        APTR.WriteUInt8(destination, (int)length++, (byte)'?');
+        APTR.WriteUInt8(destination, (int)length, 0);
+        return true;
     }
 
     // Avoid copying the 24-byte parser lease for each option lookup.

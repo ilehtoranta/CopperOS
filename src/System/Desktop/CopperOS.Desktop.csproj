@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <CopperOSUseLocalCopperSharp>true</CopperOSUseLocalCopperSharp>
+    <AssemblyName>CopperOS.Desktop</AssemblyName>
+  </PropertyGroup>
+  <Import Project="../../../CopperOS.Portable.props" />
+  <ItemGroup>
+    <ProjectReference Include="../../../../CopperSharp68k/Compiler/CopperSharp.Compiler.csproj" />
+  </ItemGroup>
+</Project>

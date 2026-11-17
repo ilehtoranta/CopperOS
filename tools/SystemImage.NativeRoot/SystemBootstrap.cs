@@ -13,30 +13,24 @@ namespace CopperOS.SystemImage;
 // publication and console operations go through guest Exec/DOS vectors.
 public static class SystemBootstrap
 {
-    internal const uint DirectKickstartShellMarker = 0x434F5348;
+    internal const uint DirectShellMarker = 0x434F5348;
 
     [M68kExport("copperos.system.shell-entry")]
     public static uint ShellEntry()
     {
         var memory = new CopperSharpNativeDosPlatform();
         var task = global::Amiga.Exec.FindTask(CString.FromPointer(0));
-        var cli = DosProcessCodec.ReadCommandLineInterface(ref memory, task).Address;
-        if (!DosShellNativeChildContextCore.TryGetCliState(ref memory, cli, out var state))
+        if (PublicShellWorkerStartup.TryRun(task, out var workerResult)) return workerResult;
+        if (APTR.ReadUInt32(task, ExecLayout.Task.UserData) == DirectShellMarker)
         {
-            if (APTR.ReadUInt32(task, ExecLayout.Task.UserData) == DirectKickstartShellMarker)
-            {
-                APTR.WriteUInt32(task, ExecLayout.Task.UserData, 0);
-                return KickstartShell.Run();
-            }
-            return KickstartShell.RunDosStartup(task);
+            APTR.WriteUInt32(task, ExecLayout.Task.UserData, 0);
+            var cli = DosProcessCodec.ReadCommandLineInterface(ref memory, task).Address;
+            var shell = new DosShellNativePlatform(APTR.Null);
+            if (!shell.TryUpdateCommandPath(cli, Text("C:"), 3, 1,
+                PathCommand.OperationAdd, 1)) return 20;
+            return DosShellNativeChildCore.RunFromInitializedCli();
         }
-        var exec = APTR.FromPointer(APTR.ReadUInt32(APTR.FromPointer(4), 0));
-        if (!DosShellNativeContextCore.WriteExecBase(ref memory, state, exec)) return 20;
-        var shell = new DosShellNativePlatform(state);
-        // The ROM's bounded boot CLI does not construct a general Shell path.
-        // Run this as the real child so DOS owns its C: locks and path lifetime.
-        if (!shell.TryUpdateCommandPath(cli, Text("C:"), 3, 1, PathCommand.OperationAdd, 1)) return 20;
-        return DosShellNativeEntrypoints.ShellTaskEntry();
+        return DosShellPacketStartup.Run(task);
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -88,8 +82,7 @@ public static class SystemBootstrap
             var cli = DosProcessCodec.ReadCommandLineInterface(ref memory, child).Address;
             DosCommandLineInterfaceCodec.WriteInteractive(ref memory, cli, 1);
             DosCommandLineInterfaceCodec.WriteBackground(ref memory, cli, 0);
-            if (!DosShellNativeChildContextCore.TryGetCliState(ref bootMemory, parentCli, out _))
-                APTR.WriteUInt32(child, ExecLayout.Task.UserData, DirectKickstartShellMarker);
+            APTR.WriteUInt32(child, ExecLayout.Task.UserData, DirectShellMarker);
         }
         global::Amiga.Exec.Permit();
         if (child.IsNull) { Print(dos, "Shell Process creation failed\n"); return 20; }

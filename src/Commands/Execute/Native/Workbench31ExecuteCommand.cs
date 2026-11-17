@@ -56,7 +56,8 @@ public static class Workbench31ExecuteCommand
     private const int FormatArgsOffset = 4624;        // VPrintf argument LONGs
     private const int EmptyLineOffset = 4640;         // "\n" for an empty tail
     private const int NumberOffset = 4644;            // 12 bytes
-    private const uint WorkBytes = 4672;
+    private const int WriteOffset = 4672, WriteCapacity = 4096;
+    private const uint WorkBytes = WriteOffset + WriteCapacity;
 
     // dos/rdargs.h: DOS_RDARGS for AllocDosObject; ReadItem results.
     private const uint DosRdArgs = 5;
@@ -89,6 +90,7 @@ public static class Workbench31ExecuteCommand
         internal byte Bra, Ket, Dollar, Dot;
         internal uint PoolUsed;
         internal uint OutLength;
+        internal uint WriteLength;
     }
 
     /// <summary>
@@ -199,6 +201,10 @@ public static class Workbench31ExecuteCommand
             return DOS.RETURN_FAIL;
         }
 
+        // This is an owned, noninteractive stream. A failed buffer request
+        // leaves ordinary FGets semantics available.
+        _ = DOS.SetVBuf(script, APTR.Null, DosBufferMode.Full, 1024);
+
         var tempName = APTR.FromPointer(st.Work.Raw + (uint)TempNameOffset);
         st.Temp = CreateWorkFile(tempName);
         if (st.Temp.IsNull)
@@ -211,22 +217,28 @@ public static class Workbench31ExecuteCommand
 
         var line = APTR.FromPointer(st.Work.Raw + (uint)LineOffset);
         var failed = false;
-        while (DOS.FGets(script, line, LineCapacity - 1).IsNotNull)
+        while (true)
         {
+            DOS.SetIoErr(0);
+            if (DOS.FGets(script, line, LineCapacity - 1).IsNull)
+            {
+                ioError = (int)DOS.IoErr();
+                if (ioError != 0) failed = true;
+                break;
+            }
             var length = CStringLength(line, LineCapacity);
             var action = ProcessLine(ref st, line, length);
             if (action == LineAction.Fail) { failed = true; break; }
-            // Preserve each contiguous line as one transfer. Size-one FWrite
-            // elements otherwise cause one filesystem transaction per byte.
-            if (action == LineAction.Emit && st.OutLength > 0)
-                DOS.Write(st.Temp, APTR.FromPointer(st.Work.Raw + (uint)OutOffset), (int)st.OutLength);
+            if (action == LineAction.Emit && st.OutLength > 0 &&
+                !BufferWorkFile(ref st, APTR.FromPointer(st.Work.Raw + (uint)OutOffset),
+                    st.OutLength, out ioError)) { failed = true; break; }
         }
         DOS.Close(script);
+        if (!failed && !FlushWorkFile(ref st, out ioError)) failed = true;
 
         if (failed)
         {
-            DOS.Close(st.Temp);
-            DOS.DeleteFile(CString.FromPointer(tempName.Raw));
+            DiscardWorkFile(ref st, tempName);
             return DOS.RETURN_ERROR;
         }
 
@@ -235,37 +247,104 @@ public static class Workbench31ExecuteCommand
         var standard = BPTR.FromRaw(APTR.ReadUInt32(cli, DosLayout.CommandLineInterface.StandardInput));
         var oldName = APTR.FromPointer(st.Work.Raw + (uint)OldNameOffset);
         APTR.WriteUInt8(oldName, 0, 0);
-        if (current.IsNotNull && current.Raw != standard.Raw)
+        var copyingCaller = current.IsNotNull && current.Raw != standard.Raw;
+        var callerPosition = -1;
+        if (copyingCaller)
         {
-            // The unread caller text is copied in blocks at its current cursor.
-            int count;
-            while ((count = DOS.Read(current, line, LineCapacity)) > 0)
-                DOS.Write(st.Temp, line, count);
+            // Keep the caller's reader open until the replacement is ready.
+            // Seekable script input can be restored if copying or reopening
+            // fails, including a short write after earlier successful blocks.
+            callerPosition = DOS.Seek(current, 0, (int)DosConstants.OffsetCurrent);
+            while (true)
+            {
+                DOS.SetIoErr(0);
+                var count = DOS.Read(current, line, LineCapacity);
+                if (count == 0) break;
+                if (count < 0)
+                { ioError = (int)DOS.IoErr(); failed = true; break; }
+                if (!BufferWorkFile(ref st, line, (uint)count, out ioError))
+                { failed = true; break; }
+            }
+            if (!failed && !FlushWorkFile(ref st, out ioError)) failed = true;
+            if (failed)
+            {
+                RestoreCallerPosition(current, callerPosition);
+                DiscardWorkFile(ref st, tempName);
+                return DOS.RETURN_ERROR;
+            }
             ReadCommandFile(cli, oldName);
-            DOS.Close(current);
         }
-        DOS.Close(st.Temp);
+        var closed = DOS.Close(st.Temp);
         st.Temp = BPTR.Null;
-        if (IsWorkFileName(oldName))
-            DOS.DeleteFile(CString.FromPointer(oldName.Raw));
+        if (closed == 0)
+        {
+            ioError = (int)DOS.IoErr();
+            if (ioError == 0) ioError = (int)DOS.Error.DiskFull;
+            if (copyingCaller) RestoreCallerPosition(current, callerPosition);
+            DiscardWorkFile(ref st, tempName);
+            return DOS.RETURN_ERROR;
+        }
 
         var input = DOS.OpenRaw(CString.FromPointer(tempName.Raw), DOS.FileMode.OldFile);
         if (input.IsNull)
         {
             ioError = (int)DOS.IoErr();
-            // The old input is already gone if we were inside a script; fall
-            // back to standard input so the Shell does not read a closed handle.
-            if (current.IsNotNull && current.Raw != standard.Raw)
-                APTR.WriteUInt32(cli, DosLayout.CommandLineInterface.CurrentInput, standard.Raw);
-            DOS.DeleteFile(CString.FromPointer(tempName.Raw));
+            if (copyingCaller) RestoreCallerPosition(current, callerPosition);
+            DiscardWorkFile(ref st, tempName);
             DOS.PrintFault((DOS.Error)ioError, "Execute: can't open work file");
             return DOS.RETURN_FAIL;
         }
 
+        if (copyingCaller) DOS.Close(current);
+        if (IsWorkFileName(oldName))
+            DOS.DeleteFile(CString.FromPointer(oldName.Raw));
+        // This replacement reader is owned by Execute's CLI handoff too.
+        // Configure it before the Shell starts consuming the transformed file.
+        _ = DOS.SetVBuf(input, APTR.Null, DosBufferMode.Full, 1024);
         APTR.WriteUInt32(cli, DosLayout.CommandLineInterface.CurrentInput, input.Raw);
         APTR.WriteUInt32(cli, DosLayout.CommandLineInterface.Interactive, 0);
         WriteCommandFile(cli, tempName);
         return DOS.RETURN_OK;
+    }
+
+    private static void RestoreCallerPosition(BPTR input, int position)
+    {
+        if (position >= 0)
+            _ = DOS.Seek(input, position, (int)DosConstants.OffsetBeginning);
+    }
+
+    private static void DiscardWorkFile(ref State st, APTR name)
+    {
+        if (st.Temp.IsNotNull) DOS.Close(st.Temp);
+        st.Temp = BPTR.Null;
+        DOS.DeleteFile(CString.FromPointer(name.Raw));
+    }
+
+    private static bool BufferWorkFile(ref State st, APTR source, uint length, out int ioError)
+    {
+        ioError = 0;
+        var buffer = APTR.FromPointer(st.Work.Raw + WriteOffset);
+        for (var i = 0u; i < length; i++)
+        {
+            if (st.WriteLength == WriteCapacity && !FlushWorkFile(ref st, out ioError)) return false;
+            APTR.WriteUInt8(buffer, (int)st.WriteLength++, APTR.ReadUInt8(source, (int)i));
+        }
+        return true;
+    }
+
+    private static bool FlushWorkFile(ref State st, out int ioError)
+    {
+        ioError = 0;
+        if (st.WriteLength == 0) return true;
+        var written = DOS.Write(st.Temp, APTR.FromPointer(st.Work.Raw + WriteOffset), (int)st.WriteLength);
+        if (written != (int)st.WriteLength)
+        {
+            ioError = (int)DOS.IoErr();
+            if (ioError == 0) ioError = (int)DOS.Error.DiskFull;
+            return false;
+        }
+        st.WriteLength = 0;
+        return true;
     }
 
     // ---- Line processing ---------------------------------------------------

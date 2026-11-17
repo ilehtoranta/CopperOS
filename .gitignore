@@ -12,4 +12,14 @@
 *.hunk
 # Generated C: directory (tools/Commands/build-c.ps1)
 /out/
+# Generated system-library staging output
+/filesystem/SYS/Libs/mathtrans.library
+/filesystem/SYS/C/BootShell
+/filesystem/SYS/C/Demo
+/filesystem/SYS/C/Execute
+/filesystem/SYS/C/List
+/filesystem/SYS/L/Shell-Seg
+/filesystem/SYS/S/Startup-Sequence
+/filesystem/SYS/S/CopperOS-Release.json
+/filesystem/SYS/T/
 artifacts

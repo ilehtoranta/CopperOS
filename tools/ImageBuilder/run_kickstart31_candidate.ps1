@@ -4,7 +4,8 @@ param(
     [Parameter(Mandatory)][string]$KickstartRom,
     [Parameter(Mandatory)][string]$WinUAE,
     [Parameter(Mandatory)][string]$OutputDirectory,
-    [ValidateRange(1, 60)][int]$DurationSeconds = 20
+    [ValidateRange(1, 300)][int]$DurationSeconds = 20,
+    [switch]$PortableLog
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -16,6 +17,13 @@ if (Test-Path -LiteralPath $output) { throw 'Choose a fresh output directory.' }
 New-Item -ItemType Directory -Path $output | Out-Null
 $copy = Join-Path $output 'candidate.hdf'
 Copy-Item -LiteralPath $imagePath -Destination $copy
+$launchExe = $winuaePath
+if ($PortableLog) {
+    $engineDirectory = Join-Path $output 'engine'
+    New-Item -ItemType Directory -Path $engineDirectory | Out-Null
+    $launchExe = Join-Path $engineDirectory 'winuae64.exe'
+    Copy-Item -LiteralPath $winuaePath -Destination $launchExe
+}
 $configuration = Join-Path $output 'candidate.uae'
 $config = @(
     'config_description=CopperOS unqualified Kickstart candidate'
@@ -25,8 +33,15 @@ $config = @(
     'nr_floppies=0', 'sound_output=none'
     "hardfile2=rw,DH0:$copy,32,2,2,512,0,,uae0"
 )
+if ($PortableLog) { $config += @('win32.logfile=true', 'log_illegal_mem=true') }
 [IO.File]::WriteAllLines($configuration, $config, [Text.UTF8Encoding]::new($false))
-$process = Start-Process -FilePath $winuaePath -ArgumentList @('-nobootlog', '-f', ('"' + $configuration + '"')) -PassThru -WindowStyle Hidden
+$arguments = @('-nobootlog', '-f', ('"' + $configuration + '"'))
+if ($PortableLog) { $arguments = @('-portable') + $arguments }
+if ($PortableLog) {
+    $process = Start-Process -FilePath $launchExe -ArgumentList $arguments -WorkingDirectory $engineDirectory -PassThru -WindowStyle Hidden
+} else {
+    $process = Start-Process -FilePath $launchExe -ArgumentList $arguments -PassThru -WindowStyle Hidden
+}
 $exited = $process.WaitForExit($DurationSeconds * 1000)
 if (-not $exited) { $process.Kill(); $process.WaitForExit() }
 $result = @{
@@ -36,7 +51,7 @@ $result = @{
     imageCopySha256 = (Get-FileHash -LiteralPath $copy -Algorithm SHA256).Hash.ToLowerInvariant()
     romSha256 = (Get-FileHash -LiteralPath $romPath -Algorithm SHA256).Hash.ToLowerInvariant()
     winuaeSha256 = (Get-FileHash -LiteralPath $winuaePath -Algorithm SHA256).Hash.ToLowerInvariant()
-    winuaeVersion = (Get-Item -LiteralPath $winuaePath).VersionInfo.FileVersion
+    winuaeVersion = (Get-Item -LiteralPath $winuaePath).VersionInfo.FileVersion; portableLog = [bool]$PortableLog
     configuration = $config; durationSeconds = $DurationSeconds; exitedBeforeTimeout = $exited
     exitCode = $process.ExitCode
 }

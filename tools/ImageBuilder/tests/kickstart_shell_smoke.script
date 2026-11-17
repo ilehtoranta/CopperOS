@@ -1,0 +1,12 @@
+; Run with Execute from a helper volume named DH0: containing the MathTrans
+; probes p and q. Output files are guest-produced evidence, not test inputs.
+echo "quoted two words" >DH0:quote.txt
+echo tail >>DH0:quote.txt
+path add DH0:
+path show >DH0:path.txt
+p
+path reset C:
+cd DH0:
+q
+"demo" >DH0:demo.txt
+echo script-complete >DH0:done.txt

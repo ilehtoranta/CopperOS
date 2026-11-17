@@ -1,6 +1,6 @@
-"""Compose an original CopperOS ADF or FFS HDF development boot proof (never shipping).
+"""Compose an original CopperOS ADF or FFS HDF from its native build manifest.
 
-Only hash-bound native artifacts from build_system_proof.ps1 are
+Only hash-bound native artifacts from build_system_native.ps1 are
 admitted. No loose commands, reference OS files, ROMs or command-release records
 are imported. This does not bypass the separate command distribution preflight.
 """
@@ -17,7 +17,9 @@ def digest(data):
 
 
 def pair_id(manifest_bytes):
-    return 'a500-copperos-cli-boot-proof-dev.1.' + digest(manifest_bytes)[:12]
+    kind = json.loads(manifest_bytes.decode('utf-8-sig'))['kind']
+    prefix = 'a500-copperos-system-dev.1.' if kind == 'copperos-system-native' else 'a500-copperos-cli-boot-proof-dev.1.'
+    return prefix + digest(manifest_bytes)[:12]
 
 
 class Disk:
@@ -141,11 +143,13 @@ class Disk:
 def build(manifest_path, blocks=1760):
     manifest_bytes = manifest_path.read_bytes()
     manifest = json.loads(manifest_bytes.decode('utf-8-sig'))
-    if manifest['kind'] != 'original-system-boot-proof' or manifest['shipping'] is not False:
-        raise ValueError('Only explicit nonshipping proof inputs are accepted')
+    if manifest['kind'] not in ('original-system-boot-proof', 'copperos-system-native') or manifest['shipping'] is not False:
+        raise ValueError('Only explicit nonshipping system/proof native inputs are accepted')
     artifacts = manifest['artifacts']
-    if len({f['name'] for f in artifacts}) != len(artifacts) or {f['name'] for f in artifacts} not in ({'Shell-Seg', 'BootShell', 'Demo', 'mathtrans.library'}, {'Shell-Seg', 'BootShell', 'Demo', 'mathtrans.library', 'Storage'}):
-        raise ValueError('Original Shell/Boot/Demo, staged mathtrans.library and optional native Storage proof artifacts are required')
+    names = {f['name'] for f in artifacts}
+    required = {'Shell-Seg', 'BootShell', 'Demo', 'mathtrans.library'}
+    if len(names) != len(artifacts) or not required <= names or names - required - {'Storage', 'Execute', 'List'}:
+        raise ValueError('Original Shell/Boot/Demo, staged mathtrans.library and optional native Storage/Execute/List proof artifacts are required')
     binaries = {}
     for item in artifacts:
         path = Path(item['path'])
@@ -154,16 +158,39 @@ def build(manifest_path, blocks=1760):
         payload = (manifest_path.parent / path).read_bytes()
         if len(payload) != item['bytes'] or digest(payload) != item['sha256'] or payload[:4] != b'\0\0\x03\xf3':
             raise ValueError('Missing, altered or non-HUNK proof input: ' + item['name'])
+        gate = item.get('stackGate')
+        if gate is not None:
+            raw_path = Path(gate['input'])
+            packager = Path(__file__).with_name('wrap_shell_stack.py')
+            if (item['name'] != 'Shell-Seg' or raw_path.is_absolute() or len(raw_path.parts) != 1 or
+                    '..' in raw_path.parts or gate['packager'] != packager.name):
+                raise ValueError('Invalid Shell stack-gate provenance')
+            raw = (manifest_path.parent / raw_path).read_bytes()
+            if digest(raw) != gate['inputSha256'] or digest(packager.read_bytes()) != gate['packagerSha256']:
+                raise ValueError('Changed Shell stack-gate input or packager')
+            gate_spec = importlib.util.spec_from_file_location('shell_stack_gate', packager)
+            gate_module = importlib.util.module_from_spec(gate_spec)
+            gate_spec.loader.exec_module(gate_module)
+            if gate_module.wrap(raw) != payload:
+                raise ValueError('Shell stack-gate output does not match its input')
         binaries[item['name']] = payload
     disk = Disk(blocks)
     dirs = {name: disk.directory(disk.root, name) for name in ['C', 'L', 'Libs', 'S']}
     disk.file(dirs['C'], 'C/BootShell', binaries['BootShell'])
     disk.file(dirs['C'], 'C/Demo', binaries['Demo'])
+    if 'List' in binaries:
+        disk.file(dirs['C'], 'C/List', binaries['List'])
+    if 'Execute' in binaries:
+        disk.file(dirs['C'], 'C/Execute', binaries['Execute'])
+        temporary = disk.directory(disk.root, 'T')
+        disk.file(temporary, 'T/.keep', b'')
     if 'Storage' in binaries:
         disk.file(dirs['C'], 'C/Storage', binaries['Storage'])
     disk.file(dirs['L'], 'L/Shell-Seg', binaries['Shell-Seg'])
     disk.file(dirs['Libs'], 'Libs/mathtrans.library', binaries['mathtrans.library'])
-    disk.file(dirs['S'], 'S/Startup-Sequence', b'; Original CopperOS development boot proof\nC:BootShell\n')
+    startup = (b'; CopperOS system startup\nC:BootShell\n' if manifest['kind'] == 'copperos-system-native'
+               else b'; Original CopperOS development boot proof\nC:BootShell\n')
+    disk.file(dirs['S'], 'S/Startup-Sequence', startup)
     identity = dict(schemaVersion=1, version=manifest['version'], pairId=pair_id(manifest_bytes),
                     shipping=False, producerManifestSha256=digest(manifest_bytes),
                     nativeArtifacts={f['name']: f['sha256'] for f in artifacts})
@@ -171,7 +198,7 @@ def build(manifest_path, blocks=1760):
     return disk.finish(), disk.files
 
 
-def verify(image, files):
+def verify(image, files, volume='CopperOS'):
     # Preserve the distribution verifier's nonbootable admission boundary.
     # Only a private copy's reserved boot code/checksum is zeroed for its
     # independent filesystem check; the original boot checksum is checked here.
@@ -189,7 +216,7 @@ def verify(image, files):
     normalized[4:8] = bytes(4)
     normalized[12:1024] = bytes(1012)
     records = [dict(installed_path=f['path'], bytes=f['bytes'], sha256=f['sha256'], amiga_protection=f['protection']) for f in files]
-    result = reader._verify(bytes(normalized), records, 'CopperOS')
+    result = reader._verify(bytes(normalized), records, volume)
     return dict(originalBootChecksum='passed', originalImageSha256=digest(image),
                 filesystemCheckOnPrivateBootNormalizedCopy=result,
                 normalization='Only reserved boot checksum [4:8] and boot code [12:1024]; filesystem bytes unmodified',
@@ -216,7 +243,7 @@ if __name__ == '__main__':
     args.receipt.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open('xb') as f:
         f.write(image)
-    receipt = dict(schemaVersion=1, kind='original-system-boot-proof', version=manifest['version'], pairId=pair_id(manifest_bytes),
+    receipt = dict(schemaVersion=1, kind=('copperos-system-image' if manifest['kind'] == 'copperos-system-native' else 'original-system-boot-proof'), version=manifest['version'], pairId=pair_id(manifest_bytes),
                    shipping=False, runtimeQualified=False, bytes=len(image), sha256=digest(image),
                    imageFormat=args.format, filesystem='DOS1', volume='CopperOS', dates='Amiga epoch', files=files,
                    inputManifestSha256=digest(manifest_bytes), verification=verification)
@@ -226,4 +253,4 @@ if __name__ == '__main__':
     with args.receipt.open('x', encoding='utf-8') as f:
         json.dump(receipt, f, indent=2)
         f.write('\n')
-    print(f'Created original nonshipping system proof: {args.output}, SHA-256 {digest(image)}')
+    print(f'Created CopperOS development system image: {args.output}, SHA-256 {digest(image)}')

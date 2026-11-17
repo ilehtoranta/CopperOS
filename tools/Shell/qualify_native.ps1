@@ -52,14 +52,14 @@ if ($IncludeFullExecute) {
     # ExportAddress resolves only symbols admitted by this explicit allowlist.
     # The standalone qualification root wraps the production DOS return owner.
     $exports = @('copperos.shell.execute-begin', 'copperos.shell.execute-poll',
-        'copperos.shell.entry', 'copperos.shell.child',
+        'copperos.shell.entry', 'copperos.shell.child', 'copperos.shell.background', 'copperos.shell.new-process',
         'copperos.shell.execute-park',
         'copperstart.dos.process-return')
 } elseif ($UseShellTaskEntry) {
     $mode = 'shell-task'
     $entryPoint = 'CopperOS.Shell.Dos.DosShellNativeEntrypoints::ShellTaskEntry'
     $exports = @('copperos.shell.execute-begin', 'copperos.shell.execute-poll',
-        'copperos.shell.entry', 'copperos.shell.child',
+        'copperos.shell.entry', 'copperos.shell.child', 'copperos.shell.background', 'copperos.shell.new-process',
         'copperos.shell.execute-park',
         'copperstart.dos.process-return')
 }

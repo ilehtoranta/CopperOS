@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "CopperSharp.Sdk.Amiga": {
+        "type": "Direct",
+        "requested": "[0.1.0-preview.1-g20, )",
+        "resolved": "0.1.0-preview.1-g20",
+        "contentHash": "NwFTaqvgDLvdPHaMiSxGG0c71cQFXP+gs39svyvP6jyZyDUdXNtueSBQ8Bny107CmB51U4fLHr96q7ipj81CbA==",
+        "dependencies": {
+          "CopperSharp.Compiler": "0.1.0-preview.1-g20"
+        }
+      },
+      "CopperSharp.Sdk.Amiga.Support": {
+        "type": "Direct",
+        "requested": "[0.1.0-preview.1-g20, )",
+        "resolved": "0.1.0-preview.1-g20",
+        "contentHash": "ALwFoDNnTO7eopOkrtZdKyvISdTRTA53PbmRn3scDjmI0mIA0KB6SXKDZByMlk2CG3CRFw64ymIzsJChW5n0iQ==",
+        "dependencies": {
+          "CopperSharp.Sdk.Amiga": "0.1.0-preview.1-g20"
+        }
+      },
+      "CopperSharp.Compiler": {
+        "type": "Transitive",
+        "resolved": "0.1.0-preview.1-g20",
+        "contentHash": "QdccgXCuZsGyQcpT570YC+BZst2JQ80U5wKt21ylDPCapSKs1fFfVGAaa3gsbM66KhTiStDpPxCYNbnQJMToQw=="
+      }
+    }
+  }
+}

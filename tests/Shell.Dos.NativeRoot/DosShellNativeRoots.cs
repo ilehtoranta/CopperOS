@@ -45,7 +45,7 @@ public static class DosShellNativeRoots
 			APTR.Null).IsNotNull) return 2;
 		var nativeShell = new DosShellNativePlatform(state);
 		if (nativeShell.TryRunCommand(APTR.Null, BPTR.Null, BPTR.Null, BPTR.Null,
-			BPTR.Null, APTR.Null, APTR.Null, 0, 0, 0, 0, 0, 0, 0)) return 3;
+			0, BPTR.Null, APTR.Null, APTR.Null, 0, 0, 0, 0, 0, 0, 0)) return 3;
 		if (nativeShell.TryCreateShell(APTR.FromPointer(4),
 			ShellLaunchKind.NewShell, BPTR.Null, BPTR.Null, BPTR.Null,
 			BPTR.Null, APTR.Null, APTR.Null, 0, APTR.FromPointer(12), 1))
